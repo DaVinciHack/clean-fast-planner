@@ -1,0 +1,12 @@
+{
+  "foundryUrl": "https://bristow.palantirfoundry.com",
+  "site": {
+    "application": "ri.third-party-applications.main.application.607daad5-8e12-4321-89a4-746c0f6881a7",
+    "directory": "./dist",
+    "autoVersion": {
+      "type": "git-describe",
+      "tagPrefix": ""
+    },
+    "uploadOnly": true
+  }
+}
