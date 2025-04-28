@@ -81,20 +81,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Check for token and set initial auth state
   const initialAuthState = checkForToken();
   
-  // Initialize with a default user name if we're authenticated
-  const getInitialUserName = (): string => {
-    // Always default to Duncan Burbury if authenticated
-    if (initialAuthState) {
-      return "Duncan Burbury";
-    }
-    return null;
-  };
-  
   // Initialize state with proper values
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuthState);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>(getInitialUserName());
+  const [userName, setUserName] = useState<string | null>(initialAuthState ? "Duncan Burbury" : null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Log initial state
@@ -131,30 +122,32 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     (window as any).isFoundryAuthenticated = authState;
     (window as any).foundryUserName = displayName;
     
-    // Update auth UI elements directly
-    try {
-      // Update connection status message
-      const authMessage = document.getElementById('auth-message');
-      if (authMessage) {
-        if (authState) {
-          authMessage.innerHTML = `Connected to Foundry as ${displayName}`;
-          authMessage.className = 'auth-success';
-        } else {
-          authMessage.innerHTML = 'Not connected to Foundry';
-          authMessage.className = 'auth-error';
+    // Update auth UI elements directly - using a timeout to ensure DOM is ready
+    setTimeout(() => {
+      try {
+        // Update connection status message
+        const authMessage = document.getElementById('auth-message');
+        if (authMessage) {
+          if (authState) {
+            authMessage.innerHTML = `Connected to Foundry as ${displayName}`;
+            authMessage.className = 'auth-success';
+          } else {
+            authMessage.innerHTML = 'Not connected to Foundry';
+            authMessage.className = 'auth-error';
+          }
         }
+        
+        // Update login button
+        const loginButton = document.getElementById('login-button');
+        if (loginButton && authState) {
+          loginButton.style.display = 'none';
+        } else if (loginButton) {
+          loginButton.style.display = 'block';
+        }
+      } catch (error) {
+        console.warn("Failed to update DOM elements:", error);
       }
-      
-      // Update login button
-      const loginButton = document.getElementById('login-button');
-      if (loginButton && authState) {
-        loginButton.style.display = 'none';
-      } else if (loginButton) {
-        loginButton.style.display = 'block';
-      }
-    } catch (error) {
-      console.warn("Failed to update DOM elements:", error);
-    }
+    }, 100); // Short delay to ensure DOM is fully loaded
     
     // Store auth state in localStorage so other parts of the app can check it
     try {
@@ -491,27 +484,33 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     console.log("%c=== RUNNING AUTH CHECK ON MOUNT ===", 
       "background: #060; color: white; font-weight: bold; padding: 5px;");
     
-    // Already authenticated from initial check? Just update user details
-    if (isAuthenticated) {
-      console.log("%cAlready authenticated, fetching user details", 
-        "color: #060; font-weight: bold;");
-      
-      // Try to get user details from the admin API
-      debugAdminUser().catch(err => {
-        console.warn("Failed to get user details from admin API:", err);
-      });
-    } else {
-      // Not yet authenticated, run full check
-      checkAuth();
-    }
+    // Run the check with a slight delay to ensure everything is initialized
+    setTimeout(() => {
+      try {
+        // Already authenticated from initial check? Just update user details
+        if (isAuthenticated) {
+          console.log("%cAlready authenticated, fetching user details", 
+            "color: #060; font-weight: bold;");
+          
+          // Try to get user details from the admin API
+          debugAdminUser().catch(err => {
+            console.warn("Failed to get user details from admin API:", err);
+          });
+        } else {
+          // Not yet authenticated, run full check
+          checkAuth();
+        }
+      } catch (error) {
+        console.error("Error in auth check:", error);
+      }
+    }, 200);
     
     // Add an event listener for storage changes (in case another tab authenticates)
     const handleStorageChange = (event) => {
-      if (event.key === 'fastPlanner_isAuthenticated' && event.newValue === 'true') {
+      if (event && event.key === 'fastPlanner_isAuthenticated' && event.newValue === 'true') {
         console.log("%cAuthentication state changed in another tab/window", 
           "background: orange; color: black; font-weight: bold;");
         updateAuthState(true, null, "Duncan Burbury");
-        checkAuth();
       }
     };
     

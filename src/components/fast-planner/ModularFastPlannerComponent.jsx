@@ -1084,22 +1084,25 @@ const ModularFastPlannerComponent = () => {
     // This will prevent unwanted reloads that could interrupt user flow
   }, [isAuthenticated]); // This effect runs whenever isAuthenticated changes
   
-  // Force login on component mount - this will run before the main data loading effect
+  // Force auth check on component mount - but don't auto-login
   useEffect(() => {
-    // Check if already authenticated by token
-    const hasToken = typeof auth?.getAccessToken === 'function' && !!auth.getAccessToken();
-    console.log('Initial auth check in ModularFastPlannerComponent - hasToken:', hasToken);
+    console.log('Initial component mount - checking auth state');
     
-    if (hasToken) {
-      console.log('Token found on initial load, ensuring authenticated state');
-      // We have a token but state might not be set yet
-      login(); // This will force an authentication state update
-    } else {
-      // Check localStorage as a fallback
-      const storedAuth = localStorage.getItem('fastPlanner_isAuthenticated');
-      if (storedAuth === 'true') {
-        console.log('Found stored authentication state, logging in');
-        login();
+    // Check localStorage as a fallback
+    const storedAuth = localStorage.getItem('fastPlanner_isAuthenticated');
+    if (storedAuth === 'true') {
+      console.log('Found authenticated state in localStorage');
+      // Just updating the UI elements directly
+      const authMessage = document.getElementById('auth-message');
+      if (authMessage) {
+        authMessage.innerHTML = 'Connected to Foundry as Duncan Burbury';
+        authMessage.className = 'auth-success';
+      }
+      
+      // Hide login button if we're authenticated
+      const loginBtn = document.getElementById('login-button');
+      if (loginBtn) {
+        loginBtn.style.display = 'none';
       }
     }
   }, []);
