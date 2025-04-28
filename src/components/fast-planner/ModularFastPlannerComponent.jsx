@@ -303,6 +303,23 @@ const ModularFastPlannerComponent = () => {
         console.log(`Region changed to: ${region.name}`);
         setCurrentRegion(region);
         setRegionLoading(true);
+        
+        // Automatically trigger platform loading when region changes
+        // but only during initialization, not during manual region changes
+        if (initialLoadRef.current && isAuthenticated && client && platformManagerRef.current) {
+          console.log(`Automatic platform loading for region change to ${region.name}`);
+          
+          // Let the UI update first
+          setTimeout(() => {
+            platformManagerRef.current.loadPlatformsFromFoundry(client, region.osdkRegion)
+              .then(() => {
+                console.log(`Successfully loaded platforms for ${region.name}`);
+              })
+              .catch(error => {
+                console.error(`Error auto-loading platforms for ${region.name}:`, error);
+              });
+          }, 1000);
+        }
       });
       
       regionManagerRef.current.setCallback('onRegionLoaded', (data) => {
@@ -323,53 +340,17 @@ const ModularFastPlannerComponent = () => {
       // Initialize with a default region
       regionManagerRef.current.initialize('gulf-of-mexico');
     }
-  }, [platformManagerRef]);
+  }, [currentRegion, aircraftType]);
+
+  // Calculate route statistics is now defined at the top of the file
 
   // Define loadStaticRigData and setupMapEventHandlers *before* handleMapReady
-  // Load static rig data (without requiring authentication)
-  const loadStaticRigData = useCallback(() => { 
-    if (!platformManagerRef.current) return;
-    
-    console.log('Loading static platform data');
-    
-    // Define static platforms - Gulf of Mexico platforms
-    const staticPlatforms = [
-      { name: "Mars", coordinates: [-90.966, 28.1677], operator: "Platform Shell" },
-      { name: "Perdido", coordinates: [-94.9025, 26.1347], operator: "Platform Shell" },
-      { name: "Thunder Horse", coordinates: [-88.4957, 28.1912], operator: "Platform BP" },
-      { name: "Olympus", coordinates: [-90.9772, 28.1516], operator: "Platform Shell" },
-      { name: "Appomattox", coordinates: [-91.654, 28.968], operator: "Platform Shell" },
-      { name: "Atlantis", coordinates: [-90.1675, 27.1959], operator: "Platform BP" },
-      { name: "Mad Dog", coordinates: [-90.9122, 27.3389], operator: "Platform BP" },
-      { name: "Auger", coordinates: [-92.4458, 27.5483], operator: "Platform Shell" },
-      { name: "Hoover Diana", coordinates: [-94.6894, 26.9333], operator: "Platform ExxonMobil" },
-      { name: "Genesis", coordinates: [-90.8597, 27.7778], operator: "Platform Chevron" },
-      { name: "Ram Powell", coordinates: [-88.1111, 29.0736], operator: "Platform Shell" },
-      { name: "Ursa", coordinates: [-89.7875, 28.1539], operator: "Platform Shell" },
-      { name: "Holstein", coordinates: [-90.5397, 27.3217], operator: "Platform BHP" },
-      { name: "Brutus", coordinates: [-90.6506, 27.7978], operator: "Platform Shell" },
-      { name: "Amberjack", coordinates: [-90.5703, 28.5983], operator: "Platform Talos Energy" }
-    ];
-    
-    // Apply the same filtering as we use for live data to ensure consistency
-    const filteredPlatforms = staticPlatforms.filter(platform => {
-      if (!platform.operator) return true; // Keep platforms without operator info
-      
-      const locType = platform.operator.toLowerCase();
-      return locType.includes("platform") || 
-             locType.includes("rig") || 
-             locType.includes("vessel") || 
-             locType.includes("ship") || 
-             locType.includes("blocks") || 
-             locType.includes("jackup") || 
-             locType.includes("movable") || 
-             locType.includes("moveable") || 
-             locType.includes("fpso");
-    });
-    
-    console.log(`Adding ${filteredPlatforms.length} filtered static platforms`);
-    platformManagerRef.current.addPlatformsToMap(filteredPlatforms);
-  }, [platformManagerRef]); // Dependency for useCallback
+  // Dummy function for static rig data - empty implementation
+  const loadStaticRigData = useCallback(() => {
+    // Do nothing - no static data
+    console.log('Static data loading disabled');
+    return [];
+  }, []);
   
   // Setup route rubber-band dragging functionality
   const setupRouteDragging = useCallback(() => {
@@ -403,31 +384,63 @@ const ModularFastPlannerComponent = () => {
       }
     };
     
+    // Critical: Ensure the map is available
+    const map = mapManagerRef.current.getMap();
+    if (!map) {
+      console.error('Cannot setup route dragging: Map not initialized');
+      
+      // Schedule a retry attempt after a short delay
+      setTimeout(() => {
+        console.log('Retrying route dragging setup...');
+        if (mapManagerRef.current && mapManagerRef.current.getMap()) {
+          mapManagerRef.current.setupRouteDragging(handleRouteDrag);
+          console.log('✅ Route dragging successfully set up on retry');
+        }
+      }, 1500);
+      return;
+    }
+    
     // Set up dragging in the map manager
     mapManagerRef.current.setupRouteDragging(handleRouteDrag);
+    console.log('✅ Route dragging successfully set up');
     
   }, [mapManagerRef, waypointManagerRef, platformManagerRef]);
   
   // Set up map event handlers
   const setupMapEventHandlers = useCallback((map) => { // Wrap in useCallback
-    if (!map) return;
+    if (!map) {
+      console.error("Cannot setup map event handlers: Map is null");
+      return;
+    }
     
-    console.log('Setting up map event handlers');
+    console.log('📍 Setting up map click event handlers');
+    
+    // CRITICAL: Remove any existing click handler to prevent duplicates
+    map.off('click');
     
     // Map click for adding waypoints
     map.on('click', (e) => {
-      console.log('Map clicked at:', e.lngLat);
+      console.log('🗺️ MAP CLICK DETECTED:', e.lngLat);
       
       // Exit early if waypoint manager isn't initialized
       if (!waypointManagerRef.current) {
-        console.error('Waypoint manager not initialized');
+        console.error('❌ Waypoint manager not initialized');
         return;
       }
       
       // Check if clicking on a platform marker
       try {
-        const platformFeatures = map.queryRenderedFeatures(e.point, { layers: ['platforms-layer'] });
+        // CRITICAL: Check ALL platform-related layers
+        const platformFeatures = map.queryRenderedFeatures(e.point, { 
+          layers: [
+            'platforms-fixed-layer', 
+            'platforms-movable-layer',
+            'airfields-layer'
+          ] 
+        });
+        
         if (platformFeatures && platformFeatures.length > 0) {
+          console.log('✅ Clicked on platform:', platformFeatures[0].properties.name);
           const props = platformFeatures[0].properties;
           const coordinates = platformFeatures[0].geometry.coordinates.slice();
           
@@ -443,6 +456,7 @@ const ModularFastPlannerComponent = () => {
       try {
         const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
         if (routeFeatures && routeFeatures.length > 0) {
+          console.log('✅ Clicked on route line');
           // Find where to insert on the path
           const insertIndex = waypointManagerRef.current.findPathInsertIndex(e.lngLat);
           
@@ -450,6 +464,7 @@ const ModularFastPlannerComponent = () => {
           const nearestRig = platformManagerRef.current?.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
           
           if (nearestRig) {
+            console.log(`Found nearby rig: ${nearestRig.name}`);
             // Add the nearest rig at the insertion point
             waypointManagerRef.current.addWaypointAtIndex([nearestRig.lng, nearestRig.lat], nearestRig.name, insertIndex);
           } else {
@@ -462,24 +477,53 @@ const ModularFastPlannerComponent = () => {
       }
       
       // Regular map click - Check for nearest rig first
-      const nearestRig = platformManagerRef.current?.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
-      
-      if (nearestRig) {
-        console.log(`Found nearby rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
-        waypointManagerRef.current.addWaypoint([nearestRig.lng, nearestRig.lat], nearestRig.name);
-      } else {
+      try {
+        console.log('⭐ Processing regular map click');
+        const nearestRig = platformManagerRef.current?.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
+        
+        if (nearestRig) {
+          console.log(`Found nearby rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
+          waypointManagerRef.current.addWaypoint([nearestRig.lng, nearestRig.lat], nearestRig.name);
+        } else {
+          // Create a basic waypoint at clicked location
+          console.log('Creating generic waypoint at clicked location');
+          waypointManagerRef.current.addWaypoint([e.lngLat.lng, e.lngLat.lat]);
+        }
+      } catch (err) {
+        // Fallback to direct waypoint placement if anything fails
+        console.error('Error in regular map click handling:', err);
         waypointManagerRef.current.addWaypoint([e.lngLat.lng, e.lngLat.lat]);
       }
     });
     
     // Change cursor on hover over platforms
-    map.on('mouseenter', 'platforms-layer', () => {
+    map.on('mouseenter', 'platforms-fixed-layer', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
     
-    map.on('mouseleave', 'platforms-layer', () => {
+    map.on('mouseleave', 'platforms-fixed-layer', () => {
       map.getCanvas().style.cursor = '';
     });
+
+    map.on('mouseenter', 'platforms-movable-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    
+    map.on('mouseleave', 'platforms-movable-layer', () => {
+      map.getCanvas().style.cursor = '';
+    });
+    
+    // CRITICAL: Add route hover effect for rubber-band functionality
+    map.on('mouseenter', 'route', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    
+    map.on('mouseleave', 'route', () => {
+      map.getCanvas().style.cursor = '';
+    });
+    
+    // Confirm handlers are set up with a diagnostic log
+    console.log('✅ All map click and hover handlers are now active');
   }, [waypointManagerRef, platformManagerRef]); // Dependencies for useCallback
 
   // Handle map instance creation (called before map is fully loaded)
@@ -495,7 +539,7 @@ const ModularFastPlannerComponent = () => {
     // Initialize managers that only need the mapManagerRef immediately
     // Create waypoint manager if it doesn't exist
     if (!waypointManagerRef.current) {
-        waypointManagerRef.current = new WaypointManager(mapManagerRef.current);
+      waypointManagerRef.current = new WaypointManager(mapManagerRef.current);
       
       // Set up waypoint manager callbacks
       waypointManagerRef.current.setCallback('onChange', (waypoints) => {
@@ -512,12 +556,12 @@ const ModularFastPlannerComponent = () => {
       waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
         // Calculate route stats whenever the route changes
         calculateRouteStats(routeData.coordinates);
-        });
+      });
     }
       
     // Create platform manager if it doesn't exist
     if (!platformManagerRef.current) {
-        platformManagerRef.current = new PlatformManager(mapManagerRef.current);
+      platformManagerRef.current = new PlatformManager(mapManagerRef.current);
       
       // Set up platform manager callbacks
       platformManagerRef.current.setCallback('onPlatformsLoaded', (platforms) => {
@@ -534,36 +578,95 @@ const ModularFastPlannerComponent = () => {
       platformManagerRef.current.setCallback('onError', (error) => {
         setRigsError(error);
         console.error('Platform loading error:', error);
-        });
+      });
     }
 
-    // Use the MapManager's robust onMapLoaded to schedule load-dependent actions
-    mapManagerRef.current.onMapLoaded(() => {
-      console.log("Executing actions via onMapLoaded callback in handleMapReady.");
-      const currentMap = mapManagerRef.current.getMap(); // Get potentially updated map ref
-      if (!currentMap) {
-        console.error("Map instance unavailable when onMapLoaded callback executed.");
+    // CRITICAL FIX: Add global event listener for map handlers reinitialization
+    // This will be triggered by the MapComponent or the Fix button if needed
+    const handleReinitializeEvent = () => {
+      // Check if handlers have already been initialized
+      if (window.mapHandlersInitialized) {
+        console.log("⚠️ Map handlers already initialized - SKIPPING to prevent duplicates");
         return;
       }
-      // Initialize map event handlers now that map is loaded
+      
+      console.log("🔄 CAUGHT EVENT: Initializing map handlers");
+      
+      // Get fresh map reference
+      const currentMap = mapManagerRef.current?.getMap();
+      if (!currentMap) {
+        console.error("Cannot initialize handlers: Map instance not available");
+        return;
+      }
+      
+      // First remove any existing handlers to avoid duplicates
+      currentMap.off('click');
+      
+      // Then set up the event handlers fresh
+      console.log("Applying click handlers...");
       setupMapEventHandlers(currentMap);
       
-      // Make sure the platform manager is set in the region manager
-      if (regionManagerRef.current && platformManagerRef.current) {
-        regionManagerRef.current.platformManager = platformManagerRef.current;
-      }
-      
-      // Initialize route rubberband dragging
+      // Set up route dragging
+      console.log("Setting up route dragging...");
       setupRouteDragging();
       
-      // Load static rig data if no platforms are loaded yet
-      if (platformManagerRef.current && !platformsLoaded) {
-        console.log("Loading static rig data after map initialization");
-        loadStaticRigData();
-      }
-    });
+      console.log("✅ Map handlers successfully initialized from event");
+      
+      // Mark as initialized
+      window.mapHandlersInitialized = true;
+    };
+    
+    // Add the event listener
+    window.addEventListener('reinitialize-map-handlers', handleReinitializeEvent);
+    
+    // Return cleanup function
+    return () => {
+      window.removeEventListener('reinitialize-map-handlers', handleReinitializeEvent);
+    };
+  }, [mapManagerRef, waypointManagerRef, platformManagerRef, setupMapEventHandlers, setupRouteDragging]);
 
-  }, [mapManagerRef, waypointManagerRef, platformManagerRef, setupMapEventHandlers, loadStaticRigData, setupRouteDragging]); // Keep dependencies
+  // Use the MapManager's robust onMapLoaded to schedule load-dependent actions
+  useEffect(() => {
+    if (mapManagerRef.current) {
+      mapManagerRef.current.onMapLoaded(() => {
+        console.log("Executing actions via onMapLoaded callback in handleMapReady.");
+        const currentMap = mapManagerRef.current.getMap(); // Get potentially updated map ref
+        if (!currentMap) {
+          console.error("Map instance unavailable when onMapLoaded callback executed.");
+          return;
+        }
+        
+        console.log("========== SETTING UP MAP CLICK HANDLERS ===========");
+        
+        // Make sure the platform manager is set in the region manager
+        if (regionManagerRef.current && platformManagerRef.current) {
+          regionManagerRef.current.platformManager = platformManagerRef.current;
+        }
+        
+        // Don't load static rig data at all
+        console.log("Static rig data loading disabled");
+        
+        // SIMPLIFIED FIX: One initialization, no timeouts for now
+        // Multiple initializations are causing duplicate handlers
+        
+        // First remove any existing handlers to avoid duplicates
+        currentMap.off('click');
+            
+        // Then set up the event handlers fresh
+        console.log("🔄 INITIALIZING CLICK HANDLERS (once only)");
+        setupMapEventHandlers(currentMap);
+        
+        // Initialize route rubberband dragging
+        setupRouteDragging();
+            
+        // Diagnostic log
+        console.log("✅ Map click handlers successfully initialized");
+        
+        // Set a global flag to indicate handlers have been set up
+        window.mapHandlersInitialized = true;
+      });
+    }
+  }, [mapManagerRef, regionManagerRef, platformManagerRef, setupMapEventHandlers, setupRouteDragging]);
 
   // Calculate route statistics 
   const calculateRouteStats = (coordinates) => {
@@ -606,187 +709,255 @@ const ModularFastPlannerComponent = () => {
   
   // Load aircraft data from OSDK
   const loadAircraftData = async (region = null) => {
-    if (!aircraftManagerRef.current || !client) {
-      console.error('Cannot load aircraft: AircraftManager or client not initialized');
-      return;
-    }
-    
-    setAircraftLoading(true);
-    
-    // Set a global flag that data loading has been attempted
-    // This helps the auth system know we're authenticated if data loads
-    window.aircraftLoadAttempted = true;
-    
-    // Create debug overlay
-    const showDebugMessage = (message, success = true) => {
-      let debugOverlay = document.getElementById('aircraft-debug-overlay');
-      if (!debugOverlay) {
-        debugOverlay = document.createElement('div');
-        debugOverlay.id = 'aircraft-debug-overlay';
-        debugOverlay.style.position = 'fixed';
-        debugOverlay.style.top = '50px';
-        debugOverlay.style.left = '10px';
-        debugOverlay.style.backgroundColor = success ? 'rgba(0,100,0,0.8)' : 'rgba(100,0,0,0.8)';
-        debugOverlay.style.color = 'white';
-        debugOverlay.style.padding = '15px';
-        debugOverlay.style.borderRadius = '5px';
-        debugOverlay.style.zIndex = '10000';
-        debugOverlay.style.fontSize = '14px';
-        debugOverlay.style.fontFamily = 'monospace';
-        debugOverlay.style.maxWidth = '80%';
-        debugOverlay.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-        document.body.appendChild(debugOverlay);
+    // Return a promise so we can chain with .then() and .catch()
+    return new Promise(async (resolve, reject) => {
+      if (!aircraftManagerRef.current || !client) {
+        console.error('Cannot load aircraft: AircraftManager or client not initialized');
+        reject(new Error('AircraftManager or client not initialized'));
+        return;
       }
       
-      debugOverlay.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 10px;">${message}</div>
-        <div style="font-size: 12px;">This message will disappear in 5 seconds</div>
-      `;
+      setAircraftLoading(true);
       
-      setTimeout(() => {
-        if (debugOverlay && debugOverlay.parentNode) {
-          debugOverlay.parentNode.removeChild(debugOverlay);
-        }
-      }, 5000);
-    };
-    
-    try {
-      // Define debug messages with styling for better visibility
-      console.log(`%c===== LOADING AIRCRAFT DATA ${region ? `FOR REGION: ${region.name}` : ''} =====`, 
-        'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
+      // Set a global flag that data loading has been attempted
+      // This helps the auth system know we're authenticated if data loads
+      window.aircraftLoadAttempted = true;
       
-      const regionInfo = region ? `${region.name} (${region.id})` : 'All Regions';
-      showDebugMessage(`Loading aircraft data for ${regionInfo}...`);
-      
-      // Show loading message
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.textContent = `Loading aircraft data for ${regionInfo}...`;
-        loadingOverlay.style.display = 'block';
-      }
-      
-      // First verify the AircraftManager is properly initialized
-      if (!aircraftManagerRef.current) {
-        console.error('AircraftManager is not initialized!');
-        throw new Error('AircraftManager is not initialized');
-      }
-      
-      // Log current region and aircraft type
-      console.log('Current state before loading:');
-      console.log('- Current Region:', currentRegion ? `${currentRegion.name} (${currentRegion.id})` : 'None');
-      console.log('- Current Aircraft Type:', aircraftType);
-      console.log('- Existing aircraft count:', aircraftManagerRef.current.aircraftList.length);
-      
-      // Load aircraft data - if region is provided, use it for initial filtering
-      const regionId = region ? region.id : null;
-      await aircraftManagerRef.current.loadAircraftFromOSDK(client, regionId);
-      
-      // Get count after loading
-      const loadedCount = aircraftManagerRef.current.aircraftList.length;
-      console.log(`Loaded ${loadedCount} aircraft from OSDK`);
-      
-      // Set a global flag that aircraft data has been successfully loaded
-      // This helps the auth system know we're authenticated
-      window.aircraftLoaded = true;
-      
-      // CRITICAL FIX: Always do a region-only filter first to discover all available types
-      if (currentRegion) {
-        console.log(`%cDoing region-only filter for: ${currentRegion.id}`, 
-          'background: #070; color: #fff; font-size: 14px;');
-        
-        const filteredAircraft = aircraftManagerRef.current.filterAircraft(currentRegion.id, null);
-        showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${currentRegion.name}`);
-      } else if (region) {
-        console.log(`%cDoing region-only filter for: ${region.id}`, 
-          'background: #070; color: #fff; font-size: 14px;');
-        
-        const filteredAircraft = aircraftManagerRef.current.filterAircraft(region.id, null);
-        showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${region.name}`);
-      } else {
-        // If no filtering criteria, show raw counts by region and type
-        console.log('%cNo filtering criteria provided, showing raw counts:', 'color: #f90; font-weight: bold;');
-        const regionCounts = {};
-        const typeCounts = {};
-        
-        aircraftManagerRef.current.aircraftList.forEach(aircraft => {
-          // Count by region
-          const region = aircraft.region || 'Unknown';
-          regionCounts[region] = (regionCounts[region] || 0) + 1;
-          
-          // Count by type
-          const type = aircraft.modelType || 'Unknown';
-          typeCounts[type] = (typeCounts[type] || 0) + 1;
-        });
-        
-        console.log('Aircraft counts by region:', regionCounts);
-        console.log('Aircraft counts by type:', typeCounts);
-      }
-      
-      console.log(`%c===== AIRCRAFT DATA LOADED AND FILTERED =====`, 
-        'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
-      
-      // Hide loading overlay
-      if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
-      }
-    } catch (error) {
-      console.error('Error loading aircraft data:', error);
-      
-      // Show error message
-      showDebugMessage(`Error loading aircraft data: ${error.message}`, false);
-      
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.textContent = `Error loading aircraft data: ${error.message}`;
-        loadingOverlay.style.display = 'block';
-        
-        // Hide after a delay
-        setTimeout(() => {
+      // Set a safety timeout to ensure loading state doesn't get stuck
+      const safetyTimeout = setTimeout(() => {
+        console.log("Aircraft loading safety timeout triggered");
+        setAircraftLoading(false);
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
           loadingOverlay.style.display = 'none';
-        }, 3000);
+        }
+        // Don't reject here - let the UI recover even if we don't get data
+      }, 15000); // 15 second timeout
+      
+      // Create debug overlay
+      const showDebugMessage = (message, success = true) => {
+        let debugOverlay = document.getElementById('aircraft-debug-overlay');
+        if (!debugOverlay) {
+          debugOverlay = document.createElement('div');
+          debugOverlay.id = 'aircraft-debug-overlay';
+          debugOverlay.style.position = 'fixed';
+          debugOverlay.style.top = '50px';
+          debugOverlay.style.left = '10px';
+          debugOverlay.style.backgroundColor = success ? 'rgba(0,100,0,0.8)' : 'rgba(100,0,0,0.8)';
+          debugOverlay.style.color = 'white';
+          debugOverlay.style.padding = '15px';
+          debugOverlay.style.borderRadius = '5px';
+          debugOverlay.style.zIndex = '10000';
+          debugOverlay.style.fontSize = '14px';
+          debugOverlay.style.fontFamily = 'monospace';
+          debugOverlay.style.maxWidth = '80%';
+          debugOverlay.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+          document.body.appendChild(debugOverlay);
+        }
+        
+        debugOverlay.innerHTML = `
+          <div style="font-weight: bold; margin-bottom: 10px;">${message}</div>
+          <div style="font-size: 12px;">This message will disappear in 5 seconds</div>
+        `;
+        
+        setTimeout(() => {
+          if (debugOverlay && debugOverlay.parentNode) {
+            debugOverlay.parentNode.removeChild(debugOverlay);
+          }
+        }, 5000);
+      };
+      
+      try {
+        // Define debug messages with styling for better visibility
+        console.log(`%c===== LOADING AIRCRAFT DATA ${region ? `FOR REGION: ${region.name}` : ''} =====`, 
+          'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
+        
+        const regionInfo = region ? `${region.name} (${region.id})` : 'All Regions';
+        showDebugMessage(`Loading aircraft data for ${regionInfo}...`);
+        
+        // Show loading message
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+          loadingOverlay.textContent = `Loading aircraft data for ${regionInfo}...`;
+          loadingOverlay.style.display = 'block';
+        }
+        
+        // First verify the AircraftManager is properly initialized
+        if (!aircraftManagerRef.current) {
+          console.error('AircraftManager is not initialized!');
+          throw new Error('AircraftManager is not initialized');
+        }
+        
+        // Log current region and aircraft type
+        console.log('Current state before loading:');
+        console.log('- Current Region:', currentRegion ? `${currentRegion.name} (${currentRegion.id})` : 'None');
+        console.log('- Current Aircraft Type:', aircraftType);
+        console.log('- Existing aircraft count:', aircraftManagerRef.current.aircraftList.length);
+        
+        // Load aircraft data - if region is provided, use it for initial filtering
+        const regionId = region ? region.id : null;
+        
+        // Set a specific timeout for OSDK loading
+        const osdkTimeout = setTimeout(() => {
+          console.log("OSDK aircraft loading timeout reached");
+          // We'll create empty mock aircraft data as a fallback
+          if (aircraftManagerRef.current) {
+            console.log("Falling back to empty aircraft list");
+            aircraftManagerRef.current.aircraftList = []; // Reset to empty
+            
+            // Hide loading indicators
+            if (loadingOverlay) {
+              loadingOverlay.style.display = 'none';
+            }
+            setAircraftLoading(false);
+            
+            // Show a message about the timeout
+            showDebugMessage(`OSDK aircraft loading timeout - no aircraft available`, false);
+            
+            // Resolve with empty list rather than rejecting
+            resolve([]);
+            clearTimeout(safetyTimeout);
+          }
+        }, 10000); // 10 second timeout for OSDK loading
+        
+        try {
+          await aircraftManagerRef.current.loadAircraftFromOSDK(client, regionId);
+          clearTimeout(osdkTimeout);
+          
+          // Get count after loading
+          const loadedCount = aircraftManagerRef.current.aircraftList.length;
+          console.log(`Loaded ${loadedCount} aircraft from OSDK`);
+          
+          // Set a global flag that aircraft data has been successfully loaded
+          // This helps the auth system know we're authenticated
+          window.aircraftLoaded = true;
+          
+          // CRITICAL FIX: Always do a region-only filter first to discover all available types
+          if (currentRegion) {
+            console.log(`%cDoing region-only filter for: ${currentRegion.id}`, 
+              'background: #070; color: #fff; font-size: 14px;');
+            
+            const filteredAircraft = aircraftManagerRef.current.filterAircraft(currentRegion.id, null);
+            showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${currentRegion.name}`);
+          } else if (region) {
+            console.log(`%cDoing region-only filter for: ${region.id}`, 
+              'background: #070; color: #fff; font-size: 14px;');
+            
+            const filteredAircraft = aircraftManagerRef.current.filterAircraft(region.id, null);
+            showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${region.name}`);
+          } else {
+            // If no filtering criteria, show raw counts by region and type
+            console.log('%cNo filtering criteria provided, showing raw counts:', 'color: #f90; font-weight: bold;');
+            const regionCounts = {};
+            const typeCounts = {};
+            
+            aircraftManagerRef.current.aircraftList.forEach(aircraft => {
+              // Count by region
+              const region = aircraft.region || 'Unknown';
+              regionCounts[region] = (regionCounts[region] || 0) + 1;
+              
+              // Count by type
+              const type = aircraft.modelType || 'Unknown';
+              typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            
+            console.log('Aircraft counts by region:', regionCounts);
+            console.log('Aircraft counts by type:', typeCounts);
+          }
+          
+          console.log(`%c===== AIRCRAFT DATA LOADED AND FILTERED =====`, 
+            'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
+        } catch (error) {
+          clearTimeout(osdkTimeout);
+          console.error('Error during OSDK aircraft loading:', error);
+          showDebugMessage(`OSDK error: ${error.message}`, false);
+          
+          // We'll continue with an empty aircraft list rather than failing completely
+          if (aircraftManagerRef.current) {
+            aircraftManagerRef.current.aircraftList = []; // Reset to empty
+          }
+        }
+        
+        // Nothing to hide
+        
+        // Clear the main safety timeout as we've completed successfully
+        clearTimeout(safetyTimeout);
+        
+        // Resolve the promise with the aircraft list (even if empty)
+        resolve(aircraftManagerRef.current?.aircraftList || []);
+      } catch (error) {
+        console.error('Error in aircraft loading process:', error);
+        
+        // Show error message
+        showDebugMessage(`Error loading aircraft data: ${error.message}`, false);
+        
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+          loadingOverlay.textContent = `Error loading aircraft data: ${error.message}`;
+          loadingOverlay.style.display = 'block';
+          
+          // Hide after a delay
+          setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+          }, 3000);
+        }
+        
+        // Clear the safety timeout since we're handling the error
+        clearTimeout(safetyTimeout);
+        
+        // Reject the promise
+        reject(error);
+      } finally {
+        setAircraftLoading(false);
       }
-    } finally {
-      setAircraftLoading(false);
-    }
+    });
   };
   
   // Load rig data from Foundry
   const loadRigData = async () => {
-    if (!platformManagerRef.current) return;
-    
-    // Set a global flag that data loading has been attempted
-    window.platformLoadAttempted = true;
-    
-    // Show loading overlay
-    const loadingOverlay = document.getElementById('loading-overlay');
-    if (loadingOverlay) {
-      loadingOverlay.textContent = 'Loading rig data...';
-      loadingOverlay.style.display = 'block';
-    }
-    
-    // Set loading state
-    setRigsLoading(true);
-    setRigsError(null);
-    
-    try {
-      await platformManagerRef.current.loadPlatformsFromFoundry(client);
-      
-      // Set a global flag that platform data has been successfully loaded
-      window.platformsLoaded = true;
-    } catch (error) {
-      console.error('Error loading platforms:', error);
-      setRigsError(error.message);
-      
-      // Fall back to static data
-      loadStaticRigData();
-    } finally {
-      // Hide loading overlay
-      if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
+    // Return a promise so we can chain with .then() and .catch()
+    return new Promise(async (resolve, reject) => {
+      if (!platformManagerRef.current) {
+        reject(new Error('Platform manager not initialized'));
+        return;
       }
       
-      setRigsLoading(false);
-    }
+      // Set a global flag that data loading has been attempted
+      window.platformLoadAttempted = true;
+      
+      // Don't show any loading overlays - just log to console
+      console.log('Loading rig data...');
+      
+      // Set loading state
+      setRigsLoading(true);
+      setRigsError(null);
+      
+      try {
+        const platforms = await platformManagerRef.current.loadPlatformsFromFoundry(client);
+        
+        // Set a global flag that platform data has been successfully loaded
+        window.platformsLoaded = true;
+        
+        // Nothing to hide
+        
+        setRigsLoading(false);
+        resolve(platforms);
+      } catch (error) {
+        console.error('Error loading platforms:', error);
+        setRigsError(error.message);
+        
+        // Don't fall back to static data
+        console.log("Error loading platforms, not falling back to static data");
+        
+        // Hide loading overlay
+        if (loadingOverlay) {
+          loadingOverlay.style.display = 'none';
+        }
+        
+        setRigsLoading(false);
+        reject(error);
+      }
+    });
   };
   
   // Toggle platforms visibility
@@ -1076,13 +1247,129 @@ const ModularFastPlannerComponent = () => {
     }
   };
   
-  // Track authentication changes
+  // Create refs outside of effects for tracking state
+  const dataLoadedRef = useRef(false);
+  const initialLoadRef = useRef(false);
+  const rigsAutoloadedRef = useRef(false); // Track if rigs have been auto-loaded
+  
+  // Use useCallback to memoize functions used in effects to prevent stale closures
+  const memoizedLoadRigData = useCallback(loadRigData, [client, platformManagerRef.current]);
+  const memoizedLoadAircraftData = useCallback(loadAircraftData, [client, aircraftManagerRef.current, currentRegion]);
+  const memoizedFetchAirportData = useCallback(fetchAirportData, []);
+  const memoizedInitializeFavoritesManager = useCallback(initializeFavoritesManager, []);
+  const memoizedGetFromLocalStorage = useCallback(getFromLocalStorage, []);
+  
+  // REMOVED: User interaction listener was causing duplicate handlers
+
+  // Track authentication changes and load data automatically when authenticated
   useEffect(() => {
     console.log(`Authentication state changed to: ${isAuthenticated ? 'Authenticated' : 'Not authenticated'}`);
     
-    // Only log the change but don't automatically trigger data loading
-    // This will prevent unwanted reloads that could interrupt user flow
-  }, [isAuthenticated]); // This effect runs whenever isAuthenticated changes
+    // Only load data if we're authenticated AND haven't loaded data yet
+    if (isAuthenticated && client && (!dataLoadedRef.current || !rigsAutoloadedRef.current)) {
+      console.log('Authentication detected - automatically loading data');
+      dataLoadedRef.current = true; // Mark that we've loaded data
+      
+      // Show loading message
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.textContent = 'Loading platform data...';
+        loadingOverlay.style.display = 'block';
+      }
+      
+      // Try to load user preferences from localStorage
+      const savedAircraftType = getFromLocalStorage('lastAircraftType', 'S92');
+      console.log(`Using saved aircraft type preference: ${savedAircraftType}`);
+      
+      // Set the aircraft type from storage
+      if (savedAircraftType) {
+        setAircraftType(savedAircraftType);
+      }
+      
+      // PLATFORM LOADING ONLY - NO AIRCRAFT LOADING FOR DEBUGGING
+      console.log("======= TESTING MODE: AIRCRAFT LOADING DISABLED =======");
+      
+      // If we have a current region, ensure we load region-specific rigs
+      if (currentRegion && platformManagerRef.current) {
+        console.log(`Loading rigs for current region: ${currentRegion.name}`);
+        platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
+          .then(platforms => {
+            console.log(`Loaded ${platforms.length} platforms for ${currentRegion.name}`);
+            rigsAutoloadedRef.current = true;
+            setPlatformsLoaded(true);
+            setPlatformsVisible(true);
+            
+            // Force visibility in the manager if method exists
+            if (platformManagerRef.current.setVisibility) {
+              platformManagerRef.current.setVisibility(true);
+            }
+            
+            // DO NOT LOAD AIRCRAFT - FOR DEBUGGING
+            console.log("Skipping aircraft loading to debug platform visibility");
+          })
+          .catch(error => {
+            console.error('Error loading region-specific platforms:', error);
+            // Don't load static data as fallback
+            console.log("Not falling back to static data");
+          })
+          .finally(() => {
+            // Hide loading overlay
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (loadingOverlay) {
+              loadingOverlay.style.display = 'none';
+            }
+          });
+      } else {
+        // No current region, load general data for default region
+        console.log("No current region, loading data for default region (Gulf of Mexico)");
+        
+        // First set the default region
+        if (regionManagerRef.current) {
+          const defaultRegion = regionManagerRef.current.setRegion('gulf-of-mexico');
+          
+          if (defaultRegion) {
+            console.log(`Set default region to ${defaultRegion.name}`);
+            
+            // Don't load static data, just load from Foundry
+            platformManagerRef.current.loadPlatformsFromFoundry(client, defaultRegion.osdkRegion)
+              .then(platforms => {
+                console.log(`Loaded ${platforms.length} platforms for ${defaultRegion.name}`);
+                rigsAutoloadedRef.current = true;
+                setPlatformsLoaded(true);
+                setPlatformsVisible(true);
+                
+                // Force visibility in the manager if method exists
+                if (platformManagerRef.current.setVisibility) {
+                  platformManagerRef.current.setVisibility(true);
+                }
+              })
+              .catch(error => {
+                console.error('Error loading platforms from Foundry:', error);
+                // Static data already loaded as fallback
+              })
+              .finally(() => {
+                // Hide loading overlay
+                if (loadingOverlay) {
+                  loadingOverlay.style.display = 'none';
+                }
+              });
+          } else {
+            console.error("Failed to set default region");
+            // Hide loading overlay
+            if (loadingOverlay) {
+              loadingOverlay.style.display = 'none';
+            }
+          }
+        } else {
+          console.error("Region manager not available");
+          // Hide loading overlay
+          if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+          }
+        }
+      }
+    }
+  }, [isAuthenticated, client, currentRegion]); // Removed aircraft loading dependencies
   
   // Force auth check on component mount - but don't auto-login
   useEffect(() => {
@@ -1107,51 +1394,153 @@ const ModularFastPlannerComponent = () => {
     }
   }, []);
   
-  // Load data when component mounts
+  // Load data when component mounts - simplified approach
   useEffect(() => {
-    fetchAirportData();
+    // Only run once
+    if (initialLoadRef.current) return;
+    initialLoadRef.current = true;
     
-    // Initialize FavoriteLocationsManager if it doesn't exist yet
-    initializeFavoritesManager();
+    console.log("Starting simplified initial load sequence");
     
-    // Try to load user preferences from localStorage
-    const savedRegionId = getFromLocalStorage('lastRegionId', 'gulf-of-mexico');
+    // Set a very simple loading message
+    const showMessage = (message) => {
+      console.log(message);
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.textContent = message;
+        loadingOverlay.style.display = 'block';
+      }
+    };
+    
+    const hideMessage = () => {
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.style.display = 'none';
+      }
+    };
+    
+    // Load airport data
+    memoizedFetchAirportData();
+    
+    // Initialize FavoriteLocationsManager
+    memoizedInitializeFavoritesManager();
+    
+    // Always start with Gulf of Mexico
+    const defaultRegion = 'gulf-of-mexico';
+    
+    // Load the saved aircraft type
     const savedAircraftType = getFromLocalStorage('lastAircraftType', 'S92');
+    console.log(`Using aircraft type: ${savedAircraftType}`);
+    setAircraftType(savedAircraftType);
     
-    console.log(`Loading saved preferences - Region: ${savedRegionId}, Aircraft: ${savedAircraftType}`);
-    
-    // Set the aircraft type from storage
-    if (savedAircraftType) {
-      setAircraftType(savedAircraftType);
-    }
-    
-    // If we have a region manager, set the region from storage
-    if (regionManagerRef.current && savedRegionId) {
-      // This will trigger the region change handler which will load aircraft
-      const regionExists = regionManagerRef.current.getRegions().some(r => r.id === savedRegionId);
-      
-      if (regionExists) {
-        console.log(`Setting initial region to saved value: ${savedRegionId}`);
-        regionManagerRef.current.setRegion(savedRegionId);
-      } else {
-        console.log(`Saved region ${savedRegionId} not found in available regions`);
-      }
-    } else {
-      // No region manager or saved region, so load aircraft data directly
-      if (isAuthenticated && aircraftManagerRef.current && client) {
-        console.log("Initial load of aircraft data...");
+    // Simple sequential loading with delays and basic error handling
+    const simpleLoadSequence = async () => {
+      try {
+        // Step 1: Set the region (always Gulf of Mexico first)
+        showMessage("Setting up Gulf of Mexico region...");
+        console.log("Setting region to Gulf of Mexico");
         
-        // If we already have a current region set, use it
-        if (currentRegion) {
-          console.log(`Loading aircraft data for initial region: ${currentRegion.name}`);
-          loadAircraftData(currentRegion);
-        } else {
-          // Otherwise just load all aircraft and we'll filter when region is set
-          console.log(`Loading all aircraft data without region filter`);
-          loadAircraftData();
+        if (!regionManagerRef.current) {
+          console.error("Region manager not available");
+          hideMessage();
+          return;
         }
+        
+        const region = regionManagerRef.current.setRegion(defaultRegion);
+        if (!region) {
+          console.error("Failed to set region to Gulf of Mexico");
+          hideMessage();
+          return;
+        }
+        
+        // Wait to ensure region is set
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Skip static data loading - wait for the real data
+        console.log("Skipping static data, waiting for real data");
+        setPlatformsVisible(true);
+        
+        // Short delay before continuing
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Step 3: If authenticated, load platforms from Foundry
+        if (isAuthenticated && client && platformManagerRef.current) {
+          showMessage("Loading platforms from Foundry...");
+          console.log("Loading platforms from Foundry for Gulf of Mexico");
+          
+          try {
+            // Log the platform manager state before loading
+            console.log("Initial load - platform manager before loading:", 
+              platformManagerRef.current ? "Exists" : "Missing");
+            console.log("Initial load - platform count before loading:", 
+              platformManagerRef.current && platformManagerRef.current.getPlatformCount ? 
+              platformManagerRef.current.getPlatformCount() : "Not available");
+            
+            const platforms = await platformManagerRef.current.loadPlatformsFromFoundry(client, region.osdkRegion);
+            console.log(`Loaded ${platforms.length} platforms from Foundry`);
+            
+            // Force visibility states
+            setPlatformsLoaded(true);
+            setPlatformsVisible(true);
+            
+            // If the platform manager has a setVisibility method, ensure it's visible
+            if (platformManagerRef.current && platformManagerRef.current.setVisibility) {
+              platformManagerRef.current.setVisibility(true);
+              console.log("Initial load - forced platform visibility using manager's setVisibility method");
+            }
+            
+            // Log what's actually in the platform manager now
+            console.log("Initial load - platform manager after loading:", 
+              platformManagerRef.current ? "Exists" : "Missing");
+            console.log("Initial load - platform count after loading:", 
+              platformManagerRef.current && platformManagerRef.current.getPlatformCount ? 
+              platformManagerRef.current.getPlatformCount() : "Not available");
+            
+            // Wait longer to ensure platforms are rendered
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // TEMPORARILY DISABLE AIRCRAFT LOADING
+            showMessage("Platforms loaded - aircraft loading disabled for testing");
+            console.log("Initial load - aircraft loading has been temporarily disabled for debugging");
+            
+            /* TEMPORARILY COMMENTED OUT
+            // Step 4: Load aircraft data
+            showMessage("Loading aircraft data...");
+            console.log("Loading aircraft data for Gulf of Mexico");
+            
+            if (aircraftManagerRef.current) {
+              try {
+                const aircraft = await loadAircraftData(region);
+                console.log(`Loaded ${aircraft.length} aircraft`);
+                
+                // Wait to ensure aircraft data is processed
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              } catch (aircraftError) {
+                console.error("Error loading aircraft:", aircraftError);
+              }
+            }
+            */
+          } catch (platformError) {
+            console.error("Error loading platforms from Foundry:", platformError);
+          }
+        }
+        
+        // Final cleanup
+        setRegionLoading(false);
+        setAircraftLoading(false);
+        hideMessage();
+        console.log("Initial load sequence completed");
+        
+      } catch (error) {
+        console.error("Error in load sequence:", error);
+        setRegionLoading(false);
+        setAircraftLoading(false);
+        hideMessage();
       }
-    }
+    };
+    
+    // Start the loading sequence with a small delay
+    setTimeout(simpleLoadSequence, 1000);
     
     // Add global function for adding favorites from map popups
     window.addToFavorites = (name, coords) => {
@@ -1203,121 +1592,170 @@ const ModularFastPlannerComponent = () => {
     };
   }, [isAuthenticated]); // Only re-run when authentication status changes
   
-  // Handle region selection
+  // Handle region selection - simplified with NO aircraft loading
   const handleRegionChange = (regionId) => {
     if (!regionManagerRef.current) return;
     
-    console.log(`Changing region to: ${regionId}`);
+    console.log(`\n======================================`);
+    console.log(`CHANGING REGION TO: ${regionId.toUpperCase()}`);
+    console.log(`======================================\n`);
+    
     setRegionLoading(true);
+    
+    // Message handling - Console only, no UI overlays
+    const showMessage = (message) => {
+      console.log(message);
+      // Don't show any UI overlays
+    };
+    
+    const hideMessage = () => {
+      // No UI overlays to hide
+    };
     
     // Save selected region to localStorage
     saveToLocalStorage('lastRegionId', regionId);
     
-    // Reset aircraft registration when changing regions
-    setAircraftRegistration('');
-    
-    // Clear existing platforms and aircraft data before changing region
-    if (platformManagerRef.current) {
-      console.log('Clearing existing platforms before region change');
+    // COMPLETELY CLEAN VERSION - NO AIRCRAFT LOADING AT ALL
+    const loadRegionDataMinimal = async () => {
       try {
-        // Clear existing platforms
-        platformManagerRef.current.clearPlatforms();
+        // Step 1: Initial message
+        showMessage(`Changing to ${regionId}...`);
         
-        // Also reset aircraft data for the region
-        if (aircraftManagerRef.current) {
-          console.log('Resetting aircraft data for new region');
-          // Clear the filtered aircraft for the region
-          aircraftManagerRef.current.resetAircraftForRegion();
-        }
-      } catch (error) {
-        console.error('Error clearing data for region change:', error);
-      }
-    }
-    
-    // Set the selected region
-    const region = regionManagerRef.current.setRegion(regionId);
-    
-    if (region) {
-      // Instead of using full-screen loading overlay, show loading in region selector
-      console.log(`Flying to ${region.name} region...`);
-      
-      // Make sure FavoriteLocationsManager is initialized
-      if (!favoriteLocationsManagerRef.current) {
-        initializeFavoritesManager();
-      }
-      
-      // Update favorite locations for this region
-      if (favoriteLocationsManagerRef.current) {
-        const favoritesForRegion = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
-        console.log(`Loaded ${favoritesForRegion.length} favorites for region ${region.name}`);
-        setFavoriteLocations(favoritesForRegion);
-      }
-      
-      // If we have a platform manager, reload platforms for this region
-      if (platformManagerRef.current) {
-        // After a short delay to let the map move, load platforms for the new region
-        setTimeout(() => {
+        // Step 2: Clear existing platforms
+        if (platformManagerRef.current) {
+          console.log('Clearing existing platforms');
           try {
-            console.log(`Loading static data for region: ${region.name}`);
-            // Load static data for this region first
-            loadStaticRigDataForRegion(region);
+            // Get a reference to existing platform count before clearing
+            const beforeCount = platformManagerRef.current.getPlatformCount ? 
+                                platformManagerRef.current.getPlatformCount() : 
+                                "unknown";
+            console.log(`Platform count before clearing: ${beforeCount}`);
             
-            // Only try to load from Foundry if authenticated
-            if (isAuthenticated && client) {
-              console.log(`Loading platforms from Foundry for region: ${region.osdkRegion}`);
-              
-              // Debug message to observe the authentication state during region change
-              console.log(`Auth state during region change - isAuthenticated: ${isAuthenticated}, client available: ${!!client}`);
-              
-              platformManagerRef.current.loadPlatformsFromFoundry(client, region.osdkRegion)
-                .then(platforms => {
-                  console.log(`Loaded ${platforms.length} platforms for ${region.name} from Foundry`);
-                  setRegionLoading(false);
-                  setPlatformsLoaded(true);
-                  
-                  // Load aircraft data for this region after platforms are loaded
-                  if (aircraftManagerRef.current) {
-                    console.log(`Loading aircraft data for region: ${region.name}`);
-                    setAircraftLoading(true);
-                    
-                    // First do a region-only filter to find available types
-                    if (aircraftManagerRef.current.aircraftList.length > 0) {
-                      console.log(`Using existing aircraft data for region: ${region.id}`);
-                      aircraftManagerRef.current.filterAircraft(region.id, null);
-                    } else {
-                      console.log(`Loading fresh aircraft data for region: ${region.id}`);
-                      loadAircraftData(region);
-                    }
-                  }
-                })
-                .catch(error => {
-                  console.error(`Error loading platforms from Foundry: ${error.message}`);
-                  // Don't set auth state based on an error - this could be a network issue
-                  // or other problem unrelated to authentication
-                  
-                  // Fall back to static data
-                  loadStaticRigDataForRegion(region);
-                  
-                  setRigsError(error.message);
-                  setRegionLoading(false);
-                });
-            } else {
-              // If not authenticated, just load static data and continue
-              loadStaticRigDataForRegion(region);
-              setRegionLoading(false);
-            }
+            platformManagerRef.current.clearPlatforms();
           } catch (error) {
-            console.error(`Error during region change to ${region.name}:`, error);
-            setRegionLoading(false);
-            setRigsError(`Error loading ${region.name}: ${error.message}`);
+            console.error('Error clearing platforms:', error);
           }
-        }, 1000);
-      } else {
+        }
+        
+        // Step 3: Set the region
+        console.log(`Setting region to ${regionId}`);
+        const region = regionManagerRef.current.setRegion(regionId);
+        
+        if (!region) {
+          console.error(`Failed to set region to ${regionId}`);
+          setRegionLoading(false);
+          hideMessage();
+          return;
+        }
+        
+        // Step 4: Update favorites for this region
+        if (favoriteLocationsManagerRef.current) {
+          const favoritesForRegion = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
+          console.log(`Loaded ${favoritesForRegion.length} favorites for ${region.name}`);
+          setFavoriteLocations(favoritesForRegion);
+        }
+        
+        // Wait for region change to finalize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Skip static data loading completely
+        console.log(`Loading map data for ${region.name}...`);
+        setPlatformsVisible(true);
+        
+        // If authenticated, load platforms from Foundry
+        if (isAuthenticated && client && platformManagerRef.current) {
+          showMessage(`Loading rigs for ${region.name}...`);
+          console.log(`Loading platforms from Foundry for ${region.name}`);
+          
+          try {
+            // IMPORTANT: Set a flag to prevent double loading which causes layer issues
+            window.isLoadingPlatforms = true;
+            
+            // Load platforms with a direct call
+            console.log(`Loading platforms for ${region.name}...`);
+            
+            // CRITICAL CHANGE: Modify platform manager to prevent platform clearing after load
+            if (platformManagerRef.current) {
+              platformManagerRef.current.skipNextClear = true;
+            }
+            
+            const platforms = await platformManagerRef.current.loadPlatformsFromFoundry(client, region.osdkRegion);
+            console.log(`Successfully loaded ${platforms.length} platforms for ${region.name} from Foundry`);
+            
+            // Force visibility states
+            setPlatformsLoaded(true);
+            setPlatformsVisible(true);
+            
+            // Force visibility in the manager if method exists
+            if (platformManagerRef.current && platformManagerRef.current.setVisibility) {
+              platformManagerRef.current.setVisibility(true);
+              console.log("Forced platform visibility using manager's setVisibility method");
+            }
+            
+            // Clear the loading flag
+            window.isLoadingPlatforms = false;
+            
+            // Set a safeguard timeout to ensure layers stay visible
+            setTimeout(() => {
+              try {
+                const map = mapManagerRef.current?.getMap();
+                if (map) {
+                  console.log('Setting explicit visibility on all platform layers - SAFEGUARD');
+                  const platformLayers = [
+                    'platforms-fixed-layer',
+                    'platforms-movable-layer',
+                    'platforms-fixed-labels',
+                    'platforms-movable-labels',
+                    'airfields-layer',
+                    'airfields-labels'
+                  ];
+                  
+                  platformLayers.forEach(layerId => {
+                    if (map.getLayer(layerId)) {
+                      map.setLayoutProperty(layerId, 'visibility', 'visible');
+                      console.log(`Set ${layerId} to visible`);
+                    }
+                  });
+                }
+                
+                // Log final platform count
+                if (platformManagerRef.current && platformManagerRef.current.getPlatformCount) {
+                  console.log(`Final platform count: ${platformManagerRef.current.getPlatformCount()}`);
+                }
+              } catch (e) {
+                console.warn('Error in safeguard visibility setting:', e);
+              }
+            }, 2000);
+            
+            // No success toast to show
+            
+            // Don't show any loading overlay
+            hideMessage();
+          } catch (error) {
+            console.error(`Error loading platforms from Foundry: ${error.message}`);
+            // Static data already loaded as fallback
+            showMessage(`Using static data for ${region.name}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // Final cleanup
+        console.log(`\n=======================================`);
+        console.log(`REGION CHANGE TO ${region.name.toUpperCase()} COMPLETE`);
+        console.log(`=======================================\n`);
+        
         setRegionLoading(false);
+        hideMessage();
+        
+      } catch (error) {
+        console.error(`Error during region change: ${error.message}`);
+        setRegionLoading(false);
+        hideMessage();
       }
-    } else {
-      setRegionLoading(false);
-    }
+    };
+    
+    // Start the region change process with the simplified version
+    loadRegionDataMinimal();
   };
   
   // Handle adding a favorite location
@@ -1417,154 +1855,11 @@ const ModularFastPlannerComponent = () => {
     }
   };
   
-  // Load static rig data for a specific region
+  // Dummy function - disabled
   const loadStaticRigDataForRegion = (region) => {
-    if (!platformManagerRef.current || !region) return;
-    
-    // If we already loaded static data for this region, don't reload
-    if (window.staticDataLoaded === region.id) {
-      console.log(`Static data already loaded for ${region.name}`);
-      return;
-    }
-    
-    // If we're authenticated and going to load from Foundry later, don't load static data
-    if (isAuthenticated && client) {
-      console.log(`Skipping static data load for ${region.name} as we'll load from Foundry`);
-      return;
-    }
-    
-    console.log(`Loading static platform data for ${region.name}`);
-    
-    // First, ensure existing platforms are cleared
-    try {
-      platformManagerRef.current.clearPlatforms();
-    } catch (error) {
-      console.error('Error clearing platforms before loading static data:', error);
-    }
-    
-    // Helper function to enhance platform data
-    const enhancePlatforms = (platforms, regionName) => {
-      return platforms.map(platform => ({
-        ...platform,
-        operator: platform.operator || `Platform in ${regionName}`,
-        // Add isAirfield and isMovable flags used by the platform manager
-        isAirfield: platform.isAirfield || false,
-        isMovable: platform.isMovable || platform.operator?.toLowerCase().includes('movable') || false
-      }));
-    };
-    
-    // Define static airports for each region
-    const staticAirportsByRegion = {
-      'gulf-of-mexico': [
-        { name: "KHOU", coordinates: [-95.2789, 29.6451], operator: "Houston Hobby Airport", isAirfield: true },
-        { name: "KMSY", coordinates: [-90.2594, 29.9934], operator: "New Orleans Intl Airport", isAirfield: true },
-        { name: "KGLS", coordinates: [-94.8604, 29.2653], operator: "Galveston Airport", isAirfield: true }
-      ],
-      'norway': [
-        { name: "ENZV", coordinates: [5.6317, 58.8767], operator: "Stavanger Airport", isAirfield: true },
-        { name: "ENBR", coordinates: [5.2183, 60.2928], operator: "Bergen Airport", isAirfield: true },
-        { name: "ENVA", coordinates: [10.9239, 63.4567], operator: "Trondheim Airport", isAirfield: true }
-      ],
-      'united-kingdom': [
-        { name: "EGPD", coordinates: [-2.1997, 57.2019], operator: "Aberdeen Airport", isAirfield: true },
-        { name: "EGTC", coordinates: [-0.6166, 52.0722], operator: "Cranfield Airport", isAirfield: true }
-      ]
-    };
-    
-    // Define region-specific static platforms
-    const staticPlatformsByRegion = {
-      'gulf-of-mexico': [
-        { name: "Mars", coordinates: [-90.966, 28.1677], operator: "Platform Shell" },
-        { name: "Perdido", coordinates: [-94.9025, 26.1347], operator: "Platform Shell" },
-        { name: "Thunder Horse", coordinates: [-88.4957, 28.1912], operator: "Platform BP" },
-        { name: "Olympus", coordinates: [-90.9772, 28.1516], operator: "Platform Shell" },
-        { name: "Appomattox", coordinates: [-91.654, 28.968], operator: "Platform Shell" },
-        { name: "Atlantis", coordinates: [-90.1675, 27.1959], operator: "Platform BP" },
-        { name: "Mad Dog", coordinates: [-90.9122, 27.3389], operator: "Platform BP" },
-        { name: "Auger", coordinates: [-92.4458, 27.5483], operator: "Platform Shell" },
-        { name: "Hoover Diana", coordinates: [-94.6894, 26.9333], operator: "Platform ExxonMobil" },
-        { name: "Genesis", coordinates: [-90.8597, 27.7778], operator: "Platform Chevron" },
-        { name: "Ram Powell", coordinates: [-88.1111, 29.0736], operator: "Platform Shell" },
-        { name: "Ursa", coordinates: [-89.7875, 28.1539], operator: "Platform Shell" },
-        { name: "Holstein", coordinates: [-90.5397, 27.3217], operator: "Platform BHP" },
-        { name: "Brutus", coordinates: [-90.6506, 27.7978], operator: "Platform Shell" },
-        { name: "Amberjack", coordinates: [-90.5703, 28.5983], operator: "Platform Talos Energy" }
-      ],
-      'norway': [
-        { name: "Troll A", coordinates: [3.6, 60.6], operator: "Platform Equinor" },
-        { name: "Oseberg", coordinates: [2.8, 60.5], operator: "Platform Equinor" },
-        { name: "Sleipner", coordinates: [1.9, 58.4], operator: "Platform Equinor" },
-        { name: "Ekofisk", coordinates: [3.2, 56.5], operator: "Platform ConocoPhillips" },
-        { name: "Johan Sverdrup", coordinates: [2.5, 58.9], operator: "Platform Equinor" },
-        { name: "Gullfaks", coordinates: [2.3, 61.2], operator: "Platform Equinor" },
-        { name: "Statfjord A", coordinates: [1.85, 61.2], operator: "Platform Equinor" },
-        { name: "Statfjord B", coordinates: [1.83, 61.15], operator: "Platform Equinor" },
-        { name: "Visund", coordinates: [2.4, 61.35], operator: "Platform Equinor" },
-        { name: "Snorre A", coordinates: [2.15, 61.45], operator: "Platform Equinor" }
-      ],
-      'united-kingdom': [
-        { name: "Brent Charlie", coordinates: [1.7, 61.1], operator: "Platform Shell" },
-        { name: "Forties", coordinates: [0.9, 57.7], operator: "Platform Apache" },
-        { name: "Buzzard", coordinates: [-0.3, 57.8], operator: "Platform CNOOC" },
-        { name: "Ninian", coordinates: [1.7, 60.8], operator: "Platform EnQuest" },
-        { name: "Bruce", coordinates: [-1.2, 59.7], operator: "Platform Serica Energy" },
-        { name: "Alba", coordinates: [0.2, 58.2], operator: "Platform Ithaca Energy" },
-        { name: "Beryl", coordinates: [1.5, 59.5], operator: "Platform Apache" },
-        { name: "Elgin", coordinates: [1.9, 57.0], operator: "Platform Total" }
-      ],
-      'west-africa': [
-        { name: "Bonga", coordinates: [4.5, 4.6], operator: "Platform Shell" },
-        { name: "Agbami", coordinates: [5.0, 3.0], operator: "Platform Chevron" },
-        { name: "Akpo", coordinates: [7.5, 3.2], operator: "Platform Total" },
-        { name: "Girassol", coordinates: [8.4, -5.4], operator: "Platform Total" },
-        { name: "Egina", coordinates: [6.7, 3.4], operator: "Platform Total" },
-        { name: "Erha", coordinates: [4.9, 3.8], operator: "Platform ExxonMobil" }
-      ],
-      'brazil': [
-        { name: "Lula", coordinates: [-39.1, -25.2], operator: "Platform Petrobras" },
-        { name: "Buzios", coordinates: [-39.4, -24.8], operator: "Platform Petrobras" },
-        { name: "Tupi", coordinates: [-38.8, -24.5], operator: "Platform Petrobras" },
-        { name: "Sapinhoa", coordinates: [-40.1, -25.6], operator: "Platform Petrobras" },
-        { name: "Marlim", coordinates: [-39.6, -22.4], operator: "Platform Petrobras" }
-      ],
-      'australia': [
-        { name: "North Rankin", coordinates: [116.1, -19.6], operator: "Platform Woodside" },
-        { name: "Goodwyn A", coordinates: [115.8, -19.9], operator: "Platform Woodside" },
-        { name: "Angel", coordinates: [116.0, -19.5], operator: "Platform Woodside" },
-        { name: "Pluto", coordinates: [116.2, -20.0], operator: "Platform Woodside" },
-        { name: "Ichthys", coordinates: [115.3, -17.1], operator: "Platform INPEX" }
-      ]
-    };
-    
-    // Get platforms for the current region
-    const platforms = staticPlatformsByRegion[region.id] || [];
-    
-    // Get airports for this region
-    const airports = staticAirportsByRegion[region.id] || [];
-    
-    // Combine platforms and airports
-    const allLocations = [
-      ...enhancePlatforms(platforms, region.name),
-      ...enhancePlatforms(airports, region.name)
-    ];
-    
-    if (allLocations.length > 0) {
-      console.log(`Adding ${allLocations.length} static locations for ${region.name}`);
-      console.log(`- ${platforms.length} platforms`);
-      console.log(`- ${airports.length} airports`);
-      
-      platformManagerRef.current.addPlatformsToMap(allLocations);
-      
-      // Update the UI state
-      setPlatformsLoaded(true);
-      setPlatformsVisible(true);
-      
-      // Mark this region as having static data loaded
-      window.staticDataLoaded = region.id;
-      console.log(`Static data loaded for ${region.name}`);
-    } else {
-      console.log(`No static locations defined for ${region.name}`);
-    }
+    // Do nothing - no static data
+    console.log(`Static data loading for region ${region?.name || 'unknown'} disabled`);
+    return [];
   };
 
   return (
@@ -1636,7 +1931,40 @@ const ModularFastPlannerComponent = () => {
         }}
         onLoadRigData={loadRigData}
         onToggleChart={togglePlatformsVisibility}
-        onLoadCustomChart={() => {}}
+        onLoadCustomChart={() => {
+          // Fix map click handlers - but do it directly rather than via event
+          console.log("MANUALLY REFRESHING MAP CLICK HANDLERS");
+          
+          // Get the map
+          const map = mapManagerRef.current?.getMap();
+          if (!map) {
+            console.error("Cannot refresh handlers: Map not available");
+            return;
+          }
+          
+          // Reset the initialization flag
+          window.mapHandlersInitialized = false;
+          
+          // Remove existing handlers
+          map.off('click');
+          
+          // Set up handlers directly
+          setupMapEventHandlers(map);
+          setupRouteDragging();
+          
+          // Reset the flag
+          window.mapHandlersInitialized = true;
+          
+          // Show confirmation message
+          const loadingOverlay = document.getElementById('loading-overlay');
+          if (loadingOverlay) {
+            loadingOverlay.textContent = "Map click handlers and route dragging refreshed";
+            loadingOverlay.style.display = 'block';
+            setTimeout(() => {
+              loadingOverlay.style.display = 'none';
+            }, 1500);
+          }
+        }}
         chartsVisible={platformsLoaded ? platformsVisible : null}
         aircraftType={aircraftType}
         onAircraftTypeChange={handleAircraftTypeChange}
