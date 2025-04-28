@@ -1,0 +1,425 @@
+import type { PropertyDef as $PropertyDef } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+import type { FuelPolicyBuilder } from './FuelPolicyBuilder.js';
+import type { ObjectTypeDefinition as $ObjectTypeDefinition, ObjectMetadata as $ObjectMetadata } from '@osdk/client';
+import type { ObjectSet as $ObjectSet, Osdk as $Osdk, PropertyValueWireToClient as $PropType, SingleLinkAccessor as $SingleLinkAccessor } from '@osdk/client';
+export declare namespace FlightFuelDburbury {
+    type PropertyKeys = 'leg1fuelBurned' | 'plannedApproachFuel' | 'plannedReserveFuel' | 'requiredFuelStop2description' | 'minFuelBreakdown' | 'plannedAraFuel' | 'minTotalFuel' | 'plannedContingencyFuelAlternate' | 'totalFuelUplifted' | 'leg5fuelBurned' | 'leg4landingFuel' | 'requiredFuelStop5' | 'requiredFuelStop4' | 'requiredFuelStop3' | 'plannedTimeOnTaskFuel' | 'requiredFuelStop2' | 'fuelUnit' | 'leg1onBlocksFuel' | 'leg4takeOffFuel' | 'requiredFuelStop4description' | 'leg1landingFuel' | 'plannedTotalFuel' | 'requiredFuelStop1' | 'plannedDeckFuel' | 'plannedTaxiFuel' | 'leg1takeOffFuel' | 'leg3takeOffFuel' | 'leg2landingFuel' | 'requiredFuelStop5description' | 'leg2fuelBurned' | 'leg3landingFuel' | 'leg2takeOffFuel' | 'leg5fuelUplifted' | 'aircraft' | 'leg6fuelUplifted' | 'leg6landingFuel' | 'policyUuid' | 'createdAt' | 'leg5takeOffFuel' | 'requiredFuelStop3description' | 'totalFuelBurned' | 'plannedAlternateFuel' | 'automationSummary' | 'flightUuid' | 'leg6fuelBurned' | 'leg3fuelBurned' | 'uuid' | 'roundTripFuel' | 'upDatedAt' | 'leg3onBlocksFuel' | 'leg4offBlocksFuel' | 'flightName' | 'leg5offBlocksFuel' | 'leg2offBlocksFuel' | 'leg5landingFuel' | 'leg2onBlocksFuel' | 'leg6onBlocksFuel' | 'leg3offBlocksFuel' | 'plannedExtraFuel' | 'leg5onBlocksFuel' | 'plannedTripFuel' | 'leg4onBlocksFuel' | 'leg6offBlocksFuel' | 'leg2fuelUplifted' | 'blockFuel' | 'leg4fuelBurned' | 'requiredFuelStop1description' | 'leg1fuelUplifted' | 'policyName' | 'leg4fuelUplifted' | 'leg1offBlocksFuel' | 'plannedContingencyFuelFlightLegs' | 'leg3fuelUplifted' | 'leg6takeOffFuel';
+    interface Links {
+        readonly fuelPolicyBuilder: $SingleLinkAccessor<FuelPolicyBuilder>;
+    }
+    interface Props {
+        readonly aircraft: $PropType['string'] | undefined;
+        readonly automationSummary: $PropType['string'] | undefined;
+        readonly blockFuel: $PropType['double'] | undefined;
+        readonly createdAt: $PropType['timestamp'] | undefined;
+        readonly flightName: $PropType['string'] | undefined;
+        readonly flightUuid: $PropType['string'] | undefined;
+        readonly fuelUnit: $PropType['string'] | undefined;
+        readonly leg1fuelBurned: $PropType['double'] | undefined;
+        readonly leg1fuelUplifted: $PropType['double'] | undefined;
+        readonly leg1landingFuel: $PropType['double'] | undefined;
+        readonly leg1offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg1onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg1takeOffFuel: $PropType['double'] | undefined;
+        readonly leg2fuelBurned: $PropType['double'] | undefined;
+        readonly leg2fuelUplifted: $PropType['double'] | undefined;
+        readonly leg2landingFuel: $PropType['double'] | undefined;
+        readonly leg2offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg2onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg2takeOffFuel: $PropType['double'] | undefined;
+        readonly leg3fuelBurned: $PropType['double'] | undefined;
+        readonly leg3fuelUplifted: $PropType['double'] | undefined;
+        readonly leg3landingFuel: $PropType['double'] | undefined;
+        readonly leg3offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg3onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg3takeOffFuel: $PropType['double'] | undefined;
+        readonly leg4fuelBurned: $PropType['double'] | undefined;
+        readonly leg4fuelUplifted: $PropType['double'] | undefined;
+        readonly leg4landingFuel: $PropType['double'] | undefined;
+        readonly leg4offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg4onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg4takeOffFuel: $PropType['double'] | undefined;
+        readonly leg5fuelBurned: $PropType['double'] | undefined;
+        readonly leg5fuelUplifted: $PropType['double'] | undefined;
+        readonly leg5landingFuel: $PropType['double'] | undefined;
+        readonly leg5offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg5onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg5takeOffFuel: $PropType['double'] | undefined;
+        readonly leg6fuelBurned: $PropType['double'] | undefined;
+        readonly leg6fuelUplifted: $PropType['double'] | undefined;
+        readonly leg6landingFuel: $PropType['double'] | undefined;
+        readonly leg6offBlocksFuel: $PropType['double'] | undefined;
+        readonly leg6onBlocksFuel: $PropType['double'] | undefined;
+        readonly leg6takeOffFuel: $PropType['double'] | undefined;
+        readonly minFuelBreakdown: $PropType['string'] | undefined;
+        readonly minTotalFuel: $PropType['integer'] | undefined;
+        readonly plannedAlternateFuel: $PropType['double'] | undefined;
+        readonly plannedApproachFuel: $PropType['double'] | undefined;
+        readonly plannedAraFuel: $PropType['double'] | undefined;
+        readonly plannedContingencyFuelAlternate: $PropType['double'] | undefined;
+        readonly plannedContingencyFuelFlightLegs: $PropType['double'] | undefined;
+        readonly plannedDeckFuel: $PropType['double'] | undefined;
+        readonly plannedExtraFuel: $PropType['double'] | undefined;
+        readonly plannedReserveFuel: $PropType['double'] | undefined;
+        readonly plannedTaxiFuel: $PropType['double'] | undefined;
+        readonly plannedTimeOnTaskFuel: $PropType['double'] | undefined;
+        readonly plannedTotalFuel: $PropType['double'] | undefined;
+        readonly plannedTripFuel: $PropType['double'] | undefined;
+        readonly policyName: $PropType['string'] | undefined;
+        readonly policyUuid: $PropType['string'] | undefined;
+        readonly requiredFuelStop1: $PropType['integer'] | undefined;
+        readonly requiredFuelStop1description: $PropType['string'] | undefined;
+        readonly requiredFuelStop2: $PropType['integer'] | undefined;
+        readonly requiredFuelStop2description: $PropType['string'] | undefined;
+        readonly requiredFuelStop3: $PropType['integer'] | undefined;
+        readonly requiredFuelStop3description: $PropType['string'] | undefined;
+        readonly requiredFuelStop4: $PropType['integer'] | undefined;
+        readonly requiredFuelStop4description: $PropType['string'] | undefined;
+        readonly requiredFuelStop5: $PropType['integer'] | undefined;
+        readonly requiredFuelStop5description: $PropType['string'] | undefined;
+        readonly roundTripFuel: $PropType['integer'] | undefined;
+        readonly totalFuelBurned: $PropType['double'] | undefined;
+        readonly totalFuelUplifted: $PropType['double'] | undefined;
+        readonly upDatedAt: $PropType['timestamp'] | undefined;
+        readonly uuid: $PropType['string'];
+    }
+    type StrictProps = Props;
+    interface ObjectSet extends $ObjectSet<FlightFuelDburbury, FlightFuelDburbury.ObjectSet> {
+    }
+    type OsdkInstance<OPTIONS extends never | '$rid' = never, K extends keyof FlightFuelDburbury.Props = keyof FlightFuelDburbury.Props> = $Osdk.Instance<FlightFuelDburbury, OPTIONS, K>;
+    /** @deprecated use OsdkInstance */
+    type OsdkObject<OPTIONS extends never | '$rid' = never, K extends keyof FlightFuelDburbury.Props = keyof FlightFuelDburbury.Props> = OsdkInstance<OPTIONS, K>;
+}
+export interface FlightFuelDburbury extends $ObjectTypeDefinition {
+    osdkMetadata: typeof $osdkMetadata;
+    type: 'object';
+    apiName: 'FlightFuelDburbury';
+    __DefinitionMetadata?: {
+        objectSet: FlightFuelDburbury.ObjectSet;
+        props: FlightFuelDburbury.Props;
+        linksType: FlightFuelDburbury.Links;
+        strictProps: FlightFuelDburbury.StrictProps;
+        apiName: 'FlightFuelDburbury';
+        description: 'Flight fuel attached to flight object';
+        displayName: 'FlightFuel [ dburbury ]';
+        icon: {
+            type: 'blueprint';
+            color: '#F5498B';
+            name: 'fuel';
+        };
+        implements: [];
+        interfaceMap: {};
+        inverseInterfaceMap: {};
+        links: {
+            fuelPolicyBuilder: $ObjectMetadata.Link<FuelPolicyBuilder, false>;
+        };
+        pluralDisplayName: 'Flight Fuel [ dburbury ]s';
+        primaryKeyApiName: 'uuid';
+        primaryKeyType: 'string';
+        properties: {
+            /**
+             *   display name: 'Aircraft'
+             */
+            aircraft: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Automation Summary'
+             */
+            automationSummary: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Block Fuel'
+             */
+            blockFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Created At'
+             */
+            createdAt: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             *   display name: 'Flight Name'
+             */
+            flightName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Flight Uuid'
+             */
+            flightUuid: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Fuel Unit'
+             */
+            fuelUnit: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1Fuel Burned'
+             */
+            leg1fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1Fuel Uplifted'
+             */
+            leg1fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1Landing Fuel'
+             */
+            leg1landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1Off Blocks Fuel'
+             */
+            leg1offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1On Blocks Fuel'
+             */
+            leg1onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg1Take Off Fuel'
+             */
+            leg1takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2Fuel Burned'
+             */
+            leg2fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2Fuel Uplifted'
+             */
+            leg2fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2Landing Fuel'
+             */
+            leg2landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2Off Blocks Fuel'
+             */
+            leg2offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2On Blocks Fuel'
+             */
+            leg2onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg2Take Off Fuel'
+             */
+            leg2takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3Fuel Burned'
+             */
+            leg3fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3Fuel Uplifted'
+             */
+            leg3fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3Landing Fuel'
+             */
+            leg3landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3Off Blocks Fuel'
+             */
+            leg3offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3On Blocks Fuel'
+             */
+            leg3onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg3Take Off Fuel'
+             */
+            leg3takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4Fuel Burned'
+             */
+            leg4fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4Fuel Uplifted'
+             */
+            leg4fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4Landing Fuel'
+             */
+            leg4landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4Off Blocks Fuel'
+             */
+            leg4offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4On Blocks Fuel'
+             */
+            leg4onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg4Take Off Fuel'
+             */
+            leg4takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5Fuel Burned'
+             */
+            leg5fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5Fuel Uplifted'
+             */
+            leg5fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5Landing Fuel'
+             */
+            leg5landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5Off Blocks Fuel'
+             */
+            leg5offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5On Blocks Fuel'
+             */
+            leg5onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg5Take Off Fuel'
+             */
+            leg5takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6Fuel Burned'
+             */
+            leg6fuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6Fuel Uplifted'
+             */
+            leg6fuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6Landing Fuel'
+             */
+            leg6landingFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6Off Blocks Fuel'
+             */
+            leg6offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6On Blocks Fuel'
+             */
+            leg6onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'leg6Take Off Fuel'
+             */
+            leg6takeOffFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Min Fuel Breakdown'
+             */
+            minFuelBreakdown: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Min Total Fuel'
+             */
+            minTotalFuel: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Alternate Fuel'
+             */
+            plannedAlternateFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Approach Fuel'
+             */
+            plannedApproachFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Ara Fuel'
+             */
+            plannedAraFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Contingency Fuel Alternate'
+             */
+            plannedContingencyFuelAlternate: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Contingency Fuel Flight Legs'
+             */
+            plannedContingencyFuelFlightLegs: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Deck Fuel'
+             */
+            plannedDeckFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Extra Fuel'
+             */
+            plannedExtraFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Reserve Fuel'
+             */
+            plannedReserveFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Taxi Fuel'
+             */
+            plannedTaxiFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Time On Task Fuel'
+             */
+            plannedTimeOnTaskFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Total Fuel'
+             */
+            plannedTotalFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Planned Trip Fuel'
+             */
+            plannedTripFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Policy Name'
+             */
+            policyName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Policy Uuid'
+             */
+            policyUuid: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop1'
+             */
+            requiredFuelStop1: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop1Description'
+             */
+            requiredFuelStop1description: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop2'
+             */
+            requiredFuelStop2: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop2Description'
+             */
+            requiredFuelStop2description: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop3'
+             */
+            requiredFuelStop3: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop3Description'
+             */
+            requiredFuelStop3description: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop4'
+             */
+            requiredFuelStop4: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop4Description'
+             */
+            requiredFuelStop4description: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop5'
+             */
+            requiredFuelStop5: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Required Fuel Stop5Description'
+             */
+            requiredFuelStop5description: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Round Trip Fuel'
+             */
+            roundTripFuel: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Total Fuel Burned'
+             */
+            totalFuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Total Fuel Uplifted'
+             */
+            totalFuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Up Dated At'
+             */
+            upDatedAt: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             *   display name: 'Uuid'
+             */
+            uuid: $PropertyDef<'string', 'non-nullable', 'single'>;
+        };
+        rid: 'ri.ontology.main.object-type.745a07cc-37fb-458d-9912-12494312d3d4';
+        status: 'EXPERIMENTAL';
+        titleProperty: 'flightName';
+        type: 'object';
+        visibility: 'NORMAL';
+    };
+}
+export declare const FlightFuelDburbury: FlightFuelDburbury;
