@@ -201,6 +201,10 @@ const RightPanel = ({
         
         <div id="auth-status" className="control-section">
           <h4>Connection Status</h4>
+          {/* Add debug info in development */}
+          <div style={{fontSize: '10px', color: '#888', marginBottom: '4px'}}>
+            Auth state: {String(isAuthenticated)} | User: {authUserName || 'None'}
+          </div>
           <div id="auth-message" className={isAuthenticated ? "auth-success" : "auth-error"}>
             {isAuthenticated 
               ? `Connected to Foundry${authUserName ? " as " + authUserName : ""}` 
@@ -210,11 +214,76 @@ const RightPanel = ({
             <button 
               id="login-button" 
               className="control-button" 
-              onClick={onLogin}
+              onClick={(e) => {
+                e.preventDefault();
+                // Add a visual feedback
+                const messageEl = document.getElementById('auth-message');
+                if (messageEl) {
+                  messageEl.innerHTML = 'Connecting to Foundry...';
+                  messageEl.className = 'auth-pending';
+                }
+                
+                // Call the login function
+                if (onLogin) {
+                  onLogin();
+                }
+              }}
             >
               Login to Foundry
             </button>
           )}
+          {/* Debug button to refresh state */}
+          <button 
+            style={{
+              fontSize: '10px', 
+              padding: '2px 4px', 
+              backgroundColor: '#555', 
+              color: 'white',
+              marginTop: '5px',
+              cursor: 'pointer',
+              border: 'none',
+              borderRadius: '3px'
+            }}
+            onClick={() => {
+              console.log("Checking localStorage for auth state...");
+              try {
+                // Check localStorage
+                const storedAuth = localStorage.getItem('fastPlanner_isAuthenticated');
+                console.log("localStorage auth state:", storedAuth);
+                
+                // Force refresh auth state from localStorage
+                if (storedAuth === 'true') {
+                  console.log("Found true auth state in localStorage, refreshing UI...");
+                  
+                  // Get user details
+                  const userDetails = localStorage.getItem('fastPlanner_userDetails');
+                  console.log("User details in localStorage:", userDetails ? "FOUND" : "NOT FOUND");
+                  
+                  // Create a flash message
+                  const loadingOverlay = document.getElementById('loading-overlay');
+                  if (loadingOverlay) {
+                    loadingOverlay.textContent = 'Refreshing authentication state...';
+                    loadingOverlay.style.display = 'block';
+                    
+                    setTimeout(() => {
+                      loadingOverlay.style.display = 'none';
+                      window.location.reload(); // Force page reload as a last resort
+                    }, 1000);
+                  }
+                } else {
+                  console.log("No valid auth state in localStorage");
+                  if (onLogin) {
+                    console.log("Calling login function...");
+                    onLogin();
+                  }
+                }
+              } catch (e) {
+                console.error("Error checking auth state:", e);
+              }
+            }}
+          >
+            Refresh connection
+          </button>
         </div>
       </div>
     </>

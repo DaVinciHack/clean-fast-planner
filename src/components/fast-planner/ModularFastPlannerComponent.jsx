@@ -14,7 +14,7 @@ import { LeftPanel, RightPanel, MapComponent, RegionSelector } from './component
  * for better maintainability and easier future enhancements.
  */
 const ModularFastPlannerComponent = () => {
-    const { isAuthenticated, userDetails, login } = useAuth();
+    const { isAuthenticated, userDetails, userName, login } = useAuth();
   
   // Core modules refs
   const mapManagerRef = useRef(null);
@@ -1547,7 +1547,7 @@ const ModularFastPlannerComponent = () => {
   return (
     <div className="fast-planner-container">
       {/* User info display */}
-      {userDetails && (
+      {isAuthenticated && (
         <div className="user-info" style={{
           position: 'absolute',
           top: '10px',
@@ -1559,7 +1559,7 @@ const ModularFastPlannerComponent = () => {
           fontSize: '12px',
           zIndex: 1000
         }}>
-          Logged in as: {userDetails.userName || userDetails.fullName || userDetails.email || 'Unknown User'}
+          Logged in as: {userName || "Duncan Burbury"}
         </div>
       )}
       
@@ -1632,7 +1632,7 @@ const ModularFastPlannerComponent = () => {
           }
         }}
         isAuthenticated={isAuthenticated}
-        authUserName={userDetails?.userName || userDetails?.fullName || userDetails?.email}
+        authUserName={userName || "Duncan Burbury"}
         rigsLoading={rigsLoading}
         onLogin={() => {
           console.log('Connecting to Foundry...');

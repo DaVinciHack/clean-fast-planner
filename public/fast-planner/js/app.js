@@ -15,14 +15,24 @@ document.addEventListener('DOMContentLoaded', function() {
   // Set up UI event handlers
   setupEventHandlers();
   
+  // DISABLED: We now use React's Authentication Context
   // Check for authentication token
-  checkAuthenticationStatus();
+  // checkAuthenticationStatus();
+  
+  console.log('Legacy auth check disabled - using React authentication context');
 });
 
 /**
- * Check for authentication token and update UI
+ * DISABLED: Check for authentication token and update UI
+ * We now use React's Authentication Context instead
  */
 function checkAuthenticationStatus() {
+  console.log('Legacy authentication check called - this function is deprecated');
+  
+  // DISABLED - this function should no longer be used
+  return;
+  
+  /*
   // First try to get token from our app's storage
   let token = getStoredToken();
   
@@ -51,6 +61,7 @@ function checkAuthenticationStatus() {
   
   const userInfo = token ? extractUserInfoFromToken(token) : null;
   updateAuthUI(token, userInfo);
+  */
 }
 
 /**
@@ -97,13 +108,26 @@ function extractUserInfoFromToken(token) {
 }
 
 /**
- * Update authentication UI based on token and user info
+ * DISABLED: Update authentication UI based on token and user info
+ * We now use React's Authentication Context instead
+ * 
  * @param {string|null} token Auth token
  * @param {Object|null} userInfo User info
  */
 function updateAuthUI(token, userInfo) {
+  console.log('Legacy updateAuthUI called - this function is deprecated');
+  
+  // DISABLED - this function should no longer be used
+  return;
+  
+  /*
   const authMessage = document.getElementById('auth-message');
   const loginButton = document.getElementById('login-button');
+  
+  if (!authMessage || !loginButton) {
+    console.log('Auth UI elements not found - React likely handling authentication');
+    return;
+  }
   
   if (token) {
     authMessage.innerHTML = `Connected to Foundry${userInfo?.email ? ' as ' + userInfo.email : ''}`;
@@ -135,6 +159,7 @@ function updateAuthUI(token, userInfo) {
     loginButton.textContent = 'Login to Foundry';
     // Keep original href for login
   }
+  */
 }
 
 /**

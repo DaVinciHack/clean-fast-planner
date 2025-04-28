@@ -622,6 +622,17 @@
   color: #F44336 !important;
 }
 
+.auth-pending {
+  color: #FFC107 !important; /* Amber/yellow for pending status */
+  animation: pulse-auth 1.5s infinite;
+}
+
+@keyframes pulse-auth {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
 /* Custom waypoint marker styles */
 .custom-waypoint-marker {
   cursor: grab;
