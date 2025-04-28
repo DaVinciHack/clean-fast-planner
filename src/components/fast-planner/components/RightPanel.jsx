@@ -207,7 +207,7 @@ const RightPanel = ({
           </div>
           <div id="auth-message" className={isAuthenticated ? "auth-success" : "auth-error"}>
             {isAuthenticated 
-              ? `Connected to Foundry as ${authUserName || "Duncan Burbury"}` 
+              ? `Connected to Foundry${authUserName ? " as " + authUserName : ""}` 
               : "Not connected to Foundry"}
           </div>
           {!isAuthenticated && (

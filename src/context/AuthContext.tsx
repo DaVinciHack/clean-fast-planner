@@ -89,16 +89,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Log initial state
-  console.log(`%cInitial auth state: ${initialAuthState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${getInitialUserName() || 'None'}`, 
+  console.log(`%cInitial auth state: ${initialAuthState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${userName || 'None'}`, 
     'background: #060; color: white; font-weight: bold;');
   
   // Create a wrapped version of setIsAuthenticated that ensures consistency
-  const updateAuthState = (authState: boolean, details: UserDetails | null = null, name: string = "Duncan Burbury", email: string | null = null) => {
+  const updateAuthState = (authState: boolean, details: UserDetails | null = null, name: string | null = null, email: string | null = null) => {
     console.log(`%cUPDATING AUTH STATE: ${authState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${name || 'None'}`, 
       'background: #060; color: white; font-weight: bold; padding: 4px 8px; border-radius: 4px;');
     
-    // Always use Duncan Burbury as the name when authenticated
-    const displayName = authState ? "Duncan Burbury" : null;
+    // Use the provided name or extract from existing user details
+    const displayName = name || (authState && userDetails ? 
+        (userDetails.givenName && userDetails.familyName ? 
+            `${userDetails.givenName} ${userDetails.familyName}` : 
+            userDetails.givenName || userDetails.username || userEmail) : 
+        null);
     
     // Update all related state at once to ensure consistency
     setIsAuthenticated(authState);
@@ -152,7 +156,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     // Store auth state in localStorage so other parts of the app can check it
     try {
       localStorage.setItem('fastPlanner_isAuthenticated', JSON.stringify(authState));
-      localStorage.setItem('fastPlanner_userName', displayName || "");
+      if (displayName) {
+        localStorage.setItem('fastPlanner_userName', displayName);
+      }
       
       if (authState && details) {
         localStorage.setItem('fastPlanner_userDetails', JSON.stringify(details));

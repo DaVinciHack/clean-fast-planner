@@ -1583,7 +1583,7 @@ const ModularFastPlannerComponent = () => {
           zIndex: 1000,
           fontWeight: 'bold'
         }}>
-          Logged in as: Duncan Burbury
+          Logged in as: {userName || "User"}
         </div>
       )}
       
