@@ -1286,10 +1286,10 @@ const ModularFastPlannerComponent = () => {
         setAircraftType(savedAircraftType);
       }
       
-      // PLATFORM LOADING ONLY - NO AIRCRAFT LOADING FOR DEBUGGING
-      console.log("======= TESTING MODE: AIRCRAFT LOADING DISABLED =======");
+      // Load both platforms AND aircraft data
+      console.log("======= NORMAL MODE: LOADING PLATFORMS AND AIRCRAFT =======");
       
-      // If we have a current region, ensure we load region-specific rigs
+      // If we have a current region, ensure we load region-specific rigs and aircraft
       if (currentRegion && platformManagerRef.current) {
         console.log(`Loading rigs for current region: ${currentRegion.name}`);
         platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
@@ -1304,8 +1304,14 @@ const ModularFastPlannerComponent = () => {
               platformManagerRef.current.setVisibility(true);
             }
             
-            // DO NOT LOAD AIRCRAFT - FOR DEBUGGING
-            console.log("Skipping aircraft loading to debug platform visibility");
+            // Now load aircraft for this region
+            console.log(`Now loading aircraft for ${currentRegion.name}`);
+            return loadAircraftData(currentRegion);
+          })
+          .then(aircraft => {
+            if (aircraft) {
+              console.log(`Successfully loaded ${aircraft.length} aircraft for ${currentRegion.name}`);
+            }
           })
           .catch(error => {
             console.error('Error loading region-specific platforms:', error);
@@ -1499,12 +1505,7 @@ const ModularFastPlannerComponent = () => {
             // Wait longer to ensure platforms are rendered
             await new Promise(resolve => setTimeout(resolve, 3000));
             
-            // TEMPORARILY DISABLE AIRCRAFT LOADING
-            showMessage("Platforms loaded - aircraft loading disabled for testing");
-            console.log("Initial load - aircraft loading has been temporarily disabled for debugging");
-            
-            /* TEMPORARILY COMMENTED OUT
-            // Step 4: Load aircraft data
+            // Re-enable aircraft loading
             showMessage("Loading aircraft data...");
             console.log("Loading aircraft data for Gulf of Mexico");
             
@@ -1519,7 +1520,6 @@ const ModularFastPlannerComponent = () => {
                 console.error("Error loading aircraft:", aircraftError);
               }
             }
-            */
           } catch (platformError) {
             console.error("Error loading platforms from Foundry:", platformError);
           }
@@ -1592,7 +1592,7 @@ const ModularFastPlannerComponent = () => {
     };
   }, [isAuthenticated]); // Only re-run when authentication status changes
   
-  // Handle region selection - simplified with NO aircraft loading
+  // Handle region selection - with aircraft loading enabled
   const handleRegionChange = (regionId) => {
     if (!regionManagerRef.current) return;
     
@@ -1727,10 +1727,29 @@ const ModularFastPlannerComponent = () => {
               }
             }, 2000);
             
-            // No success toast to show
+            // Now load aircraft for this region
+            showMessage(`Loading aircraft for ${region.name}...`);
+            console.log(`Loading aircraft data for ${region.name}...`);
             
-            // Don't show any loading overlay
-            hideMessage();
+            try {
+              // Reset aircraft data for new region
+              if (aircraftManagerRef.current) {
+                aircraftManagerRef.current.resetAircraftForRegion();
+                setAircraftLoading(true);
+                
+                // Load aircraft data for the new region
+                const aircraft = await loadAircraftData(region);
+                console.log(`Successfully loaded ${aircraft.length} aircraft for ${region.name}`);
+                
+                showMessage(`Loaded ${aircraft.length} aircraft for ${region.name}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                hideMessage();
+              }
+            } catch (aircraftError) {
+              console.error(`Error loading aircraft for ${region.name}:`, aircraftError);
+              hideMessage();
+            }
           } catch (error) {
             console.error(`Error loading platforms from Foundry: ${error.message}`);
             // Static data already loaded as fallback

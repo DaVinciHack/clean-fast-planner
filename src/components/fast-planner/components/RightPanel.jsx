@@ -66,20 +66,22 @@ const RightPanel = ({
             Clear Route
           </button>
           <button 
-            id="load-rig-data" 
-            className="control-button" 
-            onClick={onLoadRigData}
-            disabled={rigsLoading}
-          >
-            {rigsLoading ? 'Loading...' : 'Load Rig Data'}
-          </button>
-          <button 
             id="toggle-chart" 
             className="control-button" 
             style={{ display: chartsVisible !== null ? "inline-block" : "none" }}
             onClick={onToggleChart}
           >
             {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}
+          </button>
+          {/* Manual reload button - hidden by default but useful for development */}
+          <button 
+            id="reload-data" 
+            className="control-button" 
+            onClick={onLoadRigData}
+            disabled={rigsLoading}
+            style={{ display: 'none' }} /* Hidden by default */
+          >
+            {rigsLoading ? 'Loading...' : 'Reload Data'}
           </button>
         </div>
         
