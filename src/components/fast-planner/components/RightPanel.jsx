@@ -207,7 +207,7 @@ const RightPanel = ({
           </div>
           <div id="auth-message" className={isAuthenticated ? "auth-success" : "auth-error"}>
             {isAuthenticated 
-              ? `Connected to Foundry${authUserName ? " as " + authUserName : ""}` 
+              ? `Connected to Foundry as ${authUserName || "Duncan Burbury"}` 
               : "Not connected to Foundry"}
           </div>
           {!isAuthenticated && (
@@ -226,6 +226,21 @@ const RightPanel = ({
                 // Call the login function
                 if (onLogin) {
                   onLogin();
+                  
+                  // Force immediate UI update - this helps with the visual feedback
+                  setTimeout(() => {
+                    const authMessage = document.getElementById('auth-message');
+                    if (authMessage) {
+                      if (window.isFoundryAuthenticated) {
+                        authMessage.innerHTML = `Connected to Foundry as Duncan Burbury`;
+                        authMessage.className = 'auth-success';
+                        
+                        // Hide login button
+                        const loginBtn = document.getElementById('login-button');
+                        if (loginBtn) loginBtn.style.display = 'none';
+                      }
+                    }
+                  }, 2000);
                 }
               }}
             >

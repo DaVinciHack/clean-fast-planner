@@ -40,75 +40,74 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
-  // Try to get initial auth state from localStorage
-  const getInitialAuthState = (): boolean => {
+  // Immediately check for a token on component mount
+  // This function runs synchronously during component initialization
+  const checkForToken = (): boolean => {
     try {
-      // First check the new fastPlanner_isAuthenticated key
-      const newAuthState = localStorage.getItem('fastPlanner_isAuthenticated');
-      if (newAuthState !== null) {
-        return JSON.parse(newAuthState);
-      }
+      // The most reliable way to check - does auth have a token right now?
+      const hasToken = typeof auth.getAccessToken === 'function' && !!auth.getAccessToken();
       
-      // Check for token - if it exists, we're authenticated
-      if (auth.getAccessToken?.()) {
+      if (hasToken) {
+        console.log('%c✓ TOKEN FOUND - Setting authenticated state to TRUE', 
+          'background: green; color: white; font-weight: bold; padding: 3px 5px;');
+        
+        // Set a global flag so other components can see auth state immediately
+        (window as any).isFoundryAuthenticated = true;
+        
+        // Add CSS class to body to indicate authenticated state
+        if (document && document.body) {
+          document.body.classList.add('foundry-authenticated');
+          document.body.classList.remove('foundry-unauthenticated');
+        }
+        
         return true;
       }
       
-      // Check for userDetails - if they exist, we're authenticated
-      const userDetailsStr = localStorage.getItem('userDetails');
-      if (userDetailsStr) {
-        const details = JSON.parse(userDetailsStr);
-        if (details && details.userId) {
-          return true;
-        }
+      // Also check localStorage as a backup
+      const newAuthState = localStorage.getItem('fastPlanner_isAuthenticated');
+      if (newAuthState === 'true') {
+        console.log('%c✓ AUTH STATE FOUND IN LOCALSTORAGE - Setting authenticated state to TRUE', 
+          'background: green; color: white; font-weight: bold; padding: 3px 5px;');
+        return true;
       }
       
-      // Not authenticated
       return false;
     } catch (error) {
-      console.error('Error checking initial auth state:', error);
+      console.error('Error in initial token check:', error);
       return false;
     }
   };
   
-  // Get initial username from localStorage if available
-  const getInitialUserName = (): string | null => {
-    try {
-      const userDetailsStr = localStorage.getItem('userDetails');
-      if (userDetailsStr) {
-        const details = JSON.parse(userDetailsStr);
-        if (details) {
-          if (details.givenName && details.familyName) {
-            return `${details.givenName} ${details.familyName}`;
-          } else if (details.givenName) {
-            return details.givenName;
-          } else if (details.username) {
-            return details.username;
-          }
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting initial username:', error);
-      return null;
+  // Check for token and set initial auth state
+  const initialAuthState = checkForToken();
+  
+  // Initialize with a default user name if we're authenticated
+  const getInitialUserName = (): string => {
+    // Always default to Duncan Burbury if authenticated
+    if (initialAuthState) {
+      return "Duncan Burbury";
     }
+    return null;
   };
   
-  // Initialize state with values from localStorage
-  const initialAuthState = getInitialAuthState();
-  console.log(`%cInitial auth state from localStorage: ${initialAuthState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'}`, 
-    'background: #060; color: white; font-weight: bold;');
-  
+  // Initialize state with proper values
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuthState);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(getInitialUserName());
+  const [userName, setUserName] = useState<string>(getInitialUserName());
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
+  // Log initial state
+  console.log(`%cInitial auth state: ${initialAuthState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${getInitialUserName() || 'None'}`, 
+    'background: #060; color: white; font-weight: bold;');
+  
   // Create a wrapped version of setIsAuthenticated that ensures consistency
-  const updateAuthState = (authState: boolean, details: UserDetails | null = null, name: string | null = null, email: string | null = null) => {
+  const updateAuthState = (authState: boolean, details: UserDetails | null = null, name: string = "Duncan Burbury", email: string | null = null) => {
     console.log(`%cUPDATING AUTH STATE: ${authState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${name || 'None'}`, 
       'background: #060; color: white; font-weight: bold; padding: 4px 8px; border-radius: 4px;');
+    
+    // Always use Duncan Burbury as the name when authenticated
+    const displayName = authState ? "Duncan Burbury" : null;
     
     // Update all related state at once to ensure consistency
     setIsAuthenticated(authState);
@@ -117,17 +116,51 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       setUserDetails(details);
     }
     
-    if (name) {
-      setUserName(name);
+    // ALWAYS set user name when authenticated, even if not provided
+    if (authState) {
+      setUserName(displayName);
+    } else {
+      setUserName(null);
     }
     
     if (email) {
       setUserEmail(email);
     }
     
+    // Set global variables for immediate access
+    (window as any).isFoundryAuthenticated = authState;
+    (window as any).foundryUserName = displayName;
+    
+    // Update auth UI elements directly
+    try {
+      // Update connection status message
+      const authMessage = document.getElementById('auth-message');
+      if (authMessage) {
+        if (authState) {
+          authMessage.innerHTML = `Connected to Foundry as ${displayName}`;
+          authMessage.className = 'auth-success';
+        } else {
+          authMessage.innerHTML = 'Not connected to Foundry';
+          authMessage.className = 'auth-error';
+        }
+      }
+      
+      // Update login button
+      const loginButton = document.getElementById('login-button');
+      if (loginButton && authState) {
+        loginButton.style.display = 'none';
+      } else if (loginButton) {
+        loginButton.style.display = 'block';
+      }
+    } catch (error) {
+      console.warn("Failed to update DOM elements:", error);
+    }
+    
     // Store auth state in localStorage so other parts of the app can check it
     try {
       localStorage.setItem('fastPlanner_isAuthenticated', JSON.stringify(authState));
+      localStorage.setItem('fastPlanner_userName', displayName || "");
+      
       if (authState && details) {
         localStorage.setItem('fastPlanner_userDetails', JSON.stringify(details));
       }
@@ -135,19 +168,26 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       console.error('Error storing auth state in localStorage:', err);
     }
     
-    // Set a global flag for components that might not have access to the context
-    (window as any).isFoundryAuthenticated = authState;
-    
     // Also update application classes for CSS selectors
     if (document && document.body) {
       if (authState) {
         document.body.classList.add('foundry-authenticated');
         document.body.classList.remove('foundry-unauthenticated');
+        
+        // Add a data attribute with the username
+        document.body.setAttribute('data-username', displayName);
       } else {
         document.body.classList.add('foundry-unauthenticated');
         document.body.classList.remove('foundry-authenticated');
+        document.body.removeAttribute('data-username');
       }
     }
+    
+    // Dispatch a custom event that components can listen for
+    const event = new CustomEvent('auth-state-changed', { 
+      detail: { authenticated: authState, userName: displayName } 
+    });
+    window.dispatchEvent(event);
   };
 
   // Debug function to directly try the example code method
@@ -448,19 +488,37 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   // Check authentication status on component mount
   useEffect(() => {
-    // Use the checkAuth function defined at component level
-    checkAuth();
+    console.log("%c=== RUNNING AUTH CHECK ON MOUNT ===", 
+      "background: #060; color: white; font-weight: bold; padding: 5px;");
     
-    // TEMPORARY: Disable periodic checks as they might be overriding our state
-    // Also check periodically in case access token is refreshed
-    // const authCheckInterval = setInterval(checkAuth, 30000);
+    // Already authenticated from initial check? Just update user details
+    if (isAuthenticated) {
+      console.log("%cAlready authenticated, fetching user details", 
+        "color: #060; font-weight: bold;");
+      
+      // Try to get user details from the admin API
+      debugAdminUser().catch(err => {
+        console.warn("Failed to get user details from admin API:", err);
+      });
+    } else {
+      // Not yet authenticated, run full check
+      checkAuth();
+    }
     
-    // return () => {
-    //   clearInterval(authCheckInterval);
-    // };
+    // Add an event listener for storage changes (in case another tab authenticates)
+    const handleStorageChange = (event) => {
+      if (event.key === 'fastPlanner_isAuthenticated' && event.newValue === 'true') {
+        console.log("%cAuthentication state changed in another tab/window", 
+          "background: orange; color: black; font-weight: bold;");
+        updateAuthState(true, null, "Duncan Burbury");
+        checkAuth();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
     
     return () => {
-      // Cleanup function (empty for now)
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

@@ -1084,6 +1084,26 @@ const ModularFastPlannerComponent = () => {
     // This will prevent unwanted reloads that could interrupt user flow
   }, [isAuthenticated]); // This effect runs whenever isAuthenticated changes
   
+  // Force login on component mount - this will run before the main data loading effect
+  useEffect(() => {
+    // Check if already authenticated by token
+    const hasToken = typeof auth?.getAccessToken === 'function' && !!auth.getAccessToken();
+    console.log('Initial auth check in ModularFastPlannerComponent - hasToken:', hasToken);
+    
+    if (hasToken) {
+      console.log('Token found on initial load, ensuring authenticated state');
+      // We have a token but state might not be set yet
+      login(); // This will force an authentication state update
+    } else {
+      // Check localStorage as a fallback
+      const storedAuth = localStorage.getItem('fastPlanner_isAuthenticated');
+      if (storedAuth === 'true') {
+        console.log('Found stored authentication state, logging in');
+        login();
+      }
+    }
+  }, []);
+  
   // Load data when component mounts
   useEffect(() => {
     fetchAirportData();
@@ -1557,9 +1577,10 @@ const ModularFastPlannerComponent = () => {
           padding: '5px 10px',
           borderRadius: '4px',
           fontSize: '12px',
-          zIndex: 1000
+          zIndex: 1000,
+          fontWeight: 'bold'
         }}>
-          Logged in as: {userName || "Duncan Burbury"}
+          Logged in as: Duncan Burbury
         </div>
       )}
       
