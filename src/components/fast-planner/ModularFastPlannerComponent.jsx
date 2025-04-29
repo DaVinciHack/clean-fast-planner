@@ -945,24 +945,36 @@ const ModularFastPlannerComponent = () => {
   };
 
   /**
-   * Handle aircraft type change - enhanced memory-based approach with empty selection handling
+   * Handle aircraft type change - simplified version that preserves registration
    */
   const handleAircraftTypeChange = (type) => {
     console.log(`%c===== CHANGING AIRCRAFT TYPE TO: ${type || 'EMPTY'} =====`, 'background: #070; color: #fff; font-size: 14px;');
     
-    if (type === aircraftType) {
+    // Preserve the current registration
+    const currentReg = aircraftRegistration;
+    
+    // If same type selected, no change needed (except for empty which means "Change Type")
+    if (type === aircraftType && type !== '') {
       console.log("Type already selected, no change needed");
       return;
     }
     
-    // Update state
+    // Show loading state for feedback
+    setAircraftLoading(true);
+    
+    // Update the type - always
     setAircraftType(type);
     
-    // Only save non-empty preferences to localStorage
+    // Clear registration only if type changed to another actual type
+    if (type !== '' && type !== aircraftType) {
+      setAircraftRegistration('');
+    }
+    
+    // Save preference only for non-empty types
     if (type) {
       saveToLocalStorage('lastAircraftType', type);
     } else {
-      // Clear saved preference if empty selection
+      // Clear saved preference
       try {
         localStorage.removeItem('fast-planner-lastAircraftType');
       } catch (e) {
@@ -970,107 +982,34 @@ const ModularFastPlannerComponent = () => {
       }
     }
     
-    // Reset aircraft registration when type changes
-    setAircraftRegistration('');
-    
-    // Show loading state briefly for visual feedback
-    setAircraftLoading(true);
-    
-    // Create simple debug overlay
-    const showTypeChangeMessage = (message) => {
-      let debugOverlay = document.getElementById('type-change-overlay');
-      if (!debugOverlay) {
-        debugOverlay = document.createElement('div');
-        debugOverlay.id = 'type-change-overlay';
-        debugOverlay.style.position = 'fixed';
-        debugOverlay.style.top = '120px';
-        debugOverlay.style.left = '10px';
-        debugOverlay.style.backgroundColor = 'rgba(0,70,130,0.9)';
-        debugOverlay.style.color = 'white';
-        debugOverlay.style.padding = '15px';
-        debugOverlay.style.borderRadius = '5px';
-        debugOverlay.style.zIndex = '10000';
-        debugOverlay.style.fontSize = '14px';
-        debugOverlay.style.fontFamily = 'monospace';
-        debugOverlay.style.maxWidth = '80%';
-        debugOverlay.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-        document.body.appendChild(debugOverlay);
-      }
-      
-      debugOverlay.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 10px;">
-          ${message}
-        </div>
-        <div style="font-size: 12px;">
-          This message will disappear in 4 seconds
-        </div>
-      `;
-      
-      setTimeout(() => {
-        if (debugOverlay && debugOverlay.parentNode) {
-          debugOverlay.parentNode.removeChild(debugOverlay);
-        }
-      }, 4000);
-    };
-    
-    // Confirm we have the AircraftManager 
+    // Apply the appropriate filtering
     if (aircraftManagerRef.current) {
       try {
         const regionId = currentRegion ? currentRegion.id : null;
         const regionName = currentRegion ? currentRegion.name : "All Regions";
         
-        // Handle empty type selection - show all aircraft for region
+        // If "Change Aircraft Type" was selected (empty type)
         if (!type) {
-          console.log(`Empty type selection - showing all aircraft in ${regionName}`);
-          showTypeChangeMessage(`Showing all aircraft in ${regionName}`);
+          console.log("Change Aircraft Type selected - showing all aircraft types");
           
-          // Filter only by region, not by type
-          const regionAircraft = aircraftManagerRef.current.filterAircraft(regionId, null);
-          console.log(`Showing ${regionAircraft.length} total aircraft in ${regionName}`);
+          // Get all aircraft for the region
+          aircraftManagerRef.current.filterAircraft(regionId, null);
           
-          // Update route stats
-          const wps = waypointManagerRef.current?.getWaypoints() || [];
-          if (wps.length >= 2) {
-            const coordinates = wps.map(wp => wp.coords);
-            // Use S92 as default type for calculations when no type is selected
-            calculateRouteStats(coordinates);
-          }
-          
-          // Finish loading state after a short delay
-          setTimeout(() => {
-            setAircraftLoading(false);
-          }, 300);
-          
-          return; // Exit early
-        }
-        
-        // Handle specific type selection
-        console.log(`Filtering for ${type} aircraft in ${regionName}`);
-        showTypeChangeMessage(`Filtering ${type} aircraft in ${regionName}...`);
-        
-        // Verify we have aircraft data for this type in the selected region
-        if (aircraftManagerRef.current.allAircraftLoaded) {
-          // Check if the type exists in the current region
-          const typeCounts = aircraftManagerRef.current.getAircraftCountsByType(regionId);
-          const typeCount = typeCounts[type] || 0;
-          
-          console.log(`Found ${typeCount} ${type} aircraft in ${regionName}`);
-          
-          if (typeCount === 0) {
-            console.warn(`No ${type} aircraft found in ${regionName}`);
-            
-            // Show warning but continue with filtering anyway
-            showTypeChangeMessage(`No ${type} aircraft found in ${regionName}`);
+          // Don't clear the registration selection
+          if (currentReg) {
+            console.log(`Preserving registration selection: ${currentReg}`);
           }
         }
+        // Normal type selection
+        else {
+          console.log(`Filtering for ${type} aircraft in ${regionName}`);
+          
+          // Apply the filter
+          const filteredAircraft = aircraftManagerRef.current.filterAircraft(regionId, type);
+          console.log(`Found ${filteredAircraft.length} ${type} aircraft in ${regionName}`);
+        }
         
-        // Apply the filter from memory
-        const filteredAircraft = aircraftManagerRef.current.filterAircraft(regionId, type);
-        
-        // Display success message with count
-        showTypeChangeMessage(`Found ${filteredAircraft.length} ${type} aircraft in ${regionName}`);
-        
-        // Recalculate route stats with the new aircraft type
+        // Update route calculations
         const wps = waypointManagerRef.current?.getWaypoints() || [];
         if (wps.length >= 2) {
           const coordinates = wps.map(wp => wp.coords);
@@ -1078,18 +1017,13 @@ const ModularFastPlannerComponent = () => {
         }
       } catch (error) {
         console.error('Error filtering aircraft:', error);
-        showTypeChangeMessage(`Error filtering aircraft: ${error.message}`);
-      } finally {
-        // Always finish loading state after a short delay
-        setTimeout(() => {
-          setAircraftLoading(false);
-        }, 300);
       }
-    } else {
-      setAircraftLoading(false);
-      console.error('Cannot filter aircraft: AircraftManager not initialized');
-      showTypeChangeMessage('Error: Aircraft manager not initialized');
     }
+    
+    // Reset loading state
+    setTimeout(() => {
+      setAircraftLoading(false);
+    }, 300);
   };
   
   // Handle aircraft registration change

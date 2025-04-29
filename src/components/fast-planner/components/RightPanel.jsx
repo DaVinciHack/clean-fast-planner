@@ -88,7 +88,7 @@ const RightPanel = ({
         <div className="control-section">
           <h4>Aircraft Configuration</h4>
           <label htmlFor="aircraft-type">Aircraft Type:</label>
-          {/* Improved aircraft type selection dropdown that doesn't require an extra click */}
+          {/* Simple aircraft type selection dropdown */}
           <select 
             id="aircraft-type" 
             value={aircraftType || ''}
@@ -96,7 +96,7 @@ const RightPanel = ({
             disabled={aircraftLoading}
             className="aircraft-type-dropdown"
           >
-            {/* Clear option - always first, with better wording */}
+            {/* Always show the change type option first */}
             <option value="">-- Change Aircraft Type --</option>
             
             {aircraftLoading ? (
