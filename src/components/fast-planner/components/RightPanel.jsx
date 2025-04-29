@@ -140,11 +140,29 @@ const RightPanel = ({
             id="aircraft-registration" 
             value={aircraftRegistration}
             onChange={(e) => onAircraftRegistrationChange(e.target.value)}
-            disabled={aircraftLoading || !aircraftType || (aircraftsByType && (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
+            // Only disable if loading or if there are no aircraft available at all
+            disabled={aircraftLoading || 
+                     (aircraftType && aircraftsByType && 
+                      (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
           >
             <option value="">-- Select Aircraft --</option>
             {aircraftLoading ? (
               <option value="" disabled>Loading aircraft data...</option>
+            ) : !aircraftType ? (
+              // If no aircraft type is selected but we have a registration selected,
+              // show all aircraft to allow keeping the selection
+              aircraftList && aircraftList.length > 0 ? (
+                // Show all aircraft sorted alphabetically
+                [...aircraftList]
+                  .sort((a, b) => a.registration.localeCompare(b.registration))
+                  .map(aircraft => (
+                    <option key={aircraft.registration} value={aircraft.registration}>
+                      {aircraft.registration}
+                    </option>
+                  ))
+              ) : (
+                <option value="" disabled>No aircraft available</option>
+              )
             ) : aircraftsByType && aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
               // Show filtered aircraft for this type, sorted alphabetically
               [...aircraftsByType[aircraftType]]

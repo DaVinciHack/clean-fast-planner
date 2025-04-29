@@ -166,6 +166,9 @@ const ModularFastPlannerComponent = () => {
         console.log(`%c===== AIRCRAFT FILTERING RESULTS =====`, 'background: #070; color: #fff; font-size: 16px; font-weight: bold;');
         console.log(`Filtered to ${filteredAircraft.length} total aircraft for current region`);
         
+        // Store the current registration to preserve it during filtering
+        const currentRegistration = aircraftRegistration;
+        
         // Debug: print what's being filtered
         const region = currentRegion ? currentRegion.name : 'Unknown region';
         const filterType = aircraftType || 'All types';
@@ -273,6 +276,13 @@ const ModularFastPlannerComponent = () => {
         console.log(`Updating aircraft type buckets in state...`);
         setAircraftsByType(byType);
         setAircraftLoading(false);
+        
+        // If we had a registration selected, and we're resetting the type but keeping the registration,
+        // make sure we don't clear the registration field
+        if (currentRegistration && aircraftType === '') {
+          console.log(`Preserving registration selection: ${currentRegistration}`);
+          // The registration will remain in state because we're not resetting it
+        }
       });
       
       aircraftManagerRef.current.setCallback('onAircraftSelected', (aircraft) => {
@@ -1084,18 +1094,39 @@ const ModularFastPlannerComponent = () => {
   
   // Handle aircraft registration change
   const handleAircraftRegistrationChange = (registration) => {
+    // Store the current registration
     setAircraftRegistration(registration);
+    
+    // Remember the selected aircraft and details
+    let selectedAircraftDetails = null;
     
     // Select the aircraft in the AircraftManager
     if (aircraftManagerRef.current && registration) {
+      // First make sure we store the aircraft details
+      const aircraft = aircraftManagerRef.current.getAircraftByRegistration(registration);
+      if (aircraft) {
+        selectedAircraftDetails = aircraft;
+        aircraftManagerRef.current.selectedAircraft = aircraft;
+      }
+      
+      // Select it officially via the method
       aircraftManagerRef.current.selectAircraft(registration);
       
       // After selecting a specific aircraft, reset the type dropdown state
-      // This will actually reset the type selection in state, not just the UI
+      // But preserve the aircraft registration
       setTimeout(() => {
+        // First save the current registration
+        const currentReg = aircraftRegistration || registration;
+        
+        // Reset the aircraft type to empty
         setAircraftType('');
         console.log('Reset aircraft type state to empty after registration selection');
-      }, 1000); // Longer timeout to ensure registration is fully processed
+        
+        // Make sure we don't lose the aircraft registration
+        if (selectedAircraftDetails) {
+          console.log(`Preserving selected aircraft: ${selectedAircraftDetails.registration}`);
+        }
+      }, 800); // Shorter timeout to be more responsive
     }
     
     // Recalculate route stats with the selected aircraft
