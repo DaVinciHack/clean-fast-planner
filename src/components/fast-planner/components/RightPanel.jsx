@@ -229,11 +229,18 @@ const RightPanel = ({
             ) : null}
           </div>
           
-          {/* Show the selected aircraft registration at the bottom */}
+          {/* Show the selected aircraft registration at the bottom with type */}
           <div className="selected-aircraft">
             <label>Selected Aircraft:</label>
             <div className="selected-aircraft-display">
-              {selectedAircraft ? selectedAircraft.registration : "None Selected"}
+              {selectedAircraft ? (
+                <>
+                  {/* Extract registration without region */}
+                  {selectedAircraft.registration.split(' (')[0]} 
+                  {/* Show type instead of region */}
+                  {selectedAircraft.modelType ? ` (${selectedAircraft.modelType})` : ''}
+                </>
+              ) : "None Selected"}
             </div>
           </div>
           
