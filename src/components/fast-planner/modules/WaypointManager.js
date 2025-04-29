@@ -88,8 +88,8 @@ class WaypointManager {
         console.error('Failed to create waypoint marker');
       }
       
-      // Update route
-      this.updateRoute();
+      // Update route - don't pass route stats here as they'll be calculated by the callback
+      this.updateRoute(null);
       
       // Log the operation for debugging
       console.log(`Added waypoint ${waypoint.name} at the end, ID: ${id}`);
@@ -146,8 +146,8 @@ class WaypointManager {
     this.waypoints.splice(index, 0, waypoint);
     this.markers.splice(index, 0, marker);
     
-    // Update route
-    this.updateRoute();
+    // Update route - don't pass route stats here as they'll be calculated by the callback
+    this.updateRoute(null);
     
     // Log the operation for debugging
     console.log(`Added waypoint ${waypoint.name} at index ${index}, ID: ${id}`);
@@ -308,29 +308,24 @@ class WaypointManager {
       
       // Add leg info label at middle of the segment
       if (distance >= 2) { // Only add labels for segments longer than 2 nm
-        let legData = {};
-        
-        // Get leg data from routeStats if available
-        if (routeStats && routeStats.legs && routeStats.legs[i]) {
-          legData = routeStats.legs[i];
-        }
-        
         // Calculate time for this leg if aircraft speed is available
         let legTime = '';
         let legFuel = '';
         
-        if (routeStats && routeStats.aircraft) {
-          const speed = routeStats.aircraft.cruiseSpeed || 145;
+        if (routeStats && routeStats.aircraft && routeStats.aircraft.cruiseSpeed) {
+          const speed = routeStats.aircraft.cruiseSpeed;
           const timeHours = distance / speed;
           
           // Format time as MM:SS for this leg
           const minutes = Math.floor(timeHours * 60);
           const seconds = Math.floor((timeHours * 60 - minutes) * 60);
-          legTime = `${minutes}m${seconds}s`;
+          legTime = `${minutes}m${seconds.toString().padStart(2, '0')}s`;
           
           // Calculate fuel for this leg
-          const fuelBurn = routeStats.aircraft.fuelBurn || 1100;
-          legFuel = Math.round(timeHours * fuelBurn);
+          if (routeStats.aircraft.fuelBurn) {
+            const fuelBurn = routeStats.aircraft.fuelBurn;
+            legFuel = Math.round(timeHours * fuelBurn);
+          }
         }
         
         // Find the midpoint of the segment
@@ -342,17 +337,21 @@ class WaypointManager {
         );
         
         // Add label feature at midpoint with leg info
+        const props = {
+          isLabel: true,
+          bearing: bearing,
+          distance: distance.toFixed(1),
+          legIndex: i
+        };
+        
+        // Only add time and fuel if they exist
+        if (legTime) props.time = legTime;
+        if (legFuel) props.fuel = legFuel;
+        
         features.push({
           type: 'Feature',
           geometry: midPoint.geometry,
-          properties: {
-            isLabel: true,
-            bearing: bearing,
-            distance: distance.toFixed(1),
-            time: legTime,
-            fuel: legFuel,
-            legIndex: i
-          }
+          properties: props
         });
       }
     }
@@ -472,8 +471,11 @@ class WaypointManager {
         'filter': ['==', '$type', 'LineString']
       }, 'route'); // Insert below the main route
       
+      // Access route stats from global state if not provided
+      const stats = routeStats || window.currentRouteStats;
+      
       // Create a GeoJSON source for the route arrows and leg labels
-      const arrowsData = this.createArrowsAlongLine(coordinates, routeStats);
+      const arrowsData = this.createArrowsAlongLine(coordinates, stats);
       
       // Add a source for the arrows and labels
       map.addSource('route-arrows', {
@@ -541,19 +543,12 @@ class WaypointManager {
         'layout': {
           'symbol-placement': 'point',
           'text-field': [
-            'case',
-            ['has', 'fuel'],
-            // If we have fuel data, show distance, time and fuel
-            [
-              'concat',
-              ['get', 'distance'], ' nm\n',
-              ['get', 'time'], '\n',
-              ['get', 'fuel'], ' lbs'
-            ],
-            // Otherwise just show distance
-            ['concat', ['get', 'distance'], ' nm']
+            'concat',
+            ['get', 'distance'], ' nm',
+            ['has', 'time'], ['\n', ['get', 'time']], [''],
+            ['has', 'fuel'], ['\n', ['get', 'fuel'], ' lbs'], ['']
           ],
-          'text-size': 11,
+          'text-size': 12,
           'text-font': ['Arial Unicode MS Bold'],
           'text-offset': [0, 0.5],
           'text-anchor': 'center',

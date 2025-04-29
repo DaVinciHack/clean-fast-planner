@@ -584,13 +584,9 @@ const ModularFastPlannerComponent = () => {
       });
       
       waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
-        // Calculate route stats whenever the route changes
-        const stats = calculateRouteStats(routeData.coordinates);
-        
-        // Update the route with the calculated stats to show leg labels
-        if (stats && waypointManagerRef.current) {
-          waypointManagerRef.current.updateRoute(stats);
-        }
+        // Simply calculate route stats whenever the route changes
+        // Don't call updateRoute again to avoid infinite loop
+        calculateRouteStats(routeData.coordinates);
       });
     }
       
@@ -707,7 +703,7 @@ const ModularFastPlannerComponent = () => {
   const calculateRouteStats = (coordinates) => {
     if (!routeCalculatorRef.current || !coordinates || coordinates.length < 2) {
       setRouteStats(null);
-      return;
+      return null;
     }
     
     // Use S92 as default type if no type is selected
@@ -759,10 +755,8 @@ const ModularFastPlannerComponent = () => {
     // Update route stats state
     setRouteStats(stats);
     
-    // Update the route with the stats for leg labels
-    if (waypointManagerRef.current) {
-      waypointManagerRef.current.updateRoute(stats);
-    }
+    // Store route stats globally for access by WaypointManager
+    window.currentRouteStats = stats;
     
     return stats;
   };
