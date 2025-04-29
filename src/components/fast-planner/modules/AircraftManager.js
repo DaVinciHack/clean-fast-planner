@@ -251,12 +251,29 @@ class AircraftManager {
             };
           });
           
-          // Filter out aircraft with invalid data or inactive status
-          this.aircraftList = this.aircraftList.filter(aircraft => 
-            aircraft.registration && 
-            aircraft.modelName && 
-            (aircraft.status !== 'INACTIVE' && aircraft.status !== 'RETIRED')
-          );
+          // Filter out aircraft with invalid data, inactive status, or in long-term maintenance
+          this.aircraftList = this.aircraftList.filter(aircraft => {
+            // Check for required fields
+            if (!aircraft.registration || !aircraft.modelName) {
+              return false;
+            }
+            
+            // Check for inactive statuses
+            if (aircraft.status === 'INACTIVE' || aircraft.status === 'RETIRED') {
+              return false;
+            }
+            
+            // Check for long-term maintenance
+            if (aircraft.status && 
+                (aircraft.status.toUpperCase().includes('MAINTENANCE') || 
+                 aircraft.status.toUpperCase().includes('REPAIR') || 
+                 aircraft.status.toUpperCase().includes('OVERHAUL'))) {
+              console.log(`Filtering out aircraft in maintenance: ${aircraft.registration}, Status: ${aircraft.status}`);
+              return false;
+            }
+            
+            return true;
+          });
           
           console.log(`Processed ${this.aircraftList.length} valid aircraft`);
           
@@ -403,8 +420,32 @@ class AircraftManager {
         console.log(`${type}: ${count} aircraft`);
       });
       
-      // Add detailed debugging for S92 aircraft
-      console.log(`%c===== DETAILED S92 INSPECTION IN GULF OF MEXICO =====`, 'background: #f00; color: #fff;');
+      // Add detailed debugging for all aircraft in Gulf of Mexico
+      console.log(`%c===== DETAILED AIRCRAFT INSPECTION IN GULF OF MEXICO =====`, 'background: #f00; color: #fff;');
+      
+      // Get specific registrations to check
+      const registrationsToCheck = [
+        'N145JW', 'N290BG', 'N293BG', 'N524PB', 'N592BG',
+        'N692BG', 'N806AP', 'N920VH', 'N92EH'
+      ];
+      
+      // Find all these registrations in the aircraft list
+      console.log('CHECKING SPECIFIC REGISTRATIONS:');
+      registrationsToCheck.forEach(reg => {
+        const matches = this.aircraftList.filter(aircraft => 
+          aircraft.registration.includes(reg)
+        );
+        
+        console.log(`${reg}: Found ${matches.length} matches`);
+        
+        matches.forEach(aircraft => {
+          console.log(`  - Registration: ${aircraft.registration}`);
+          console.log(`    Type: ${aircraft.modelType}`);
+          console.log(`    Model Name: ${aircraft.modelName}`);
+          console.log(`    Region: ${aircraft.region}`);
+          console.log(`    Status: ${aircraft.status}`);
+        });
+      });
       
       // Get all S92 aircraft in Gulf of Mexico
       const s92AircraftInGOM = this.aircraftList.filter(aircraft => 
@@ -420,6 +461,7 @@ class AircraftManager {
         console.log(`Type: ${aircraft.modelType}`);
         console.log(`Model Name: ${aircraft.modelName}`);
         console.log(`Region: ${aircraft.region}`);
+        console.log(`Status: ${aircraft.status}`);
         console.log('---------');
       });
       
@@ -693,6 +735,23 @@ class AircraftManager {
     const formattedRegion = this.formatRegionForOSDK(region);
     console.log(`Getting aircraft for region: ${formattedRegion}`);
     
+    // Special handling for Gulf of Mexico - log all aircraft in this region
+    if (formattedRegion === 'GULF OF MEXICO') {
+      console.log(`%c===== ALL AIRCRAFT IN GULF OF MEXICO =====`, 'background: #00a; color: #fff;');
+      
+      // Find all aircraft that match this region
+      const gulfAircraft = this.aircraftList.filter(aircraft => 
+        this.regionsMatch(aircraft.region, formattedRegion)
+      );
+      
+      console.log(`Total aircraft in Gulf of Mexico: ${gulfAircraft.length}`);
+      
+      // Print basic info for each aircraft
+      gulfAircraft.forEach(aircraft => {
+        console.log(`- ${aircraft.registration} (${aircraft.modelType}): Status=${aircraft.status || 'Unknown'}`);
+      });
+    }
+    
     // Check if we have pre-organized data for this region
     if (this.aircraftByRegion[formattedRegion]) {
       const result = this.aircraftByRegion[formattedRegion].all;
@@ -912,6 +971,40 @@ class AircraftManager {
           });
           
           console.log(`Found ${filtered.length} aircraft using flexible type matching`);
+        }
+      }
+    }
+    
+    // Additional detailed logging for S92 after filtering for Gulf of Mexico
+    if (formattedRegion === 'GULF OF MEXICO' && (type === 'S92' || !type)) {
+      const s92Aircraft = filtered.filter(aircraft => aircraft.modelType === 'S92');
+      console.log(`%c===== S92 AIRCRAFT AFTER FILTERING (count: ${s92Aircraft.length}) =====`, 'background: #f00; color: #fff;');
+      
+      // Show each S92 aircraft in detail
+      s92Aircraft.forEach(aircraft => {
+        console.log(`- Registration: ${aircraft.registration}`);
+        console.log(`  Model: ${aircraft.modelName}`);
+        console.log(`  Type: ${aircraft.modelType}`);
+        console.log(`  Region: ${aircraft.region}`);
+        console.log(`  Status: ${aircraft.status || 'Unknown'}`);
+      });
+      
+      // Look for potential duplicates
+      const registrations = s92Aircraft.map(a => a.registration);
+      const uniqueRegs = new Set(registrations);
+      
+      if (registrations.length !== uniqueRegs.size) {
+        console.log(`%c⚠️ WARNING: FOUND DUPLICATE REGISTRATIONS IN S92 AIRCRAFT`, 'background: #f00; color: #ff0; font-weight: bold;');
+        // Find the duplicates
+        const counts = {};
+        registrations.forEach(reg => {
+          counts[reg] = (counts[reg] || 0) + 1;
+        });
+        
+        for (const [reg, count] of Object.entries(counts)) {
+          if (count > 1) {
+            console.log(`Registration ${reg} appears ${count} times!`);
+          }
         }
       }
     }
