@@ -139,21 +139,7 @@ const RightPanel = ({
           <select 
             id="aircraft-registration" 
             value={aircraftRegistration}
-            onChange={(e) => {
-              // Call the original handler with the selected registration
-              onAircraftRegistrationChange(e.target.value);
-              
-              // After selecting a specific aircraft, reset the type dropdown
-              // so the user can easily switch to another type
-              if (e.target.value) {
-                setTimeout(() => {
-                  const typeDropdown = document.getElementById('aircraft-type');
-                  if (typeDropdown) {
-                    typeDropdown.value = '';
-                  }
-                }, 500); // Slightly longer delay to ensure the registration is processed
-              }
-            }}
+            onChange={(e) => onAircraftRegistrationChange(e.target.value)}
             disabled={aircraftLoading || !aircraftType || (aircraftsByType && (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
           >
             <option value="">-- Select Aircraft --</option>

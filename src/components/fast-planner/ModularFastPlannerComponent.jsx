@@ -1089,6 +1089,13 @@ const ModularFastPlannerComponent = () => {
     // Select the aircraft in the AircraftManager
     if (aircraftManagerRef.current && registration) {
       aircraftManagerRef.current.selectAircraft(registration);
+      
+      // After selecting a specific aircraft, reset the type dropdown state
+      // This will actually reset the type selection in state, not just the UI
+      setTimeout(() => {
+        setAircraftType('');
+        console.log('Reset aircraft type state to empty after registration selection');
+      }, 1000); // Longer timeout to ensure registration is fully processed
     }
     
     // Recalculate route stats with the selected aircraft
