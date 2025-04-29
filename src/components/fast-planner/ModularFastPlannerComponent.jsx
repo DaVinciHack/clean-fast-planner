@@ -585,7 +585,12 @@ const ModularFastPlannerComponent = () => {
       
       waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
         // Calculate route stats whenever the route changes
-        calculateRouteStats(routeData.coordinates);
+        const stats = calculateRouteStats(routeData.coordinates);
+        
+        // Update the route with the calculated stats to show leg labels
+        if (stats && waypointManagerRef.current) {
+          waypointManagerRef.current.updateRoute(stats);
+        }
       });
     }
       
@@ -706,38 +711,60 @@ const ModularFastPlannerComponent = () => {
     }
     
     // Use S92 as default type if no type is selected
-    const calculationAircraftType = aircraftType || 'S92';
+    let calculationAircraftType = aircraftType || 'S92';
     
-    // If we have a specific aircraft registration selected, use its performance data
+    // If we have a selected aircraft from the third field, use that data
+    if (selectedAircraft) {
+      calculationAircraftType = selectedAircraft.modelType || 'S92';
+    }
+    
+    // Set up parameters for calculation
     let params = {
-      aircraftType: calculationAircraftType,
+      aircraftType: calculationAircraftType.toLowerCase(),
       payloadWeight,
       reserveFuel
     };
     
     // Add registration if available for specific aircraft performance data
-    if (aircraftRegistration && aircraftManagerRef.current) {
-      const aircraft = aircraftManagerRef.current.getAircraftByRegistration(aircraftRegistration);
-      if (aircraft) {
-        params.registration = aircraftRegistration;
-        
-        // Use the aircraft manager to calculate performance
-        if (aircraftManagerRef.current) {
-          const perfStats = aircraftManagerRef.current.calculateRoutePerformance(
-            calculationAircraftType,
-            coordinates,
-            params
-          );
-          
-          setRouteStats(perfStats);
-          return;
-        }
-      }
+    if (selectedAircraft) {
+      params.registration = selectedAircraft.registration;
+      
+      // If we have aircraft performance data, use it
+      const aircraftData = {
+        cruiseSpeed: selectedAircraft.cruiseSpeed || 145,
+        fuelBurn: selectedAircraft.fuelBurn || 1100,
+        maxFuel: selectedAircraft.maxFuel || 5000,
+        maxPassengers: selectedAircraft.maxPassengers || 19,
+        usefulLoad: selectedAircraft.usefulLoad || 7000
+      };
+      
+      params.aircraftData = aircraftData;
     }
     
-    // Fall back to RouteCalculator if AircraftManager calculation not available
-    const stats = routeCalculatorRef.current.calculateRouteStats(coordinates, params);
+    // Calculate route statistics
+    let stats;
+    
+    // Use the aircraft manager to calculate performance if available
+    if (aircraftManagerRef.current && selectedAircraft) {
+      stats = aircraftManagerRef.current.calculateRoutePerformance(
+        calculationAircraftType,
+        coordinates,
+        params
+      );
+    } else {
+      // Fall back to RouteCalculator
+      stats = routeCalculatorRef.current.calculateRouteStats(coordinates, params);
+    }
+    
+    // Update route stats state
     setRouteStats(stats);
+    
+    // Update the route with the stats for leg labels
+    if (waypointManagerRef.current) {
+      waypointManagerRef.current.updateRoute(stats);
+    }
+    
+    return stats;
   };
   
   /**

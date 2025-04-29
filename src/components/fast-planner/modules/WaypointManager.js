@@ -243,9 +243,10 @@ class WaypointManager {
   /**
    * Create arrow markers along a route line
    * @param {Array} coordinates - Array of [lng, lat] coordinates
+   * @param {Object} routeStats - Route statistics
    * @returns {Object} - GeoJSON feature collection of arrow markers
    */
-  createArrowsAlongLine(coordinates) {
+  createArrowsAlongLine(coordinates, routeStats = null) {
     if (!coordinates || coordinates.length < 2) {
       return {
         type: 'FeatureCollection',
@@ -304,6 +305,56 @@ class WaypointManager {
           }
         });
       }
+      
+      // Add leg info label at middle of the segment
+      if (distance >= 2) { // Only add labels for segments longer than 2 nm
+        let legData = {};
+        
+        // Get leg data from routeStats if available
+        if (routeStats && routeStats.legs && routeStats.legs[i]) {
+          legData = routeStats.legs[i];
+        }
+        
+        // Calculate time for this leg if aircraft speed is available
+        let legTime = '';
+        let legFuel = '';
+        
+        if (routeStats && routeStats.aircraft) {
+          const speed = routeStats.aircraft.cruiseSpeed || 145;
+          const timeHours = distance / speed;
+          
+          // Format time as MM:SS for this leg
+          const minutes = Math.floor(timeHours * 60);
+          const seconds = Math.floor((timeHours * 60 - minutes) * 60);
+          legTime = `${minutes}m${seconds}s`;
+          
+          // Calculate fuel for this leg
+          const fuelBurn = routeStats.aircraft.fuelBurn || 1100;
+          legFuel = Math.round(timeHours * fuelBurn);
+        }
+        
+        // Find the midpoint of the segment
+        const midpointFraction = 0.5;
+        const midPoint = window.turf.along(
+          window.turf.lineString([startPoint, endPoint]),
+          distance * midpointFraction,
+          { units: 'nauticalmiles' }
+        );
+        
+        // Add label feature at midpoint with leg info
+        features.push({
+          type: 'Feature',
+          geometry: midPoint.geometry,
+          properties: {
+            isLabel: true,
+            bearing: bearing,
+            distance: distance.toFixed(1),
+            time: legTime,
+            fuel: legFuel,
+            legIndex: i
+          }
+        });
+      }
     }
     
     return {
@@ -340,8 +391,9 @@ class WaypointManager {
   
   /**
    * Update the route line on the map
+   * @param {Object} routeStats - Optional route statistics to use for leg labels
    */
-  updateRoute() {
+  updateRoute(routeStats = null) {
     const map = this.mapManager.getMap();
     if (!map) return;
     
@@ -356,10 +408,13 @@ class WaypointManager {
       map.removeSource('route');
     }
     
-    // Remove existing arrows if they exist
+    // Remove existing arrows and labels if they exist
     if (map.getSource('route-arrows')) {
       if (map.getLayer('route-arrows')) {
         map.removeLayer('route-arrows');
+      }
+      if (map.getLayer('leg-labels')) {
+        map.removeLayer('leg-labels');
       }
       map.removeSource('route-arrows');
     }
@@ -380,7 +435,6 @@ class WaypointManager {
         }
       });
       
-      // Add main route line
       // Add main route line (make it wider for easier interaction)
       map.addLayer({
         'id': 'route',
@@ -418,10 +472,10 @@ class WaypointManager {
         'filter': ['==', '$type', 'LineString']
       }, 'route'); // Insert below the main route
       
-      // Create a GeoJSON source for the route arrows
-      const arrowsData = this.createArrowsAlongLine(coordinates);
+      // Create a GeoJSON source for the route arrows and leg labels
+      const arrowsData = this.createArrowsAlongLine(coordinates, routeStats);
       
-      // Add a source for the arrows
+      // Add a source for the arrows and labels
       map.addSource('route-arrows', {
         'type': 'geojson',
         'data': arrowsData
@@ -475,7 +529,46 @@ class WaypointManager {
         },
         'paint': {
           'icon-opacity': 0.9
-        }
+        },
+        'filter': ['!', ['has', 'isLabel']] // Only show arrows, not labels
+      });
+      
+      // Add a layer for the leg labels
+      map.addLayer({
+        'id': 'leg-labels',
+        'type': 'symbol',
+        'source': 'route-arrows',
+        'layout': {
+          'symbol-placement': 'point',
+          'text-field': [
+            'case',
+            ['has', 'fuel'],
+            // If we have fuel data, show distance, time and fuel
+            [
+              'concat',
+              ['get', 'distance'], ' nm\n',
+              ['get', 'time'], '\n',
+              ['get', 'fuel'], ' lbs'
+            ],
+            // Otherwise just show distance
+            ['concat', ['get', 'distance'], ' nm']
+          ],
+          'text-size': 11,
+          'text-font': ['Arial Unicode MS Bold'],
+          'text-offset': [0, 0.5],
+          'text-anchor': 'center',
+          'text-rotate': ['get', 'bearing'],
+          'text-rotation-alignment': 'map',
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'symbol-sort-key': 3 // Ensure labels appear above everything
+        },
+        'paint': {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 2
+        },
+        'filter': ['has', 'isLabel'] // Only show labels, not arrows
       });
       
       // Trigger route updated callback
@@ -513,10 +606,13 @@ class WaypointManager {
         map.removeSource('route');
       }
       
-      // Remove arrow layers and source
+      // Remove arrow layers, leg labels, and source
       if (map.getSource('route-arrows')) {
         if (map.getLayer('route-arrows')) {
           map.removeLayer('route-arrows');
+        }
+        if (map.getLayer('leg-labels')) {
+          map.removeLayer('leg-labels');
         }
         map.removeSource('route-arrows');
       }
