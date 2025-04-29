@@ -303,9 +303,15 @@ class WaypointManager {
       }
       
       // Create the label text in a single line with dashes between values and arrow at the end
-      let labelText = `${distance.toFixed(1)} nm`;
-      if (legTime) labelText += ` - ${legTime}`;
-      if (legFuel) labelText += ` - ${legFuel} lbs`;
+      // Make sure there are no line breaks by explicitly creating one string with all values
+      let distanceText = `${distance.toFixed(1)} nm`;
+      let timeText = legTime ? `${legTime}` : "";
+      let fuelText = legFuel ? `${legFuel} lbs` : "";
+      
+      // Combine all values in a single line with dashes
+      let labelText = distanceText;
+      if (timeText) labelText += ` - ${timeText}`;
+      if (fuelText) labelText += ` - ${fuelText}`;
       labelText += ' →'; // Add arrow at the end
       
       // Determine the adjusted bearing for text orientation
@@ -524,22 +530,23 @@ class WaypointManager {
         'layout': {
           'symbol-placement': 'point',
           'text-field': ['get', 'text'], // Use direct text field
-          'text-size': 12,
+          'text-size': 11,               // Slightly smaller text to fit better
           'text-font': ['Arial Unicode MS Bold'],
-          'text-offset': [0, -1.2],      // Position above the line
+          'text-offset': [0, -1.5],      // Position further above the line
           'text-anchor': 'center',
           'text-rotate': ['get', 'textBearing'], // Use the adjusted bearing for proper orientation
           'text-rotation-alignment': 'map',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
-          'symbol-sort-key': 3 // Ensure labels appear above everything
+          'text-max-width': 30,          // Ensure text doesn't wrap to multiple lines
+          'symbol-sort-key': 3           // Ensure labels appear above everything
         },
         'paint': {
           'text-color': '#ffffff',
           'text-halo-color': '#000000',
-          'text-halo-width': 2.5 // Slightly thicker for better readability
+          'text-halo-width': 2.5         // Slightly thicker for better readability
         },
-        'filter': ['has', 'isLabel'] // Only show labels, not arrows
+        'filter': ['has', 'isLabel']     // Only show labels, not arrows
       });
       
       // Trigger route updated callback
