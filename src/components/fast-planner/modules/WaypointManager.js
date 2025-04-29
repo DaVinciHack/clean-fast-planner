@@ -191,9 +191,9 @@ class WaypointManager {
       
       // Create a smaller pin marker with a custom color
       const marker = new window.mapboxgl.Marker({
-        color: "#40c8f0", // Turquoise/light blue 
+        color: "#FF4136", // Bright red color for better visibility
         draggable: true,
-        scale: 0.6 // Make it smaller (60% of normal size)
+        scale: 0.6 // Keep them small (60% of normal size)
       })
         .setLngLat(coords)
         .addTo(map);
@@ -311,7 +311,7 @@ class WaypointManager {
       let labelText = distanceText;
       if (timeText) labelText += ` - ${timeText}`;
       if (fuelText) labelText += ` - ${fuelText}`;
-      labelText += ' →'; // Add arrow at the end
+      labelText += ' ➜'; // Add larger arrow at the end (➜ instead of →)
       
       // Determine the adjusted bearing for text orientation
       // Make the text parallel to the line and ensure it's never upside down
