@@ -274,40 +274,6 @@ class WaypointManager {
         window.turf.point(endPoint)
       );
       
-      // Determine number of arrows based on segment length
-      let numArrows = 2; // Default to 2 arrows per segment
-      
-      // If segment is short (less than 5 nm), only use 1 arrow
-      if (distance < 5) {
-        numArrows = 1;
-      }
-      
-      // Calculate positions for arrows along the segment
-      for (let j = 1; j <= numArrows; j++) {
-        // Calculate fraction based on number of arrows
-        // For 1 arrow: place at 0.5 (middle)
-        // For 2 arrows: place at 0.33 and 0.66
-        const fraction = (j) / (numArrows + 1);
-        
-        // Find the point a fraction of the way along the segment
-        const arrowPoint = window.turf.along(
-          window.turf.lineString([startPoint, endPoint]),
-          distance * fraction,
-          { units: 'nauticalmiles' }
-        );
-        
-        // Add arrow feature at this point
-        features.push({
-          type: 'Feature',
-          geometry: arrowPoint.geometry,
-          properties: {
-            bearing: bearing
-          }
-        });
-      }
-      
-      // ALWAYS add leg info label at middle of the segment with at least distance
-      
       // Find the midpoint of the segment
       const midpointFraction = 0.5;
       const midPoint = window.turf.along(
@@ -336,18 +302,33 @@ class WaypointManager {
         legFuel = Math.round(timeHours * fuelBurn);
       }
       
-      // Create the label text
+      // Create the label text in a single line with dashes between values and arrow at the end
       let labelText = `${distance.toFixed(1)} nm`;
-      if (legTime) labelText += `\n${legTime}`;
-      if (legFuel) labelText += `\n${legFuel} lbs`;
+      if (legTime) labelText += ` - ${legTime}`;
+      if (legFuel) labelText += ` - ${legFuel} lbs`;
+      labelText += ' →'; // Add arrow at the end
       
-      // Add label feature with simple text property for direct display
+      // Determine the adjusted bearing for text orientation
+      // Make the text parallel to the line and ensure it's never upside down
+      let adjustedBearing = bearing;
+      
+      // First make it parallel to the flight path by rotating 90 degrees
+      adjustedBearing += 90;
+      
+      // Ensure text is always right-side up
+      // If the text would be upside down (90° to 270°), flip it to be right-side up
+      if (adjustedBearing > 90 && adjustedBearing < 270) {
+        adjustedBearing = (adjustedBearing + 180) % 360;
+      }
+      
+      // Add label feature with the adjusted bearing
       features.push({
         type: 'Feature',
         geometry: midPoint.geometry,
         properties: {
           isLabel: true,
-          bearing: bearing,
+          bearing: bearing,           // Original bearing for reference
+          textBearing: adjustedBearing, // Adjusted bearing for text orientation
           text: labelText,
           legIndex: i
         }
@@ -512,7 +493,8 @@ class WaypointManager {
         });
       }
       
-      // Add a layer for the arrows
+      // Since we now include arrows in the text labels, we'll disable the separate arrow markers
+      // We'll keep the layer definition but make it invisible in case we want to revert this change
       map.addLayer({
         'id': 'route-arrows',
         'type': 'symbol',
@@ -525,10 +507,11 @@ class WaypointManager {
           'icon-rotation-alignment': 'map',
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
-          'symbol-sort-key': 2 // Ensure arrows appear above the line
+          'symbol-sort-key': 2, // Ensure arrows appear above the line
+          'visibility': 'none'  // Hide the arrows since they're now in the labels
         },
         'paint': {
-          'icon-opacity': 0.9
+          'icon-opacity': 0
         },
         'filter': ['!', ['has', 'isLabel']] // Only show arrows, not labels
       });
@@ -543,9 +526,9 @@ class WaypointManager {
           'text-field': ['get', 'text'], // Use direct text field
           'text-size': 12,
           'text-font': ['Arial Unicode MS Bold'],
-          'text-offset': [0, 0.5],
+          'text-offset': [0, -1.2],      // Position above the line
           'text-anchor': 'center',
-          'text-rotate': ['get', 'bearing'],
+          'text-rotate': ['get', 'textBearing'], // Use the adjusted bearing for proper orientation
           'text-rotation-alignment': 'map',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
