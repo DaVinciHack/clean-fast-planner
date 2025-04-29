@@ -408,17 +408,35 @@
   color: var(--label-color);
 }
 
+/* Fix for white background in dropdowns and inputs */
 .info-panel input[type=number], 
-.info-panel select {
+.info-panel select,
+.info-panel input[type=text],
+select,
+.region-selector select {
   width: 95%;
   padding: 8px 10px;
   margin-bottom: 8px;
   border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-  color: var(--text-color);
+  background-color: var(--input-bg) !important; /* Force dark background */
+  color: var(--text-color) !important; /* Force light text color */
   border-radius: 5px;
   font-size: 0.85em;
   box-sizing: border-box;
+  appearance: auto; /* To ensure we're not overriding browser styles for select */
+}
+
+/* Fix for dropdown option styling */
+select option {
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+}
+
+/* Ensure contrast for dropdown selections */
+select:focus {
+  outline: none;
+  border-color: var(--button-bg);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
 }
 
 .info-panel input[type=number]:focus, 
@@ -765,4 +783,52 @@
 
 .mapboxgl-ctrl-group button:hover {
   background-color: var(--input-border);
+}
+
+/* Specifically target aircraft type and registration dropdowns */
+#aircraft-type,
+#aircraft-registration {
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+  border: 1px solid var(--input-border);
+}
+
+#aircraft-type option,
+#aircraft-registration option {
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix for possible select element styling issues */
+.info-panel select,
+.region-selector select,
+select#aircraft-type,
+select#aircraft-registration {
+  -webkit-appearance: menulist; /* Safari/Chrome */
+  -moz-appearance: menulist; /* Firefox */
+  appearance: menulist; /* Standard */
+  background-color: var(--input-bg) !important;
+  color: var(--text-color) !important;
+}
+
+/* Error message styling */
+.error-message {
+  background-color: rgba(255, 0, 0, 0.1);
+  color: var(--danger-color);
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-left: 3px solid var(--danger-color);
+  font-size: 0.9em;
+}
+
+/* Success message styling */
+.success-message {
+  background-color: rgba(0, 255, 0, 0.1);
+  color: #4CAF50;
+  padding: 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  border-left: 3px solid #4CAF50;
+  font-size: 0.9em;
 }
