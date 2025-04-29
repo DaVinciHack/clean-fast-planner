@@ -1031,36 +1031,26 @@ const ModularFastPlannerComponent = () => {
     // Store the current registration
     setAircraftRegistration(registration);
     
-    // Remember the selected aircraft and details
-    let selectedAircraftDetails = null;
-    
     // Select the aircraft in the AircraftManager
     if (aircraftManagerRef.current && registration) {
-      // First make sure we store the aircraft details
+      // Store the selected aircraft
       const aircraft = aircraftManagerRef.current.getAircraftByRegistration(registration);
       if (aircraft) {
-        selectedAircraftDetails = aircraft;
         aircraftManagerRef.current.selectedAircraft = aircraft;
       }
       
-      // Select it officially via the method
+      // Select it via the method
       aircraftManagerRef.current.selectAircraft(registration);
       
-      // After selecting a specific aircraft, reset the type dropdown state
-      // But preserve the aircraft registration
+      // After selecting a specific aircraft, reset the type dropdown to show all types
+      // IMPORTANT: Do this after a delay to ensure proper UI update
       setTimeout(() => {
-        // First save the current registration
-        const currentReg = aircraftRegistration || registration;
-        
-        // Reset the aircraft type to empty
+        // Reset aircraft type to empty which will be mapped to 'select' in the UI
         setAircraftType('');
-        console.log('Reset aircraft type state to empty after registration selection');
+        console.log('Reset aircraft type state after registration selection');
         
-        // Make sure we don't lose the aircraft registration
-        if (selectedAircraftDetails) {
-          console.log(`Preserving selected aircraft: ${selectedAircraftDetails.registration}`);
-        }
-      }, 800); // Shorter timeout to be more responsive
+        // No need to explicitly set DOM element value, the React state will handle it
+      }, 500);
     }
     
     // Recalculate route stats with the selected aircraft

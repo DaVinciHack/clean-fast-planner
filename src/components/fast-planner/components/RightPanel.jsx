@@ -91,13 +91,16 @@ const RightPanel = ({
           {/* Simple aircraft type selection dropdown */}
           <select 
             id="aircraft-type" 
-            value={aircraftType || ''}
-            onChange={(e) => onAircraftTypeChange(e.target.value)}
+            value={aircraftType === '' ? 'select' : aircraftType}
+            onChange={(e) => {
+              const value = e.target.value === 'select' ? '' : e.target.value;
+              onAircraftTypeChange(value);
+            }}
             disabled={aircraftLoading}
             className="aircraft-type-dropdown"
           >
-            {/* Always show the change type option first */}
-            <option value="">-- Change Aircraft Type --</option>
+            {/* Special option that triggers change but isn't an empty value */}
+            <option value="select">-- Change Aircraft Type --</option>
             
             {aircraftLoading ? (
               <option value="" disabled>Loading...</option>
