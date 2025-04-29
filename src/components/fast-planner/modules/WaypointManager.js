@@ -292,10 +292,9 @@ class WaypointManager {
         const speed = stats.aircraft.cruiseSpeed || 145;
         const timeHours = distance / speed;
         
-        // Format time as MM:SS for this leg
-        const minutes = Math.floor(timeHours * 60);
-        const seconds = Math.floor((timeHours * 60 - minutes) * 60);
-        legTime = `${minutes}m${seconds.toString().padStart(2, '0')}s`;
+        // Format time as minutes only, rounded to the nearest minute
+        const totalMinutes = Math.round(timeHours * 60);
+        legTime = `${totalMinutes}m`;
         
         // Calculate fuel for this leg
         const fuelBurn = stats.aircraft.fuelBurn || 1100;
