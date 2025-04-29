@@ -149,11 +149,11 @@ const RightPanel = ({
             {aircraftLoading ? (
               <option value="" disabled>Loading aircraft data...</option>
             ) : !aircraftType ? (
-              // If no aircraft type is selected but we have a registration selected,
-              // show all aircraft to allow keeping the selection
-              aircraftList && aircraftList.length > 0 ? (
-                // Show all aircraft sorted alphabetically
-                [...aircraftList]
+              // If no aircraft type is selected, show all aircraft from all types
+              // Create a combined list of all aircraft from all types
+              Object.values(aircraftsByType).flat().length > 0 ? (
+                // Show all aircraft sorted alphabetically from all types
+                [...Object.values(aircraftsByType).flat()]
                   .sort((a, b) => a.registration.localeCompare(b.registration))
                   .map(aircraft => (
                     <option key={aircraft.registration} value={aircraft.registration}>
