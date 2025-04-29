@@ -88,18 +88,24 @@ const RightPanel = ({
         <div className="control-section">
           <h4>Aircraft Configuration</h4>
           <label htmlFor="aircraft-type">Aircraft Type:</label>
+          {/* Improved aircraft type selection dropdown that doesn't require an extra click */}
           <select 
             id="aircraft-type" 
-            value={aircraftType}
+            value={aircraftType || ''}
             onChange={(e) => onAircraftTypeChange(e.target.value)}
             disabled={aircraftLoading}
+            className="aircraft-type-dropdown"
           >
+            {/* Clear option - always first */}
+            <option value="">-- Select Aircraft Type --</option>
+            
             {aircraftLoading ? (
-              <option value="">Loading...</option>
-            ) : aircraftsByType && Object.keys(aircraftsByType).some(type => aircraftsByType[type].length > 0) ? (
-              // Dynamic dropdown - only show types that have aircraft in this region
+              <option value="" disabled>Loading...</option>
+            ) : aircraftsByType && Object.keys(aircraftsByType).some(type => aircraftsByType[type] && aircraftsByType[type].length > 0) ? (
+              // Show all types that have aircraft in this region
               Object.keys(aircraftsByType)
-                .filter(type => aircraftsByType[type].length > 0)
+                .filter(type => type && aircraftsByType[type] && aircraftsByType[type].length > 0)
+                .sort() // Sort alphabetically
                 .map(type => {
                   let displayName;
                   switch(type) {
@@ -123,7 +129,7 @@ const RightPanel = ({
                   );
                 })
             ) : (
-              <option value="">No aircraft available in this region</option>
+              <option value="" disabled>No aircraft available in this region</option>
             )}
           </select>
           

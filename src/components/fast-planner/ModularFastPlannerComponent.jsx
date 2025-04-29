@@ -44,7 +44,7 @@ const ModularFastPlannerComponent = () => {
   const [regionLoading, setRegionLoading] = useState(false);
   
   // Aircraft and route state
-  const [aircraftType, setAircraftType] = useState('S92');
+  const [aircraftType, setAircraftType] = useState(''); // Start with empty selection
   const [aircraftRegistration, setAircraftRegistration] = useState('');
   const [aircraftList, setAircraftList] = useState([]);
   const [aircraftTypes, setAircraftTypes] = useState(['S92', 'S76', 'S76D', 'AW139', 'AW189', 'H175', 'H160', 'EC135', 'EC225', 'AS350', 'A119']);
@@ -120,10 +120,19 @@ const ModularFastPlannerComponent = () => {
               }
             }
             
-            // If no match found, use default bucket
+            // If no match found, create a new bucket for its actual type instead of defaulting to S92
             if (!found) {
-              console.log(`No type match for aircraft: ${aircraft.registration}, defaulting to S92`);
-              emptyByType['S92'].push(aircraft);
+              // Use the aircraft's actual type or create a new category
+              const actualType = aircraft.modelType || 'UNKNOWN';
+              console.log(`No type match for aircraft: ${aircraft.registration}, using actual type: ${actualType}`);
+              
+              // Create a new bucket if needed
+              if (!emptyByType[actualType]) {
+                emptyByType[actualType] = [];
+              }
+              
+              // Add to the correct bucket
+              emptyByType[actualType].push(aircraft);
             }
           });
           
@@ -201,9 +210,17 @@ const ModularFastPlannerComponent = () => {
             }
           }
           
-          // If we still can't find a match, use a default bucket
-          console.log(`No bucket match for aircraft type: ${type}, defaulting to S92`);
-          byType['S92'].push(aircraft);
+          // If we still can't find a match, create a bucket for this type
+          const actualType = aircraft.modelType || "UNKNOWN";
+          console.log(`No bucket match for aircraft type: ${type}, using actual type: ${actualType}`);
+          
+          // Create the bucket if it doesn't exist
+          if (!byType[actualType]) {
+            byType[actualType] = [];
+          }
+          
+          // Add to the correct bucket
+          byType[actualType].push(aircraft);
         });
         
         // STEP 2: Figure out which aircraft types are available in this region
@@ -675,9 +692,12 @@ const ModularFastPlannerComponent = () => {
       return;
     }
     
+    // Use S92 as default type if no type is selected
+    const calculationAircraftType = aircraftType || 'S92';
+    
     // If we have a specific aircraft registration selected, use its performance data
     let params = {
-      aircraftType,
+      aircraftType: calculationAircraftType,
       payloadWeight,
       reserveFuel
     };
@@ -691,7 +711,7 @@ const ModularFastPlannerComponent = () => {
         // Use the aircraft manager to calculate performance
         if (aircraftManagerRef.current) {
           const perfStats = aircraftManagerRef.current.calculateRoutePerformance(
-            aircraftType,
+            calculationAircraftType,
             coordinates,
             params
           );
@@ -707,7 +727,10 @@ const ModularFastPlannerComponent = () => {
     setRouteStats(stats);
   };
   
-  // Load aircraft data from OSDK
+  /**
+   * Load all aircraft once, then filter by region
+   * This new implementation does one big load and then filters without additional API calls
+   */
   const loadAircraftData = async (region = null) => {
     // Return a promise so we can chain with .then() and .catch()
     return new Promise(async (resolve, reject) => {
@@ -720,21 +743,9 @@ const ModularFastPlannerComponent = () => {
       setAircraftLoading(true);
       
       // Set a global flag that data loading has been attempted
-      // This helps the auth system know we're authenticated if data loads
       window.aircraftLoadAttempted = true;
       
-      // Set a safety timeout to ensure loading state doesn't get stuck
-      const safetyTimeout = setTimeout(() => {
-        console.log("Aircraft loading safety timeout triggered");
-        setAircraftLoading(false);
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-          loadingOverlay.style.display = 'none';
-        }
-        // Don't reject here - let the UI recover even if we don't get data
-      }, 15000); // 15 second timeout
-      
-      // Create debug overlay
+      // Create a simple debug overlay
       const showDebugMessage = (message, success = true) => {
         let debugOverlay = document.getElementById('aircraft-debug-overlay');
         if (!debugOverlay) {
@@ -768,144 +779,82 @@ const ModularFastPlannerComponent = () => {
       };
       
       try {
-        // Define debug messages with styling for better visibility
-        console.log(`%c===== LOADING AIRCRAFT DATA ${region ? `FOR REGION: ${region.name}` : ''} =====`, 
-          'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
+        // Use a specific timeout to prevent getting stuck
+        const loadingTimeout = setTimeout(() => {
+          console.log("Aircraft loading timeout reached");
+          setAircraftLoading(false);
+          showDebugMessage("Aircraft loading timed out. Please try again.", false);
+          resolve([]);
+        }, 15000);
         
-        const regionInfo = region ? `${region.name} (${region.id})` : 'All Regions';
-        showDebugMessage(`Loading aircraft data for ${regionInfo}...`);
-        
-        // Show loading message
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-          loadingOverlay.textContent = `Loading aircraft data for ${regionInfo}...`;
-          loadingOverlay.style.display = 'block';
+        // Show initial loading message
+        if (region) {
+          const regionInfo = region ? `${region.name} (${region.id})` : 'All Regions';
+          showDebugMessage(`Loading aircraft data for ${regionInfo}...`);
+        } else {
+          showDebugMessage(`Loading all aircraft data...`);
         }
         
-        // First verify the AircraftManager is properly initialized
-        if (!aircraftManagerRef.current) {
-          console.error('AircraftManager is not initialized!');
-          throw new Error('AircraftManager is not initialized');
+        // STEP 1: Load ALL aircraft once (if not already loaded)
+        await aircraftManagerRef.current.loadAircraftFromOSDK(client);
+        
+        // Set a global flag that aircraft data has been successfully loaded
+        window.aircraftLoaded = true;
+        
+        // Log the loaded aircraft count
+        console.log(`Loaded ${aircraftManagerRef.current.aircraftList.length} total aircraft into memory`);
+        
+        // Now update the full aircraft list in state
+        setAircraftList(aircraftManagerRef.current.aircraftList);
+        
+        // STEP 2: Filter by region if specified
+        let regionAircraft = [];
+        let regionTypes = [];
+        
+        if (region) {
+          // Get all aircraft for this region
+          regionAircraft = aircraftManagerRef.current.getAircraftByRegion(region.id);
+          
+          // Get available types in this region
+          regionTypes = aircraftManagerRef.current.getAvailableTypesInRegion(region.id);
+          
+          // Filter by the current region without a type to show all aircraft in that region
+          const filteredByRegion = aircraftManagerRef.current.filterAircraft(region.id, null);
+          
+          // Show success message with counts
+          showDebugMessage(`Found ${filteredByRegion.length} aircraft in ${region.name} with ${regionTypes.length} types`);
+          
+          // Update available types
+          setAircraftTypes(regionTypes.length > 0 ? regionTypes : ['S92']);
+          
+          // If current type isn't available in this region, switch to first available
+          if (regionTypes.length > 0 && !regionTypes.includes(aircraftType)) {
+            console.log(`Current type ${aircraftType} not available in region ${region.name}, switching to ${regionTypes[0]}`);
+            setAircraftType(regionTypes[0]);
+            saveToLocalStorage('lastAircraftType', regionTypes[0]);
+          }
+          
+          // Now apply the current type filter if applicable
+          if (aircraftType) {
+            console.log(`Filtering region's aircraft to show only ${aircraftType}`);
+            aircraftManagerRef.current.filterAircraft(region.id, aircraftType);
+          }
+        } else {
+          // No region specified, so show all aircraft types
+          const allTypes = aircraftManagerRef.current.getAvailableTypes();
+          setAircraftTypes(allTypes);
+          
+          showDebugMessage(`Loaded ${aircraftManagerRef.current.aircraftList.length} aircraft with ${allTypes.length} types`);
         }
         
-        // Log current region and aircraft type
-        console.log('Current state before loading:');
-        console.log('- Current Region:', currentRegion ? `${currentRegion.name} (${currentRegion.id})` : 'None');
-        console.log('- Current Aircraft Type:', aircraftType);
-        console.log('- Existing aircraft count:', aircraftManagerRef.current.aircraftList.length);
+        // Clear the timeout since we finished successfully
+        clearTimeout(loadingTimeout);
         
-        // Load aircraft data - if region is provided, use it for initial filtering
-        const regionId = region ? region.id : null;
-        
-        // Set a specific timeout for OSDK loading
-        const osdkTimeout = setTimeout(() => {
-          console.log("OSDK aircraft loading timeout reached");
-          // We'll create empty mock aircraft data as a fallback
-          if (aircraftManagerRef.current) {
-            console.log("Falling back to empty aircraft list");
-            aircraftManagerRef.current.aircraftList = []; // Reset to empty
-            
-            // Hide loading indicators
-            if (loadingOverlay) {
-              loadingOverlay.style.display = 'none';
-            }
-            setAircraftLoading(false);
-            
-            // Show a message about the timeout
-            showDebugMessage(`OSDK aircraft loading timeout - no aircraft available`, false);
-            
-            // Resolve with empty list rather than rejecting
-            resolve([]);
-            clearTimeout(safetyTimeout);
-          }
-        }, 10000); // 10 second timeout for OSDK loading
-        
-        try {
-          await aircraftManagerRef.current.loadAircraftFromOSDK(client, regionId);
-          clearTimeout(osdkTimeout);
-          
-          // Get count after loading
-          const loadedCount = aircraftManagerRef.current.aircraftList.length;
-          console.log(`Loaded ${loadedCount} aircraft from OSDK`);
-          
-          // Set a global flag that aircraft data has been successfully loaded
-          // This helps the auth system know we're authenticated
-          window.aircraftLoaded = true;
-          
-          // CRITICAL FIX: Always do a region-only filter first to discover all available types
-          if (currentRegion) {
-            console.log(`%cDoing region-only filter for: ${currentRegion.id}`, 
-              'background: #070; color: #fff; font-size: 14px;');
-            
-            const filteredAircraft = aircraftManagerRef.current.filterAircraft(currentRegion.id, null);
-            showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${currentRegion.name}`);
-          } else if (region) {
-            console.log(`%cDoing region-only filter for: ${region.id}`, 
-              'background: #070; color: #fff; font-size: 14px;');
-            
-            const filteredAircraft = aircraftManagerRef.current.filterAircraft(region.id, null);
-            showDebugMessage(`Found ${filteredAircraft.length} aircraft in ${region.name}`);
-          } else {
-            // If no filtering criteria, show raw counts by region and type
-            console.log('%cNo filtering criteria provided, showing raw counts:', 'color: #f90; font-weight: bold;');
-            const regionCounts = {};
-            const typeCounts = {};
-            
-            aircraftManagerRef.current.aircraftList.forEach(aircraft => {
-              // Count by region
-              const region = aircraft.region || 'Unknown';
-              regionCounts[region] = (regionCounts[region] || 0) + 1;
-              
-              // Count by type
-              const type = aircraft.modelType || 'Unknown';
-              typeCounts[type] = (typeCounts[type] || 0) + 1;
-            });
-            
-            console.log('Aircraft counts by region:', regionCounts);
-            console.log('Aircraft counts by type:', typeCounts);
-          }
-          
-          console.log(`%c===== AIRCRAFT DATA LOADED AND FILTERED =====`, 
-            'background: #007; color: #fff; font-size: 16px; font-weight: bold;');
-        } catch (error) {
-          clearTimeout(osdkTimeout);
-          console.error('Error during OSDK aircraft loading:', error);
-          showDebugMessage(`OSDK error: ${error.message}`, false);
-          
-          // We'll continue with an empty aircraft list rather than failing completely
-          if (aircraftManagerRef.current) {
-            aircraftManagerRef.current.aircraftList = []; // Reset to empty
-          }
-        }
-        
-        // Nothing to hide
-        
-        // Clear the main safety timeout as we've completed successfully
-        clearTimeout(safetyTimeout);
-        
-        // Resolve the promise with the aircraft list (even if empty)
-        resolve(aircraftManagerRef.current?.aircraftList || []);
+        // Resolve with the filtered aircraft
+        resolve(aircraftManagerRef.current.filteredAircraft);
       } catch (error) {
-        console.error('Error in aircraft loading process:', error);
-        
-        // Show error message
-        showDebugMessage(`Error loading aircraft data: ${error.message}`, false);
-        
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-          loadingOverlay.textContent = `Error loading aircraft data: ${error.message}`;
-          loadingOverlay.style.display = 'block';
-          
-          // Hide after a delay
-          setTimeout(() => {
-            loadingOverlay.style.display = 'none';
-          }, 3000);
-        }
-        
-        // Clear the safety timeout since we're handling the error
-        clearTimeout(safetyTimeout);
-        
-        // Reject the promise
+        console.error('Error loading aircraft data:', error);
+        showDebugMessage(`Error loading aircraft: ${error.message}`, false);
         reject(error);
       } finally {
         setAircraftLoading(false);
@@ -985,21 +934,39 @@ const ModularFastPlannerComponent = () => {
     setAircraftsByType(byType);
   };
 
-  // Handle aircraft type change
+  /**
+   * Handle aircraft type change - enhanced memory-based approach with empty selection handling
+   */
   const handleAircraftTypeChange = (type) => {
-    console.log(`%cChanging aircraft type to: ${type}`, 'background: #070; color: #fff; font-size: 14px;');
+    console.log(`%c===== CHANGING AIRCRAFT TYPE TO: ${type || 'EMPTY'} =====`, 'background: #070; color: #fff; font-size: 14px;');
+    
+    if (type === aircraftType) {
+      console.log("Type already selected, no change needed");
+      return;
+    }
+    
+    // Update state
     setAircraftType(type);
     
-    // Save the selected aircraft type to localStorage
-    saveToLocalStorage('lastAircraftType', type);
+    // Only save non-empty preferences to localStorage
+    if (type) {
+      saveToLocalStorage('lastAircraftType', type);
+    } else {
+      // Clear saved preference if empty selection
+      try {
+        localStorage.removeItem('fast-planner-lastAircraftType');
+      } catch (e) {
+        console.error('Error clearing localStorage:', e);
+      }
+    }
     
     // Reset aircraft registration when type changes
     setAircraftRegistration('');
     
-    // Show loading state while filtering
+    // Show loading state briefly for visual feedback
     setAircraftLoading(true);
     
-    // Create debug overlay
+    // Create simple debug overlay
     const showTypeChangeMessage = (message) => {
       let debugOverlay = document.getElementById('type-change-overlay');
       if (!debugOverlay) {
@@ -1036,44 +1003,78 @@ const ModularFastPlannerComponent = () => {
       }, 4000);
     };
     
-    // Filter aircraft by current region and new type
+    // Confirm we have the AircraftManager 
     if (aircraftManagerRef.current) {
-      const regionId = currentRegion ? currentRegion.id : null;
-      const regionName = currentRegion ? currentRegion.name : "All Regions";
-      
-      console.log(`Filtering aircraft by region: ${regionId} and new type: ${type}`);
-      showTypeChangeMessage(`Filtering ${type} aircraft in ${regionName}...`);
-      
-      // Give a small delay to allow UI to update
-      setTimeout(() => {
-        try {
-          // Count aircraft before filtering
-          const beforeCount = aircraftManagerRef.current.aircraftList.length;
-          console.log(`Total aircraft before filtering: ${beforeCount}`);
+      try {
+        const regionId = currentRegion ? currentRegion.id : null;
+        const regionName = currentRegion ? currentRegion.name : "All Regions";
+        
+        // Handle empty type selection - show all aircraft for region
+        if (!type) {
+          console.log(`Empty type selection - showing all aircraft in ${regionName}`);
+          showTypeChangeMessage(`Showing all aircraft in ${regionName}`);
           
-          // Apply the filter
-          const filteredAircraft = aircraftManagerRef.current.filterAircraft(regionId, type);
+          // Filter only by region, not by type
+          const regionAircraft = aircraftManagerRef.current.filterAircraft(regionId, null);
+          console.log(`Showing ${regionAircraft.length} total aircraft in ${regionName}`);
           
-          // Display results message
-          showTypeChangeMessage(
-            `Found ${filteredAircraft.length} ${type} aircraft in ${regionName}`
-          );
-          
-          // Recalculate route stats with the new aircraft type
+          // Update route stats
           const wps = waypointManagerRef.current?.getWaypoints() || [];
           if (wps.length >= 2) {
             const coordinates = wps.map(wp => wp.coords);
+            // Use S92 as default type for calculations when no type is selected
             calculateRouteStats(coordinates);
           }
           
-          // Update UI state
-          setAircraftLoading(false);
-        } catch (error) {
-          console.error('Error filtering aircraft:', error);
-          showTypeChangeMessage(`Error filtering aircraft: ${error.message}`);
-          setAircraftLoading(false);
+          // Finish loading state after a short delay
+          setTimeout(() => {
+            setAircraftLoading(false);
+          }, 300);
+          
+          return; // Exit early
         }
-      }, 100);
+        
+        // Handle specific type selection
+        console.log(`Filtering for ${type} aircraft in ${regionName}`);
+        showTypeChangeMessage(`Filtering ${type} aircraft in ${regionName}...`);
+        
+        // Verify we have aircraft data for this type in the selected region
+        if (aircraftManagerRef.current.allAircraftLoaded) {
+          // Check if the type exists in the current region
+          const typeCounts = aircraftManagerRef.current.getAircraftCountsByType(regionId);
+          const typeCount = typeCounts[type] || 0;
+          
+          console.log(`Found ${typeCount} ${type} aircraft in ${regionName}`);
+          
+          if (typeCount === 0) {
+            console.warn(`No ${type} aircraft found in ${regionName}`);
+            
+            // Show warning but continue with filtering anyway
+            showTypeChangeMessage(`No ${type} aircraft found in ${regionName}`);
+          }
+        }
+        
+        // Apply the filter from memory
+        const filteredAircraft = aircraftManagerRef.current.filterAircraft(regionId, type);
+        
+        // Display success message with count
+        showTypeChangeMessage(`Found ${filteredAircraft.length} ${type} aircraft in ${regionName}`);
+        
+        // Recalculate route stats with the new aircraft type
+        const wps = waypointManagerRef.current?.getWaypoints() || [];
+        if (wps.length >= 2) {
+          const coordinates = wps.map(wp => wp.coords);
+          calculateRouteStats(coordinates);
+        }
+      } catch (error) {
+        console.error('Error filtering aircraft:', error);
+        showTypeChangeMessage(`Error filtering aircraft: ${error.message}`);
+      } finally {
+        // Always finish loading state after a short delay
+        setTimeout(() => {
+          setAircraftLoading(false);
+        }, 300);
+      }
     } else {
       setAircraftLoading(false);
       console.error('Cannot filter aircraft: AircraftManager not initialized');
@@ -1252,6 +1253,19 @@ const ModularFastPlannerComponent = () => {
   const initialLoadRef = useRef(false);
   const rigsAutoloadedRef = useRef(false); // Track if rigs have been auto-loaded
   
+  // Ensure aircraft type starts empty on initial load
+  useEffect(() => {
+    // Clear aircraft type on initial component mount
+    setAircraftType('');
+    
+    // Also remove from localStorage
+    try {
+      localStorage.removeItem('fast-planner-lastAircraftType');
+    } catch (e) {
+      console.error('Error clearing localStorage:', e);
+    }
+  }, []); // Empty dependency array means this runs once on mount
+  
   // Use useCallback to memoize functions used in effects to prevent stale closures
   const memoizedLoadRigData = useCallback(loadRigData, [client, platformManagerRef.current]);
   const memoizedLoadAircraftData = useCallback(loadAircraftData, [client, aircraftManagerRef.current, currentRegion]);
@@ -1408,6 +1422,17 @@ const ModularFastPlannerComponent = () => {
     
     console.log("Starting simplified initial load sequence");
     
+    // Clear aircraft type selection on initial load
+    setAircraftType('');
+    console.log("Resetting aircraft type to empty on initial load");
+    
+    // Remove any saved aircraft type from localStorage
+    try {
+      localStorage.removeItem('fast-planner-lastAircraftType');
+    } catch (e) {
+      console.error('Error clearing localStorage:', e);
+    }
+    
     // Set a very simple loading message
     const showMessage = (message) => {
       console.log(message);
@@ -1434,10 +1459,8 @@ const ModularFastPlannerComponent = () => {
     // Always start with Gulf of Mexico
     const defaultRegion = 'gulf-of-mexico';
     
-    // Load the saved aircraft type
-    const savedAircraftType = getFromLocalStorage('lastAircraftType', 'S92');
-    console.log(`Using aircraft type: ${savedAircraftType}`);
-    setAircraftType(savedAircraftType);
+    // Don't load any saved aircraft type
+    console.log("Starting with empty aircraft type selection");
     
     // Simple sequential loading with delays and basic error handling
     const simpleLoadSequence = async () => {
@@ -1592,7 +1615,7 @@ const ModularFastPlannerComponent = () => {
     };
   }, [isAuthenticated]); // Only re-run when authentication status changes
   
-  // Handle region selection - with aircraft loading enabled
+  // Handle region selection - using in-memory aircraft data
   const handleRegionChange = (regionId) => {
     if (!regionManagerRef.current) return;
     
@@ -1602,30 +1625,37 @@ const ModularFastPlannerComponent = () => {
     
     setRegionLoading(true);
     
-    // Message handling - Console only, no UI overlays
+    // IMPORTANT: Reset aircraft selection when changing regions
+    setAircraftType(''); // Set to empty to force user to choose
+    setAircraftRegistration(''); // Clear aircraft registration too
+    
+    // Remove saved aircraft type from localStorage
+    try {
+      localStorage.removeItem('fast-planner-lastAircraftType');
+      console.log('Cleared saved aircraft type preference');
+    } catch (e) {
+      console.error('Error clearing localStorage:', e);
+    }
+    
+    // Simple status message in console only, no UI overlays
     const showMessage = (message) => {
       console.log(message);
-      // Don't show any UI overlays
-    };
-    
-    const hideMessage = () => {
-      // No UI overlays to hide
     };
     
     // Save selected region to localStorage
     saveToLocalStorage('lastRegionId', regionId);
     
-    // COMPLETELY CLEAN VERSION - NO AIRCRAFT LOADING AT ALL
-    const loadRegionDataMinimal = async () => {
+    // Enhanced region change with memory-based aircraft filtering
+    const loadRegionData = async () => {
       try {
-        // Step 1: Initial message
+        // Step 1: Initial setup
         showMessage(`Changing to ${regionId}...`);
         
         // Step 2: Clear existing platforms
         if (platformManagerRef.current) {
           console.log('Clearing existing platforms');
           try {
-            // Get a reference to existing platform count before clearing
+            // Log platform count before clearing
             const beforeCount = platformManagerRef.current.getPlatformCount ? 
                                 platformManagerRef.current.getPlatformCount() : 
                                 "unknown";
@@ -1644,7 +1674,6 @@ const ModularFastPlannerComponent = () => {
         if (!region) {
           console.error(`Failed to set region to ${regionId}`);
           setRegionLoading(false);
-          hideMessage();
           return;
         }
         
@@ -1658,8 +1687,7 @@ const ModularFastPlannerComponent = () => {
         // Wait for region change to finalize
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Skip static data loading completely
-        console.log(`Loading map data for ${region.name}...`);
+        // Set platforms visible
         setPlatformsVisible(true);
         
         // If authenticated, load platforms from Foundry
@@ -1668,15 +1696,13 @@ const ModularFastPlannerComponent = () => {
           console.log(`Loading platforms from Foundry for ${region.name}`);
           
           try {
-            // IMPORTANT: Set a flag to prevent double loading which causes layer issues
+            // Set a flag to prevent double loading which causes layer issues
             window.isLoadingPlatforms = true;
             
-            // Load platforms with a direct call
-            console.log(`Loading platforms for ${region.name}...`);
-            
-            // CRITICAL CHANGE: Modify platform manager to prevent platform clearing after load
-            if (platformManagerRef.current) {
+            // Set the skipNextClear flag to prevent duplicate layer errors
+            if (platformManagerRef.current && typeof platformManagerRef.current.skipNextClear !== 'undefined') {
               platformManagerRef.current.skipNextClear = true;
+              console.log("Set skipNextClear flag to prevent duplicate source errors");
             }
             
             const platforms = await platformManagerRef.current.loadPlatformsFromFoundry(client, region.osdkRegion);
@@ -1686,7 +1712,7 @@ const ModularFastPlannerComponent = () => {
             setPlatformsLoaded(true);
             setPlatformsVisible(true);
             
-            // Force visibility in the manager if method exists
+            // Force visibility in the manager
             if (platformManagerRef.current && platformManagerRef.current.setVisibility) {
               platformManagerRef.current.setVisibility(true);
               console.log("Forced platform visibility using manager's setVisibility method");
@@ -1727,34 +1753,85 @@ const ModularFastPlannerComponent = () => {
               }
             }, 2000);
             
-            // Now load aircraft for this region
-            showMessage(`Loading aircraft for ${region.name}...`);
-            console.log(`Loading aircraft data for ${region.name}...`);
-            
+            // AIRCRAFT FILTERING FROM MEMORY - This is the key part for your issue
+            console.log(`\n===== FILTERING AIRCRAFT FOR ${region.name} FROM MEMORY =====`);
             try {
-              // Reset aircraft data for new region
-              if (aircraftManagerRef.current) {
-                aircraftManagerRef.current.resetAircraftForRegion();
+              if (aircraftManagerRef.current && aircraftManagerRef.current.allAircraftLoaded) {
                 setAircraftLoading(true);
                 
-                // Load aircraft data for the new region
-                const aircraft = await loadAircraftData(region);
-                console.log(`Successfully loaded ${aircraft.length} aircraft for ${region.name}`);
+                // Log aircraft counts by type in this region
+                const typeCounts = aircraftManagerRef.current.getAircraftCountsByType(region.id);
+                console.log('Aircraft counts by type in this region:', typeCounts);
                 
-                showMessage(`Loaded ${aircraft.length} aircraft for ${region.name}`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Get all available aircraft types for this region from memory
+                const availableTypes = aircraftManagerRef.current.getAvailableTypesInRegion(region.id);
+                console.log(`Available aircraft types in ${region.name}:`, availableTypes);
                 
-                hideMessage();
+                // Only show types that actually have aircraft in this region
+                const typesWithAircraft = availableTypes.filter(type => typeCounts[type] && typeCounts[type] > 0);
+                console.log(`Types with aircraft in ${region.name}:`, typesWithAircraft);
+                
+                // Update the aircraft types dropdown with all available types
+                // Don't set any defaults - user must make a selection
+                console.log(`Available aircraft types in ${region.name}:`, typesWithAircraft);
+                setAircraftTypes(typesWithAircraft.length > 0 ? typesWithAircraft : []);
+                
+                // FORCE empty aircraft type - this is critical to fix the dropdown
+                setAircraftType('');
+                
+                // Clear any locally stored preference
+                try {
+                  localStorage.removeItem('fast-planner-lastAircraftType');
+                  console.log('Cleared saved aircraft type preference');
+                } catch (e) {
+                  console.error('Error clearing localStorage:', e);
+                }
+                
+                // Don't apply type filtering - show all aircraft for the region
+                console.log(`Showing all aircraft in ${region.name} without type filtering`);
+                const regionAircraft = aircraftManagerRef.current.filterAircraft(region.id, null);
+                console.log(`Showing ${regionAircraft.length} total aircraft in ${region.name}`);
+                
+                // Print type counts for debugging
+                const regionTypeCounts = aircraftManagerRef.current.getAircraftCountsByType(region.id);
+                console.log(`Type counts in ${region.name}:`, regionTypeCounts);
+                
+                setAircraftLoading(false);
+              } else {
+                // Aircraft not loaded yet, so load them now
+                console.log('Aircraft not loaded in memory yet, will attempt to load them');
+                
+                if (client && aircraftManagerRef.current) {
+                  // First load all aircraft if they're not already loaded
+                  await aircraftManagerRef.current.loadAircraftFromOSDK(client);
+                  
+                  // Then filter for this region
+                  const availableTypes = aircraftManagerRef.current.getAvailableTypesInRegion(region.id);
+                  console.log(`Available aircraft types after loading: ${availableTypes.join(', ')}`);
+                  
+                  // Update the UI with available types
+                  setAircraftTypes(availableTypes.length > 0 ? availableTypes : ['S92']);
+                  
+                  // Select first available type if current not available
+                  if (availableTypes.length > 0 && !availableTypes.includes(aircraftType)) {
+                    const newType = availableTypes[0];
+                    setAircraftType(newType);
+                    saveToLocalStorage('lastAircraftType', newType);
+                  }
+                  
+                  // Apply filtering
+                  aircraftManagerRef.current.filterAircraft(region.id, aircraftType);
+                }
+                
+                setAircraftLoading(false);
               }
             } catch (aircraftError) {
-              console.error(`Error loading aircraft for ${region.name}:`, aircraftError);
-              hideMessage();
+              console.error(`Error filtering aircraft for ${region.name}:`, aircraftError);
+              setAircraftLoading(false);
             }
           } catch (error) {
             console.error(`Error loading platforms from Foundry: ${error.message}`);
-            // Static data already loaded as fallback
-            showMessage(`Using static data for ${region.name}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            setAircraftLoading(false);
           }
         }
         
@@ -1764,17 +1841,15 @@ const ModularFastPlannerComponent = () => {
         console.log(`=======================================\n`);
         
         setRegionLoading(false);
-        hideMessage();
         
       } catch (error) {
         console.error(`Error during region change: ${error.message}`);
         setRegionLoading(false);
-        hideMessage();
       }
     };
     
-    // Start the region change process with the simplified version
-    loadRegionDataMinimal();
+    // Start the region change process
+    loadRegionData();
   };
   
   // Handle adding a favorite location
