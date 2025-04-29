@@ -46,6 +46,9 @@ const ModularFastPlannerComponent = () => {
   // Aircraft and route state
   const [aircraftType, setAircraftType] = useState(''); // Start with empty selection
   const [aircraftRegistration, setAircraftRegistration] = useState('');
+  
+  // Add a third field to store the selected aircraft independently of the dropdowns
+  const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [aircraftList, setAircraftList] = useState([]);
   const [aircraftTypes, setAircraftTypes] = useState(['S92', 'S76', 'S76D', 'AW139', 'AW189', 'H175', 'H160', 'EC135', 'EC225', 'AS350', 'A119']);
   const [aircraftsByType, setAircraftsByType] = useState({});
@@ -1026,38 +1029,75 @@ const ModularFastPlannerComponent = () => {
     }, 300);
   };
   
-  // Handle aircraft registration change
+  // Add a ref to store the last selected aircraft registration
+  const lastSelectedRegistrationRef = useRef('');
+
+  // Handler for aircraft registration change - stores selection and resets dropdowns
   const handleAircraftRegistrationChange = (registration) => {
-    // Store the current registration
-    setAircraftRegistration(registration);
+    console.log(`Selecting aircraft: ${registration}`);
     
-    // Select the aircraft in the AircraftManager
+    // IMPORTANT: First get the aircraft object
+    let aircraftObject = null;
     if (aircraftManagerRef.current && registration) {
-      // Store the selected aircraft
-      const aircraft = aircraftManagerRef.current.getAircraftByRegistration(registration);
-      if (aircraft) {
-        aircraftManagerRef.current.selectedAircraft = aircraft;
+      aircraftObject = aircraftManagerRef.current.getAircraftByRegistration(registration);
+      if (aircraftObject) {
+        console.log(`Found aircraft object: ${JSON.stringify(aircraftObject)}`);
       }
-      
-      // Select it via the method
-      aircraftManagerRef.current.selectAircraft(registration);
-      
-      // After selecting a specific aircraft, reset the type dropdown to show all types
-      // IMPORTANT: Do this after a delay to ensure proper UI update
-      setTimeout(() => {
-        // Reset aircraft type to empty which will be mapped to 'select' in the UI
-        setAircraftType('');
-        console.log('Reset aircraft type state after registration selection');
-        
-        // No need to explicitly set DOM element value, the React state will handle it
-      }, 500);
     }
     
-    // Recalculate route stats with the selected aircraft
-    const wps = waypointManagerRef.current?.getWaypoints() || [];
-    if (wps.length >= 2) {
-      const coordinates = wps.map(wp => wp.coords);
-      calculateRouteStats(coordinates);
+    // Store the aircraft object in our third field
+    if (aircraftObject) {
+      setSelectedAircraft(aircraftObject);
+      console.log(`Saved complete aircraft object to selectedAircraft state`);
+      
+      // Also save to window for persistence across re-renders
+      window.selectedAircraftObject = aircraftObject;
+      
+      // CRITICAL: Select the aircraft in the manager
+      aircraftManagerRef.current.selectedAircraft = aircraftObject;
+      aircraftManagerRef.current.selectAircraft(registration);
+      
+      // IMPORTANT: After selecting an aircraft, reset BOTH dropdowns
+      // Reset type dropdown to empty (will show "-- Change Aircraft Type --")
+      setAircraftType('');
+      // Reset registration dropdown to empty
+      setAircraftRegistration('');
+      
+      // Recalculate route stats
+      const wps = waypointManagerRef.current?.getWaypoints() || [];
+      if (wps.length >= 2) {
+        const coordinates = wps.map(wp => wp.coords);
+        calculateRouteStats(coordinates);
+      }
+      
+      // Force update immediately for visible feedback
+      setForceUpdate(prev => prev + 1);
+      
+      // Directly update DOM for immediate visual feedback
+      setTimeout(() => {
+        // Force DOM reset for the type dropdown using both React state and direct DOM manipulation
+        const typeDropdown = document.getElementById('aircraft-type');
+        if (typeDropdown) {
+          // Set the DOM value directly first
+          typeDropdown.value = 'select';
+          
+          // Then dispatch a synthetic change event to ensure React's handlers run
+          const event = new Event('change', { bubbles: true });
+          typeDropdown.dispatchEvent(event);
+          
+          console.log('Forced aircraft type dropdown reset to "-- Change Aircraft Type --"');
+        }
+        
+        // Reset registration dropdown to "-- Select Aircraft --"
+        const regDropdown = document.getElementById('aircraft-registration');
+        if (regDropdown) {
+          regDropdown.value = '';
+          console.log('Reset registration dropdown to empty');
+        }
+        
+        // Extra check - force React state update again
+        setAircraftType('');
+      }, 50);
     }
   };
   
@@ -1216,15 +1256,40 @@ const ModularFastPlannerComponent = () => {
   const rigsAutoloadedRef = useRef(false); // Track if rigs have been auto-loaded
   
   // Ensure aircraft type starts empty on initial load
+  // and restore selected aircraft if available
   useEffect(() => {
+    console.log('Initial component setup - setting default aircraft state');
+    
     // Clear aircraft type on initial component mount
     setAircraftType('');
+    console.log('Set default aircraft type to empty');
     
-    // Also remove from localStorage
+    // Remove saved aircraft type from localStorage
     try {
       localStorage.removeItem('fast-planner-lastAircraftType');
+      console.log('Cleared saved aircraft type preference');
     } catch (e) {
       console.error('Error clearing localStorage:', e);
+    }
+    
+    // CRITICAL FIX: Restore selected aircraft registration if available
+    try {
+      const savedRegistration = localStorage.getItem('fast-planner-selectedAircraftRegistration');
+      if (savedRegistration) {
+        console.log(`Found saved aircraft registration: "${savedRegistration}"`);
+        setAircraftRegistration(savedRegistration);
+        
+        // Wait for component to render, then update the dropdown directly
+        setTimeout(() => {
+          const registrationDropdown = document.getElementById('aircraft-registration');
+          if (registrationDropdown) {
+            registrationDropdown.value = savedRegistration;
+            console.log(`Restored saved aircraft registration: "${savedRegistration}"`);
+          }
+        }, 500);
+      }
+    } catch (e) {
+      console.error('Error restoring saved aircraft registration:', e);
     }
   }, []); // Empty dependency array means this runs once on mount
   
@@ -1374,6 +1439,26 @@ const ModularFastPlannerComponent = () => {
         loginBtn.style.display = 'none';
       }
     }
+    
+    // CRITICAL FIX: Add a direct event listener to handle dropdown issues
+    // This will ensure the aircraft type dropdown shows "Change Aircraft Type" after selecting an aircraft
+    setTimeout(() => {
+      const registrationDropdown = document.getElementById('aircraft-registration');
+      if (registrationDropdown) {
+        console.log('Adding direct event listener to aircraft registration dropdown');
+        
+        registrationDropdown.addEventListener('change', (e) => {
+          console.log('Aircraft registration changed via DOM event');
+          
+          // Force the type dropdown to show "-- Change Aircraft Type --"
+          const typeDropdown = document.getElementById('aircraft-type');
+          if (typeDropdown) {
+            typeDropdown.value = 'select';
+            console.log('Set aircraft type dropdown to "select" from direct event listener');
+          }
+        });
+      }
+    }, 1000);
   }, []);
   
   // Load data when component mounts - simplified approach
@@ -2026,6 +2111,8 @@ const ModularFastPlannerComponent = () => {
         onAircraftTypeChange={handleAircraftTypeChange}
         aircraftRegistration={aircraftRegistration}
         onAircraftRegistrationChange={handleAircraftRegistrationChange}
+        selectedAircraft={selectedAircraft || window.selectedAircraftObject} // Pass the third field
+        forceUpdate={forceUpdate} // Pass the forceUpdate counter to trigger re-renders
         aircraftsByType={aircraftsByType}
         aircraftLoading={aircraftLoading}
         payloadWeight={payloadWeight}

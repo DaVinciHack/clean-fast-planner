@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 /**
  * Right Panel Component
@@ -17,6 +17,8 @@ const RightPanel = ({
   onAircraftTypeChange,
   aircraftRegistration,
   onAircraftRegistrationChange,
+  selectedAircraft, // New prop for the third field
+  forceUpdate, // To detect when state changes
   aircraftsByType,
   aircraftLoading,
   payloadWeight,
@@ -31,6 +33,28 @@ const RightPanel = ({
   rigsLoading,
   onLogin
 }) => {
+  
+  // Force reset dropdowns when selectedAircraft changes
+  useEffect(() => {
+    if (selectedAircraft) {
+      // When we have a selected aircraft, force the dropdowns to reset
+      setTimeout(() => {
+        // Force DOM reset for the type dropdown
+        const typeDropdown = document.getElementById('aircraft-type');
+        if (typeDropdown) {
+          typeDropdown.value = 'select';
+          console.log('Reset type dropdown to "-- Change Aircraft Type --"');
+        }
+        
+        // Reset registration dropdown to "-- Select Aircraft --"
+        const regDropdown = document.getElementById('aircraft-registration');
+        if (regDropdown) {
+          regDropdown.value = '';
+          console.log('Reset registration dropdown to empty');
+        }
+      }, 50);
+    }
+  }, [selectedAircraft, forceUpdate]); // Re-run when selectedAircraft or forceUpdate changes
   
   const handleFileInputChange = (e) => {
     if (e.target.files.length > 0) {
@@ -95,9 +119,15 @@ const RightPanel = ({
             onChange={(e) => {
               const value = e.target.value === 'select' ? '' : e.target.value;
               onAircraftTypeChange(value);
+              
+              // If there's a selected aircraft, just show type selection but don't clear it
+              if (selectedAircraft) {
+                console.log('Keeping selected aircraft while changing type dropdown');
+              }
             }}
             disabled={aircraftLoading}
             className="aircraft-type-dropdown"
+            key={`aircraft-type-${forceUpdate}`} // Force re-render when forceUpdate changes
           >
             {/* Special option that triggers change but isn't an empty value */}
             <option value="select">-- Change Aircraft Type --</option>
@@ -142,7 +172,10 @@ const RightPanel = ({
           <select 
             id="aircraft-registration" 
             value={aircraftRegistration}
-            onChange={(e) => onAircraftRegistrationChange(e.target.value)}
+            onChange={(e) => {
+              // Simply call the parent handler - all the logic is there
+              onAircraftRegistrationChange(e.target.value);
+            }}
             // Only disable if loading or if there are no aircraft available at all
             disabled={aircraftLoading || 
                      (aircraftType && aircraftsByType && 
@@ -194,6 +227,14 @@ const RightPanel = ({
                   `No ${aircraftType} aircraft in this region`}
               </span>
             ) : null}
+          </div>
+          
+          {/* Show the selected aircraft registration at the bottom */}
+          <div className="selected-aircraft">
+            <label>Selected Aircraft:</label>
+            <div className="selected-aircraft-display">
+              {selectedAircraft ? selectedAircraft.registration : "None Selected"}
+            </div>
           </div>
           
           <label htmlFor="payload-weight">Payload Weight (lbs):</label>

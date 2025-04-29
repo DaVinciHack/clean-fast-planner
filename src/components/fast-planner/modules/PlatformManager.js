@@ -14,6 +14,8 @@ class PlatformManager {
       onVisibilityChanged: null,
       onError: null
     };
+    // Flag to prevent duplicate source/layer creation
+    this.skipNextClear = false;
   }
   
   /**
@@ -45,8 +47,15 @@ class PlatformManager {
    * @returns {Promise} - Resolves when platforms are loaded
    */
   async loadPlatformsFromFoundry(client, regionName = "GULF OF MEXICO") {
-    // Clear any existing data first to ensure fresh load
-    this.clearPlatforms();
+    // Only clear platforms if skipNextClear is false
+    if (!this.skipNextClear) {
+      // Clear any existing data first to ensure fresh load
+      this.clearPlatforms();
+    } else {
+      console.log(`Skipping clearPlatforms due to skipNextClear flag for region: ${regionName}`);
+      // Reset the flag for next time
+      this.skipNextClear = false;
+    }
     console.log(`Loading platforms for region: ${regionName}`);
     
     // Validate region name
@@ -781,24 +790,52 @@ class PlatformManager {
       }
       
       try {
-        // Remove existing layers first if they exist
-        const platformLayers = [
-          'platforms-fixed-layer',
-          'platforms-movable-layer',
-          'platforms-fixed-labels',
-          'platforms-movable-labels',
-          'airfields-layer',
-          'airfields-labels'
-        ];
-        
-        platformLayers.forEach(layerId => {
-          if (map.getLayer(layerId)) {
-            map.removeLayer(layerId);
-          }
-        });
-        if (map.getSource('major-platforms')) {
-          map.removeSource('major-platforms');
+        // CRITICAL FIX: Check if we should skip removing/recreating sources
+        // to avoid the "already exists" error during region changes
+        if (!this.skipNextClear) {
+          console.log("Removing existing platform layers and sources...");
+          // Remove existing layers first if they exist
+          const platformLayers = [
+            'platforms-layer',         // Check for old layer name too
+            'platforms-fixed-layer',
+            'platforms-movable-layer',
+            'platforms-fixed-labels',
+            'platforms-movable-labels',
+            'airfields-layer',
+            'airfields-labels'
+          ];
+          
+          // First remove all layers
+          platformLayers.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              try {
+                map.removeLayer(layerId);
+              } catch (e) {
+                console.warn(`Error removing layer ${layerId}:`, e);
+              }
+            }
+          });
+          
+          // IMPORTANT: Wait briefly before removing the source
+          // This helps avoid "source in use" errors
+          setTimeout(() => {
+            // Then remove source
+            if (map.getSource('major-platforms')) {
+              try {
+                map.removeSource('major-platforms');
+              } catch (e) {
+                console.warn("Error removing source:", e);
+              }
+            }
+          }, 50);
+        } else {
+          console.log("SKIPPING source/layer removal due to skipNextClear flag");
+          // Reset the flag for next time
+          this.skipNextClear = false;
         }
+        
+        // Check if source already exists to prevent duplicate error
+        const sourceExists = map.getSource('major-platforms');
         
         // Debug - check for specific platforms before mapping
         const debugPlatforms = ["ENLE", "ENWS", "ENWV", "ENZV"];
@@ -859,13 +896,47 @@ class PlatformManager {
         
         console.log("Adding source with features data");
         // Add source
-        map.addSource('major-platforms', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: features
+        // Add source only if it doesn't exist yet
+        if (!sourceExists) {
+          try {
+            map.addSource('major-platforms', {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: features
+              }
+            });
+          } catch (e) {
+            // If source already exists error, try to update it
+            if (e.message && e.message.includes("already exists")) {
+              console.log("Source already exists, trying to update data instead");
+              try {
+                const source = map.getSource('major-platforms');
+                if (source && typeof source.setData === 'function') {
+                  source.setData({
+                    type: 'FeatureCollection',
+                    features: features
+                  });
+                }
+              } catch (updateError) {
+                console.error("Error updating source data:", updateError);
+              }
+            }
           }
-        });
+        } else {
+          // If source exists, update its data
+          try {
+            const source = map.getSource('major-platforms');
+            if (source && typeof source.setData === 'function') {
+              source.setData({
+                type: 'FeatureCollection',
+                features: features
+              });
+            }
+          } catch (updateError) {
+            console.error("Error updating source data:", updateError);
+          }
+        }
 
         console.log("Adding fixed platforms layer");
         // Add FIXED platforms with teal ring and darker blue center
