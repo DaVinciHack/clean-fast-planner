@@ -242,27 +242,98 @@ const RightPanel = ({
                 </>
               ) : "None Selected"}
             </div>
+            
+            {/* Aircraft data grid - only shown when aircraft is selected */}
+            {selectedAircraft && (
+              <div className="aircraft-data-grid">
+                {/* Cruise Speed */}
+                <div className="aircraft-data-item">
+                  <div className="icon">✈️</div>
+                  <div className="label">Cruise Speed</div>
+                  <div className="value">
+                    {selectedAircraft.cruiseSpeed || 145}
+                    <span className="unit">kts</span>
+                  </div>
+                </div>
+                
+                {/* Fuel Flow */}
+                <div className="aircraft-data-item">
+                  <div className="icon">⛽</div>
+                  <div className="label">Fuel Flow</div>
+                  <div className="value">
+                    {selectedAircraft.fuelBurn || 1100}
+                    <span className="unit">lbs/hr</span>
+                  </div>
+                </div>
+                
+                {/* Max Passengers */}
+                <div className="aircraft-data-item">
+                  <div className="icon">👥</div>
+                  <div className="label">Max Pax</div>
+                  <div className="value">
+                    {selectedAircraft.maxPassengers || 19}
+                  </div>
+                </div>
+                
+                {/* Max Fuel */}
+                <div className="aircraft-data-item">
+                  <div className="icon">🔋</div>
+                  <div className="label">Max Fuel</div>
+                  <div className="value">
+                    {selectedAircraft.maxFuel || 5000}
+                    <span className="unit">lbs</span>
+                  </div>
+                </div>
+                
+                {/* Useful Load */}
+                <div className="aircraft-data-item">
+                  <div className="icon">⚖️</div>
+                  <div className="label">Useful Load</div>
+                  <div className="value">
+                    {selectedAircraft.usefulLoad || 7000}
+                    <span className="unit">lbs</span>
+                  </div>
+                </div>
+                
+                {/* Reserve Fuel */}
+                <div className="aircraft-data-item">
+                  <div className="icon">🔄</div>
+                  <div className="label">Reserve</div>
+                  <div className="value">
+                    {reserveFuel}
+                    <span className="unit">lbs</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          
-          <label htmlFor="payload-weight">Payload Weight (lbs):</label>
-          <input 
-            type="number" 
-            id="payload-weight" 
-            value={payloadWeight}
-            min="0" 
-            max="10000"
-            onChange={(e) => onPayloadWeightChange(parseInt(e.target.value, 10) || 0)}
-          />
-          
-          <label htmlFor="reserve-fuel">Reserve Fuel (lbs):</label>
-          <input 
-            type="number" 
-            id="reserve-fuel" 
-            value={reserveFuel}
-            min="0" 
-            max="2000"
-            onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-          />
+          {/* Keep the inputs but make them smaller and part of a more compact layout */}
+          <div style={{display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px'}}>
+            <div style={{flex: 1}}>
+              <label htmlFor="payload-weight" style={{fontSize: '11px'}}>Payload (lbs):</label>
+              <input 
+                type="number" 
+                id="payload-weight" 
+                value={payloadWeight}
+                min="0" 
+                max="10000"
+                onChange={(e) => onPayloadWeightChange(parseInt(e.target.value, 10) || 0)}
+                style={{padding: '5px', fontSize: '12px'}}
+              />
+            </div>
+            <div style={{flex: 1}}>
+              <label htmlFor="reserve-fuel" style={{fontSize: '11px'}}>Reserve (lbs):</label>
+              <input 
+                type="number" 
+                id="reserve-fuel" 
+                value={reserveFuel}
+                min="0" 
+                max="2000"
+                onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
+                style={{padding: '5px', fontSize: '12px'}}
+              />
+            </div>
+          </div>
         </div>
         
         <div className="control-section">

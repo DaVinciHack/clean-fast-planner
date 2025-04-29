@@ -790,3 +790,45 @@
   margin-bottom: 8px;
   text-align: center;
 }
+
+/* Aircraft data grid */
+.aircraft-data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+.aircraft-data-item {
+  background-color: #252525;
+  border-radius: 4px;
+  padding: 5px;
+  text-align: center;
+  border: 1px solid #333;
+}
+
+.aircraft-data-item .icon {
+  font-size: 14px;
+  color: var(--accent-cyan);
+  margin-bottom: 2px;
+}
+
+.aircraft-data-item .label {
+  font-size: 9px;
+  color: #999;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.aircraft-data-item .value {
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+
+.aircraft-data-item .unit {
+  font-size: 9px;
+  color: #aaa;
+  margin-left: 2px;
+}
