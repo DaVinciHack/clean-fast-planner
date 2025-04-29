@@ -92,12 +92,27 @@ const RightPanel = ({
           <select 
             id="aircraft-type" 
             value={aircraftType || ''}
-            onChange={(e) => onAircraftTypeChange(e.target.value)}
+            onChange={(e) => {
+              // When a selection is made, immediately reset back to the empty option
+              // This allows selecting another type right away
+              onAircraftTypeChange(e.target.value);
+              
+              // Immediately reset the dropdown to the empty option
+              if (e.target.value) {
+                setTimeout(() => {
+                  // Use setTimeout to ensure the current selection is processed first
+                  const dropdown = document.getElementById('aircraft-type');
+                  if (dropdown) {
+                    dropdown.value = '';
+                  }
+                }, 100);
+              }
+            }}
             disabled={aircraftLoading}
             className="aircraft-type-dropdown"
           >
-            {/* Clear option - always first */}
-            <option value="">-- Select Aircraft Type --</option>
+            {/* Clear option - always first, with better wording */}
+            <option value="">-- Change Aircraft Type --</option>
             
             {aircraftLoading ? (
               <option value="" disabled>Loading...</option>
