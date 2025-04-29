@@ -402,6 +402,35 @@ class AircraftManager {
       Object.entries(typeCountByRegion['GULF OF MEXICO']).forEach(([type, count]) => {
         console.log(`${type}: ${count} aircraft`);
       });
+      
+      // Add detailed debugging for S92 aircraft
+      console.log(`%c===== DETAILED S92 INSPECTION IN GULF OF MEXICO =====`, 'background: #f00; color: #fff;');
+      
+      // Get all S92 aircraft in Gulf of Mexico
+      const s92AircraftInGOM = this.aircraftList.filter(aircraft => 
+        aircraft.modelType === 'S92' && 
+        this.regionsMatch(aircraft.region, 'GULF OF MEXICO')
+      );
+      
+      console.log(`Found ${s92AircraftInGOM.length} S92 aircraft in Gulf of Mexico`);
+      
+      // Print the details of each S92 aircraft
+      s92AircraftInGOM.forEach(aircraft => {
+        console.log(`Registration: ${aircraft.registration}`);
+        console.log(`Type: ${aircraft.modelType}`);
+        console.log(`Model Name: ${aircraft.modelName}`);
+        console.log(`Region: ${aircraft.region}`);
+        console.log('---------');
+      });
+      
+      // Count each unique type in Gulf of Mexico
+      const actualTypeCounts = {};
+      this.aircraftList.filter(a => this.regionsMatch(a.region, 'GULF OF MEXICO'))
+                       .forEach(a => {
+                         actualTypeCounts[a.modelType] = (actualTypeCounts[a.modelType] || 0) + 1;
+                       });
+      
+      console.log('Actual type counts in Gulf of Mexico:', actualTypeCounts);
     }
     
     // Also check flexible region matches for alternate region names

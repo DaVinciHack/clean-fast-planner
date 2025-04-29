@@ -122,9 +122,11 @@ const RightPanel = ({
                     case 'A119': displayName = 'Leonardo A119'; break;
                     default: displayName = type;
                   }
+                  // Double-check the actual count to prevent incorrect numbers
+                  const actualCount = (aircraftsByType[type] || []).length;
                   return (
                     <option key={type} value={type}>
-                      {displayName} ({aircraftsByType[type].length})
+                      {displayName} ({actualCount})
                     </option>
                   );
                 })

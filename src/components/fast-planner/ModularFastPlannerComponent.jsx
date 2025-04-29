@@ -1402,7 +1402,7 @@ const ModularFastPlannerComponent = () => {
       // Just updating the UI elements directly
       const authMessage = document.getElementById('auth-message');
       if (authMessage) {
-        authMessage.innerHTML = 'Connected to Foundry as Duncan Burbury';
+        authMessage.innerHTML = 'Connected to Foundry';
         authMessage.className = 'auth-success';
       }
       
@@ -2078,7 +2078,7 @@ const ModularFastPlannerComponent = () => {
           }
         }}
         isAuthenticated={isAuthenticated}
-        authUserName={userName || "Duncan Burbury"}
+        authUserName={userName || "User"} // Don't use hardcoded name
         rigsLoading={rigsLoading}
         onLogin={() => {
           console.log('Connecting to Foundry...');
