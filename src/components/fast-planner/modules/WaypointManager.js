@@ -306,54 +306,52 @@ class WaypointManager {
         });
       }
       
-      // Add leg info label at middle of the segment
-      if (distance >= 2) { // Only add labels for segments longer than 2 nm
-        // Calculate time for this leg if aircraft speed is available
-        let legTime = '';
-        let legFuel = '';
+      // ALWAYS add leg info label at middle of the segment with at least distance
+      
+      // Find the midpoint of the segment
+      const midpointFraction = 0.5;
+      const midPoint = window.turf.along(
+        window.turf.lineString([startPoint, endPoint]),
+        distance * midpointFraction,
+        { units: 'nauticalmiles' }
+      );
+      
+      // Calculate leg time and fuel if aircraft data is available
+      let legTime = null;
+      let legFuel = null;
+      
+      // Try to get aircraft data from routeStats or window.currentRouteStats
+      const stats = routeStats || window.currentRouteStats;
+      if (stats && stats.aircraft) {
+        const speed = stats.aircraft.cruiseSpeed || 145;
+        const timeHours = distance / speed;
         
-        if (routeStats && routeStats.aircraft && routeStats.aircraft.cruiseSpeed) {
-          const speed = routeStats.aircraft.cruiseSpeed;
-          const timeHours = distance / speed;
-          
-          // Format time as MM:SS for this leg
-          const minutes = Math.floor(timeHours * 60);
-          const seconds = Math.floor((timeHours * 60 - minutes) * 60);
-          legTime = `${minutes}m${seconds.toString().padStart(2, '0')}s`;
-          
-          // Calculate fuel for this leg
-          if (routeStats.aircraft.fuelBurn) {
-            const fuelBurn = routeStats.aircraft.fuelBurn;
-            legFuel = Math.round(timeHours * fuelBurn);
-          }
-        }
+        // Format time as MM:SS for this leg
+        const minutes = Math.floor(timeHours * 60);
+        const seconds = Math.floor((timeHours * 60 - minutes) * 60);
+        legTime = `${minutes}m${seconds.toString().padStart(2, '0')}s`;
         
-        // Find the midpoint of the segment
-        const midpointFraction = 0.5;
-        const midPoint = window.turf.along(
-          window.turf.lineString([startPoint, endPoint]),
-          distance * midpointFraction,
-          { units: 'nauticalmiles' }
-        );
-        
-        // Add label feature at midpoint with leg info
-        const props = {
+        // Calculate fuel for this leg
+        const fuelBurn = stats.aircraft.fuelBurn || 1100;
+        legFuel = Math.round(timeHours * fuelBurn);
+      }
+      
+      // Create the label text
+      let labelText = `${distance.toFixed(1)} nm`;
+      if (legTime) labelText += `\n${legTime}`;
+      if (legFuel) labelText += `\n${legFuel} lbs`;
+      
+      // Add label feature with simple text property for direct display
+      features.push({
+        type: 'Feature',
+        geometry: midPoint.geometry,
+        properties: {
           isLabel: true,
           bearing: bearing,
-          distance: distance.toFixed(1),
+          text: labelText,
           legIndex: i
-        };
-        
-        // Only add time and fuel if they exist
-        if (legTime) props.time = legTime;
-        if (legFuel) props.fuel = legFuel;
-        
-        features.push({
-          type: 'Feature',
-          geometry: midPoint.geometry,
-          properties: props
-        });
-      }
+        }
+      });
     }
     
     return {
@@ -535,19 +533,14 @@ class WaypointManager {
         'filter': ['!', ['has', 'isLabel']] // Only show arrows, not labels
       });
       
-      // Add a layer for the leg labels
+      // Add a layer for the leg labels with direct text property
       map.addLayer({
         'id': 'leg-labels',
         'type': 'symbol',
         'source': 'route-arrows',
         'layout': {
           'symbol-placement': 'point',
-          'text-field': [
-            'concat',
-            ['get', 'distance'], ' nm',
-            ['has', 'time'], ['\n', ['get', 'time']], [''],
-            ['has', 'fuel'], ['\n', ['get', 'fuel'], ' lbs'], ['']
-          ],
+          'text-field': ['get', 'text'], // Use direct text field
           'text-size': 12,
           'text-font': ['Arial Unicode MS Bold'],
           'text-offset': [0, 0.5],
@@ -561,7 +554,7 @@ class WaypointManager {
         'paint': {
           'text-color': '#ffffff',
           'text-halo-color': '#000000',
-          'text-halo-width': 2
+          'text-halo-width': 2.5 // Slightly thicker for better readability
         },
         'filter': ['has', 'isLabel'] // Only show labels, not arrows
       });

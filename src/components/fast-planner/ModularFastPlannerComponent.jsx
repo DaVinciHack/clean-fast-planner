@@ -1037,7 +1037,14 @@ const ModularFastPlannerComponent = () => {
         const wps = waypointManagerRef.current?.getWaypoints() || [];
         if (wps.length >= 2) {
           const coordinates = wps.map(wp => wp.coords);
-          calculateRouteStats(coordinates);
+          const stats = calculateRouteStats(coordinates);
+          
+          // CRITICAL FIX: Force update the route with new leg info
+          if (waypointManagerRef.current) {
+            setTimeout(() => {
+              waypointManagerRef.current.updateRoute(stats);
+            }, 50);
+          }
         }
       } catch (error) {
         console.error('Error filtering aircraft:', error);
@@ -1088,7 +1095,14 @@ const ModularFastPlannerComponent = () => {
       const wps = waypointManagerRef.current?.getWaypoints() || [];
       if (wps.length >= 2) {
         const coordinates = wps.map(wp => wp.coords);
-        calculateRouteStats(coordinates);
+        const stats = calculateRouteStats(coordinates);
+        
+        // CRITICAL FIX: Force update the route with new leg info
+        if (waypointManagerRef.current) {
+          setTimeout(() => {
+            waypointManagerRef.current.updateRoute(stats);
+          }, 50);
+        }
       }
       
       // Force update immediately for visible feedback
@@ -1130,7 +1144,14 @@ const ModularFastPlannerComponent = () => {
     const wps = waypointManagerRef.current?.getWaypoints() || [];
     if (wps.length >= 2) {
       const coordinates = wps.map(wp => wp.coords);
-      calculateRouteStats(coordinates);
+      const stats = calculateRouteStats(coordinates);
+      
+      // CRITICAL FIX: Force update the route with new leg info
+      if (waypointManagerRef.current) {
+        setTimeout(() => {
+          waypointManagerRef.current.updateRoute(stats);
+        }, 50);
+      }
     }
   };
   
@@ -1142,7 +1163,14 @@ const ModularFastPlannerComponent = () => {
     const wps = waypointManagerRef.current?.getWaypoints() || [];
     if (wps.length >= 2) {
       const coordinates = wps.map(wp => wp.coords);
-      calculateRouteStats(coordinates);
+      const stats = calculateRouteStats(coordinates);
+      
+      // CRITICAL FIX: Force update the route with new leg info
+      if (waypointManagerRef.current) {
+        setTimeout(() => {
+          waypointManagerRef.current.updateRoute(stats);
+        }, 50);
+      }
     }
   };
   
