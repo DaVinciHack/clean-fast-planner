@@ -1,13 +1,13 @@
 import React from 'react';
 import { AuthProvider } from './context/AuthContext';
-import FastPlannerApp from './components/fast-planner/FastPlannerApp';
+import ModularFastPlannerComponent from './components/fast-planner/ModularFastPlannerComponent';
 import './index.css';
 
 function App() {
   return (
     <AuthProvider>
       <div className="app-container">
-        <FastPlannerApp />
+        <ModularFastPlannerComponent />
       </div>
     </AuthProvider>
   );
