@@ -341,10 +341,10 @@ const RightPanel = ({
           </div>
         )}
 
-        {/* Keep the inputs but make them smaller and part of a more compact layout */}
-        <div style={{display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px'}}>
-          <div style={{flex: 1}}>
-            <label htmlFor="payload-weight" style={{fontSize: '11px'}}>Payload (lbs):</label>
+        {/* Compact input layout using the new input-group class */}
+        <div className="input-group">
+          <div>
+            <label htmlFor="payload-weight">Payload:</label>
             <input 
               type="number" 
               id="payload-weight" 
@@ -352,11 +352,11 @@ const RightPanel = ({
               min="0" 
               max="10000"
               onChange={(e) => onPayloadWeightChange(parseInt(e.target.value, 10) || 0)}
-              style={{padding: '5px', fontSize: '12px'}}
             />
+            <span className="unit">lbs</span>
           </div>
-          <div style={{flex: 1}}>
-            <label htmlFor="reserve-fuel" style={{fontSize: '11px'}}>Reserve (lbs):</label>
+          <div>
+            <label htmlFor="reserve-fuel">Reserve:</label>
             <input 
               type="number" 
               id="reserve-fuel" 
@@ -364,8 +364,8 @@ const RightPanel = ({
               min="0" 
               max="2000"
               onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-              style={{padding: '5px', fontSize: '12px'}}
             />
+            <span className="unit">lbs</span>
           </div>
         </div>
       </div>
@@ -494,45 +494,57 @@ const RightPanel = ({
       <div className="control-section">
         <h4>Fuel & Weight Settings</h4>
         
-        <label htmlFor="deck-time">Deck Time Per Stop (mins):</label>
-        <input 
-          type="number" 
-          id="deck-time" 
-          value={deckTimePerStop}
-          min="0" 
-          max="60"
-          onChange={(e) => onDeckTimeChange(parseInt(e.target.value, 10) || 0)}
-        />
+        <div className="input-group">
+          <div>
+            <label htmlFor="deck-time">Deck Time (mins):</label>
+            <input 
+              type="number" 
+              id="deck-time" 
+              value={deckTimePerStop}
+              min="0" 
+              max="60"
+              onChange={(e) => onDeckTimeChange(parseInt(e.target.value, 10) || 0)}
+            />
+          </div>
+          <div>
+            <label htmlFor="deck-fuel">Deck Fuel (lbs):</label>
+            <input 
+              type="number" 
+              id="deck-fuel" 
+              value={deckFuelPerStop}
+              min="0" 
+              max="1000"
+              onChange={(e) => onDeckFuelChange(parseInt(e.target.value, 10) || 0)}
+            />
+          </div>
+        </div>
         
-        <label htmlFor="deck-fuel">Deck Fuel Per Stop (lbs):</label>
-        <input 
-          type="number" 
-          id="deck-fuel" 
-          value={deckFuelPerStop}
-          min="0" 
-          max="1000"
-          onChange={(e) => onDeckFuelChange(parseInt(e.target.value, 10) || 0)}
-        />
-        
-        <label htmlFor="passenger-weight">Passenger Weight (lbs):</label>
-        <input 
-          type="number" 
-          id="passenger-weight" 
-          value={passengerWeight}
-          min="100" 
-          max="300"
-          onChange={(e) => onPassengerWeightChange(parseInt(e.target.value, 10) || 0)}
-        />
-        
-        <label htmlFor="cargo-weight">Additional Cargo (lbs):</label>
-        <input 
-          type="number" 
-          id="cargo-weight" 
-          value={cargoWeight}
-          min="0" 
-          max="5000"
-          onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
-        />
+        <div className="input-group">
+          <div>
+            <label htmlFor="passenger-weight">Passenger Weight:</label>
+            <input 
+              type="number" 
+              id="passenger-weight" 
+              value={passengerWeight}
+              min="100" 
+              max="300"
+              onChange={(e) => onPassengerWeightChange(parseInt(e.target.value, 10) || 0)}
+            />
+            <span className="unit">lbs</span>
+          </div>
+          <div>
+            <label htmlFor="cargo-weight">Additional Cargo:</label>
+            <input 
+              type="number" 
+              id="cargo-weight" 
+              value={cargoWeight}
+              min="0" 
+              max="5000"
+              onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
+            />
+            <span className="unit">lbs</span>
+          </div>
+        </div>
         
         <h4>Fuel Reserve Settings</h4>
         
@@ -552,17 +564,20 @@ const RightPanel = ({
           
           <div>
             <label htmlFor="reserve-value">Reserve Value:</label>
-            <input 
-              type="number" 
-              id="reserve-value" 
-              value={reserveFuel}
-              min="0" 
-              onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit-label">
-              {reserveMethod === 'fixed' ? 'lbs' : 
-               reserveMethod === 'percentage' ? '%' : 'mins'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input 
+                type="number" 
+                id="reserve-value" 
+                value={reserveFuel}
+                min="0" 
+                onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
+                style={{ width: 'calc(100% - 30px)' }}
+              />
+              <span className="unit" style={{ marginLeft: '5px', minWidth: '25px' }}>
+                {reserveMethod === 'fixed' ? 'lbs' : 
+                reserveMethod === 'percentage' ? '%' : 'mins'}
+              </span>
+            </div>
           </div>
         </div>
         
