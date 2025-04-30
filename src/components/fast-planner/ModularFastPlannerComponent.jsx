@@ -5,7 +5,7 @@ import './FastPlannerStyles.css';
 
 // Import our modular components
 import { MapManager, WaypointManager, PlatformManager, RouteCalculator, RegionManager, FavoriteLocationsManager, AircraftManager } from './modules';
-import { LeftPanel, RightPanel, MapComponent, RegionSelector } from './components';
+import { LeftPanel, RightPanel, MapComponent, RegionSelector, RouteStatsCard } from './components';
 
 /**
  * Modular Fast Planner Component
@@ -750,6 +750,31 @@ const ModularFastPlannerComponent = () => {
     } else {
       // Fall back to RouteCalculator
       stats = routeCalculatorRef.current.calculateRouteStats(coordinates, params);
+    }
+    
+    // Calculate additional stats for the RouteStatsCard
+    if (stats) {
+      // Calculate endurance (in hours) - excluding reserve fuel
+      if (selectedAircraft) {
+        const fuelBurn = selectedAircraft.fuelBurn || 1100; // lbs/hr
+        const maxFuel = selectedAircraft.maxFuel || 5000; // lbs
+        const availableFuel = maxFuel - reserveFuel; // Available fuel excluding reserve
+        
+        stats.endurance = parseFloat((availableFuel / fuelBurn).toFixed(1)); // Hours
+        stats.availableFuel = availableFuel; // Available mission fuel
+        stats.takeoffWeight = selectedAircraft.emptyWeight + maxFuel + payloadWeight; // Est. takeoff weight
+        
+        // Calculate operational radius (in NM)
+        const cruiseSpeed = selectedAircraft.cruiseSpeed || 145; // kts
+        const timeAvailable = stats.endurance / 2; // Half the endurance for out and back
+        stats.operationalRadius = Math.round(cruiseSpeed * timeAvailable);
+      } else {
+        // Defaults if no aircraft selected
+        stats.endurance = 2.3;
+        stats.availableFuel = 3070;
+        stats.takeoffWeight = 24807;
+        stats.operationalRadius = 85;
+      }
     }
     
     // Update route stats state
@@ -2054,33 +2079,13 @@ const ModularFastPlannerComponent = () => {
 
   return (
     <div className="fast-planner-container">
-      {/* User info display */}
-      {isAuthenticated && (
-        <div className="user-info" style={{
-          position: 'absolute',
-          top: '10px',
-          right: '20px',
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          color: '#fff',
-          padding: '5px 10px',
-          borderRadius: '4px',
-          fontSize: '12px',
-          zIndex: 1000,
-          fontWeight: 'bold'
-        }}>
-          Logged in as: {userName || "User"}
-        </div>
-      )}
+      {/* Route Stats Card Component */}
+      <RouteStatsCard 
+        routeStats={routeStats}
+        selectedAircraft={selectedAircraft}
+      />
       
-      {/* Region Selector Component */}
-      <div className={`region-selector-container ${regionLoading ? 'loading' : ''}`}>
-        <RegionSelector
-          regions={regions}
-          currentRegion={currentRegion}
-          onRegionChange={handleRegionChange}
-          isLoading={regionLoading}
-        />
-      </div>
+      {/* Region Selector is now fully integrated within the RightPanel */}
       
       {/* Left Panel Component */}
       <LeftPanel
@@ -2193,6 +2198,11 @@ const ModularFastPlannerComponent = () => {
             setForceUpdate(prev => prev + 1);
           }, 500);
         }}
+        // Pass region props to the RightPanel
+        regions={regions}
+        currentRegion={currentRegion}
+        onRegionChange={handleRegionChange}
+        regionLoading={regionLoading}
       />
     </div>
   );

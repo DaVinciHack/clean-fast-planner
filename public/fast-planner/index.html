@@ -22,6 +22,43 @@
 <body>
   <div id="map" class="fast-planner-map"></div>
   
+  <!-- Top Center Route Statistics Card -->
+  <div id="route-stats-card">
+    <div class="card-header">
+      <div class="aircraft-info">
+        <img src="https://bristow.info/SAR/VTOL-5a215f01.png" alt="Logo" class="card-logo">
+        <span id="aircraft-id">N603PW - AW139</span>
+      </div>
+      <div class="card-title">Route Statistics</div>
+    </div>
+    <div class="card-content">
+      <div class="stats-section">
+        <div class="stat-item">
+          <div class="stat-label">Endurance (excl. reserve):</div>
+          <div class="stat-value"><span id="endurance-value">2.3</span> hrs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Available Mission Fuel:</div>
+          <div class="stat-value"><span id="mission-fuel-value">3070</span> lbs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Actual Fuel Uplift:</div>
+          <div class="stat-value"><span id="fuel-uplift-value">2039</span> lbs</div>
+        </div>
+      </div>
+      <div class="stats-section">
+        <div class="stat-item">
+          <div class="stat-label">Est. Takeoff Weight:</div>
+          <div class="stat-value"><span id="takeoff-weight-value">24807</span> lbs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Operational Radius:</div>
+          <div class="stat-value"><span id="operational-radius-value">85</span> NM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <div id="stops-panel">
     <h3>Flight Stops</h3>
     <div id="stops-container">
@@ -31,10 +68,22 @@
   </div>
   
   <div id="info-panel">
-    <h3>Gulf of Mexico Fast Planner</h3>
-    <p style="font-size: 0.8em; color: var(--label-color); margin-top: 0px; margin-bottom: 10px;">
-      Click "Load Rig Data" to show aviation grid and platforms from Foundry
-    </p>
+    <div class="panel-header">
+      <div class="header-left">
+        <img src="https://bristow.info/SAR/VTOL-5a215f01.png" alt="Logo" class="vtol-logo">
+      </div>
+    </div>
+    
+    <div class="control-section region-section">
+      <div class="region-selector">
+        <label for="region-select">Region:</label>
+        <select id="region-select">
+          <option value="gulf-of-mexico" selected>Gulf of Mexico</option>
+          <option value="north-sea">North Sea</option>
+          <option value="brazil">Brazil</option>
+        </select>
+      </div>
+    </div>
     
     <div class="control-section">
       <button id="clear-route" class="control-button">Clear Route</button>
@@ -61,16 +110,7 @@
       <input type="number" id="reserve-fuel" value="600" min="0" max="2000">
     </div>
     
-    <div class="control-section">
-      <h4>Route Statistics</h4>
-      <div id="route-stats">
-        <div><strong>Total Distance:</strong> <span id="total-distance">0</span> nm</div>
-        <div><strong>Estimated Time:</strong> <span id="estimated-time">00:00</span></div>
-        <div><strong>Fuel Required:</strong> <span id="fuel-required">0</span> lbs</div>
-        <div><strong>Usable Load:</strong> <span id="usable-load">0</span> lbs</div>
-        <div><strong>Max Passengers:</strong> <span id="max-passengers">0</span></div>
-      </div>
-    </div>
+    <!-- Route Statistics section moved to top center card -->
     
     <div class="control-section">
       <h4>Waypoints</h4>

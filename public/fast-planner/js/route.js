@@ -278,11 +278,38 @@ function calculateRouteStatsLocally(coordinates) {
  * @param {Object} stats Route statistics
  */
 function updateRouteStatsDisplay(stats) {
-  document.getElementById('total-distance').textContent = stats.totalDistance || '0';
-  document.getElementById('estimated-time').textContent = stats.estimatedTime || '00:00';
-  document.getElementById('fuel-required').textContent = stats.fuelRequired || '0';
-  document.getElementById('usable-load').textContent = stats.usableLoad || '0';
-  document.getElementById('max-passengers').textContent = stats.maxPassengers || '0';
+  // Update fuel uplift value in the top card based on calculated fuel required
+  const fuelUpliftValue = document.getElementById('fuel-uplift-value');
+  if (fuelUpliftValue) {
+    fuelUpliftValue.textContent = stats.fuelRequired || '0';
+  }
+  
+  // Update route statistics in both the right panel (if it exists) and the top card
+  const totalDistanceElements = document.querySelectorAll('[id="total-distance"]');
+  const estimatedTimeElements = document.querySelectorAll('[id="estimated-time"]');
+  const fuelRequiredElements = document.querySelectorAll('[id="fuel-required"]');
+  const usableLoadElements = document.querySelectorAll('[id="usable-load"]');
+  const maxPassengersElements = document.querySelectorAll('[id="max-passengers"]');
+  
+  totalDistanceElements.forEach(el => {
+    el.textContent = stats.totalDistance || '0';
+  });
+  
+  estimatedTimeElements.forEach(el => {
+    el.textContent = stats.estimatedTime || '00:00';
+  });
+  
+  fuelRequiredElements.forEach(el => {
+    el.textContent = stats.fuelRequired || '0';
+  });
+  
+  usableLoadElements.forEach(el => {
+    el.textContent = stats.usableLoad || '0';
+  });
+  
+  maxPassengersElements.forEach(el => {
+    el.textContent = stats.maxPassengers || '0';
+  });
 }
 
 /**

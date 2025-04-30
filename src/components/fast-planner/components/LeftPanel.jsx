@@ -172,7 +172,7 @@ const LeftPanel = ({
         className="panel-tab left-panel-tab" 
         onClick={onToggleVisibility}
       >
-        {visible ? '← Hide' : 'Stops →'}
+        {visible ? '← Hide' : 'Show →'}
       </div>
       
       {/* Route Editor Panel */}

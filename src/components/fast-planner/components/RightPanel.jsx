@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import RegionSelector from './RegionSelector';
 
 /**
  * Right Panel Component
@@ -31,7 +32,12 @@ const RightPanel = ({
   isAuthenticated,
   authUserName,
   rigsLoading,
-  onLogin
+  onLogin,
+  // Region selector props
+  regions = [],
+  currentRegion = null,
+  onRegionChange = () => {},
+  regionLoading = false
 }) => {
   
   // Force reset dropdowns when selectedAircraft changes
@@ -72,11 +78,21 @@ const RightPanel = ({
         className="panel-tab right-panel-tab" 
         onClick={onToggleVisibility}
       >
-        {visible ? 'Hide →' : '← Controls'}
+        {visible ? 'Hide →' : '← Show'}
       </div>
       
       <div id="info-panel" className={`info-panel ${!visible ? "hidden" : ""}`}>
-        <h3>Gulf of Mexico Fast Planner</h3>
+        <div className="panel-header">
+          <div className="region-selector-container">
+            <RegionSelector
+              regions={regions}
+              currentRegion={currentRegion}
+              onRegionChange={onRegionChange}
+              isLoading={regionLoading}
+            />
+          </div>
+        </div>
+        
         <p style={{ fontSize: "0.8em", color: "var(--label-color)", margin: "0 0 10px 0" }}>
           Click on map to add waypoints or use Route Editor
         </p>

@@ -6,10 +6,12 @@ import LeftPanel from './LeftPanel';
 import RightPanel from './RightPanel';
 import MapComponent from './MapComponent';
 import RegionSelector from './RegionSelector';
+import RouteStatsCard from './RouteStatsCard';
 
 export {
   LeftPanel,
   RightPanel,
   MapComponent,
-  RegionSelector
+  RegionSelector,
+  RouteStatsCard
 };
