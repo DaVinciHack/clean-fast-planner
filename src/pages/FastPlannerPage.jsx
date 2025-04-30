@@ -1,10 +1,10 @@
 import React from 'react';
-import ModularFastPlannerComponent from '../components/fast-planner/ModularFastPlannerComponent';
+import FastPlannerApp from '../components/fast-planner/FastPlannerApp';
 
 const FastPlannerPage = () => {
   return (
     <div className="fast-planner-page">
-      <ModularFastPlannerComponent />
+      <FastPlannerApp />
     </div>
   );
 };
