@@ -57,6 +57,13 @@ const ModularFastPlannerComponent = () => {
   const [reserveFuel, setReserveFuel] = useState(600);
   const [routeStats, setRouteStats] = useState(null);
   
+  // Flight settings (moved from RouteStatsCard)
+  const [deckTimePerStop, setDeckTimePerStop] = useState(5); // minutes per stop
+  const [deckFuelPerStop, setDeckFuelPerStop] = useState(100); // lbs per stop
+  const [passengerWeight, setPassengerWeight] = useState(220); // lbs per passenger
+  const [cargoWeight, setCargoWeight] = useState(0); // additional cargo weight
+  const [reserveMethod, setReserveMethod] = useState('fixed'); // 'fixed', 'percentage', or 'time'
+  
   // Initialize managers
   useEffect(() => {
     // Create managers if they don't exist
@@ -717,7 +724,7 @@ const ModularFastPlannerComponent = () => {
     // Set up parameters for calculation
     let params = {
       aircraftType: calculationAircraftType.toLowerCase(),
-      payloadWeight,
+      payloadWeight: payloadWeight + cargoWeight, // Add cargo to payload
       reserveFuel
     };
     
@@ -1492,6 +1499,29 @@ const ModularFastPlannerComponent = () => {
     }
   }, [isAuthenticated, client, currentRegion]); // Removed aircraft loading dependencies
   
+  // Load flight settings from localStorage on component mount
+  useEffect(() => {
+    try {
+      const storedDeckTime = localStorage.getItem('fastPlanner_deckTimePerStop');
+      const storedDeckFuel = localStorage.getItem('fastPlanner_deckFuelPerStop');
+      const storedPassengerWeight = localStorage.getItem('fastPlanner_passengerWeight');
+      const storedCargoWeight = localStorage.getItem('fastPlanner_cargoWeight');
+      const storedReserveMethod = localStorage.getItem('fastPlanner_reserveMethod');
+      const storedReserveFuel = localStorage.getItem('fastPlanner_reserveFuel');
+      
+      if (storedDeckTime) setDeckTimePerStop(parseInt(storedDeckTime, 10));
+      if (storedDeckFuel) setDeckFuelPerStop(parseInt(storedDeckFuel, 10));
+      if (storedPassengerWeight) setPassengerWeight(parseInt(storedPassengerWeight, 10));
+      if (storedCargoWeight) setCargoWeight(parseInt(storedCargoWeight, 10));
+      if (storedReserveMethod) setReserveMethod(storedReserveMethod);
+      if (storedReserveFuel) setReserveFuel(parseInt(storedReserveFuel, 10));
+      
+      console.log('Flight settings loaded from localStorage');
+    } catch (error) {
+      console.error('Error loading settings from localStorage:', error);
+    }
+  }, []);
+
   // Force auth check on component mount - but don't auto-login
   useEffect(() => {
     console.log('Initial component mount - checking auth state');
@@ -2084,6 +2114,10 @@ const ModularFastPlannerComponent = () => {
         routeStats={routeStats}
         selectedAircraft={selectedAircraft}
         waypoints={waypoints}
+        deckTimePerStop={deckTimePerStop}
+        deckFuelPerStop={deckFuelPerStop}
+        passengerWeight={passengerWeight}
+        cargoWeight={cargoWeight}
       />
       
       {/* Region Selector is now fully integrated within the RightPanel */}
@@ -2204,6 +2238,17 @@ const ModularFastPlannerComponent = () => {
         currentRegion={currentRegion}
         onRegionChange={handleRegionChange}
         regionLoading={regionLoading}
+        // Flight settings props
+        deckTimePerStop={deckTimePerStop}
+        deckFuelPerStop={deckFuelPerStop}
+        passengerWeight={passengerWeight}
+        cargoWeight={cargoWeight}
+        reserveMethod={reserveMethod}
+        onDeckTimeChange={setDeckTimePerStop}
+        onDeckFuelChange={setDeckFuelPerStop}
+        onPassengerWeightChange={setPassengerWeight}
+        onCargoWeightChange={setCargoWeight}
+        onReserveMethodChange={setReserveMethod}
       />
     </div>
   );

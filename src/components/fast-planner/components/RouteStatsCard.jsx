@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 /**
  * Route Statistics Card Component
@@ -7,11 +7,15 @@ import React, { useState, useEffect } from 'react';
  * Including total distance, flight time, total time (flight + deck time),
  * trip fuel, total fuel (trip + deck fuel), and passenger numbers
  */
-const RouteStatsCard = ({ routeStats, selectedAircraft, waypoints }) => {
-  // Default deck time and fuel settings (to be moved to settings panel later)
-  const [deckTimePerStop, setDeckTimePerStop] = useState(5); // minutes per stop
-  const [deckFuelPerStop, setDeckFuelPerStop] = useState(100); // lbs per stop
-  const [passengerWeight, setPassengerWeight] = useState(220); // lbs per passenger
+const RouteStatsCard = ({ 
+  routeStats, 
+  selectedAircraft, 
+  waypoints,
+  deckTimePerStop = 5,
+  deckFuelPerStop = 100,
+  passengerWeight = 220,
+  cargoWeight = 0
+}) => {
 
   // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
   const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;

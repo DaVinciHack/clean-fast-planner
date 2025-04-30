@@ -38,7 +38,18 @@ const RightPanel = ({
   regions = [],
   currentRegion = null,
   onRegionChange = () => {},
-  regionLoading = false
+  regionLoading = false,
+  // Flight settings props
+  deckTimePerStop = 5,
+  deckFuelPerStop = 100,
+  passengerWeight = 220,
+  cargoWeight = 0,
+  reserveMethod = 'fixed',
+  onDeckTimeChange = () => {},
+  onDeckFuelChange = () => {},
+  onPassengerWeightChange = () => {},
+  onCargoWeightChange = () => {},
+  onReserveMethodChange = () => {}
 }) => {
   
   // Force reset dropdowns when selectedAircraft changes
@@ -515,36 +526,40 @@ const RightPanel = ({
               <input 
                 type="number" 
                 id="deck-time" 
-                defaultValue={5}
+                value={deckTimePerStop}
                 min="0" 
                 max="60"
+                onChange={(e) => onDeckTimeChange(parseInt(e.target.value, 10) || 0)}
               />
               
               <label htmlFor="deck-fuel">Deck Fuel Per Stop (lbs):</label>
               <input 
                 type="number" 
                 id="deck-fuel" 
-                defaultValue={100}
+                value={deckFuelPerStop}
                 min="0" 
                 max="1000"
+                onChange={(e) => onDeckFuelChange(parseInt(e.target.value, 10) || 0)}
               />
               
               <label htmlFor="passenger-weight">Passenger Weight (lbs):</label>
               <input 
                 type="number" 
                 id="passenger-weight" 
-                defaultValue={220}
+                value={passengerWeight}
                 min="100" 
                 max="300"
+                onChange={(e) => onPassengerWeightChange(parseInt(e.target.value, 10) || 0)}
               />
               
               <label htmlFor="cargo-weight">Additional Cargo (lbs):</label>
               <input 
                 type="number" 
                 id="cargo-weight" 
-                defaultValue={0}
+                value={cargoWeight}
                 min="0" 
                 max="5000"
+                onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
               />
               
               <h4>Fuel Reserve Settings</h4>
@@ -552,7 +567,11 @@ const RightPanel = ({
               <div className="settings-group">
                 <div>
                   <label htmlFor="reserve-method">Reserve Method:</label>
-                  <select id="reserve-method">
+                  <select 
+                    id="reserve-method"
+                    value={reserveMethod}
+                    onChange={(e) => onReserveMethodChange(e.target.value)}
+                  >
                     <option value="fixed">Fixed Amount</option>
                     <option value="percentage">Percentage of Trip</option>
                     <option value="time">Fixed Time</option>
@@ -564,14 +583,45 @@ const RightPanel = ({
                   <input 
                     type="number" 
                     id="reserve-value" 
-                    defaultValue={600}
+                    value={reserveFuel}
                     min="0" 
+                    onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
                   />
-                  <span className="unit-label">lbs</span>
+                  <span className="unit-label">
+                    {reserveMethod === 'fixed' ? 'lbs' : 
+                     reserveMethod === 'percentage' ? '%' : 'mins'}
+                  </span>
                 </div>
               </div>
               
-              <button className="control-button">
+              <button 
+                className="control-button"
+                onClick={() => {
+                  // Create a flash message to confirm settings are saved
+                  const loadingOverlay = document.getElementById('loading-overlay');
+                  if (loadingOverlay) {
+                    loadingOverlay.textContent = 'Flight settings saved!';
+                    loadingOverlay.style.display = 'block';
+                    
+                    setTimeout(() => {
+                      loadingOverlay.style.display = 'none';
+                    }, 1500);
+                  }
+                  
+                  // Save to localStorage for persistence
+                  try {
+                    localStorage.setItem('fastPlanner_deckTimePerStop', deckTimePerStop);
+                    localStorage.setItem('fastPlanner_deckFuelPerStop', deckFuelPerStop);
+                    localStorage.setItem('fastPlanner_passengerWeight', passengerWeight);
+                    localStorage.setItem('fastPlanner_cargoWeight', cargoWeight);
+                    localStorage.setItem('fastPlanner_reserveMethod', reserveMethod);
+                    localStorage.setItem('fastPlanner_reserveFuel', reserveFuel);
+                    console.log('Flight settings saved to localStorage');
+                  } catch (error) {
+                    console.error('Error saving settings to localStorage:', error);
+                  }
+                }}
+              >
                 Save Settings
               </button>
             </div>
