@@ -99,15 +99,19 @@
   z-index: 16;
 }
 
-/* Apply border radius based on position */
-.tab-selector.right-panel-tab {
-  border-radius: 5px 0 0 5px;
-  border-right: none;
-}
-
+/* Left panel tab specific style */
 .tab-selector.left-panel-tab {
   border-radius: 0 5px 5px 0;
   border-left: none;
+}
+
+/* Right panel tab specific style - maintain original */
+.tab-selector.right-panel-tab {
+  border-radius: 5px 0 0 5px;
+  border-right: none;
+  /* Restore original width for right panel tabs */
+  width: 28px;
+  height: 85px;
 }
 
 .tab-selector:hover {
@@ -152,6 +156,14 @@
 .main-toggle {
   background-color: #333333; /* Dark gray instead of cyan */
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Right panel main toggle - restore original */
+.right-panel-tab.main-toggle {
+  background-color: #00b8d4; /* Original cyan color */
+  border-color: rgba(255, 255, 255, 0.5);
+  width: 28px;
+  height: 50px;
 }
 
 /* Tab content styles */
