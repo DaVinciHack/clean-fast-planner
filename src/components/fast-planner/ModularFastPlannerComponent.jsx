@@ -2083,6 +2083,7 @@ const ModularFastPlannerComponent = () => {
       <RouteStatsCard 
         routeStats={routeStats}
         selectedAircraft={selectedAircraft}
+        waypoints={waypoints}
       />
       
       {/* Region Selector is now fully integrated within the RightPanel */}

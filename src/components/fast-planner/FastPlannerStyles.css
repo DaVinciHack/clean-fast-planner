@@ -515,7 +515,7 @@
   border: 1px solid var(--button-bg);
   display: flex;
   flex-direction: column;
-  min-width: 630px;
+  min-width: 700px;
   transition: all 0.3s ease;
 }
 
