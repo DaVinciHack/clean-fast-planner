@@ -22,6 +22,8 @@ class FlightCalculations {
     
     // Current configuration, initialized with defaults
     this.config = {...this.defaults};
+    
+    console.log("FlightCalculations initialized with defaults:", this.config);
   }
   
   /**
@@ -30,22 +32,25 @@ class FlightCalculations {
    * @param {Object} newConfig Configuration parameters to update
    */
   updateConfig(newConfig) {
-    // Debug log to track configuration updates
-    console.log("FlightCalculations: Updating config with:", newConfig);
+    const oldConfig = {...this.config};
+    this.config = {...this.config, ...newConfig};
     
-    // Only update properties that exist in defaults
-    const validConfig = {};
-    Object.keys(newConfig).forEach(key => {
-      if (key !== 'callbacks' && (this.defaults.hasOwnProperty(key) || key === 'payloadWeight')) {
-        validConfig[key] = newConfig[key];
+    // Log the changes for debugging
+    const changes = Object.keys(newConfig).reduce((acc, key) => {
+      if (oldConfig[key] !== newConfig[key]) {
+        acc[key] = {
+          from: oldConfig[key],
+          to: newConfig[key]
+        };
       }
-    });
-    
-    // Merge the valid config with the current config
-    this.config = {...this.config, ...validConfig};
+      return acc;
+    }, {});
     
     // Log the new configuration
-    console.log("FlightCalculations: Config updated:", this.config);
+    console.log("Flight calculations config updated:", this.config);
+    if (Object.keys(changes).length > 0) {
+      console.log("Changed values:", changes);
+    }
   }
   
   /**
@@ -75,38 +80,35 @@ class FlightCalculations {
       return null;
     }
     
-    // Log input parameters for debugging
-    console.log("FlightCalculations: calculateFlightStats called with:", {
-      coordinates: coordinates.length + " waypoints",
-      aircraft: aircraft.registration || "Generic aircraft",
-      params
-    });
-    
     // Merge passed parameters with config
     const calculationParams = {
       ...this.config,
       ...params
     };
     
-    console.log("FlightCalculations: Using calculation parameters:", calculationParams);
+    console.log("Starting flight calculations with params:", calculationParams);
     
     // Extract aircraft parameters, using defaults for missing values
     const {
       cruseSpeed = 145, // knots - note the field is spelled "cruseSpeed" in the data
       fuelBurn = 1100,   // lbs per hour
       maxFuelCapacity = 5000, // lbs
-      maxFuel = 5000, // lbs (alternative field name)
       dryOperatingWeightLbs = 15000, // lbs (empty weight)
-      emptyWeight = 15000, // lbs (alternative field name)
       usefulLoad = 7000, // lbs
       maxPassengers = 19
     } = aircraft;
     
     // Use cruseSpeed (matches the field spelling in the aircraft data)
-    // But check alternative field names to handle different data structures
-    const cruiseSpeed = aircraft.cruiseSpeed || cruseSpeed;
-    const fuelCapacity = maxFuel || maxFuelCapacity;
-    const operatingWeight = dryOperatingWeightLbs || emptyWeight;
+    const cruiseSpeed = cruseSpeed;
+    
+    console.log("Aircraft parameters:", {
+      cruiseSpeed, 
+      fuelBurn, 
+      maxFuelCapacity, 
+      dryOperatingWeightLbs, 
+      usefulLoad, 
+      maxPassengers
+    });
     
     // Calculate total distance
     const totalDistance = this.calculateTotalDistance(coordinates);
@@ -136,22 +138,29 @@ class FlightCalculations {
     // Total fuel required
     const totalFuel = Math.round(tripFuel + deckFuel + contingencyFuel + taxiFuel + reserveFuel);
     
-    // Get payload weight from params or use a default
-    const payloadWeight = calculationParams.payloadWeight || 0;
-    
     // Calculate effective max takeoff weight
-    const maxTakeoffWeight = operatingWeight + usefulLoad; 
+    const maxTakeoffWeight = dryOperatingWeightLbs + usefulLoad; 
     
     // Calculate usable load after fuel
     const usableLoad = Math.max(0, usefulLoad - totalFuel);
     
     // Calculate maximum passenger capacity based on weight
-    const maxPassengersByWeight = Math.floor((usableLoad - payloadWeight) / calculationParams.passengerWeight);
+    const maxPassengersByWeight = Math.floor(usableLoad / calculationParams.passengerWeight);
     const calculatedPassengers = Math.min(maxPassengersByWeight, maxPassengers);
     
     // Calculate total time (flight time + deck time)
     const totalTimeHours = flightTimeHours + deckTimeHours;
     const totalTimeFormatted = this.formatTimeHHMM(totalTimeHours);
+    
+    // Log the fuel calculation details
+    console.log("Fuel calculations:", {
+      tripFuel: Math.round(tripFuel),
+      deckFuel: Math.round(deckFuel),
+      contingencyFuel: Math.round(contingencyFuel),
+      taxiFuel,
+      reserveFuel,
+      totalFuel
+    });
     
     // Compile results
     const result = {
@@ -175,7 +184,7 @@ class FlightCalculations {
       totalFuel,
       
       // Weight calculations
-      dryOperatingWeight: operatingWeight,
+      dryOperatingWeight: dryOperatingWeightLbs,
       maxTakeoffWeight,
       usefulLoad,
       usableLoad,
@@ -192,14 +201,6 @@ class FlightCalculations {
       numStops,
       intermediateStops
     };
-    
-    // Log the results for debugging
-    console.log("FlightCalculations: Calculation results:", {
-      totalDistance: result.totalDistance,
-      estimatedTime: result.estimatedTime,
-      totalFuel: result.totalFuel,
-      calculatedPassengers: result.calculatedPassengers
-    });
     
     // Call the callback if one exists
     if (this.config.callbacks?.onCalculationComplete) {
@@ -223,17 +224,13 @@ class FlightCalculations {
       const from = window.turf.point(coordinates[i]);
       const to = window.turf.point(coordinates[i + 1]);
       
-      try {
-        // Calculate distance in kilometers
-        const distance = window.turf.distance(from, to, {units: 'kilometers'});
-        
-        // Convert to nautical miles (1 km = 0.539957 nm)
-        const distanceNm = distance * 0.539957;
-        
-        totalDistance += distanceNm;
-      } catch (error) {
-        console.error("Error calculating leg distance:", error);
-      }
+      // Calculate distance in kilometers
+      const distance = window.turf.distance(from, to, {units: 'kilometers'});
+      
+      // Convert to nautical miles (1 km = 0.539957 nm)
+      const distanceNm = distance * 0.539957;
+      
+      totalDistance += distanceNm;
     }
     
     return totalDistance;

@@ -80,6 +80,84 @@ const ModularFastPlannerComponent = () => {
   const [contingencyFuelPercent, setContingencyFuelPercent] = useState(10); // % of trip fuel
   const [reserveMethod, setReserveMethod] = useState('fixed');
   
+  /**
+   * Unified function to handle flight settings changes
+   * Updates both individual state variables and the flight calculations module
+   */
+  const handleFlightSettingChange = (settingName, value) => {
+    console.log(`Updating flight setting: ${settingName} = ${value}`);
+    
+    // Update individual state variables (for backward compatibility)
+    switch (settingName) {
+      case 'passengerWeight':
+        setPassengerWeight(value);
+        break;
+      case 'reserveFuel':
+        setReserveFuel(value);
+        break;
+      case 'deckTimePerStop':
+        setDeckTimePerStop(value);
+        break;
+      case 'deckFuelFlow':
+        setDeckFuelFlow(value);
+        break;
+      case 'taxiFuel':
+        setTaxiFuel(value);
+        break;
+      case 'contingencyFuelPercent':
+        setContingencyFuelPercent(value);
+        break;
+      default:
+        console.warn(`Unknown setting: ${settingName}`);
+        break;
+    }
+    
+    // Update the flightSettings object
+    setFlightSettings(prevSettings => ({
+      ...prevSettings,
+      [settingName]: value
+    }));
+    
+    // Update the flight calculations module if it exists
+    if (flightCalculationsRef.current) {
+      flightCalculationsRef.current.updateConfig({
+        [settingName]: value
+      });
+      console.log(`Updated FlightCalculations module with ${settingName}: ${value}`);
+    }
+    
+    // Recalculate route stats if a route exists
+    const wps = waypointManagerRef.current?.getWaypoints() || [];
+    if (wps.length >= 2) {
+      console.log(`Recalculating route with updated ${settingName}`);
+      const coordinates = wps.map(wp => wp.coords);
+      calculateRouteStats(coordinates);
+    }
+  };
+
+  // Update the existing handler functions to use the unified handler
+
+
+
+
+
+
+  // This function synchronizes all flight settings with the calculator
+  const syncFlightCalculator = () => {
+    if (flightCalculationsRef.current) {
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight,
+        reserveFuel,
+        deckTimePerStop,
+        deckFuelFlow,
+        taxiFuel,
+        contingencyFuelPercent
+      });
+      console.log("Synchronized all flight settings with calculator");
+    }
+  };
+
+  
   // Initialize managers
   useEffect(() => {
     // Create managers if they don't exist
@@ -772,8 +850,9 @@ const ModularFastPlannerComponent = () => {
       });
     }
   }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelPerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent]);
+   
 
-
+  // Calculate route statistics using our enhanced module
   // Ensure flight calculation settings are synchronized with the module
   useEffect(() => {
     if (flightCalculationsRef.current) {
@@ -784,8 +863,7 @@ const ModularFastPlannerComponent = () => {
         deckTimePerStop,
         deckFuelFlow,
         taxiFuel,
-        contingencyFuelPercent,
-        payloadWeight
+        contingencyFuelPercent
       });
       
       console.log("Flight calculation settings synchronized with calculator module");
@@ -797,9 +875,8 @@ const ModularFastPlannerComponent = () => {
         calculateRouteStats(coordinates);
       }
     }
-  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent, payloadWeight]);
-  
-  // Calculate route statistics using our enhanced module
+  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent]);
+    // Calculate route statistics using the enhanced FlightCalculations module
   const calculateRouteStats = (coordinates) => {
     if (!coordinates || coordinates.length < 2) {
       setRouteStats(null);
@@ -809,8 +886,10 @@ const ModularFastPlannerComponent = () => {
     // Ensure flight calculator is initialized
     if (!flightCalculationsRef.current) {
       flightCalculationsRef.current = new FlightCalculations();
-      
-      // Update with current settings
+    }
+    
+    // Sync all current flight settings with the calculator
+    if (flightCalculationsRef.current) {
       flightCalculationsRef.current.updateConfig({
         passengerWeight,
         reserveFuel,
@@ -818,39 +897,129 @@ const ModularFastPlannerComponent = () => {
         deckFuelFlow,
         taxiFuel,
         contingencyFuelPercent,
-        payloadWeight
+        payloadWeight: payloadWeight + cargoWeight
       });
+      console.log("Synchronized all flight settings with calculator");
     }
     
-    // Get aircraft data
-    let aircraftData = selectedAircraft;
+    // Use S92 as default type if no type is selected
+    let calculationAircraftType = aircraftType || 'S92';
     
-    // If no aircraft is selected, get default data
-    if (!aircraftData && aircraftType && routeCalculatorRef.current) {
-      const defaultAircraft = routeCalculatorRef.current.getAircraftType(aircraftType.toLowerCase());
-      aircraftData = defaultAircraft;
+    // If we have a selected aircraft from the third field, use that data
+    if (selectedAircraft) {
+      calculationAircraftType = selectedAircraft.modelType || 'S92';
     }
     
-    // Log what we're using for calculations
-    console.log("Using aircraft for calculations:", aircraftData?.registration || "default aircraft", 
-                "with max passengers:", aircraftData?.maxPassengers || "unknown");
+    // Create aircraft data object for calculations
+    let aircraftData;
     
-    // Simply delegate ALL calculation to the FlightCalculations module
+    if (selectedAircraft) {
+      // Use selected aircraft data with fallbacks
+      aircraftData = {
+        // Use correct field names with fallbacks
+        cruiseSpeed: selectedAircraft.cruiseSpeed || selectedAircraft.cruseSpeed || 145,
+        fuelBurn: selectedAircraft.fuelBurn || 1100,
+        maxFuelCapacity: selectedAircraft.maxFuel || selectedAircraft.maxFuelCapacity || 5000,
+        dryOperatingWeightLbs: selectedAircraft.dryOperatingWeightLbs || 15000,
+        usefulLoad: selectedAircraft.usefulLoad || 7000,
+        maxPassengers: selectedAircraft.maxPassengers || 19,
+        // Include all other properties
+        ...selectedAircraft
+      };
+
+  // Update the existing handler functions to use the unified handler
+  const handlePassengerWeightChange = (weight) => {
+    handleFlightSettingChange('passengerWeight', weight);
+  };
+
+  const handleReserveFuelChange = (fuel) => {
+    handleFlightSettingChange('reserveFuel', fuel);
+  };
+
+  const handleDeckTimeChange = (time) => {
+    handleFlightSettingChange('deckTimePerStop', time);
+  };
+
+  const handleDeckFuelFlowChange = (fuelFlow) => {
+    handleFlightSettingChange('deckFuelFlow', fuelFlow);
+  };
+
+  const handleTaxiFuelChange = (fuel) => {
+    handleFlightSettingChange('taxiFuel', fuel);
+  };
+
+  const handleContingencyFuelPercentChange = (percent) => {
+    handleFlightSettingChange('contingencyFuelPercent', percent);
+  };
+
+  // This function synchronizes all flight settings with the calculator
+  const handlePayloadWeightChange = (weight) => {
+    handleFlightSettingChange('payloadWeight', weight);
+  };
+
+  const syncFlightCalculator = () => {
+    if (flightCalculationsRef.current) {
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight,
+        reserveFuel,
+        deckTimePerStop,
+        deckFuelFlow,
+        taxiFuel,
+        contingencyFuelPercent
+      });
+      console.log("Synchronized all flight settings with calculator");
+    }
+  };
+
+    } else if (routeCalculatorRef.current) {
+      // Get default aircraft data from RouteCalculator if no aircraft selected
+      const defaultAircraft = routeCalculatorRef.current.getAircraftType(calculationAircraftType.toLowerCase());
+      aircraftData = {
+        cruiseSpeed: defaultAircraft.cruiseSpeed,
+        fuelBurn: defaultAircraft.fuelBurn,
+        maxFuelCapacity: defaultAircraft.maxFuel,
+        dryOperatingWeightLbs: defaultAircraft.emptyWeight,
+        usefulLoad: defaultAircraft.usefulLoad || 7000,
+        maxPassengers: defaultAircraft.maxPassengers || 19,
+        modelType: calculationAircraftType
+      };
+    } else {
+      // Fallback to basic defaults if no data source available
+      aircraftData = {
+        cruiseSpeed: 145,
+        fuelBurn: 1100,
+        maxFuelCapacity: 5000,
+        dryOperatingWeightLbs: 15000,
+        usefulLoad: 7000,
+        maxPassengers: 19,
+        modelType: calculationAircraftType
+      };
+    }
+    
+    console.log("Calculating route stats with aircraft data:", {
+      type: calculationAircraftType,
+      cruiseSpeed: aircraftData.cruiseSpeed,
+      fuelBurn: aircraftData.fuelBurn
+    });
+    
+    // Calculate with the enhanced flight calculations module
     const stats = flightCalculationsRef.current.calculateFlightStats(
       coordinates, 
-      aircraftData || {}, // Pass the actual aircraft data
+      aircraftData,
       { 
         payloadWeight: payloadWeight + cargoWeight
+        // No need to pass other settings as they've been synced already
       }
     );
     
     // Update route stats state
     setRouteStats(stats);
+    
+    // Store route stats globally for access by WaypointManager
     window.currentRouteStats = stats;
     
     return stats;
-  };
-  
+  };  
   /**
    * Load all aircraft once, then filter by region
    * This new implementation does one big load and then filters without additional API calls
@@ -1315,52 +1484,10 @@ const ModularFastPlannerComponent = () => {
   };
   
   // Handle payload weight change
-  /**
-   * Unified function to handle flight settings changes
-   * Updates both individual state variables and the flight calculations module
-   */
-  const handleFlightSettingChange = (settingName, value) => {
-    console.log(`Updating flight setting: ${settingName} = ${value}`);
-    
-    // Update the flightSettings object
-    setFlightSettings(prevSettings => ({
-      ...prevSettings,
-      [settingName]: value
-    }));
-    
-    // Update the flight calculations module if it exists
-    if (flightCalculationsRef.current) {
-      flightCalculationsRef.current.updateConfig({
-        [settingName]: value
-      });
-    }
-  };
-
-  const handlePayloadWeightChange = (weight) => {
+  const handlePayloadWeightChange = (weight) => { = (weight) => {
     setPayloadWeight(weight);
-    handleFlightSettingChange('payloadWeight', weight);
     
     // Recalculate route stats with the new payload weight
-    const wps = waypointManagerRef.current?.getWaypoints() || [];
-    if (wps.length >= 2) {
-      const coordinates = wps.map(wp => wp.coords);
-      const stats = calculateRouteStats(coordinates);
-      
-      // Force update the route with new leg info
-      if (waypointManagerRef.current) {
-        setTimeout(() => {
-          waypointManagerRef.current.updateRouteInfoFromStats(stats);
-        }, 50);
-      }
-    }
-  };
-  
-  // Handle reserve fuel change
-  const handleReserveFuelChange = (fuel) => {
-    setReserveFuel(fuel);
-    handleFlightSettingChange('reserveFuel', fuel);
-    
-    // Recalculate route stats with the new reserve fuel
     const wps = waypointManagerRef.current?.getWaypoints() || [];
     if (wps.length >= 2) {
       const coordinates = wps.map(wp => wp.coords);
@@ -1369,68 +1496,19 @@ const ModularFastPlannerComponent = () => {
       // CRITICAL FIX: Force update the route with new leg info
       if (waypointManagerRef.current) {
         setTimeout(() => {
-          waypointManagerRef.current.updateRouteInfoFromStats(stats);
+          waypointManagerRef.current.updateRoute(stats);
         }, 50);
       }
     }
   };
+  
+  // Handle reserve fuel change
 
   // Handle deck fuel flow change
-  const handleDeckFuelFlowChange = (fuelFlow) => {
-    setDeckFuelFlow(fuelFlow);
-    
-    // Recalculate route stats with the new deck fuel flow
-    const wps = waypointManagerRef.current?.getWaypoints() || [];
-    if (wps.length >= 2) {
-      const coordinates = wps.map(wp => wp.coords);
-      const stats = calculateRouteStats(coordinates);
-      
-      // Force update the route with new leg info
-      if (waypointManagerRef.current) {
-        setTimeout(() => {
-          waypointManagerRef.current.updateRoute(stats);
-        }, 50);
-      }
-    }
-  };
 
   // Handle taxi fuel change
-  const handleTaxiFuelChange = (fuel) => {
-    setTaxiFuel(fuel);
-    
-    // Recalculate route stats with the new taxi fuel
-    const wps = waypointManagerRef.current?.getWaypoints() || [];
-    if (wps.length >= 2) {
-      const coordinates = wps.map(wp => wp.coords);
-      const stats = calculateRouteStats(coordinates);
-      
-      // Force update the route with new leg info
-      if (waypointManagerRef.current) {
-        setTimeout(() => {
-          waypointManagerRef.current.updateRoute(stats);
-        }, 50);
-      }
-    }
-  };
 
   // Handle contingency fuel percentage change
-  const handleContingencyFuelPercentChange = (percent) => {
-    setContingencyFuelPercent(percent);
-    
-    // Recalculate route stats with the new contingency fuel percentage
-    const wps = waypointManagerRef.current?.getWaypoints() || [];
-    if (wps.length >= 2) {
-      const coordinates = wps.map(wp => wp.coords);
-      const stats = calculateRouteStats(coordinates);
-      
-      // Force update the route with new leg info
-      if (waypointManagerRef.current) {
-        setTimeout(() => {
-          waypointManagerRef.current.updateRoute(stats);
-        }, 50);
-      }
-    }
-  };
   
   // Handle waypoint name change
   const handleWaypointNameChange = (id, name, updatedWaypoints) => {
@@ -2546,10 +2624,10 @@ const ModularFastPlannerComponent = () => {
         taxiFuel={taxiFuel}
         contingencyFuelPercent={contingencyFuelPercent}
         reserveMethod={reserveMethod}
-        onDeckTimeChange={setDeckTimePerStop}
+        onDeckTimeChange={handleDeckTimeChange}
         onDeckFuelChange={setDeckFuelPerStop}
         onDeckFuelFlowChange={handleDeckFuelFlowChange}
-        onPassengerWeightChange={setPassengerWeight}
+        onPassengerWeightChange={handlePassengerWeightChange}
         onCargoWeightChange={setCargoWeight}
         onTaxiFuelChange={handleTaxiFuelChange}
         onContingencyFuelPercentChange={handleContingencyFuelPercentChange}

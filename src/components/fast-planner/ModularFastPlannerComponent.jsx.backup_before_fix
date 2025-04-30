@@ -772,32 +772,6 @@ const ModularFastPlannerComponent = () => {
       });
     }
   }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelPerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent]);
-
-
-  // Ensure flight calculation settings are synchronized with the module
-  useEffect(() => {
-    if (flightCalculationsRef.current) {
-      // Sync all state values to the calculator when they change
-      flightCalculationsRef.current.updateConfig({
-        passengerWeight,
-        reserveFuel,
-        deckTimePerStop,
-        deckFuelFlow,
-        taxiFuel,
-        contingencyFuelPercent,
-        payloadWeight
-      });
-      
-      console.log("Flight calculation settings synchronized with calculator module");
-      
-      // Recalculate route if we have waypoints
-      const wps = waypointManagerRef.current?.getWaypoints() || [];
-      if (wps.length >= 2) {
-        const coordinates = wps.map(wp => wp.coords);
-        calculateRouteStats(coordinates);
-      }
-    }
-  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent, payloadWeight]);
   
   // Calculate route statistics using our enhanced module
   const calculateRouteStats = (coordinates) => {
@@ -809,43 +783,75 @@ const ModularFastPlannerComponent = () => {
     // Ensure flight calculator is initialized
     if (!flightCalculationsRef.current) {
       flightCalculationsRef.current = new FlightCalculations();
-      
-      // Update with current settings
-      flightCalculationsRef.current.updateConfig({
-        passengerWeight,
-        reserveFuel,
-        deckTimePerStop,
-        deckFuelFlow,
-        taxiFuel,
-        contingencyFuelPercent,
-        payloadWeight
-      });
     }
     
-    // Get aircraft data
-    let aircraftData = selectedAircraft;
+    // Use S92 as default type if no type is selected
+    let calculationAircraftType = aircraftType || 'S92';
     
-    // If no aircraft is selected, get default data
-    if (!aircraftData && aircraftType && routeCalculatorRef.current) {
-      const defaultAircraft = routeCalculatorRef.current.getAircraftType(aircraftType.toLowerCase());
-      aircraftData = defaultAircraft;
+    // If we have a selected aircraft from the third field, use that data
+    if (selectedAircraft) {
+      calculationAircraftType = selectedAircraft.modelType || 'S92';
     }
     
-    // Log what we're using for calculations
-    console.log("Using aircraft for calculations:", aircraftData?.registration || "default aircraft", 
-                "with max passengers:", aircraftData?.maxPassengers || "unknown");
+    // Create aircraft data object for calculations
+    let aircraftData;
     
-    // Simply delegate ALL calculation to the FlightCalculations module
+    if (selectedAircraft) {
+      // Use selected aircraft data with fallbacks
+      aircraftData = {
+        // Use correct field names with fallbacks
+        cruiseSpeed: selectedAircraft.cruiseSpeed || selectedAircraft.cruseSpeed || 145,
+        fuelBurn: selectedAircraft.fuelBurn || 1100,
+        maxFuelCapacity: selectedAircraft.maxFuel || selectedAircraft.maxFuelCapacity || 5000,
+        dryOperatingWeightLbs: selectedAircraft.dryOperatingWeightLbs || 15000,
+        usefulLoad: selectedAircraft.usefulLoad || 7000,
+        maxPassengers: selectedAircraft.maxPassengers || 19,
+        // Include all other properties
+        ...selectedAircraft
+      };
+    } else if (routeCalculatorRef.current) {
+      // Get default aircraft data from RouteCalculator if no aircraft selected
+      const defaultAircraft = routeCalculatorRef.current.getAircraftType(calculationAircraftType.toLowerCase());
+      aircraftData = {
+        cruiseSpeed: defaultAircraft.cruiseSpeed,
+        fuelBurn: defaultAircraft.fuelBurn,
+        maxFuelCapacity: defaultAircraft.maxFuel,
+        dryOperatingWeightLbs: defaultAircraft.emptyWeight,
+        usefulLoad: defaultAircraft.usefulLoad || 7000,
+        maxPassengers: defaultAircraft.maxPassengers || 19,
+        modelType: calculationAircraftType
+      };
+    } else {
+      // Fallback to basic defaults if no data source available
+      aircraftData = {
+        cruiseSpeed: 145,
+        fuelBurn: 1100,
+        maxFuelCapacity: 5000,
+        dryOperatingWeightLbs: 15000,
+        usefulLoad: 7000,
+        maxPassengers: 19,
+        modelType: calculationAircraftType
+      };
+    }
+    
+    // Calculate with the enhanced flight calculations module
     const stats = flightCalculationsRef.current.calculateFlightStats(
       coordinates, 
-      aircraftData || {}, // Pass the actual aircraft data
+      aircraftData,
       { 
-        payloadWeight: payloadWeight + cargoWeight
+        payloadWeight: payloadWeight + cargoWeight,
+        reserveFuel: reserveFuel,
+        taxiFuel: taxiFuel,
+        contingencyFuelPercent: contingencyFuelPercent,
+        deckTimePerStop: deckTimePerStop,
+        deckFuelFlow: deckFuelFlow
       }
     );
     
     // Update route stats state
     setRouteStats(stats);
+    
+    // Store route stats globally for access by WaypointManager
     window.currentRouteStats = stats;
     
     return stats;
@@ -1315,30 +1321,8 @@ const ModularFastPlannerComponent = () => {
   };
   
   // Handle payload weight change
-  /**
-   * Unified function to handle flight settings changes
-   * Updates both individual state variables and the flight calculations module
-   */
-  const handleFlightSettingChange = (settingName, value) => {
-    console.log(`Updating flight setting: ${settingName} = ${value}`);
-    
-    // Update the flightSettings object
-    setFlightSettings(prevSettings => ({
-      ...prevSettings,
-      [settingName]: value
-    }));
-    
-    // Update the flight calculations module if it exists
-    if (flightCalculationsRef.current) {
-      flightCalculationsRef.current.updateConfig({
-        [settingName]: value
-      });
-    }
-  };
-
   const handlePayloadWeightChange = (weight) => {
     setPayloadWeight(weight);
-    handleFlightSettingChange('payloadWeight', weight);
     
     // Recalculate route stats with the new payload weight
     const wps = waypointManagerRef.current?.getWaypoints() || [];
@@ -1346,10 +1330,10 @@ const ModularFastPlannerComponent = () => {
       const coordinates = wps.map(wp => wp.coords);
       const stats = calculateRouteStats(coordinates);
       
-      // Force update the route with new leg info
+      // CRITICAL FIX: Force update the route with new leg info
       if (waypointManagerRef.current) {
         setTimeout(() => {
-          waypointManagerRef.current.updateRouteInfoFromStats(stats);
+          waypointManagerRef.current.updateRoute(stats);
         }, 50);
       }
     }
@@ -1358,7 +1342,6 @@ const ModularFastPlannerComponent = () => {
   // Handle reserve fuel change
   const handleReserveFuelChange = (fuel) => {
     setReserveFuel(fuel);
-    handleFlightSettingChange('reserveFuel', fuel);
     
     // Recalculate route stats with the new reserve fuel
     const wps = waypointManagerRef.current?.getWaypoints() || [];
@@ -1369,7 +1352,7 @@ const ModularFastPlannerComponent = () => {
       // CRITICAL FIX: Force update the route with new leg info
       if (waypointManagerRef.current) {
         setTimeout(() => {
-          waypointManagerRef.current.updateRouteInfoFromStats(stats);
+          waypointManagerRef.current.updateRoute(stats);
         }, 50);
       }
     }

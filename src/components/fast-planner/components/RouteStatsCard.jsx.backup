@@ -20,17 +20,9 @@ const RouteStatsCard = ({
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
 
-  // Add debug logging to track the routeStats data
-  console.log("RouteStatsCard - received stats:", routeStats);
-  
-  // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
+  // Use the stats from the FlightCalculations module directly
+  // This ensures we're using the same calculation method throughout the app
   const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;
-  
-  // Calculate total deck time (in minutes) - prefer value from stats if available
-  const totalDeckTime = routeStats?.deckTimeMinutes || (landingsCount * deckTimePerStop);
-  
-  // Calculate total deck fuel - prefer value from stats if available
-  const totalDeckFuel = routeStats?.deckFuel || (landingsCount * deckFuelPerStop);
   
   // Always show the card, even without route stats
   // Use default values if routeStats is not available
@@ -47,18 +39,19 @@ const RouteStatsCard = ({
     operationalRadius: '85'
   };
   
-  // Format total time (flight time + deck time)
+  // Format total time - prioritize the pre-calculated value from FlightCalculations
   const calculateTotalTime = () => {
-    // Use totalTimeFormatted from stats if available
+    // Always use totalTimeFormatted from FlightCalculations if available
     if (stats.totalTimeFormatted) {
       return stats.totalTimeFormatted;
     }
     
+    // If we don't have flight time, return default
     if (!stats.timeHours && stats.timeHours !== 0) return '00:00';
     
-    // Convert deck time from minutes to hours
-    const deckTimeHours = totalDeckTime / 60;
-    // Add flight time and deck time
+    // Calculate from the available flight time and deck time
+    // This is a fallback for when totalTimeFormatted is not available
+    const deckTimeHours = (stats.deckTimeMinutes || 0) / 60;
     const totalTimeHours = stats.timeHours + deckTimeHours;
     
     // Format as HH:MM
@@ -66,22 +59,30 @@ const RouteStatsCard = ({
     const minutes = Math.floor((totalTimeHours - hours) * 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
+
+  // Always use totalFuel from stats which contains the complete calculation
+  // This includes tripFuel, deckFuel, contingencyFuel, taxiFuel, and reserveFuel
+  const totalFuel = stats.totalFuel || (
+    (parseInt(stats.tripFuel || 0) || parseInt(stats.fuelRequired || 0)) + 
+    parseInt(stats.deckFuel || 0) + 
+    parseInt(stats.contingencyFuel || 0) + 
+    parseInt(stats.taxiFuel || 0) + 
+    parseInt(stats.reserveFuel || 0)
+  );
   
-  // Use totalFuel from stats if available, or calculate from components if those are available,
-  // or fall back to basic calculation as last resort
-  const totalFuel = stats.totalFuel || 
-                    (stats.tripFuel && stats.deckFuel && stats.contingencyFuel && stats.taxiFuel && stats.reserveFuel) ? 
-                      (parseInt(stats.tripFuel) + parseInt(stats.deckFuel) + parseInt(stats.contingencyFuel) + parseInt(stats.taxiFuel) + parseInt(stats.reserveFuel)) : 
-                      (parseInt(stats.fuelRequired || 0) + totalDeckFuel);
-  
-  // Calculate maximum passengers based on usable load and passenger weight
+  // Calculate maximum passengers - prioritize the pre-calculated value from FlightCalculations
   const calculateMaxPassengers = () => {
-    // If we have calculatedPassengers from the flight calculator, use that
+    // Use the calculated passengers value if available (most accurate)
     if (stats.calculatedPassengers !== undefined) {
       return stats.calculatedPassengers;
     }
     
-    // Otherwise calculate manually as a fallback
+    // Fallback to maxPassengers if available (already accounts for both weight and aircraft capacity)
+    if (stats.maxPassengers !== undefined) {
+      return stats.maxPassengers;
+    }
+    
+    // If no pre-calculated values are available, calculate from scratch
     if (!selectedAircraft || !stats.usableLoad) return 0;
     
     // Get max passengers from the aircraft data or calculate based on usable load
@@ -131,7 +132,7 @@ const RouteStatsCard = ({
           {/* Column 2: Deck Time and Deck Fuel */}
           <div className="route-stat-item">
             <div className="route-stat-label">Deck Time:</div>
-            <div className="route-stat-value">{stats.deckTimeMinutes || totalDeckTime} mins</div>
+            <div className="route-stat-value">{stats.deckTimeMinutes || 0} mins</div>
           </div>
           
           {/* Column 3: Flight Time and Total Time */}
@@ -157,7 +158,7 @@ const RouteStatsCard = ({
           {/* Column 2: Deck Fuel (below Deck Time) */}
           <div className="route-stat-item">
             <div className="route-stat-label">Deck Fuel:</div>
-            <div className="route-stat-value">{stats.deckFuel || totalDeckFuel} lbs</div>
+            <div className="route-stat-value">{stats.deckFuel || 0} lbs</div>
           </div>
           
           {/* Column 3: Total Time (below Flight Time) */}
