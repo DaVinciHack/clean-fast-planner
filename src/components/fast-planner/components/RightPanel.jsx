@@ -128,7 +128,7 @@ const RightPanel = ({
         {/* Main Tab Content */}
         {activeTab === 'main' && (
           <div className="tab-content main-tab">
-        <div className="panel-header">
+            <div className="panel-header">
           <div className="region-selector-container">
             <RegionSelector
               regions={regions}
@@ -513,6 +513,7 @@ const RightPanel = ({
             Refresh connection
           </button>
         </div>
+          </div>
         )}
         
         {/* Settings Tab Content */}
