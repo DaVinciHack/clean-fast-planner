@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import RegionSelector from './RegionSelector';
 
 /**
  * Right Panel Component
  * 
  * Contains controls, aircraft configuration and route statistics
+ * with tab system for settings, performance, weather, finance, and evacuation
  */
 const RightPanel = ({
   visible,
@@ -71,17 +72,51 @@ const RightPanel = ({
     }
   };
   
+  // Define the available tabs
+  const tabs = [
+    { id: 'main', name: 'Main', icon: '🛠️', color: '#4a90e2' },
+    { id: 'settings', name: 'Settings', icon: '⚙️', color: '#5b9be0' },
+    { id: 'performance', name: 'Performance', icon: '📊', color: '#6ca6de' },
+    { id: 'weather', name: 'Weather', icon: '🌤️', color: '#7eb1dc' },
+    { id: 'finance', name: 'Finance', icon: '💰', color: '#8fbcda' },
+    { id: 'evacuation', name: 'Evacuation', icon: '🚁', color: '#9fc7d8' }
+  ];
+  
+  // State for the active tab
+  const [activeTab, setActiveTab] = useState('main');
+  
   return (
     <>
       {/* Right panel toggle tab */}
       <div 
-        className="panel-tab right-panel-tab" 
+        className="panel-tab right-panel-tab main-toggle" 
         onClick={onToggleVisibility}
       >
         {visible ? 'Hide →' : '← Show'}
       </div>
       
+      {/* Tab System */}
+      {visible && tabs.map((tab, index) => (
+        <div 
+          key={tab.id}
+          className={`panel-tab right-panel-tab tab-selector ${activeTab === tab.id ? 'active' : ''}`}
+          style={{ 
+            backgroundColor: tab.color,
+            top: `${180 + index * 80}px`,
+            opacity: activeTab === tab.id ? 1 : 0.8
+          }}
+          onClick={() => setActiveTab(tab.id)}
+          title={tab.name}
+        >
+          <div className="tab-icon">{tab.icon}</div>
+          <div className="tab-name">{tab.name}</div>
+        </div>
+      ))}
+      
       <div id="info-panel" className={`info-panel ${!visible ? "hidden" : ""}`}>
+        {/* Main Tab Content */}
+        {activeTab === 'main' && (
+          <div className="tab-content main-tab">
         <div className="panel-header">
           <div className="region-selector-container">
             <RegionSelector
@@ -258,6 +293,7 @@ const RightPanel = ({
                 </>
               ) : "None Selected"}
             </div>
+          </div>
             
             {/* Aircraft data grid - only shown when aircraft is selected */}
             {selectedAircraft && (
@@ -466,6 +502,389 @@ const RightPanel = ({
             Refresh connection
           </button>
         </div>
+        )}
+        
+        {/* Settings Tab Content */}
+        {activeTab === 'settings' && (
+          <div className="tab-content settings-tab">
+            <h3>Flight Settings</h3>
+            <div className="control-section">
+              <h4>Fuel & Weight Settings</h4>
+              
+              <label htmlFor="deck-time">Deck Time Per Stop (mins):</label>
+              <input 
+                type="number" 
+                id="deck-time" 
+                defaultValue={5}
+                min="0" 
+                max="60"
+              />
+              
+              <label htmlFor="deck-fuel">Deck Fuel Per Stop (lbs):</label>
+              <input 
+                type="number" 
+                id="deck-fuel" 
+                defaultValue={100}
+                min="0" 
+                max="1000"
+              />
+              
+              <label htmlFor="passenger-weight">Passenger Weight (lbs):</label>
+              <input 
+                type="number" 
+                id="passenger-weight" 
+                defaultValue={220}
+                min="100" 
+                max="300"
+              />
+              
+              <label htmlFor="cargo-weight">Additional Cargo (lbs):</label>
+              <input 
+                type="number" 
+                id="cargo-weight" 
+                defaultValue={0}
+                min="0" 
+                max="5000"
+              />
+              
+              <h4>Fuel Reserve Settings</h4>
+              
+              <div className="settings-group">
+                <div>
+                  <label htmlFor="reserve-method">Reserve Method:</label>
+                  <select id="reserve-method">
+                    <option value="fixed">Fixed Amount</option>
+                    <option value="percentage">Percentage of Trip</option>
+                    <option value="time">Fixed Time</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label htmlFor="reserve-value">Reserve Value:</label>
+                  <input 
+                    type="number" 
+                    id="reserve-value" 
+                    defaultValue={600}
+                    min="0" 
+                  />
+                  <span className="unit-label">lbs</span>
+                </div>
+              </div>
+              
+              <button className="control-button">
+                Save Settings
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Performance Tab Content */}
+        {activeTab === 'performance' && (
+          <div className="tab-content performance-tab">
+            <h3>Performance Settings</h3>
+            <div className="control-section">
+              <h4>Take-off & Landing Performance</h4>
+              
+              <div className="settings-group">
+                <div>
+                  <label htmlFor="temperature">Temperature (°C):</label>
+                  <input 
+                    type="number" 
+                    id="temperature" 
+                    defaultValue={25}
+                    min="-20" 
+                    max="50"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="pressure-altitude">Pressure Altitude (ft):</label>
+                  <input 
+                    type="number" 
+                    id="pressure-altitude" 
+                    defaultValue={0}
+                    min="0" 
+                    max="10000"
+                  />
+                </div>
+              </div>
+              
+              <h4>Aircraft Configuration</h4>
+              
+              <div className="performance-checkbox-group">
+                <div>
+                  <input type="checkbox" id="engine-failure" />
+                  <label htmlFor="engine-failure">Include Engine Failure Analysis</label>
+                </div>
+                
+                <div>
+                  <input type="checkbox" id="cat-a" defaultChecked />
+                  <label htmlFor="cat-a">Apply Category A Procedures</label>
+                </div>
+              </div>
+              
+              <button className="control-button">
+                Calculate Performance
+              </button>
+              
+              <div className="performance-results">
+                <h4>Performance Results</h4>
+                <div className="result-item">
+                  <div className="result-label">Max Takeoff Weight:</div>
+                  <div className="result-value">17,500 lbs</div>
+                </div>
+                <div className="result-item">
+                  <div className="result-label">Weight Limited By:</div>
+                  <div className="result-value">Cat A Takeoff</div>
+                </div>
+                <div className="result-item">
+                  <div className="result-label">Max Passengers:</div>
+                  <div className="result-value">12</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Weather Tab Content */}
+        {activeTab === 'weather' && (
+          <div className="tab-content weather-tab">
+            <h3>Weather Settings</h3>
+            <div className="control-section">
+              <h4>Weather Source</h4>
+              
+              <div className="weather-source-options">
+                <div>
+                  <input type="radio" id="actual-weather" name="weather-source" defaultChecked />
+                  <label htmlFor="actual-weather">Use Actual Weather</label>
+                </div>
+                
+                <div>
+                  <input type="radio" id="manual-weather" name="weather-source" />
+                  <label htmlFor="manual-weather">Manual Weather Entry</label>
+                </div>
+              </div>
+              
+              <h4>Wind Settings</h4>
+              
+              <div className="settings-group">
+                <div>
+                  <label htmlFor="wind-direction">Wind Direction (°):</label>
+                  <input 
+                    type="number" 
+                    id="wind-direction" 
+                    defaultValue={270}
+                    min="0" 
+                    max="359"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="wind-speed">Wind Speed (kts):</label>
+                  <input 
+                    type="number" 
+                    id="wind-speed" 
+                    defaultValue={15}
+                    min="0" 
+                    max="100"
+                  />
+                </div>
+              </div>
+              
+              <h4>Visibility & Ceiling</h4>
+              
+              <div className="settings-group">
+                <div>
+                  <label htmlFor="visibility">Visibility (nm):</label>
+                  <input 
+                    type="number" 
+                    id="visibility" 
+                    defaultValue={10}
+                    min="0" 
+                    max="50"
+                    step="0.1"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="ceiling">Ceiling (ft):</label>
+                  <input 
+                    type="number" 
+                    id="ceiling" 
+                    defaultValue={3000}
+                    min="0" 
+                    max="20000"
+                    step="100"
+                  />
+                </div>
+              </div>
+              
+              <button className="control-button">
+                Apply Weather
+              </button>
+              
+              <div className="weather-data">
+                <h4>Current Weather</h4>
+                <div className="weather-item">
+                  <div className="weather-icon">🌤️</div>
+                  <div className="weather-details">
+                    <div>Wind: 270° at 15 kts</div>
+                    <div>Visibility: 10 nm</div>
+                    <div>Ceiling: 3,000 ft</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Finance Tab Content */}
+        {activeTab === 'finance' && (
+          <div className="tab-content finance-tab">
+            <h3>Finance Calculator</h3>
+            <div className="control-section">
+              <h4>Flight Cost Parameters</h4>
+              
+              <label htmlFor="hourly-rate">Hourly Rate (USD):</label>
+              <input 
+                type="number" 
+                id="hourly-rate" 
+                defaultValue={4500}
+                min="0"
+                step="100"
+              />
+              
+              <label htmlFor="landing-fee">Landing Fee (USD):</label>
+              <input 
+                type="number" 
+                id="landing-fee" 
+                defaultValue={250}
+                min="0"
+                step="50"
+              />
+              
+              <label htmlFor="fuel-cost">Fuel Cost (USD/lb):</label>
+              <input 
+                type="number" 
+                id="fuel-cost" 
+                defaultValue={3.25}
+                min="0"
+                step="0.05"
+              />
+              
+              <h4>Contract Details</h4>
+              
+              <label htmlFor="billing-method">Billing Method:</label>
+              <select id="billing-method">
+                <option value="hourly">Hourly Rate</option>
+                <option value="fixed">Fixed Price</option>
+                <option value="mileage">Per Nautical Mile</option>
+              </select>
+              
+              <button className="control-button finance-calculate">
+                Calculate Quote
+              </button>
+              
+              <div className="finance-results">
+                <h4>Cost Breakdown</h4>
+                <div className="finance-item">
+                  <div className="finance-label">Flight Time Cost:</div>
+                  <div className="finance-value">$9,900.00</div>
+                </div>
+                <div className="finance-item">
+                  <div className="finance-label">Landing Fees:</div>
+                  <div className="finance-value">$2,500.00</div>
+                </div>
+                <div className="finance-item">
+                  <div className="finance-label">Fuel Cost:</div>
+                  <div className="finance-value">$16,850.00</div>
+                </div>
+                <div className="finance-item total">
+                  <div className="finance-label">Total Cost:</div>
+                  <div className="finance-value">$29,250.00</div>
+                </div>
+                <div className="finance-item per-passenger">
+                  <div className="finance-label">Cost Per Passenger (12 pax):</div>
+                  <div className="finance-value">$2,437.50</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Evacuation Tab Content */}
+        {activeTab === 'evacuation' && (
+          <div className="tab-content evacuation-tab">
+            <h3>Evacuation Planner</h3>
+            <div className="control-section">
+              <h4>Evacuation Parameters</h4>
+              
+              <label htmlFor="total-evacuees">Total Personnel to Evacuate:</label>
+              <input 
+                type="number" 
+                id="total-evacuees" 
+                defaultValue={120}
+                min="1"
+              />
+              
+              <label htmlFor="available-aircraft">Available Aircraft:</label>
+              <select id="available-aircraft" multiple>
+                <option value="N603PW">N603PW (AW139)</option>
+                <option value="N604PW">N604PW (AW139)</option>
+                <option value="N701BH">N701BH (S92)</option>
+                <option value="N702BH">N702BH (S92)</option>
+              </select>
+              <div className="small-hint">Hold Ctrl/Cmd to select multiple</div>
+              
+              <label htmlFor="priority-level">Priority Level:</label>
+              <select id="priority-level">
+                <option value="1">1 - Immediate (Medical Emergency)</option>
+                <option value="2">2 - Urgent (Weather Threat)</option>
+                <option value="3" selected>3 - Standard Evacuation</option>
+                <option value="4">4 - Non-Essential Personnel</option>
+              </select>
+              
+              <button className="control-button evacuation-calculate">
+                Calculate Evacuation Plan
+              </button>
+              
+              <div className="evacuation-results">
+                <h4>Evacuation Plan</h4>
+                <div className="evacuation-summary">
+                  <div>Total Evacuees: 120</div>
+                  <div>Total Flights Required: 10</div>
+                  <div>Estimated Completion Time: 4:30</div>
+                </div>
+                
+                <div className="evacuation-flight-list">
+                  <h5>Flight Schedule</h5>
+                  <div className="evacuation-flight">
+                    <div className="flight-number">Flight 1</div>
+                    <div className="flight-details">
+                      <div>N603PW - 12 pax</div>
+                      <div>Depart: 10:00 - Arrive: 10:45</div>
+                    </div>
+                  </div>
+                  <div className="evacuation-flight">
+                    <div className="flight-number">Flight 2</div>
+                    <div className="flight-details">
+                      <div>N701BH - 19 pax</div>
+                      <div>Depart: 10:15 - Arrive: 11:00</div>
+                    </div>
+                  </div>
+                  <div className="evacuation-flight">
+                    <div className="flight-number">Flight 3</div>
+                    <div className="flight-details">
+                      <div>N604PW - 12 pax</div>
+                      <div>Depart: 10:30 - Arrive: 11:15</div>
+                    </div>
+                  </div>
+                  <div className="evacuation-more">+7 more flights...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -36,6 +36,7 @@
   cursor: pointer;
   z-index: 15;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   border-radius: 0 5px 5px 0;
@@ -66,10 +67,192 @@
 
 .right-panel-tab {
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
   border-radius: 5px 0 0 5px;
   border-right: none;
+}
+
+.main-toggle {
+  top: 50%;
+  transform: translateY(-50%);
+  height: 90px;
+  background-color: rgba(0, 123, 255, 0.8);
+}
+
+/* Tab selector styles */
+.tab-selector {
+  width: 50px;
+  height: 60px;
+  writing-mode: horizontal-tb;
+  text-orientation: upright;
+  padding: 5px;
+  transition: all 0.3s ease;
+  opacity: 0.8;
+}
+
+.tab-selector:hover {
+  opacity: 1;
+  width: 55px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+}
+
+.tab-selector.active {
+  opacity: 1;
+  width: 55px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+  border: 2px solid white;
+}
+
+.tab-icon {
+  font-size: 20px;
+  margin-bottom: 5px;
+}
+
+.tab-name {
+  font-size: 10px;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  text-align: center;
+}
+
+/* Tab content styles */
+.tab-content {
+  width: 100%;
+  height: 100%;
+}
+
+/* Settings-specific styles */
+.settings-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.settings-group > div {
+  flex: 1;
+}
+
+.unit-label {
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--label-color);
+}
+
+.small-hint {
+  font-size: 10px;
+  color: var(--label-color);
+  margin-top: -5px;
+  margin-bottom: 10px;
+}
+
+/* Performance tab styles */
+.performance-checkbox-group {
+  margin: 15px 0;
+}
+
+.performance-checkbox-group > div {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.performance-checkbox-group input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.performance-results, .finance-results, .weather-data, .evacuation-results {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: var(--input-bg);
+  border-radius: 5px;
+  border: 1px solid var(--input-border);
+}
+
+.result-item, .finance-item, .weather-item, .evacuation-flight {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.result-item:last-child, .finance-item:last-child, .weather-item:last-child, .evacuation-flight:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.finance-item.total {
+  margin-top: 10px;
+  border-top: 1px solid var(--accent-cyan);
+  border-bottom: 1px solid var(--accent-cyan);
+  padding: 8px 0;
+  font-weight: bold;
+  color: var(--accent-cyan);
+}
+
+.finance-item.per-passenger {
+  margin-top: 5px;
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.weather-source-options {
+  margin: 15px 0;
+}
+
+.weather-source-options > div {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.weather-source-options input[type="radio"] {
+  margin-right: 8px;
+}
+
+.weather-item {
+  display: flex;
+  align-items: center;
+}
+
+.weather-icon {
+  font-size: 24px;
+  margin-right: 15px;
+}
+
+.weather-details {
+  flex: 1;
+}
+
+.evacuation-summary {
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.evacuation-flight-list {
+  margin-top: 10px;
+}
+
+.evacuation-flight {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.flight-number {
+  width: 80px;
+  font-weight: bold;
+}
+
+.flight-details {
+  flex: 1;
+}
+
+.evacuation-more {
+  font-style: italic;
+  text-align: center;
+  margin-top: 5px;
+  color: var(--label-color);
 }
 
 .route-editor-panel {
