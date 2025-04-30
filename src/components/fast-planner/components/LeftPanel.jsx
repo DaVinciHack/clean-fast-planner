@@ -167,9 +167,10 @@ const LeftPanel = ({
   
   return (
     <>
-      {/* Left panel toggle tab */}
+      {/* Left panel toggle tab - matched height with right panel tab */}
       <div 
-        className="panel-tab left-panel-tab" 
+        className="panel-tab left-panel-tab main-toggle tab-selector" 
+        style={{ top: '50px' }}
         onClick={onToggleVisibility}
       >
         {visible ? '← Hide' : 'Show →'}

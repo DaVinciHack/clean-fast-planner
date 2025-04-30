@@ -48,8 +48,7 @@ class MapManager {
         
         console.log('Map instance created successfully');
         
-        // Add navigation controls
-        this.map.addControl(new window.mapboxgl.NavigationControl(), 'top-left');
+        // Navigation controls removed to clean up UI
 
         this._isLoaded = false; // Reset flag on initialization
         this._loadCallbacks = []; // Clear any previous callbacks
