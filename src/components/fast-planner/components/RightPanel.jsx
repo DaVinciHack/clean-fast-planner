@@ -85,12 +85,12 @@ const RightPanel = ({
   
   // Define the available tabs
   const tabs = [
-    { id: 'main', name: 'Main', icon: '🛠️', color: '#4a90e2' },
-    { id: 'settings', name: 'Settings', icon: '⚙️', color: '#5b9be0' },
-    { id: 'performance', name: 'Performance', icon: '📊', color: '#6ca6de' },
-    { id: 'weather', name: 'Weather', icon: '🌤️', color: '#7eb1dc' },
-    { id: 'finance', name: 'Finance', icon: '💰', color: '#8fbcda' },
-    { id: 'evacuation', name: 'Evacuation', icon: '🚁', color: '#9fc7d8' }
+    { id: 'main', name: 'Main', color: '#4a90e2' },
+    { id: 'settings', name: 'Settings', color: '#5b9be0' },
+    { id: 'performance', name: 'Performance', color: '#6ca6de' },
+    { id: 'weather', name: 'Weather', color: '#7eb1dc' },
+    { id: 'finance', name: 'Finance', color: '#8fbcda' },
+    { id: 'evacuation', name: 'Evacuation', color: '#9fc7d8' }
   ];
   
   // State for the active tab
@@ -926,14 +926,13 @@ const RightPanel = ({
           className={`panel-tab right-panel-tab tab-selector ${activeTab === tab.id ? 'active' : ''}`}
           style={{ 
             backgroundColor: tab.color,
-            top: `${180 + index * 80}px`,
+            top: `${150 + index * 90}px`,
             opacity: activeTab === tab.id ? 1 : 0.8
           }}
           onClick={() => setActiveTab(tab.id)}
           title={tab.name}
         >
-          <div className="tab-icon">{tab.icon}</div>
-          <div className="tab-name">{tab.name}</div>
+          {tab.name}
         </div>
       ))}
       
