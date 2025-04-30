@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import RegionSelector from '../controls/RegionSelector';
 import FlightSettings from '../flight/FlightSettings';
-import '../styles/FlightSettings.css';
+import '../../FastPlannerStyles.css';
 
 /**
  * Right Panel Component
