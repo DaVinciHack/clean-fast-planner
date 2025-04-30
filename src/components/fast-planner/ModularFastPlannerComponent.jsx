@@ -443,7 +443,7 @@ const ModularFastPlannerComponent = () => {
     
   }, [mapManagerRef, waypointManagerRef, platformManagerRef]);
   
-  // Set up map event handlers - this is the one place that defines all map click behaviors
+  // Set up map event handlers
   const setupMapEventHandlers = useCallback((map) => { // Wrap in useCallback
     if (!map) {
       console.error("Cannot setup map event handlers: Map is null");
@@ -452,13 +452,11 @@ const ModularFastPlannerComponent = () => {
     
     console.log('📍 Setting up map click event handlers');
     
-    // CRITICAL: Remove ANY existing click handlers to prevent duplicates
-    // Use specific handler function name to ensure proper cleanup
+    // CRITICAL: Remove any existing click handler to prevent duplicates
     map.off('click');
-    map.off('click.waypointHandler'); // Use namespaced event for better cleanup
     
-    // Map click for adding waypoints - use namespaced event handler for better cleanup
-    map.on('click.waypointHandler', (e) => {
+    // Map click for adding waypoints
+    map.on('click', (e) => {
       console.log('🗺️ MAP CLICK DETECTED:', e.lngLat);
       
       // Ensure left panel is shown when clicking on map
@@ -645,9 +643,8 @@ const ModularFastPlannerComponent = () => {
         return;
       }
       
-      // First thoroughly remove any existing handlers to avoid duplicates
+      // First remove any existing handlers to avoid duplicates
       currentMap.off('click');
-      currentMap.off('click.waypointHandler');
       
       // Then set up the event handlers fresh
       console.log("Applying click handlers...");
@@ -696,9 +693,8 @@ const ModularFastPlannerComponent = () => {
         // SIMPLIFIED FIX: Clean and thorough handler initialization
         // Multiple/duplicate initializations are causing duplicate handlers
         
-        // First thoroughly clean up any existing handlers to avoid duplicates
+        // First remove any existing handlers to avoid duplicates
         currentMap.off('click');
-        currentMap.off('click.waypointHandler');
             
         // Reset initialization flag to ensure fresh setup
         window.mapHandlersInitialized = false;
@@ -1801,7 +1797,6 @@ const ModularFastPlannerComponent = () => {
     if (map) {
       console.log('Cleaning up map event handlers during region change');
       map.off('click');
-      map.off('click.waypointHandler');
       
       // Reset the handler initialization flag
       window.mapHandlersInitialized = false;
@@ -2214,9 +2209,8 @@ const ModularFastPlannerComponent = () => {
           // Reset the initialization flag
           window.mapHandlersInitialized = false;
           
-          // Remove existing handlers - be thorough to avoid duplicates
+          // Remove existing handlers
           map.off('click');
-          map.off('click.waypointHandler');
           
           // Set up handlers directly
           setupMapEventHandlers(map);
