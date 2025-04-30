@@ -121,23 +121,28 @@
 }
 
 .tab-settings {
-  background-color: #0052a3;
+  background-color: #0049a8;
 }
 
 .tab-performance {
-  background-color: #004080;
+  background-color: #003584;
 }
 
 .tab-weather {
-  background-color: #003366;
+  background-color: #002566;
 }
 
 .tab-finance {
-  background-color: #480087;
+  background-color: #330066;
 }
 
 .tab-evacuation {
-  background-color: #660066;
+  background-color: #4b0045;
+}
+
+/* Main toggle tab (Hide/Show) */
+.main-toggle {
+  background-color: #007bff;
 }
 
 /* Tab content styles */
