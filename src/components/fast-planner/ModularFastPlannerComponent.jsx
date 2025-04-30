@@ -30,7 +30,7 @@ const ModularFastPlannerComponent = () => {
   const [routeInput, setRouteInput] = useState('');
   const [airportData, setAirportData] = useState([]);
   const [favoriteLocations, setFavoriteLocations] = useState([]); // Add state for favorite locations
-  const [leftPanelVisible, setLeftPanelVisible] = useState(true);
+  const [leftPanelVisible, setLeftPanelVisible] = useState(false); // Start with left panel closed
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
   const [platformsVisible, setPlatformsVisible] = useState(true);
   const [platformsLoaded, setPlatformsLoaded] = useState(false);
@@ -458,6 +458,12 @@ const ModularFastPlannerComponent = () => {
     // Map click for adding waypoints
     map.on('click', (e) => {
       console.log('🗺️ MAP CLICK DETECTED:', e.lngLat);
+      
+      // Ensure left panel is shown when clicking on map
+      if (!leftPanelVisible) {
+        console.log('Opening left panel due to map click');
+        setLeftPanelVisible(true);
+      }
       
       // Exit early if waypoint manager isn't initialized
       if (!waypointManagerRef.current) {
@@ -1223,6 +1229,12 @@ const ModularFastPlannerComponent = () => {
   // Add a waypoint from the UI (not from map click)
   const handleAddWaypoint = (name, coords) => {
     if (!waypointManagerRef.current) return;
+    
+    // Ensure left panel is visible when adding waypoints
+    if (!leftPanelVisible) {
+      console.log('Opening left panel due to adding waypoint');
+      setLeftPanelVisible(true);
+    }
     
     // If name is provided but no coords, first try to find a platform with that name
     if (!coords && name && platformManagerRef.current) {
