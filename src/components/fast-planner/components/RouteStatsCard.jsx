@@ -96,18 +96,8 @@ const RouteStatsCard = ({
             <div className="route-stat-value">{stats.estimatedTime || '00:00'}</div>
           </div>
           <div className="route-stat-item">
-            <div className="route-stat-label">Total Time (Flight + Deck):</div>
+            <div className="route-stat-label">Total Time:</div>
             <div className="route-stat-value">{calculateTotalTime()}</div>
-          </div>
-        </div>
-        <div className="stats-row">
-          <div className="route-stat-item">
-            <div className="route-stat-label">Trip Fuel:</div>
-            <div className="route-stat-value">{stats.fuelRequired || '0'} lbs</div>
-          </div>
-          <div className="route-stat-item">
-            <div className="route-stat-label">Total Fuel (+ Deck):</div>
-            <div className="route-stat-value">{totalFuel} lbs</div>
           </div>
           <div className="route-stat-item">
             <div className="route-stat-label">Passengers:</div>
@@ -116,8 +106,12 @@ const RouteStatsCard = ({
         </div>
         <div className="stats-row">
           <div className="route-stat-item">
-            <div className="route-stat-label">Landings:</div>
-            <div className="route-stat-value">{landingsCount}</div>
+            <div className="route-stat-label">Trip Fuel:</div>
+            <div className="route-stat-value">{stats.fuelRequired || '0'} lbs</div>
+          </div>
+          <div className="route-stat-item">
+            <div className="route-stat-label">Total Fuel:</div>
+            <div className="route-stat-value">{totalFuel} lbs</div>
           </div>
           <div className="route-stat-item">
             <div className="route-stat-label">Deck Time:</div>
