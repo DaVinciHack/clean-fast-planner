@@ -62,6 +62,8 @@
   transform: none; /* Remove the vertical centering */
   border-radius: 0 5px 5px 0; /* Rounded corners on right side */
   border-left: none;
+  height: 24px; /* Shorter height to be more square */
+  width: 24px; /* Slightly wider to be more square */
 }
 
 .right-panel-tab {
@@ -158,10 +160,10 @@
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Right panel main toggle - restore original */
+/* Right panel main toggle - use dark gray instead of cyan */
 .right-panel-tab.main-toggle {
-  background-color: #00b8d4; /* Original cyan color */
-  border-color: rgba(255, 255, 255, 0.5);
+  background-color: #333333; /* Dark gray instead of cyan */
+  border-color: rgba(255, 255, 255, 0.2);
   width: 28px;
   height: 50px;
 }
