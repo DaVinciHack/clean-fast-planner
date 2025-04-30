@@ -7,11 +7,13 @@ import RightPanel from './RightPanel';
 import MapComponent from './MapComponent';
 import RegionSelector from './RegionSelector';
 import RouteStatsCard from './RouteStatsCard';
+import FlightSettings from './FlightSettings';
 
 export {
   LeftPanel,
   RightPanel,
   MapComponent,
   RegionSelector,
-  RouteStatsCard
+  RouteStatsCard,
+  FlightSettings
 };

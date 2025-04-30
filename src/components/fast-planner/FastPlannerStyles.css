@@ -1311,3 +1311,34 @@
   color: #aaa;
   margin-left: 2px;
 }
+
+/* Flight Settings styles */
+.flight-settings {
+  margin-top: 15px;
+}
+
+.input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-unit input {
+  width: 100%;
+  padding-right: 30px;
+}
+
+.input-with-unit .unit {
+  position: absolute;
+  right: 8px;
+  font-size: 10px;
+  color: var(--label-color);
+  pointer-events: none;
+}
+
+.flight-settings .small-hint {
+  font-size: 10px;
+  color: var(--label-color);
+  margin-top: 4px;
+  margin-bottom: 12px;
+}

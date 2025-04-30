@@ -1082,6 +1082,23 @@ const ModularFastPlannerComponent = () => {
     // Show loading state for feedback
     setAircraftLoading(true);
     
+    // Save current settings for the previous aircraft type
+    if (aircraftType && aircraftType !== '') {
+      const currentSettings = {
+        deckTimePerStop,
+        deckFuelPerStop,
+        deckFuelFlow,
+        taxiFuel,
+        contingencyFuelPercent,
+        reserveFuel,
+        reserveMethod,
+        passengerWeight,
+        cargoWeight
+      };
+      saveAircraftSettings(aircraftType, currentSettings);
+      console.log(`Saved settings for ${aircraftType} before switching to ${type}`);
+    }
+    
     // Update the type - always
     setAircraftType(type);
     
@@ -1093,6 +1110,23 @@ const ModularFastPlannerComponent = () => {
     // Save preference only for non-empty types
     if (type) {
       saveToLocalStorage('lastAircraftType', type);
+      
+      // Load settings for the new aircraft type if available
+      const aircraftSettings = loadAircraftSettings(type);
+      if (aircraftSettings) {
+        console.log(`Loading settings for ${type}:`, aircraftSettings);
+        
+        // Update state with aircraft-specific settings
+        if (aircraftSettings.deckTimePerStop !== undefined) setDeckTimePerStop(aircraftSettings.deckTimePerStop);
+        if (aircraftSettings.deckFuelPerStop !== undefined) setDeckFuelPerStop(aircraftSettings.deckFuelPerStop);
+        if (aircraftSettings.deckFuelFlow !== undefined) setDeckFuelFlow(aircraftSettings.deckFuelFlow);
+        if (aircraftSettings.taxiFuel !== undefined) setTaxiFuel(aircraftSettings.taxiFuel);
+        if (aircraftSettings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(aircraftSettings.contingencyFuelPercent);
+        if (aircraftSettings.reserveFuel !== undefined) setReserveFuel(aircraftSettings.reserveFuel);
+        if (aircraftSettings.reserveMethod !== undefined) setReserveMethod(aircraftSettings.reserveMethod);
+        if (aircraftSettings.passengerWeight !== undefined) setPassengerWeight(aircraftSettings.passengerWeight);
+        if (aircraftSettings.cargoWeight !== undefined) setCargoWeight(aircraftSettings.cargoWeight);
+      }
     } else {
       // Clear saved preference
       try {
@@ -1160,6 +1194,24 @@ const ModularFastPlannerComponent = () => {
   const handleAircraftRegistrationChange = (registration) => {
     console.log(`Selecting aircraft: ${registration}`);
     
+    // Save settings for previous aircraft if it exists
+    if (selectedAircraft) {
+      const currentReg = selectedAircraft.registration;
+      const currentSettings = {
+        deckTimePerStop,
+        deckFuelPerStop,
+        deckFuelFlow,
+        taxiFuel,
+        contingencyFuelPercent,
+        reserveFuel,
+        reserveMethod,
+        passengerWeight,
+        cargoWeight
+      };
+      saveAircraftSettings(`aircraft_${currentReg}`, currentSettings);
+      console.log(`Saved settings for aircraft ${currentReg} before switching`);
+    }
+    
     // IMPORTANT: First get the aircraft object
     let aircraftObject = null;
     if (aircraftManagerRef.current && registration) {
@@ -1186,6 +1238,42 @@ const ModularFastPlannerComponent = () => {
       setAircraftType('');
       // Reset registration dropdown to empty
       setAircraftRegistration('');
+      
+      // Load settings for this specific aircraft if available
+      const aircraftSettingsKey = `aircraft_${registration}`;
+      const aircraftSettings = loadAircraftSettings(aircraftSettingsKey);
+      
+      if (aircraftSettings) {
+        console.log(`Loading settings for aircraft ${registration}:`, aircraftSettings);
+        
+        // Update state with aircraft-specific settings
+        if (aircraftSettings.deckTimePerStop !== undefined) setDeckTimePerStop(aircraftSettings.deckTimePerStop);
+        if (aircraftSettings.deckFuelPerStop !== undefined) setDeckFuelPerStop(aircraftSettings.deckFuelPerStop);
+        if (aircraftSettings.deckFuelFlow !== undefined) setDeckFuelFlow(aircraftSettings.deckFuelFlow);
+        if (aircraftSettings.taxiFuel !== undefined) setTaxiFuel(aircraftSettings.taxiFuel);
+        if (aircraftSettings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(aircraftSettings.contingencyFuelPercent);
+        if (aircraftSettings.reserveFuel !== undefined) setReserveFuel(aircraftSettings.reserveFuel);
+        if (aircraftSettings.reserveMethod !== undefined) setReserveMethod(aircraftSettings.reserveMethod);
+        if (aircraftSettings.passengerWeight !== undefined) setPassengerWeight(aircraftSettings.passengerWeight);
+        if (aircraftSettings.cargoWeight !== undefined) setCargoWeight(aircraftSettings.cargoWeight);
+      } else {
+        // If no specific aircraft settings, try to load type settings
+        const typeSettings = loadAircraftSettings(aircraftObject.modelType);
+        if (typeSettings) {
+          console.log(`No settings for ${registration}, using type settings for ${aircraftObject.modelType}`);
+          
+          // Update state with type-specific settings
+          if (typeSettings.deckTimePerStop !== undefined) setDeckTimePerStop(typeSettings.deckTimePerStop);
+          if (typeSettings.deckFuelPerStop !== undefined) setDeckFuelPerStop(typeSettings.deckFuelPerStop);
+          if (typeSettings.deckFuelFlow !== undefined) setDeckFuelFlow(typeSettings.deckFuelFlow);
+          if (typeSettings.taxiFuel !== undefined) setTaxiFuel(typeSettings.taxiFuel);
+          if (typeSettings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(typeSettings.contingencyFuelPercent);
+          if (typeSettings.reserveFuel !== undefined) setReserveFuel(typeSettings.reserveFuel);
+          if (typeSettings.reserveMethod !== undefined) setReserveMethod(typeSettings.reserveMethod);
+          if (typeSettings.passengerWeight !== undefined) setPassengerWeight(typeSettings.passengerWeight);
+          if (typeSettings.cargoWeight !== undefined) setCargoWeight(typeSettings.cargoWeight);
+        }
+      }
       
       // Recalculate route stats
       const wps = waypointManagerRef.current?.getWaypoints() || [];
@@ -1626,7 +1714,48 @@ const ModularFastPlannerComponent = () => {
     }
   }, [isAuthenticated, client, currentRegion]); // Removed aircraft loading dependencies
   
-  // Load flight settings from localStorage on component mount
+  // Function to save aircraft-specific settings
+  const saveAircraftSettings = useCallback((aircraftType, settings) => {
+    try {
+      // Get existing aircraft settings or initialize empty object
+      const storedSettingsStr = localStorage.getItem('fastPlanner_aircraftSettings');
+      const aircraftSettings = storedSettingsStr ? JSON.parse(storedSettingsStr) : {};
+      
+      // Update settings for this aircraft type
+      aircraftSettings[aircraftType] = {
+        ...aircraftSettings[aircraftType],
+        ...settings
+      };
+      
+      // Save back to localStorage
+      localStorage.setItem('fastPlanner_aircraftSettings', JSON.stringify(aircraftSettings));
+      console.log(`Saved settings for ${aircraftType}:`, settings);
+    } catch (error) {
+      console.error('Error saving aircraft settings to localStorage:', error);
+    }
+  }, []);
+  
+  // Function to load aircraft-specific settings
+  const loadAircraftSettings = useCallback((aircraftType) => {
+    try {
+      // Get stored aircraft settings
+      const storedSettingsStr = localStorage.getItem('fastPlanner_aircraftSettings');
+      if (!storedSettingsStr) return null;
+      
+      const aircraftSettings = JSON.parse(storedSettingsStr);
+      
+      // Get settings for this aircraft type
+      const settings = aircraftSettings[aircraftType];
+      
+      console.log(`Loaded settings for ${aircraftType}:`, settings);
+      return settings || null;
+    } catch (error) {
+      console.error('Error loading aircraft settings from localStorage:', error);
+      return null;
+    }
+  }, []);
+  
+  // Load global flight settings from localStorage on component mount
   useEffect(() => {
     try {
       const storedDeckTime = localStorage.getItem('fastPlanner_deckTimePerStop');
@@ -1635,15 +1764,22 @@ const ModularFastPlannerComponent = () => {
       const storedCargoWeight = localStorage.getItem('fastPlanner_cargoWeight');
       const storedReserveMethod = localStorage.getItem('fastPlanner_reserveMethod');
       const storedReserveFuel = localStorage.getItem('fastPlanner_reserveFuel');
+      const storedDeckFuelFlow = localStorage.getItem('fastPlanner_deckFuelFlow');
+      const storedTaxiFuel = localStorage.getItem('fastPlanner_taxiFuel');
+      const storedContingencyFuelPercent = localStorage.getItem('fastPlanner_contingencyFuelPercent');
       
+      // Load global settings if available
       if (storedDeckTime) setDeckTimePerStop(parseInt(storedDeckTime, 10));
       if (storedDeckFuel) setDeckFuelPerStop(parseInt(storedDeckFuel, 10));
       if (storedPassengerWeight) setPassengerWeight(parseInt(storedPassengerWeight, 10));
       if (storedCargoWeight) setCargoWeight(parseInt(storedCargoWeight, 10));
       if (storedReserveMethod) setReserveMethod(storedReserveMethod);
       if (storedReserveFuel) setReserveFuel(parseInt(storedReserveFuel, 10));
+      if (storedDeckFuelFlow) setDeckFuelFlow(parseInt(storedDeckFuelFlow, 10));
+      if (storedTaxiFuel) setTaxiFuel(parseInt(storedTaxiFuel, 10));
+      if (storedContingencyFuelPercent) setContingencyFuelPercent(parseInt(storedContingencyFuelPercent, 10));
       
-      console.log('Flight settings loaded from localStorage');
+      console.log('Global flight settings loaded from localStorage');
     } catch (error) {
       console.error('Error loading settings from localStorage:', error);
     }
@@ -2404,6 +2540,22 @@ const ModularFastPlannerComponent = () => {
       />
     </div>
   );
+  // Add event listener for saving aircraft settings
+  useEffect(() => {
+    // Add event listener for saving aircraft settings from RightPanel
+    const handleSaveAircraftSettings = (e) => {
+      const { key, settings } = e.detail;
+      console.log(`Saving settings for ${key}:`, settings);
+      saveAircraftSettings(key, settings);
+    };
+    
+    window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    
+    // Cleanup function
+    return () => {
+      window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    };
+  }, [saveAircraftSettings]);
 };
 
 export default ModularFastPlannerComponent;
