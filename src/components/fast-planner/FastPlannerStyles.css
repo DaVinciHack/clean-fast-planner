@@ -72,29 +72,32 @@
 }
 
 .main-toggle {
-  top: 70px;
-  height: 70px;
-  background-color: rgba(0, 123, 255, 0.8);
+  top: 50px;
+  height: 60px;
+  background-color: #007bff;
+  z-index: 20;
 }
 
 /* Tab selector styles */
 .tab-selector {
   width: 28px;
-  height: 80px;
+  height: 90px;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   padding: 10px 0;
   transition: all 0.3s ease;
-  opacity: 0.85;
+  opacity: 0.95;
   border-radius: 5px 0 0 5px;
   margin-bottom: 10px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-right: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.5px;
 }
 
 .tab-selector:hover {
@@ -106,9 +109,35 @@
 .tab-selector.active {
   opacity: 1;
   width: 32px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
   border: 1px solid white;
   border-right: none;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+/* Tab color classes */
+.tab-main {
+  background-color: #0066cc;
+}
+
+.tab-settings {
+  background-color: #0052a3;
+}
+
+.tab-performance {
+  background-color: #004080;
+}
+
+.tab-weather {
+  background-color: #003366;
+}
+
+.tab-finance {
+  background-color: #480087;
+}
+
+.tab-evacuation {
+  background-color: #660066;
 }
 
 /* Tab content styles */
