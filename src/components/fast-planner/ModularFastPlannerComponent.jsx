@@ -73,8 +73,11 @@ const ModularFastPlannerComponent = () => {
   // Maintain backwards compatibility with existing code
   const [deckTimePerStop, setDeckTimePerStop] = useState(5); 
   const [deckFuelPerStop, setDeckFuelPerStop] = useState(100);
+  const [deckFuelFlow, setDeckFuelFlow] = useState(400); // lbs per hour during deck operations
   const [passengerWeight, setPassengerWeight] = useState(220);
   const [cargoWeight, setCargoWeight] = useState(0);
+  const [taxiFuel, setTaxiFuel] = useState(50); // lbs of taxi fuel
+  const [contingencyFuelPercent, setContingencyFuelPercent] = useState(10); // % of trip fuel
   const [reserveMethod, setReserveMethod] = useState('fixed');
   
   // Initialize managers
@@ -744,7 +747,7 @@ const ModularFastPlannerComponent = () => {
 
   // Calculate route statistics 
   // Initialize FlightCalculations module
-  const flightCalculationsRef = useRef(null);
+
   
   // Initialize the flight calculations module
   useEffect(() => {
@@ -763,12 +766,12 @@ const ModularFastPlannerComponent = () => {
         passengerWeight,
         reserveFuel,
         deckTimePerStop,
-        deckFuelFlow: 400, // Using a default value for now
-        taxiFuel: 50, // Default value
-        contingencyFuelPercent: 10 // Default value
+        deckFuelFlow,
+        taxiFuel,
+        contingencyFuelPercent
       });
     }
-  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelPerStop]);
+  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelPerStop, deckFuelFlow, taxiFuel, contingencyFuelPercent]);
   
   // Calculate route statistics using our enhanced module
   const calculateRouteStats = (coordinates) => {
@@ -1252,6 +1255,63 @@ const ModularFastPlannerComponent = () => {
       const stats = calculateRouteStats(coordinates);
       
       // CRITICAL FIX: Force update the route with new leg info
+      if (waypointManagerRef.current) {
+        setTimeout(() => {
+          waypointManagerRef.current.updateRoute(stats);
+        }, 50);
+      }
+    }
+  };
+
+  // Handle deck fuel flow change
+  const handleDeckFuelFlowChange = (fuelFlow) => {
+    setDeckFuelFlow(fuelFlow);
+    
+    // Recalculate route stats with the new deck fuel flow
+    const wps = waypointManagerRef.current?.getWaypoints() || [];
+    if (wps.length >= 2) {
+      const coordinates = wps.map(wp => wp.coords);
+      const stats = calculateRouteStats(coordinates);
+      
+      // Force update the route with new leg info
+      if (waypointManagerRef.current) {
+        setTimeout(() => {
+          waypointManagerRef.current.updateRoute(stats);
+        }, 50);
+      }
+    }
+  };
+
+  // Handle taxi fuel change
+  const handleTaxiFuelChange = (fuel) => {
+    setTaxiFuel(fuel);
+    
+    // Recalculate route stats with the new taxi fuel
+    const wps = waypointManagerRef.current?.getWaypoints() || [];
+    if (wps.length >= 2) {
+      const coordinates = wps.map(wp => wp.coords);
+      const stats = calculateRouteStats(coordinates);
+      
+      // Force update the route with new leg info
+      if (waypointManagerRef.current) {
+        setTimeout(() => {
+          waypointManagerRef.current.updateRoute(stats);
+        }, 50);
+      }
+    }
+  };
+
+  // Handle contingency fuel percentage change
+  const handleContingencyFuelPercentChange = (percent) => {
+    setContingencyFuelPercent(percent);
+    
+    // Recalculate route stats with the new contingency fuel percentage
+    const wps = waypointManagerRef.current?.getWaypoints() || [];
+    if (wps.length >= 2) {
+      const coordinates = wps.map(wp => wp.coords);
+      const stats = calculateRouteStats(coordinates);
+      
+      // Force update the route with new leg info
       if (waypointManagerRef.current) {
         setTimeout(() => {
           waypointManagerRef.current.updateRoute(stats);
@@ -2320,13 +2380,19 @@ const ModularFastPlannerComponent = () => {
         // Flight settings props
         deckTimePerStop={deckTimePerStop}
         deckFuelPerStop={deckFuelPerStop}
+        deckFuelFlow={deckFuelFlow}
         passengerWeight={passengerWeight}
         cargoWeight={cargoWeight}
+        taxiFuel={taxiFuel}
+        contingencyFuelPercent={contingencyFuelPercent}
         reserveMethod={reserveMethod}
         onDeckTimeChange={setDeckTimePerStop}
         onDeckFuelChange={setDeckFuelPerStop}
+        onDeckFuelFlowChange={handleDeckFuelFlowChange}
         onPassengerWeightChange={setPassengerWeight}
         onCargoWeightChange={setCargoWeight}
+        onTaxiFuelChange={handleTaxiFuelChange}
+        onContingencyFuelPercentChange={handleContingencyFuelPercentChange}
         onReserveMethodChange={setReserveMethod}
       />
     </div>

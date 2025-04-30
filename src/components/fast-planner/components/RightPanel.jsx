@@ -44,13 +44,19 @@ const RightPanel = ({
   // Flight settings props
   deckTimePerStop = 5,
   deckFuelPerStop = 100,
+  deckFuelFlow = 400,
   passengerWeight = 220,
   cargoWeight = 0,
+  taxiFuel = 50,
+  contingencyFuelPercent = 10,
   reserveMethod = 'fixed',
   onDeckTimeChange = () => {},
   onDeckFuelChange = () => {},
+  onDeckFuelFlowChange = () => {},
   onPassengerWeightChange = () => {},
   onCargoWeightChange = () => {},
+  onTaxiFuelChange = () => {},
+  onContingencyFuelPercentChange = () => {},
   onReserveMethodChange = () => {}
 }) => {
   
@@ -494,16 +500,21 @@ const RightPanel = ({
     // Prepare settings for FlightSettings component
     const flightSettings = {
       passengerWeight,
-      taxiFuel: 50, // Default for now
+      taxiFuel,
       reserveFuel,
-      contingencyFuelPercent: 10, // Default for now
+      contingencyFuelPercent,
       deckTimePerStop,
-      deckFuelFlow: 400 // Default for now
+      deckFuelFlow
     };
     
     // Handler for settings changes
     const handleFlightSettingsChange = (newSettings) => {
       console.log("Flight settings changed:", newSettings);
+      
+      // Log each setting change for debugging
+      Object.keys(newSettings).forEach(key => {
+        console.log(`Setting ${key} changed to:`, newSettings[key]);
+      });
       
       // Update the state for each setting
       if (newSettings.passengerWeight !== undefined) {
@@ -519,8 +530,15 @@ const RightPanel = ({
       }
       
       if (newSettings.deckFuelFlow !== undefined) {
-        // We're not storing this yet, but could add it
-        console.log("Deck fuel flow updated:", newSettings.deckFuelFlow);
+        onDeckFuelFlowChange(newSettings.deckFuelFlow);
+      }
+      
+      if (newSettings.taxiFuel !== undefined) {
+        onTaxiFuelChange(newSettings.taxiFuel);
+      }
+      
+      if (newSettings.contingencyFuelPercent !== undefined) {
+        onContingencyFuelPercentChange(newSettings.contingencyFuelPercent);
       }
     };
     
@@ -585,6 +603,7 @@ const RightPanel = ({
       </div>
     </div>
   );
+  };
   
   // Render the Performance Tab Content
   const renderPerformanceTab = () => (
