@@ -82,7 +82,7 @@
 /* Tab selector styles */
 .tab-selector {
   width: 28px;
-  height: 80px;
+  height: 85px;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   padding: 10px 0;
@@ -537,7 +537,7 @@
 .info-panel {
   position: absolute;
   top: 15px;
-  right: 40px;
+  right: 45px;
   z-index: 2;
   background-color: rgba(30, 30, 30, 0.5);
   backdrop-filter: blur(10px);
