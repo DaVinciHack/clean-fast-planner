@@ -443,7 +443,7 @@ const ModularFastPlannerComponent = () => {
     
   }, [mapManagerRef, waypointManagerRef, platformManagerRef]);
   
-  // Set up map event handlers
+  // Set up map event handlers - this is the one place that defines all map click behaviors
   const setupMapEventHandlers = useCallback((map) => { // Wrap in useCallback
     if (!map) {
       console.error("Cannot setup map event handlers: Map is null");
@@ -452,11 +452,13 @@ const ModularFastPlannerComponent = () => {
     
     console.log('📍 Setting up map click event handlers');
     
-    // CRITICAL: Remove any existing click handler to prevent duplicates
+    // CRITICAL: Remove ANY existing click handlers to prevent duplicates
+    // Use specific handler function name to ensure proper cleanup
     map.off('click');
+    map.off('click.waypointHandler'); // Use namespaced event for better cleanup
     
-    // Map click for adding waypoints
-    map.on('click', (e) => {
+    // Map click for adding waypoints - use namespaced event handler for better cleanup
+    map.on('click.waypointHandler', (e) => {
       console.log('🗺️ MAP CLICK DETECTED:', e.lngLat);
       
       // Ensure left panel is shown when clicking on map
@@ -643,8 +645,9 @@ const ModularFastPlannerComponent = () => {
         return;
       }
       
-      // First remove any existing handlers to avoid duplicates
+      // First thoroughly remove any existing handlers to avoid duplicates
       currentMap.off('click');
+      currentMap.off('click.waypointHandler');
       
       // Then set up the event handlers fresh
       console.log("Applying click handlers...");
@@ -690,11 +693,15 @@ const ModularFastPlannerComponent = () => {
         // Don't load static rig data at all
         console.log("Static rig data loading disabled");
         
-        // SIMPLIFIED FIX: One initialization, no timeouts for now
-        // Multiple initializations are causing duplicate handlers
+        // SIMPLIFIED FIX: Clean and thorough handler initialization
+        // Multiple/duplicate initializations are causing duplicate handlers
         
-        // First remove any existing handlers to avoid duplicates
+        // First thoroughly clean up any existing handlers to avoid duplicates
         currentMap.off('click');
+        currentMap.off('click.waypointHandler');
+            
+        // Reset initialization flag to ensure fresh setup
+        window.mapHandlersInitialized = false;
             
         // Then set up the event handlers fresh
         console.log("🔄 INITIALIZING CLICK HANDLERS (once only)");
@@ -1788,6 +1795,18 @@ const ModularFastPlannerComponent = () => {
     
     setRegionLoading(true);
     
+    // IMPORTANT: Clean up map event handlers before changing region
+    // This prevents duplicate handlers from accumulating
+    const map = mapManagerRef.current?.getMap();
+    if (map) {
+      console.log('Cleaning up map event handlers during region change');
+      map.off('click');
+      map.off('click.waypointHandler');
+      
+      // Reset the handler initialization flag
+      window.mapHandlersInitialized = false;
+    }
+    
     // IMPORTANT: Reset aircraft selection when changing regions
     setAircraftType(''); // Set to empty to force user to choose
     setAircraftRegistration(''); // Clear aircraft registration too
@@ -2195,8 +2214,9 @@ const ModularFastPlannerComponent = () => {
           // Reset the initialization flag
           window.mapHandlersInitialized = false;
           
-          // Remove existing handlers
+          // Remove existing handlers - be thorough to avoid duplicates
           map.off('click');
+          map.off('click.waypointHandler');
           
           // Set up handlers directly
           setupMapEventHandlers(map);
