@@ -928,7 +928,8 @@ const RightPanel = ({
     <>
       {/* Right panel toggle tab */}
       <div 
-        className="panel-tab right-panel-tab main-toggle" 
+        className="panel-tab right-panel-tab main-toggle tab-selector" 
+        style={{ top: '50px' }}
         onClick={onToggleVisibility}
       >
         {visible ? 'Hide →' : '← Show'}
