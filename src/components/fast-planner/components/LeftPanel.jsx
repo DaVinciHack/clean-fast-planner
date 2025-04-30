@@ -170,10 +170,10 @@ const LeftPanel = ({
       {/* Left panel toggle tab - matched height with right panel tab */}
       <div 
         className="panel-tab left-panel-tab main-toggle tab-selector" 
-        style={{ top: '50px' }}
+        style={{ top: '50px', left: '5px' }}
         onClick={onToggleVisibility}
       >
-        {visible ? '← Hide' : 'Show →'}
+        {visible ? '←' : '→'}
       </div>
       
       {/* Route Editor Panel */}
