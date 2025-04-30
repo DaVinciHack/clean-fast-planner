@@ -167,13 +167,13 @@ const LeftPanel = ({
   
   return (
     <>
-      {/* Left panel toggle tab - shorter and with double arrows */}
+      {/* Left panel toggle tab - with horizontal > and < markers */}
       <div 
         className="panel-tab left-panel-tab main-toggle tab-selector" 
-        style={{ top: '50px', left: '5px', height: '24px' }}
+        style={{ top: '50px', left: '5px', height: '24px', writingMode: 'horizontal-tb' }}
         onClick={onToggleVisibility}
       >
-        {visible ? '<<' : '>>'}
+        {visible ? '<' : '>'}
       </div>
       
       {/* Route Editor Panel */}
