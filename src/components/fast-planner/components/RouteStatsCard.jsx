@@ -46,6 +46,11 @@ const RouteStatsCard = ({
   
   // Format total time (flight time + deck time)
   const calculateTotalTime = () => {
+    // Use totalTimeFormatted from stats if available
+    if (stats.totalTimeFormatted) {
+      return stats.totalTimeFormatted;
+    }
+    
     if (!stats.timeHours && stats.timeHours !== 0) return '00:00';
     
     // Convert deck time from minutes to hours
@@ -59,8 +64,8 @@ const RouteStatsCard = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
   
-  // Calculate total fuel (trip fuel + deck fuel)
-  const totalFuel = parseInt(stats.fuelRequired || 0) + totalDeckFuel;
+  // Use total fuel from stats if available, otherwise calculate it
+  const totalFuel = stats.totalFuel || (parseInt(stats.fuelRequired || 0) + totalDeckFuel);
   
   // Calculate maximum passengers based on usable load and passenger weight
   const calculateMaxPassengers = () => {
@@ -104,39 +109,54 @@ const RouteStatsCard = ({
       </div>
       <div className="route-stats-content">
         <div className="stats-row">
+          {/* Column 1: Total Distance and Trip Fuel */}
           <div className="route-stat-item">
             <div className="route-stat-label">Total Distance:</div>
             <div className="route-stat-value">{stats.totalDistance || '0'} NM</div>
           </div>
+          
+          {/* Column 2: Deck Time and Deck Fuel */}
+          <div className="route-stat-item">
+            <div className="route-stat-label">Deck Time:</div>
+            <div className="route-stat-value">{stats.deckTimeMinutes || totalDeckTime} mins</div>
+          </div>
+          
+          {/* Column 3: Flight Time and Total Time */}
           <div className="route-stat-item">
             <div className="route-stat-label">Flight Time:</div>
             <div className="route-stat-value">{stats.estimatedTime || '00:00'}</div>
           </div>
-          <div className="route-stat-item">
-            <div className="route-stat-label">Total Time:</div>
-            <div className="route-stat-value">{calculateTotalTime()}</div>
-          </div>
-          <div className="route-stat-item">
-            <div className="route-stat-label">Passengers:</div>
-            <div className="route-stat-value">{calculateMaxPassengers()}</div>
-          </div>
-        </div>
-        <div className="stats-row">
-          <div className="route-stat-item">
-            <div className="route-stat-label">Trip Fuel:</div>
-            <div className="route-stat-value">{stats.fuelRequired || '0'} lbs</div>
-          </div>
+          
+          {/* Column 4: Total Fuel and Passengers */}
           <div className="route-stat-item">
             <div className="route-stat-label">Total Fuel:</div>
             <div className="route-stat-value">{totalFuel} lbs</div>
           </div>
+        </div>
+        
+        <div className="stats-row">
+          {/* Column 1: Trip Fuel (below Total Distance) */}
           <div className="route-stat-item">
-            <div className="route-stat-label">Deck Time:</div>
-            <div className="route-stat-value">{totalDeckTime} mins</div>
+            <div className="route-stat-label">Trip Fuel:</div>
+            <div className="route-stat-value">{stats.tripFuel || stats.fuelRequired || '0'} lbs</div>
           </div>
+          
+          {/* Column 2: Deck Fuel (below Deck Time) */}
           <div className="route-stat-item">
             <div className="route-stat-label">Deck Fuel:</div>
-            <div className="route-stat-value">{totalDeckFuel} lbs</div>
+            <div className="route-stat-value">{stats.deckFuel || totalDeckFuel} lbs</div>
+          </div>
+          
+          {/* Column 3: Total Time (below Flight Time) */}
+          <div className="route-stat-item">
+            <div className="route-stat-label">Total Time:</div>
+            <div className="route-stat-value">{calculateTotalTime()}</div>
+          </div>
+          
+          {/* Column 4: Passengers (below Total Fuel) */}
+          <div className="route-stat-item">
+            <div className="route-stat-label">Passengers:</div>
+            <div className="route-stat-value">{calculateMaxPassengers()}</div>
           </div>
         </div>
       </div>

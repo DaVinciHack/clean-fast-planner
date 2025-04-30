@@ -838,7 +838,14 @@ const ModularFastPlannerComponent = () => {
     const stats = flightCalculationsRef.current.calculateFlightStats(
       coordinates, 
       aircraftData,
-      { payloadWeight: payloadWeight + cargoWeight }
+      { 
+        payloadWeight: payloadWeight + cargoWeight,
+        reserveFuel: reserveFuel,
+        taxiFuel: taxiFuel,
+        contingencyFuelPercent: contingencyFuelPercent,
+        deckTimePerStop: deckTimePerStop,
+        deckFuelFlow: deckFuelFlow
+      }
     );
     
     // Update route stats state
