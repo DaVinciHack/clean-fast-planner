@@ -2169,6 +2169,14 @@ const ModularFastPlannerComponent = () => {
         onClearRoute={() => {
           if (waypointManagerRef.current) {
             waypointManagerRef.current.clearRoute();
+            
+            // Reset route statistics to zero
+            setRouteStats(null);
+            
+            // Also clear the global route stats
+            window.currentRouteStats = null;
+            
+            console.log('Route cleared and statistics reset');
           }
         }}
         onLoadRigData={loadRigData}
