@@ -1,3 +1,12 @@
+/* Import the Mrs Saint Delafield script font */
+@font-face {
+  font-family: 'Mrs Saint Delafield';
+  src: url('../../fonts/MrsSaintDelafield-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Dark Grey Theme from original FastPlanner */
   --bg-color: #1a1a1a; /* Even darker base grey */
@@ -16,6 +25,7 @@
   --danger-color: #e53e3e; /* Red */
   --danger-hover-bg: #fc8181; /* Lighter Red */
   --info-bg: #2e2e2e; /* Dark grey for stats/results */
+  --connection-green: #4CAF50; /* Green for connection status */
 }
 
 .fast-planner-container {
@@ -107,13 +117,21 @@
   border-left: none;
 }
 
-/* Right panel tab specific style - maintain original */
+/* Right panel tab specific style */
 .tab-selector.right-panel-tab {
   border-radius: 5px 0 0 5px;
   border-right: none;
-  /* Restore original width for right panel tabs */
+  /* Original dimensions */
   width: 28px;
   height: 85px;
+  /* Smaller, darker upward shadow */
+  box-shadow: 0 -5px 8px -3px rgba(0, 0, 0, 0.85);
+}
+
+/* Enhanced shadow for active right panel tab */
+.tab-selector.right-panel-tab.active {
+  /* Smaller, darker upward shadow for active tabs */
+  box-shadow: 0 -6px 10px -3px rgba(0, 0, 0, 1);
 }
 
 .tab-selector:hover {
@@ -123,8 +141,8 @@
 
 .tab-selector.active {
   opacity: 1;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
-  border: 1px solid white;
+  box-shadow: 0 -6px 10px -2px rgba(0, 0, 0, 1); /* Smaller, darker UPWARD shadow */
+  border: 1px solid rgba(255, 255, 255, 0.3); /* More subtle white border */
   border-right: none;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
 }
@@ -817,7 +835,11 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 12;
-  background: linear-gradient(to bottom, rgba(45, 45, 45, 0.95) 0%, rgba(35, 35, 35, 0.85) 50%, rgba(25, 25, 25, 0.5) 100%);
+  background: linear-gradient(to bottom, 
+    rgba(60, 60, 60, 0.95) 0%, 
+    rgba(45, 45, 45, 0.85) 30%, 
+    rgba(35, 35, 35, 0.75) 60%, 
+    rgba(25, 25, 25, 0.4) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   padding: 6px 10px 10px 10px; /* Added more padding at the bottom */
@@ -857,6 +879,41 @@
   font-weight: bold;
   color: var(--text-color);
   flex-grow: 1;
+}
+
+/* Auth status container on the right side */
+.auth-status-container {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* OSDK Connection indicator and username styles */
+.connection-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 10px;
+}
+
+.connection-indicator.connected {
+  background-color: var(--connection-green);
+  box-shadow: 0 0 4px rgba(76, 175, 80, 0.8);
+}
+
+.connection-indicator.disconnected {
+  background-color: var(--danger-color);
+  box-shadow: 0 0 4px rgba(229, 62, 62, 0.8);
+}
+
+.username-display {
+  font-family: 'Mrs Saint Delafield', cursive;
+  font-size: 24px;
+  color: white;
+  margin-right: 12px;
+  font-weight: 400;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .route-stats-content {

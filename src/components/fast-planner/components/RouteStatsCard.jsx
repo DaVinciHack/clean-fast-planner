@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAuth } from '../../../context/AuthContext';
 
 /**
  * Route Statistics Card Component
@@ -16,6 +17,8 @@ const RouteStatsCard = ({
   passengerWeight = 220,
   cargoWeight = 0
 }) => {
+  // Get authentication state and user details
+  const { isAuthenticated, userName } = useAuth();
 
   // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
   const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;
@@ -83,6 +86,20 @@ const RouteStatsCard = ({
           ) : (
             <span>Route Statistics</span>
           )}
+        </div>
+        
+        {/* Auth status container - always show on the right */}
+        <div className="auth-status-container">
+          {/* Username display with script font */}
+          {isAuthenticated && userName && (
+            <span className="username-display">{userName}</span>
+          )}
+          
+          {/* Connection indicator dot - changes color based on status */}
+          <span 
+            className={`connection-indicator ${isAuthenticated ? 'connected' : 'disconnected'}`} 
+            title={isAuthenticated ? 'Connected to OSDK' : 'Not connected to OSDK'}
+          ></span>
         </div>
       </div>
       <div className="route-stats-content">
