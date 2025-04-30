@@ -129,21 +129,21 @@ const RightPanel = ({
         {activeTab === 'main' && (
           <div className="tab-content main-tab">
             <div className="panel-header">
-          <div className="region-selector-container">
-            <RegionSelector
-              regions={regions}
-              currentRegion={currentRegion}
-              onRegionChange={onRegionChange}
-              isLoading={regionLoading}
-            />
-          </div>
-        </div>
-        
-        <p style={{ fontSize: "0.8em", color: "var(--label-color)", margin: "0 0 10px 0" }}>
-          Click on map to add waypoints or use Route Editor
-        </p>
-        
-        <div className="control-section">
+              <div className="region-selector-container">
+                <RegionSelector
+                  regions={regions}
+                  currentRegion={currentRegion}
+                  onRegionChange={onRegionChange}
+                  isLoading={regionLoading}
+                />
+              </div>
+            </div>
+            
+            <p style={{ fontSize: "0.8em", color: "var(--label-color)", margin: "0 0 10px 0" }}>
+              Click on map to add waypoints or use Route Editor
+            </p>
+            
+            <div className="control-section">
           <button 
             id="clear-route" 
             className="control-button" 
@@ -171,9 +171,9 @@ const RightPanel = ({
           </button>
         </div>
         
-        <div className="control-section">
-          <h4>Aircraft Configuration</h4>
-          <label htmlFor="aircraft-type">Aircraft Type:</label>
+            <div className="control-section">
+              <h4>Aircraft Configuration</h4>
+              <label htmlFor="aircraft-type">Aircraft Type:</label>
           {/* Simple aircraft type selection dropdown */}
           <select 
             id="aircraft-type" 
@@ -397,22 +397,22 @@ const RightPanel = ({
               />
             </div>
           </div>
-        </div>
-        
-        <div className="control-section">
-          <h4>Route Statistics</h4>
-          <div id="route-stats" className="route-stats">
-            <div><strong>Total Distance:</strong> <span id="total-distance">{routeStats?.totalDistance || '0'}</span> nm</div>
-            <div><strong>Estimated Time:</strong> <span id="estimated-time">{routeStats?.estimatedTime || '00:00'}</span></div>
-            <div><strong>Fuel Required:</strong> <span id="fuel-required">{routeStats?.fuelRequired || '0'}</span> lbs</div>
-            <div><strong>Usable Load:</strong> <span id="usable-load">{routeStats?.usableLoad || '0'}</span> lbs</div>
-            <div><strong>Max Passengers:</strong> <span id="max-passengers">{routeStats?.maxPassengers || '0'}</span></div>
-          </div>
-        </div>
-        
-        {/* Waypoints list removed to avoid duplication - now only shown in left panel */}
-        
-        <div id="auth-status" className="control-section">
+            </div>
+            
+            <div className="control-section">
+              <h4>Route Statistics</h4>
+              <div id="route-stats" className="route-stats">
+                <div><strong>Total Distance:</strong> <span id="total-distance">{routeStats?.totalDistance || '0'}</span> nm</div>
+                <div><strong>Estimated Time:</strong> <span id="estimated-time">{routeStats?.estimatedTime || '00:00'}</span></div>
+                <div><strong>Fuel Required:</strong> <span id="fuel-required">{routeStats?.fuelRequired || '0'}</span> lbs</div>
+                <div><strong>Usable Load:</strong> <span id="usable-load">{routeStats?.usableLoad || '0'}</span> lbs</div>
+                <div><strong>Max Passengers:</strong> <span id="max-passengers">{routeStats?.maxPassengers || '0'}</span></div>
+              </div>
+            </div>
+            
+            {/* Waypoints list removed to avoid duplication - now only shown in left panel */}
+            
+            <div id="auth-status" className="control-section">
           <h4>Connection Status</h4>
           {/* Add debug info in development */}
           <div style={{fontSize: '10px', color: '#888', marginBottom: '4px'}}>
@@ -511,8 +511,8 @@ const RightPanel = ({
             }}
           >
             Refresh connection
-          </button>
-        </div>
+              </button>
+            </div>
           </div>
         )}
         
