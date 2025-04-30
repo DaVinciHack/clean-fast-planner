@@ -59,8 +59,8 @@
 
 .left-panel-tab {
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 50px; /* Fixed position at exactly the same height as right panel tab */
+  transform: none; /* Remove the vertical centering */
   border-radius: 0 5px 5px 0;
   border-left: none;
 }
@@ -74,7 +74,7 @@
 .main-toggle {
   top: 50px;
   height: 50px;
-  background-color: #007bff;
+  background-color: #333333; /* Dark gray instead of blue */
   z-index: 16; /* Same as other tabs */
   width: 28px;
 }
@@ -142,8 +142,8 @@
 
 /* Main toggle tab (Hide/Show) */
 .main-toggle {
-  background-color: #00b8d4;
-  border-color: rgba(255, 255, 255, 0.5);
+  background-color: #333333; /* Dark gray instead of cyan */
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Tab content styles */
@@ -1144,6 +1144,11 @@
 .mapboxgl-popup-tip {
   border-top-color: rgba(20, 20, 20, 0.98) !important;
   border-bottom-color: rgba(20, 20, 20, 0.98) !important;
+}
+
+/* Hide map controls completely */
+.mapboxgl-ctrl-top-left {
+  display: none !important;
 }
 
 .mapboxgl-ctrl-group {
