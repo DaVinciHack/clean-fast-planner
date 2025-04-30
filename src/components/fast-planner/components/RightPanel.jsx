@@ -940,7 +940,7 @@ const RightPanel = ({
           key={tab.id}
           className={`panel-tab right-panel-tab tab-selector tab-${tab.id} ${activeTab === tab.id ? 'active' : ''}`}
           style={{ 
-            top: `${120 + index * 110}px`
+            top: `${120 + index * 90}px`
           }}
           onClick={() => setActiveTab(tab.id)}
           title={tab.name}
