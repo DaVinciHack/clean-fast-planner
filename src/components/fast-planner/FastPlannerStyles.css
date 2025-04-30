@@ -117,32 +117,33 @@
 
 /* Tab color classes */
 .tab-main {
-  background-color: #0066cc;
+  background-color: #004aad;
 }
 
 .tab-settings {
-  background-color: #0049a8;
+  background-color: #003a8c;
 }
 
 .tab-performance {
-  background-color: #003584;
+  background-color: #00296b;
 }
 
 .tab-weather {
-  background-color: #002566;
+  background-color: #1e0077;
 }
 
 .tab-finance {
-  background-color: #330066;
+  background-color: #3a0088;
 }
 
 .tab-evacuation {
-  background-color: #4b0045;
+  background-color: #5c0099;
 }
 
 /* Main toggle tab (Hide/Show) */
 .main-toggle {
-  background-color: #007bff;
+  background-color: #00b8d4;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Tab content styles */
