@@ -5,7 +5,8 @@ import './FastPlannerStyles.css';
 
 // Import our modular components
 import { MapManager, WaypointManager, PlatformManager, RouteCalculator, RegionManager, FavoriteLocationsManager, AircraftManager } from './modules';
-import { LeftPanel, RightPanel, MapComponent, RegionSelector, RouteStatsCard } from './components';
+import { LeftPanel, RightPanel, MapComponent, RegionSelector, RouteStatsCard, FlightSettings } from './components';
+import FlightCalculations from './modules/calculations/FlightCalculations';
 
 /**
  * Modular Fast Planner Component
@@ -23,7 +24,9 @@ const ModularFastPlannerComponent = () => {
   const routeCalculatorRef = useRef(null);
   const regionManagerRef = useRef(null);
   const favoriteLocationsManagerRef = useRef(null);
-  const aircraftManagerRef = useRef(null); // Add reference for AircraftManager
+  const aircraftManagerRef = useRef(null); 
+  const flightCalculationsRef = useRef(null); // Add reference for FlightCalculations
+
   
   // UI state
   const [forceUpdate, setForceUpdate] = useState(0); // Used to force component rerender
@@ -57,12 +60,22 @@ const ModularFastPlannerComponent = () => {
   const [reserveFuel, setReserveFuel] = useState(600);
   const [routeStats, setRouteStats] = useState(null);
   
-  // Flight settings (moved from RouteStatsCard)
-  const [deckTimePerStop, setDeckTimePerStop] = useState(5); // minutes per stop
-  const [deckFuelPerStop, setDeckFuelPerStop] = useState(100); // lbs per stop
-  const [passengerWeight, setPassengerWeight] = useState(220); // lbs per passenger
-  const [cargoWeight, setCargoWeight] = useState(0); // additional cargo weight
-  const [reserveMethod, setReserveMethod] = useState('fixed'); // 'fixed', 'percentage', or 'time'
+  // Flight calculation settings
+  const [flightSettings, setFlightSettings] = useState({
+    passengerWeight: 220, // lbs per passenger including baggage
+    contingencyFuelPercent: 10, // 10% contingency fuel
+    taxiFuel: 50, // lbs
+    reserveFuel: 600, // lbs
+    deckTimePerStop: 5, // minutes
+    deckFuelFlow: 400, // lbs per hour during deck operations
+  });
+  
+  // Maintain backwards compatibility with existing code
+  const [deckTimePerStop, setDeckTimePerStop] = useState(5); 
+  const [deckFuelPerStop, setDeckFuelPerStop] = useState(100);
+  const [passengerWeight, setPassengerWeight] = useState(220);
+  const [cargoWeight, setCargoWeight] = useState(0);
+  const [reserveMethod, setReserveMethod] = useState('fixed');
   
   // Initialize managers
   useEffect(() => {
@@ -77,6 +90,20 @@ const ModularFastPlannerComponent = () => {
       // Set up route calculator callbacks
       routeCalculatorRef.current.setCallback('onCalculationComplete', (stats) => {
         setRouteStats(stats);
+      });
+    }
+    
+    // Initialize the flight calculations module
+    if (!flightCalculationsRef.current) {
+      flightCalculationsRef.current = new FlightCalculations();
+      
+      // Update with current settings
+      flightCalculationsRef.current.updateConfig(flightSettings);
+      
+      // Set up callback to receive calculation results
+      flightCalculationsRef.current.setCallback('onCalculationComplete', (stats) => {
+        setRouteStats(stats);
+        console.log("New flight calculations completed:", stats);
       });
     }
     
@@ -716,10 +743,43 @@ const ModularFastPlannerComponent = () => {
   }, [mapManagerRef, regionManagerRef, platformManagerRef, setupMapEventHandlers, setupRouteDragging]);
 
   // Calculate route statistics 
+  // Initialize FlightCalculations module
+  const flightCalculationsRef = useRef(null);
+  
+  // Initialize the flight calculations module
+  useEffect(() => {
+    if (!flightCalculationsRef.current) {
+      flightCalculationsRef.current = new FlightCalculations();
+      
+      // Set callback to receive calculation results
+      flightCalculationsRef.current.setCallback('onCalculationComplete', (result) => {
+        console.log('Flight calculations completed:', result);
+      });
+    }
+    
+    // Update the configuration when relevant state changes
+    if (flightCalculationsRef.current) {
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight,
+        reserveFuel,
+        deckTimePerStop,
+        deckFuelFlow: 400, // Using a default value for now
+        taxiFuel: 50, // Default value
+        contingencyFuelPercent: 10 // Default value
+      });
+    }
+  }, [passengerWeight, reserveFuel, deckTimePerStop, deckFuelPerStop]);
+  
+  // Calculate route statistics using our enhanced module
   const calculateRouteStats = (coordinates) => {
-    if (!routeCalculatorRef.current || !coordinates || coordinates.length < 2) {
+    if (!coordinates || coordinates.length < 2) {
       setRouteStats(null);
       return null;
+    }
+    
+    // Ensure flight calculator is initialized
+    if (!flightCalculationsRef.current) {
+      flightCalculationsRef.current = new FlightCalculations();
     }
     
     // Use S92 as default type if no type is selected
@@ -730,68 +790,53 @@ const ModularFastPlannerComponent = () => {
       calculationAircraftType = selectedAircraft.modelType || 'S92';
     }
     
-    // Set up parameters for calculation
-    let params = {
-      aircraftType: calculationAircraftType.toLowerCase(),
-      payloadWeight: payloadWeight + cargoWeight, // Add cargo to payload
-      reserveFuel
-    };
+    // Create aircraft data object for calculations
+    let aircraftData;
     
-    // Add registration if available for specific aircraft performance data
     if (selectedAircraft) {
-      params.registration = selectedAircraft.registration;
-      
-      // If we have aircraft performance data, use it
-      const aircraftData = {
-        cruiseSpeed: selectedAircraft.cruiseSpeed || 145,
+      // Use selected aircraft data with fallbacks
+      aircraftData = {
+        // Use correct field names with fallbacks
+        cruiseSpeed: selectedAircraft.cruiseSpeed || selectedAircraft.cruseSpeed || 145,
         fuelBurn: selectedAircraft.fuelBurn || 1100,
-        maxFuel: selectedAircraft.maxFuel || 5000,
+        maxFuelCapacity: selectedAircraft.maxFuel || selectedAircraft.maxFuelCapacity || 5000,
+        dryOperatingWeightLbs: selectedAircraft.dryOperatingWeightLbs || 15000,
+        usefulLoad: selectedAircraft.usefulLoad || 7000,
         maxPassengers: selectedAircraft.maxPassengers || 19,
-        usefulLoad: selectedAircraft.usefulLoad || 7000
+        // Include all other properties
+        ...selectedAircraft
       };
-      
-      params.aircraftData = aircraftData;
-    }
-    
-    // Calculate route statistics
-    let stats;
-    
-    // Use the aircraft manager to calculate performance if available
-    if (aircraftManagerRef.current && selectedAircraft) {
-      stats = aircraftManagerRef.current.calculateRoutePerformance(
-        calculationAircraftType,
-        coordinates,
-        params
-      );
+    } else if (routeCalculatorRef.current) {
+      // Get default aircraft data from RouteCalculator if no aircraft selected
+      const defaultAircraft = routeCalculatorRef.current.getAircraftType(calculationAircraftType.toLowerCase());
+      aircraftData = {
+        cruiseSpeed: defaultAircraft.cruiseSpeed,
+        fuelBurn: defaultAircraft.fuelBurn,
+        maxFuelCapacity: defaultAircraft.maxFuel,
+        dryOperatingWeightLbs: defaultAircraft.emptyWeight,
+        usefulLoad: defaultAircraft.usefulLoad || 7000,
+        maxPassengers: defaultAircraft.maxPassengers || 19,
+        modelType: calculationAircraftType
+      };
     } else {
-      // Fall back to RouteCalculator
-      stats = routeCalculatorRef.current.calculateRouteStats(coordinates, params);
+      // Fallback to basic defaults if no data source available
+      aircraftData = {
+        cruiseSpeed: 145,
+        fuelBurn: 1100,
+        maxFuelCapacity: 5000,
+        dryOperatingWeightLbs: 15000,
+        usefulLoad: 7000,
+        maxPassengers: 19,
+        modelType: calculationAircraftType
+      };
     }
     
-    // Calculate additional stats for the RouteStatsCard
-    if (stats) {
-      // Calculate endurance (in hours) - excluding reserve fuel
-      if (selectedAircraft) {
-        const fuelBurn = selectedAircraft.fuelBurn || 1100; // lbs/hr
-        const maxFuel = selectedAircraft.maxFuel || 5000; // lbs
-        const availableFuel = maxFuel - reserveFuel; // Available fuel excluding reserve
-        
-        stats.endurance = parseFloat((availableFuel / fuelBurn).toFixed(1)); // Hours
-        stats.availableFuel = availableFuel; // Available mission fuel
-        stats.takeoffWeight = selectedAircraft.emptyWeight + maxFuel + payloadWeight; // Est. takeoff weight
-        
-        // Calculate operational radius (in NM)
-        const cruiseSpeed = selectedAircraft.cruiseSpeed || 145; // kts
-        const timeAvailable = stats.endurance / 2; // Half the endurance for out and back
-        stats.operationalRadius = Math.round(cruiseSpeed * timeAvailable);
-      } else {
-        // Defaults if no aircraft selected
-        stats.endurance = 2.3;
-        stats.availableFuel = 3070;
-        stats.takeoffWeight = 24807;
-        stats.operationalRadius = 85;
-      }
-    }
+    // Calculate with the enhanced flight calculations module
+    const stats = flightCalculationsRef.current.calculateFlightStats(
+      coordinates, 
+      aircraftData,
+      { payloadWeight: payloadWeight + cargoWeight }
+    );
     
     // Update route stats state
     setRouteStats(stats);

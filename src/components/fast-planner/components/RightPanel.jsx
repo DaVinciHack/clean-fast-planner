@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import RegionSelector from './RegionSelector';
+import FlightSettings from './FlightSettings';
+import '../components/styles/FlightSettings.css';
 
 /**
  * Right Panel Component
@@ -488,98 +490,67 @@ const RightPanel = ({
   );
   
   // Render the Settings Tab Content 
-  const renderSettingsTab = () => (
-    <div className="tab-content settings-tab">
-      <h3>Flight Settings</h3>
-      <div className="control-section">
-        <h4>Fuel & Weight Settings</h4>
-        
-        <div className="input-group">
-          <div>
-            <label htmlFor="deck-time">Deck Time (mins):</label>
-            <input 
-              type="number" 
-              id="deck-time" 
-              value={deckTimePerStop}
-              min="0" 
-              max="60"
-              onChange={(e) => onDeckTimeChange(parseInt(e.target.value, 10) || 0)}
-            />
-          </div>
-          <div>
-            <label htmlFor="deck-fuel">Deck Fuel (lbs):</label>
-            <input 
-              type="number" 
-              id="deck-fuel" 
-              value={deckFuelPerStop}
-              min="0" 
-              max="1000"
-              onChange={(e) => onDeckFuelChange(parseInt(e.target.value, 10) || 0)}
-            />
-          </div>
-        </div>
-        
-        <div className="input-group">
-          <div>
-            <label htmlFor="passenger-weight">Passenger Weight:</label>
-            <input 
-              type="number" 
-              id="passenger-weight" 
-              value={passengerWeight}
-              min="100" 
-              max="300"
-              onChange={(e) => onPassengerWeightChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-          <div>
-            <label htmlFor="cargo-weight">Additional Cargo:</label>
-            <input 
-              type="number" 
-              id="cargo-weight" 
-              value={cargoWeight}
-              min="0" 
-              max="5000"
-              onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-        </div>
-        
-        <h4>Fuel Reserve Settings</h4>
-        
-        <div className="settings-group">
-          <div>
-            <label htmlFor="reserve-method">Reserve Method:</label>
-            <select 
-              id="reserve-method"
-              value={reserveMethod}
-              onChange={(e) => onReserveMethodChange(e.target.value)}
-            >
-              <option value="fixed">Fixed Amount</option>
-              <option value="percentage">Percentage of Trip</option>
-              <option value="time">Fixed Time</option>
-            </select>
-          </div>
+  const renderSettingsTab = () => {
+    // Prepare settings for FlightSettings component
+    const flightSettings = {
+      passengerWeight,
+      taxiFuel: 50, // Default for now
+      reserveFuel,
+      contingencyFuelPercent: 10, // Default for now
+      deckTimePerStop,
+      deckFuelFlow: 400 // Default for now
+    };
+    
+    // Handler for settings changes
+    const handleFlightSettingsChange = (newSettings) => {
+      console.log("Flight settings changed:", newSettings);
+      
+      // Update the state for each setting
+      if (newSettings.passengerWeight !== undefined) {
+        onPassengerWeightChange(newSettings.passengerWeight);
+      }
+      
+      if (newSettings.reserveFuel !== undefined) {
+        onReserveFuelChange(newSettings.reserveFuel);
+      }
+      
+      if (newSettings.deckTimePerStop !== undefined) {
+        onDeckTimeChange(newSettings.deckTimePerStop);
+      }
+      
+      if (newSettings.deckFuelFlow !== undefined) {
+        // We're not storing this yet, but could add it
+        console.log("Deck fuel flow updated:", newSettings.deckFuelFlow);
+      }
+    };
+    
+    return (
+      <div className="tab-content settings-tab">
+        <h3>Flight Settings</h3>
+        <div className="control-section">
+          {/* Render our new FlightSettings component */}
+          <FlightSettings 
+            settings={flightSettings}
+            onSettingsChange={handleFlightSettingsChange}
+          />
           
-          <div>
-            <label htmlFor="reserve-value">Reserve Value:</label>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
+          {/* Additional settings */}
+          <h4>Additional Settings</h4>
+          
+          <div className="input-group">
+            <div>
+              <label htmlFor="cargo-weight">Additional Cargo:</label>
               <input 
                 type="number" 
-                id="reserve-value" 
-                value={reserveFuel}
+                id="cargo-weight" 
+                value={cargoWeight}
                 min="0" 
-                onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-                style={{ width: 'calc(100% - 30px)' }}
+                max="5000"
+                onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
               />
-              <span className="unit" style={{ marginLeft: '5px', minWidth: '25px' }}>
-                {reserveMethod === 'fixed' ? 'lbs' : 
-                reserveMethod === 'percentage' ? '%' : 'mins'}
-              </span>
+              <span className="unit">lbs</span>
             </div>
           </div>
-        </div>
         
         <button 
           className="control-button"
