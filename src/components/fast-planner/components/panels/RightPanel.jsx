@@ -9,6 +9,9 @@ import '../../FastPlannerStyles.css';
  * Contains controls, aircraft configuration and route statistics
  * with tab system for settings, performance, weather, finance, and evacuation
  */
+// This key will force a complete re-render of the RightPanel when needed
+let rightPanelRenderKey = 0;
+
 const RightPanel = ({
   visible,
   onToggleVisibility,
@@ -63,24 +66,108 @@ const RightPanel = ({
   // Force reset dropdowns when selectedAircraft changes
   useEffect(() => {
     if (selectedAircraft) {
-      // When we have a selected aircraft, force the dropdowns to reset
+      // When we have a selected aircraft, force the dropdowns to reset properly
       setTimeout(() => {
         // Force DOM reset for the type dropdown
         const typeDropdown = document.getElementById('aircraft-type');
         if (typeDropdown) {
+          // Set to "Change Aircraft Type"
           typeDropdown.value = 'select';
           console.log('Reset type dropdown to "-- Change Aircraft Type --"');
         }
         
-        // Reset registration dropdown to "-- Select Aircraft --"
+        // The registration dropdown should still show the selected registration
         const regDropdown = document.getElementById('aircraft-registration');
         if (regDropdown) {
-          regDropdown.value = '';
-          console.log('Reset registration dropdown to empty');
+          // Make sure it shows the selected aircraft, not blank
+          regDropdown.value = aircraftRegistration;
+          console.log(`Set registration dropdown to selected value: ${aircraftRegistration}`);
         }
       }, 50);
     }
-  }, [selectedAircraft, forceUpdate]); // Re-run when selectedAircraft or forceUpdate changes
+  }, [selectedAircraft, aircraftRegistration, forceUpdate]); // Re-run when selectedAircraft or forceUpdate changes
+  
+  // Initial mount effect - run once
+  useEffect(() => {
+    console.log("RightPanel mounted");
+    
+    // Mark that we've mounted - no reloading
+    if (!window.rightPanelMounted) {
+      window.rightPanelMounted = true;
+      
+      // Log diagnostic information
+      console.log("RightPanel initial mount - aircraft data:", {
+        aircraftsByType: aircraftsByType,
+        aircraftCount: Object.values(aircraftsByType || {}).flat().length,
+        typeCount: Object.keys(aircraftsByType || {}).length
+      });
+      
+      // Display a helpful notification without reloading
+      if (Object.keys(aircraftsByType || {}).length === 0) {
+        console.log("No aircraft types found after mount - will wait for data to load");
+        
+        // Create a notification
+        const notification = document.createElement('div');
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.left = '50%';
+        notification.style.transform = 'translateX(-50%)';
+        notification.style.padding = '10px 15px';
+        notification.style.backgroundColor = 'rgba(0, 70, 150, 0.9)';
+        notification.style.color = 'white';
+        notification.style.borderRadius = '5px';
+        notification.style.zIndex = '10000';
+        notification.style.fontFamily = 'sans-serif';
+        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3)';
+        notification.textContent = 'Waiting for aircraft data to load...';
+        document.body.appendChild(notification);
+        
+        // Remove after 4 seconds
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 4000);
+      }
+    }
+  }, [aircraftsByType]);
+  
+  // Debug aircraft data
+  useEffect(() => {
+    console.log("RightPanel Aircraft Data:", {
+      aircraftType,
+      aircraftRegistration,
+      selectedAircraft,
+      aircraftsByTypeKeys: Object.keys(aircraftsByType || {}),
+      aircraftsByTypeCount: Object.keys(aircraftsByType || {}).reduce((acc, type) => {
+        acc[type] = (aircraftsByType[type] || []).length;
+        return acc;
+      }, {})
+    });
+    
+    // Check if dropdown has options
+    setTimeout(() => {
+      const typeDropdown = document.getElementById('aircraft-type');
+      if (typeDropdown) {
+        console.log("Aircraft Type Dropdown:", {
+          options: Array.from(typeDropdown.options || []).map(o => o.value),
+          selectedValue: typeDropdown.value,
+          optionCount: typeDropdown.options?.length || 0
+        });
+      }
+      
+      // Auto-select first type if none selected and we have types
+      if (!aircraftType && !selectedAircraft) {
+        const availableTypes = Object.keys(aircraftsByType || {})
+          .filter(type => (aircraftsByType[type] || []).length > 0);
+        
+        if (availableTypes.length > 0) {
+          console.log(`No type selected, auto-selecting first type: ${availableTypes[0]}`);
+          onAircraftTypeChange(availableTypes[0]);
+        }
+      }
+    }, 200);
+  }, [aircraftType, aircraftRegistration, selectedAircraft, aircraftsByType, forceUpdate, onAircraftTypeChange]);
   
   const handleFileInputChange = (e) => {
     if (e.target.files.length > 0) {
@@ -158,54 +245,108 @@ const RightPanel = ({
           id="aircraft-type" 
           value={aircraftType === '' ? 'select' : aircraftType}
           onChange={(e) => {
+            // Get the actual value ('' for 'select', otherwise the type)
             const value = e.target.value === 'select' ? '' : e.target.value;
-            onAircraftTypeChange(value);
+            console.log(`Aircraft type dropdown changed to: ${value || 'empty'}`);
             
-            // If there's a selected aircraft, just show type selection but don't clear it
-            if (selectedAircraft) {
-              console.log('Keeping selected aircraft while changing type dropdown');
+            // CRITICAL FIX: In the original code, there are two scenarios:
+            // 1. Type dropdown is clicked and a new type is selected
+            // 2. Type dropdown is clicked but "-- Change Aircraft Type --" is selected
+            
+            if (value) {
+              // Scenario 1: Selecting a specific type
+              console.log('Selecting specific aircraft type:', value);
+              
+              // If we already had a selected aircraft, clear it
+              // This matches the original behavior
+              if (selectedAircraft) {
+                console.log('Had selected aircraft, clearing it for new type selection');
+              }
+              
+              // Call handler to update the type filter
+              onAircraftTypeChange(value);
+              
+              // And clear the registration dropdown
+              const regDropdown = document.getElementById('aircraft-registration');
+              if (regDropdown) {
+                regDropdown.value = '';
+              }
+            } else {
+              // Scenario 2: "-- Change Aircraft Type --" selected
+              console.log('Change Aircraft Type selected (empty value)');
+              
+              // In the original, this shows all aircraft types
+              // but keeps the current aircraft selected
+              onAircraftTypeChange('');
+              
+              // If we had a selected aircraft, keep it selected
+              if (selectedAircraft && aircraftRegistration) {
+                console.log('Keeping selected aircraft while showing all types');
+                
+                // Make sure registration dropdown still shows selected aircraft
+                const regDropdown = document.getElementById('aircraft-registration');
+                if (regDropdown) {
+                  regDropdown.value = aircraftRegistration;
+                }
+              }
             }
           }}
           disabled={aircraftLoading}
           className="aircraft-type-dropdown"
           key={`aircraft-type-${forceUpdate}`} // Force re-render when forceUpdate changes
         >
-          {/* Special option that triggers change but isn't an empty value */}
+          {/* Only one "Change Aircraft Type" option */}
           <option value="select">-- Change Aircraft Type --</option>
           
           {aircraftLoading ? (
-            <option value="" disabled>Loading...</option>
-          ) : aircraftsByType && Object.keys(aircraftsByType).some(type => aircraftsByType[type] && aircraftsByType[type].length > 0) ? (
-            // Show all types that have aircraft in this region
-            Object.keys(aircraftsByType)
-              .filter(type => type && aircraftsByType[type] && aircraftsByType[type].length > 0)
-              .sort() // Sort alphabetically
-              .map(type => {
-                let displayName;
-                switch(type) {
-                  case 'S92': displayName = 'Sikorsky S-92'; break;
-                  case 'S76': displayName = 'Sikorsky S-76'; break;
-                  case 'S76D': displayName = 'Sikorsky S-76D'; break;
-                  case 'AW139': displayName = 'Leonardo AW139'; break;
-                  case 'AW189': displayName = 'Leonardo AW189'; break;
-                  case 'H175': displayName = 'Airbus H175'; break;
-                  case 'H160': displayName = 'Airbus H160'; break;
-                  case 'EC135': displayName = 'Airbus EC135'; break;
-                  case 'EC225': displayName = 'Airbus EC225'; break;
-                  case 'AS350': displayName = 'Airbus AS350'; break;
-                  case 'A119': displayName = 'Leonardo A119'; break;
-                  default: displayName = type;
-                }
-                // Double-check the actual count to prevent incorrect numbers
-                const actualCount = (aircraftsByType[type] || []).length;
-                return (
-                  <option key={type} value={type}>
-                    {displayName} ({actualCount})
-                  </option>
-                );
-              })
+            <option value="" disabled>Loading aircraft data...</option>
           ) : (
-            <option value="" disabled>No aircraft available in this region</option>
+            // Even if we're not loading, check if we have aircraft data
+            aircraftsByType && Object.keys(aircraftsByType).length > 0 ? (
+              // Map through all available types, regardless of whether they have aircraft or not
+              // This matches the behavior of the original component
+              Object.keys(aircraftsByType)
+                .sort() // Sort alphabetically 
+                .map(type => {
+                  // Create friendly display names
+                  let displayName;
+                  switch(type) {
+                    case 'S92': displayName = 'Sikorsky S-92'; break;
+                    case 'S76': displayName = 'Sikorsky S-76'; break;
+                    case 'S76D': displayName = 'Sikorsky S-76D'; break;
+                    case 'AW139': displayName = 'Leonardo AW139'; break;
+                    case 'AW189': displayName = 'Leonardo AW189'; break;
+                    case 'H175': displayName = 'Airbus H175'; break;
+                    case 'H160': displayName = 'Airbus H160'; break;
+                    case 'EC135': displayName = 'Airbus EC135'; break;
+                    case 'EC225': displayName = 'Airbus EC225'; break;
+                    case 'AS350': displayName = 'Airbus AS350'; break;
+                    case 'A119': displayName = 'Leonardo A119'; break;
+                    case 'A109E': displayName = 'A109E'; break;
+                    default: displayName = type;
+                  }
+                  
+                  // Get the actual count of aircraft for this type
+                  const actualCount = (aircraftsByType[type] || []).length;
+                  
+                  // Only show the type if it has aircraft available
+                  if (actualCount > 0) {
+                    return (
+                      <option key={type} value={type}>
+                        {displayName} ({actualCount})
+                      </option>
+                    );
+                  } else {
+                    // Don't return anything for empty types
+                    return null;
+                  }
+                })
+                // Filter out null values from the map
+                .filter(Boolean)
+            ) : (
+              // If no types at all, show a placeholder
+              <option value="" disabled>No aircraft types available</option>
+            )
           )}
         </select>
         
@@ -214,8 +355,28 @@ const RightPanel = ({
           id="aircraft-registration" 
           value={aircraftRegistration}
           onChange={(e) => {
-            // Simply call the parent handler - all the logic is there
-            onAircraftRegistrationChange(e.target.value);
+            const newReg = e.target.value;
+            console.log(`Aircraft registration changed to: ${newReg || 'empty'}`);
+            
+            if (newReg) {
+              console.log('Specific aircraft selected, will reset type dropdown');
+              
+              // Schedule a reset of the type dropdown
+              setTimeout(() => {
+                // First call the parent handler to update the state and select the aircraft
+                onAircraftRegistrationChange(newReg);
+                
+                // Then reset the type dropdown to "Change Aircraft Type"
+                const typeDropdown = document.getElementById('aircraft-type');
+                if (typeDropdown) {
+                  typeDropdown.value = 'select';
+                  console.log('Reset type dropdown to "-- Change Aircraft Type --"');
+                }
+              }, 10);
+            } else {
+              // Just call the parent handler normally for empty selection
+              onAircraftRegistrationChange(newReg);
+            }
           }}
           // Only disable if loading or if there are no aircraft available at all
           disabled={aircraftLoading || 
@@ -223,37 +384,48 @@ const RightPanel = ({
                     (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
         >
           <option value="">-- Select Aircraft --</option>
+          
           {aircraftLoading ? (
+            // Show loading indicator while aircraft data is loading
             <option value="" disabled>Loading aircraft data...</option>
-          ) : !aircraftType ? (
-            // If no aircraft type is selected, show all aircraft from all types
-            // Create a combined list of all aircraft from all types
-            Object.values(aircraftsByType).flat().length > 0 ? (
-              // Show all aircraft sorted alphabetically from all types
-              [...Object.values(aircraftsByType).flat()]
-                .sort((a, b) => a.registration.localeCompare(b.registration))
-                .map(aircraft => (
-                  <option key={aircraft.registration} value={aircraft.registration}>
-                    {aircraft.registration}
-                  </option>
-                ))
-            ) : (
-              <option value="" disabled>No aircraft available</option>
-            )
-          ) : aircraftsByType && aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
-            // Show filtered aircraft for this type, sorted alphabetically
-            [...aircraftsByType[aircraftType]]
-              .sort((a, b) => a.registration.localeCompare(b.registration))
-              .map(aircraft => (
-                <option key={aircraft.registration} value={aircraft.registration}>
-                  {aircraft.registration}
-                </option>
-              ))
           ) : (
-            // No aircraft available message
-            <option value="" disabled>
-              No {aircraftType} aircraft available in this region
-            </option>
+            // Start with a check if we have ANY aircraft at all
+            Object.values(aircraftsByType).flat().length > 0 ? (
+              // If we do have aircraft, check if we're filtering by type or showing all
+              !aircraftType || aircraftType === '' ? (
+                // No type filter: show all aircraft from all types
+                [...Object.values(aircraftsByType).flat()]
+                  .filter(aircraft => aircraft) // Ensure we have valid aircraft objects
+                  .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                  .map(aircraft => (
+                    <option key={aircraft.registration} value={aircraft.registration}>
+                      {aircraft.registration}
+                    </option>
+                  ))
+              ) : (
+                // Type filter: check if we have aircraft of this type
+                aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
+                  // Show aircraft for the selected type
+                  [...aircraftsByType[aircraftType]]
+                    .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                    .map(aircraft => (
+                      <option key={aircraft.registration} value={aircraft.registration}>
+                        {aircraft.registration}
+                      </option>
+                    ))
+                ) : (
+                  // No aircraft of this type
+                  <option value="" disabled>
+                    No {aircraftType} aircraft available in this region
+                  </option>
+                )
+              )
+            ) : (
+              // No aircraft available at all
+              <option value="" disabled>
+                No aircraft available in this region
+              </option>
+            )
           )}
         </select>
         
