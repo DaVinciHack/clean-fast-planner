@@ -28,6 +28,60 @@
   --connection-green: #4CAF50; /* Green for connection status */
 }
 
+/* Panel animations */
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-320px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(320px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-320px);
+    opacity: 0;
+  }
+}
+
+@keyframes slideOutToRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320px);
+    opacity: 0;
+  }
+}
+
 .fast-planner-container {
   position: relative;
   width: 100%;
@@ -190,6 +244,15 @@
 .tab-content {
   width: 320px;
   height: 100%;
+  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+.tab-content.slide-in {
+  animation: slideInFromRight 0.4s ease-out forwards;
+}
+
+.tab-content.slide-out {
+  animation: slideOutToLeft 0.4s ease-out forwards;
 }
 
 /* Settings-specific styles */
@@ -327,6 +390,7 @@
   color: var(--label-color);
 }
 
+/* Initial animation for route editor panel */
 .route-editor-panel {
   position: absolute;
   top: 15px;
@@ -347,6 +411,7 @@
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
   border: 1px solid var(--border-color);
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: slideInFromLeft 0.6s ease-out 0.3s both;
 }
 
 .route-editor-panel.hidden {
@@ -357,6 +422,7 @@
 
 .info-panel {
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+  animation: slideInFromRight 0.6s ease-out 0.5s both;
 }
 
 .info-panel.hidden {
@@ -860,6 +926,7 @@
   transition: all 0.3s ease;
   max-height: 120px; /* Increased slightly to accommodate bottom padding */
   overflow: hidden; /* Ensure loading indicator doesn't overflow */
+  animation: fadeIn 0.8s ease-out;
 }
 
 /* Elastic loading indicator for route stats card */

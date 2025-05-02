@@ -299,6 +299,11 @@ const RightPanel = ({
   // State for the active tab
   const [activeTab, setActiveTab] = useState('main');
   
+  // State for animation
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [activeContent, setActiveContent] = useState('main');
+  const [animationClass, setAnimationClass] = useState('');
+  
   // Render the Main Tab Content
   const renderMainTab = () => (
     <div className="tab-content main-tab">
@@ -1388,7 +1393,25 @@ const RightPanel = ({
           style={{ 
             top: `${120 + index * 98}px`
           }}
-          onClick={() => setActiveTab(tab.id)}
+          onClick={() => {
+          if (activeTab === tab.id || isAnimating) return;
+          
+          setIsAnimating(true);
+          setAnimationClass('slide-out');
+          
+          // Wait for exit animation to complete
+          setTimeout(() => {
+            setActiveTab(tab.id);
+            setActiveContent(tab.id);
+            setAnimationClass('slide-in');
+            
+            // Clear animation state after entry animation
+            setTimeout(() => {
+              setAnimationClass('');
+              setIsAnimating(false);
+            }, 400);
+          }, 400);
+        }}
           title={tab.name}
         >
           {tab.name}
@@ -1397,12 +1420,36 @@ const RightPanel = ({
       
       <div id="info-panel" className={`info-panel ${!visible ? "hidden" : ""}`}>
         {/* Render appropriate tab content based on active tab */}
-        {activeTab === 'main' && renderMainTab()}
-        {activeTab === 'settings' && renderSettingsTab()}
-        {activeTab === 'performance' && renderPerformanceTab()}
-        {activeTab === 'weather' && renderWeatherTab()}
-        {activeTab === 'finance' && renderFinanceTab()}
-        {activeTab === 'evacuation' && renderEvacuationTab()}
+        {activeContent === 'main' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderMainTab()}
+          </div>
+        }
+        {activeContent === 'settings' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderSettingsTab()}
+          </div>
+        }
+        {activeContent === 'performance' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderPerformanceTab()}
+          </div>
+        }
+        {activeContent === 'weather' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderWeatherTab()}
+          </div>
+        }
+        {activeContent === 'finance' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderFinanceTab()}
+          </div>
+        }
+        {activeContent === 'evacuation' && 
+          <div className={`tab-content ${animationClass}`}>
+            {renderEvacuationTab()}
+          </div>
+        }
       </div>
     </>
   );
