@@ -603,6 +603,17 @@ const LeftPanel = ({
                 <div
                   key={locationId}
                   className={`favorite-item ${recentFavorites[locationId] ? 'highlight-new' : ''}`}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    padding: "5px 3px",
+                    marginBottom: "4px",
+                    borderRadius: "4px",
+                    backgroundColor: "rgba(0,0,0,0.1)",
+                    transition: "background-color 0.2s"
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.2)"}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.1)"}
                 >
                   <span
                     onClick={() => {
@@ -640,20 +651,38 @@ const LeftPanel = ({
                       flexGrow: 1, 
                       marginRight: "10px", 
                       display: "flex", 
-                      alignItems: "center" 
+                      alignItems: "center",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis"
                     }}
                   >
                     <span style={{ marginRight: "8px", fontSize: "14px", color: "#ff5e85" }}>❤️</span>
-                    <span>
-                      <strong>{location.name}</strong>
-                      <br />
+                    <span style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}>
+                      <strong style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{location.name}</strong>
                       {location.coords && location.coords.length === 2 ? (
-                        <span style={{ fontSize: "11px", color: "var(--label-color)" }}>
-                          {location.coords[1].toFixed(3)}, {location.coords[0].toFixed(3)}
+                        <span style={{ 
+                          fontSize: "11px", 
+                          color: "var(--label-color)", 
+                          marginLeft: "5px",
+                          whiteSpace: "nowrap" 
+                        }}>
+                          ({location.coords[1].toFixed(3)}, {location.coords[0].toFixed(3)})
                         </span>
                       ) : (
-                        <span style={{ fontSize: "11px", color: "var(--danger-color)" }}>
-                          Invalid coordinates
+                        <span style={{ 
+                          fontSize: "11px", 
+                          color: "var(--danger-color)", 
+                          marginLeft: "5px",
+                          whiteSpace: "nowrap" 
+                        }}>
+                          (Invalid coordinates)
                         </span>
                       )}
                     </span>
