@@ -154,10 +154,11 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
     manager.setCallback('onAircraftSelected', (aircraft) => {
       console.log('AircraftContext: Aircraft selected from manager:', aircraft);
       setSelectedAircraft(aircraft);
+      // CRITICAL FIX: Do NOT update the aircraft type when an aircraft is selected
+      // This is key to preventing the dropdown from being locked to one type
       if (aircraft) {
-        // Ensure the aircraft type is updated to match the selected aircraft
-        console.log(`Setting aircraft type to match selected aircraft: ${aircraft.modelType}`);
-        setAircraftType(aircraft.modelType);
+        console.log(`Aircraft selected: ${aircraft.registration} (${aircraft.modelType})`);
+        // Don't set the type here - this allows viewing all types even when aircraft is selected
       }
     });
     
@@ -562,40 +563,30 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
     if (aircraftManagerInstance && registration) {
       const aircraft = aircraftManagerInstance.getAircraftByRegistration(registration);
       if (aircraft) {
-        // CRITICAL: Store selected aircraft in state but DO NOT update the registration dropdown
-        // We're going to reset both dropdowns while keeping the aircraft selected
+        // STORE THE AIRCRAFT - This is critical to keep the aircraft info
         setSelectedAircraft(aircraft);
         console.log('Selected aircraft:', aircraft);
         
-        // Set a global reference for the current registration and type
+        // Set a global reference for debugging
         window.currentAircraftRegistration = registration;
         window.currentAircraftType = aircraft.modelType;
         window.selectedAircraftObject = aircraft;
         
-        // CRITICAL FIX: When an aircraft is selected, completely reset BOTH dropdowns
-        // but keep the selected aircraft information displayed at the bottom
+        // CRITICAL FIX: 
+        // 1. We immediately clear the TYPE AND REGISTRATION values in the state
+        // 2. This allows showing ALL aircraft types in the dropdown again
+        // 3. But we keep the selectedAircraft value for display at the bottom
+        setAircraftType('');  // CLEAR the type filter
+        setAircraftRegistration(''); // CLEAR the registration in state but keep selectedAircraft
         
-        // Store the current type for reference only
-        const currentAircraftType = aircraft.modelType;
-        console.log(`Selected aircraft is type: ${currentAircraftType}`);
-        
-        // STEP 1: Clear the type filter to show all aircraft types
-        setAircraftType('');
-        console.log('Reset type filter to empty to show all aircraft types');
-        
-        // STEP 2: Also clear the registration dropdown state (but keep selectedAircraft)
-        // This is the key difference - we're also clearing the registration dropdown
-        setAircraftRegistration('');
-        console.log('Reset registration dropdown to empty for visual reset');
-        
-        // STEP 3: Load all aircraft from the current region to ensure all types are available
+        // Force reload all aircraft in the current region
         if (currentRegion) {
           try {
-            // Get all aircraft in the current region
+            // Get all aircraft in the current region to prepare type buckets
             const allAircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
             console.log(`Found ${allAircraftInRegion.length} aircraft in region ${currentRegion.name}`);
             
-            // Create empty buckets for ALL standard types
+            // Create ALL standard type buckets
             const allTypes = {
               'S92': [],
               'S76': [],
@@ -611,18 +602,17 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
               'A109E': []
             };
             
-            // Fill in the buckets with actual aircraft
+            // Fill the buckets with aircraft
             allAircraftInRegion.forEach(a => {
               const type = a.modelType || 'S92';
               if (allTypes[type]) {
                 allTypes[type].push(a);
               } else {
-                // If unknown type, create a new bucket
                 allTypes[type] = [a];
               }
             });
             
-            // Update the state with ALL types
+            // This is critical - update the state with ALL aircraft types
             setAircraftsByType(allTypes);
             
             // Log available types for debugging
@@ -634,16 +624,15 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           }
         }
         
-        // STEP 4: Reset BOTH dropdown elements via DOM manipulation
+        // Critical DOM manipulation to reset the dropdowns
         setTimeout(() => {
           // Reset the type dropdown to "-- Change Aircraft Type --"
           const typeDropdown = document.getElementById('aircraft-type');
           if (typeDropdown) {
-            // Set the DOM value directly - this affects the visual display only
             typeDropdown.value = 'select';
-            console.log('Reset type dropdown visual display to "-- Change Aircraft Type --"');
+            console.log('Reset type dropdown to "-- Change Aircraft Type --"');
             
-            // Dispatch a change event to ensure the dropdown state is updated
+            // IMPORTANT - dispatch a change event to clear the type filter entirely
             const event = new Event('change', { bubbles: true });
             typeDropdown.dispatchEvent(event);
           }
@@ -651,33 +640,34 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           // Reset registration dropdown to "-- Select Aircraft --"
           const regDropdown = document.getElementById('aircraft-registration');
           if (regDropdown) {
-            // Set the dropdown to empty selection
             regDropdown.value = '';
             console.log('Reset registration dropdown to "-- Select Aircraft --"');
+            
+            // Dispatch event to clear reg dropdown state
+            const event = new Event('change', { bubbles: true });
+            regDropdown.dispatchEvent(event);
           }
           
-          // Create a notification to confirm the aircraft is selected
-          const flashMessage = document.createElement('div');
-          flashMessage.style.position = 'fixed';
-          flashMessage.style.top = '20px';
-          flashMessage.style.left = '50%';
-          flashMessage.style.transform = 'translateX(-50%)';
-          flashMessage.style.backgroundColor = 'rgba(0, 120, 0, 0.9)';
-          flashMessage.style.color = 'white';
-          flashMessage.style.padding = '10px 20px';
-          flashMessage.style.borderRadius = '5px';
-          flashMessage.style.fontFamily = 'sans-serif';
-          flashMessage.style.fontSize = '14px';
-          flashMessage.style.zIndex = '10000';
-          flashMessage.textContent = `Selected aircraft: ${registration} (${currentAircraftType})`;
-          document.body.appendChild(flashMessage);
+          // Show confirmation that aircraft is selected but dropdowns reset
+          const message = document.createElement('div');
+          message.style.position = 'fixed';
+          message.style.bottom = '50px';
+          message.style.right = '20px';
+          message.style.backgroundColor = 'rgba(0, 100, 0, 0.8)';
+          message.style.color = 'white';
+          message.style.padding = '10px 15px';
+          message.style.borderRadius = '5px';
+          message.style.zIndex = '10000';
+          message.style.fontFamily = 'sans-serif';
+          message.textContent = `Aircraft ${registration} (${aircraft.modelType}) selected! Dropdowns reset.`;
+          document.body.appendChild(message);
           
-          // Remove after 2 seconds
+          // Remove the message after 3 seconds
           setTimeout(() => {
-            if (flashMessage.parentNode) {
-              flashMessage.parentNode.removeChild(flashMessage);
+            if (message.parentNode) {
+              message.parentNode.removeChild(message);
             }
-          }, 2000);
+          }, 3000);
         }, 50);
         
         // Load any saved settings for this aircraft

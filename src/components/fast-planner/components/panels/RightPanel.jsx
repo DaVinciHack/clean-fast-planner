@@ -66,26 +66,62 @@ const RightPanel = ({
   // Force reset dropdowns when selectedAircraft changes
   useEffect(() => {
     if (selectedAircraft) {
-      // When we have a selected aircraft, force the dropdowns to reset properly
+      // When we have a selected aircraft, force the dropdowns to reset completely
+      console.log('RightPanel: Selected aircraft changed, resetting dropdowns');
+      
       setTimeout(() => {
         // Force DOM reset for the type dropdown
         const typeDropdown = document.getElementById('aircraft-type');
         if (typeDropdown) {
-          // Set to "Change Aircraft Type"
+          // Reset to "-- Change Aircraft Type --"
           typeDropdown.value = 'select';
-          console.log('Reset type dropdown to "-- Change Aircraft Type --"');
+          console.log('RightPanel: Reset type dropdown to "-- Change Aircraft Type --"');
         }
         
-        // The registration dropdown should still show the selected registration
+        // Reset the registration dropdown to empty
         const regDropdown = document.getElementById('aircraft-registration');
         if (regDropdown) {
-          // Make sure it shows the selected aircraft, not blank
-          regDropdown.value = aircraftRegistration;
-          console.log(`Set registration dropdown to selected value: ${aircraftRegistration}`);
+          // Make it empty to force showing the "-- Select Aircraft --" option
+          regDropdown.value = '';
+          console.log('RightPanel: Reset registration dropdown to empty');
         }
-      }, 50);
+        
+        // If this is the first time aircraft was selected, show a help message
+        if (!window.aircraftSelectionHelpShown) {
+          window.aircraftSelectionHelpShown = true;
+          
+          const helpMessage = document.createElement('div');
+          helpMessage.style.position = 'fixed';
+          helpMessage.style.top = '50%';
+          helpMessage.style.left = '50%';
+          helpMessage.style.transform = 'translate(-50%, -50%)';
+          helpMessage.style.padding = '15px 20px';
+          helpMessage.style.backgroundColor = 'rgba(0, 50, 100, 0.9)';
+          helpMessage.style.color = 'white';
+          helpMessage.style.borderRadius = '8px';
+          helpMessage.style.zIndex = '10000';
+          helpMessage.style.fontFamily = 'sans-serif';
+          helpMessage.style.fontSize = '14px';
+          helpMessage.style.maxWidth = '400px';
+          helpMessage.style.textAlign = 'center';
+          helpMessage.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+          helpMessage.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">Aircraft Selected!</div>
+            <div>You have selected ${selectedAircraft.registration.split(' (')[0]} (${selectedAircraft.modelType})</div>
+            <div style="margin-top: 10px; font-size: 12px;">Both dropdowns have been reset to allow you to select any aircraft type.</div>
+          `;
+          document.body.appendChild(helpMessage);
+          
+          // Remove after 4 seconds
+          setTimeout(() => {
+            if (helpMessage.parentNode) {
+              helpMessage.parentNode.removeChild(helpMessage);
+            }
+          }, 4000);
+        }
+      }, 100);
     }
-  }, [selectedAircraft, aircraftRegistration, forceUpdate]); // Re-run when selectedAircraft or forceUpdate changes
+  }, [selectedAircraft, forceUpdate]); // Re-run when selectedAircraft changes
   
   // Initial mount effect - run once
   useEffect(() => {
@@ -371,20 +407,16 @@ const RightPanel = ({
             console.log(`Aircraft registration changed to: ${newReg || 'empty'}`);
             
             if (newReg) {
-              console.log('Specific aircraft selected, will reset type dropdown');
+              console.log('Specific aircraft selected, will reset both dropdowns');
               
-              // Schedule a reset of the type dropdown
+              // CRITICAL FIX: Call the handler immediately to select the aircraft
+              // The context will handle resetting both dropdowns
+              onAircraftRegistrationChange(newReg);
+              
+              // Add a slight delay to show a message that aircraft was selected
               setTimeout(() => {
-                // First call the parent handler to update the state and select the aircraft
-                onAircraftRegistrationChange(newReg);
-                
-                // Then reset the type dropdown to "Change Aircraft Type"
-                const typeDropdown = document.getElementById('aircraft-type');
-                if (typeDropdown) {
-                  typeDropdown.value = 'select';
-                  console.log('Reset type dropdown to "-- Change Aircraft Type --"');
-                }
-              }, 10);
+                console.log('Aircraft selection processed, dropdowns should be reset');
+              }, 100);
             } else {
               // Just call the parent handler normally for empty selection
               onAircraftRegistrationChange(newReg);
