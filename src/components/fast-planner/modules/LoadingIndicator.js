@@ -10,7 +10,7 @@ const LoadingIndicator = (() => {
   let loaderIdCounter = 0;
   
   // New message queue system
-  const messageQueue = [];
+  let messageQueue = [];
   let isProcessingQueue = false;
   let currentMessage = null;
   let messageTimer = null;
