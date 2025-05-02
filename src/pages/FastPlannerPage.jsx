@@ -7,7 +7,7 @@ import FastPlannerApp from '../components/fast-planner/FastPlannerApp';
 
 const FastPlannerPage = () => {
   // State to track which implementation to use
-  const [implementation, setImplementation] = useState('new');
+  const [implementation, setImplementation] = useState('original');
 
   // Parse URL parameters on initial load
   useEffect(() => {
@@ -18,9 +18,9 @@ const FastPlannerPage = () => {
       console.log(`URL parameter context=${contextParam} detected`);
       setImplementation(contextParam);
     } else {
-      // Default to the new implementation if no parameter is specified
-      console.log('No context parameter, defaulting to new implementation');
-      setImplementation('new');
+      // Default to the original implementation if no parameter is specified
+      console.log('No context parameter, defaulting to original implementation');
+      setImplementation('original');
     }
   }, []);
 

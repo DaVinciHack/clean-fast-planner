@@ -39,6 +39,7 @@ const MapComponent = ({
         console.log('MapComponent initMap: Initializing map...');
         if (mapContainerRef.current) {
           // Initialize map using the captured mapManager reference
+          // CRITICAL: Use 'fast-planner-map' as the ID to match what other components expect
           const mapInstance = await mapManager.initializeMap('fast-planner-map');
           mapInitializedRef.current = true; // Mark as initialized
           console.log('MapComponent initMap: Map instance created, calling onReady.');

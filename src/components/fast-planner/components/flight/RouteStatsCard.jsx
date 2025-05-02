@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
+import LoadingIndicator from '../../modules/LoadingIndicator';
 
 /**
  * Route Statistics Card Component
@@ -19,7 +20,13 @@ const RouteStatsCard = ({
 }) => {
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
-
+  
+  // Reference to card element for adding/removing loading indicator
+  const cardRef = useRef(null);
+  
+  // Reference to track the active loader ID
+  const loaderIdRef = useRef(null);
+  
   // Add debug logging to track the routeStats data
   console.log("RouteStatsCard - received stats:", routeStats);
   
@@ -92,8 +99,56 @@ const RouteStatsCard = ({
     return Math.min(maxByLoad, aircraftMaxPax);
   };
   
+  // Add loading indicator effect
+  useEffect(() => {
+    // Function to show loading indicator
+    const showLoading = (message = "Calculating route") => {
+      // If we already have a loader, hide it first
+      if (loaderIdRef.current !== null) {
+        LoadingIndicator.hide(loaderIdRef.current);
+      }
+      
+      // Show new loading indicator at the top of the card
+      if (cardRef.current) {
+        loaderIdRef.current = LoadingIndicator.show(
+          cardRef.current.querySelector('.route-stats-header'),
+          message,
+          { position: 'bottom' }
+        );
+        
+        // Demo: update message after a delay
+        setTimeout(() => {
+          if (loaderIdRef.current !== null) {
+            LoadingIndicator.updateText(loaderIdRef.current, "Processing waypoints");
+          }
+        }, 1200);
+        
+        // Hide the loader after 3 seconds for demo purposes
+        setTimeout(() => {
+          if (loaderIdRef.current !== null) {
+            LoadingIndicator.hide(loaderIdRef.current);
+            loaderIdRef.current = null;
+          }
+        }, 3000);
+      }
+    };
+    
+    // Show loading indicator when waypoints change
+    if (waypoints && waypoints.length >= 2) {
+      showLoading("Calculating route");
+    }
+    
+    // Cleanup function to remove any remaining loaders
+    return () => {
+      if (loaderIdRef.current !== null) {
+        LoadingIndicator.hide(loaderIdRef.current);
+        loaderIdRef.current = null;
+      }
+    };
+  }, [waypoints]);
+  
   return (
-    <div className="route-stats-card">
+    <div className="route-stats-card" ref={cardRef}>
       <div className="route-stats-header">
         <div className="logo-container">
           <img src="https://bristow.info/SAR/VTOL-5a215f01.png" alt="VTOL" className="vtol-logo" />
