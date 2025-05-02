@@ -63,30 +63,98 @@ const RightPanel = ({
   onReserveMethodChange = () => {}
 }) => {
   
-  // Force reset dropdowns when selectedAircraft changes
+  // Reset dropdowns when selectedAircraft changes - COMPLETELY rebuild them
   useEffect(() => {
     if (selectedAircraft) {
-      // When we have a selected aircraft, force the dropdowns to reset completely
-      console.log('RightPanel: Selected aircraft changed, resetting dropdowns');
+      // When an aircraft is selected, completely rebuild BOTH dropdowns
+      console.log('RightPanel: Selected aircraft changed, COMPLETELY REBUILDING dropdowns');
+      console.log('IMPORTANT: Preserving selected aircraft:', selectedAircraft.registration);
       
+      // Force immediate state update for type dropdown
+      if (onAircraftTypeChange) {
+        console.log('Forcing type reset to empty string');
+        onAircraftTypeChange('');
+      }
+      
+      // Wait briefly for state to update, then force DOM update
       setTimeout(() => {
-        // Force DOM reset for the type dropdown
+        // COMPLETELY RESET the type dropdown
         const typeDropdown = document.getElementById('aircraft-type');
         if (typeDropdown) {
           // Reset to "-- Change Aircraft Type --"
           typeDropdown.value = 'select';
-          console.log('RightPanel: Reset type dropdown to "-- Change Aircraft Type --"');
+          console.log('Reset type dropdown to "-- Change Aircraft Type --"');
+          
+          // CRITICAL: Force dropdown rebuild
+          const event = new Event('change', { bubbles: true });
+          typeDropdown.dispatchEvent(event);
+          
+          // Force DOM refresh by adding/removing a class
+          typeDropdown.classList.add('force-rebuild');
+          setTimeout(() => typeDropdown.classList.remove('force-rebuild'), 10);
         }
         
-        // Reset the registration dropdown to empty
+        // COMPLETELY RESET the registration dropdown
         const regDropdown = document.getElementById('aircraft-registration');
         if (regDropdown) {
-          // Make it empty to force showing the "-- Select Aircraft --" option
+          // IMPORTANT: Set to empty to force it to rebuild
           regDropdown.value = '';
-          console.log('RightPanel: Reset registration dropdown to empty');
+          console.log('Reset registration dropdown to empty - this will force a rebuild');
+          
+          // Force change event to rebuild options
+          const event = new Event('change', { bubbles: true });
+          regDropdown.dispatchEvent(event);
+          
+          // Force DOM refresh
+          regDropdown.classList.add('force-rebuild');
+          setTimeout(() => regDropdown.classList.remove('force-rebuild'), 10);
+          
+          // Log to confirm selected aircraft is still in state
+          console.log('After dropdown reset, selectedAircraft is:', 
+            selectedAircraft ? selectedAircraft.registration : 'none');
         }
         
-        // If this is the first time aircraft was selected, show a help message
+        // CRITICAL DEBUG: Add a global listener for the dropdown state
+        if (!window.dropdownResetListener) {
+          window.dropdownResetListener = true;
+          
+          // Create a global event listener for dropdown resets
+          window.addEventListener('force-rerender-dropdowns', (e) => {
+            console.log('Received force-rerender-dropdowns event:', e.detail);
+            
+            // Get fresh references to the dropdowns
+            const typeDropdown = document.getElementById('aircraft-type');
+            const regDropdown = document.getElementById('aircraft-registration');
+            
+            if (typeDropdown) {
+              console.log('Forcing type dropdown rebuild from global listener');
+              typeDropdown.value = 'select';
+              
+              // Log the actual options to verify
+              const options = Array.from(typeDropdown.options || []);
+              console.log(`Type dropdown options (${options.length}):`, 
+                options.map(o => o.value).slice(0, 5).join(', ') + '...');
+            }
+            
+            if (regDropdown) {
+              console.log('Forcing registration dropdown rebuild from global listener');
+              regDropdown.value = '';
+            }
+            
+            // Force a visual class change to trigger UI refresh
+            if (typeDropdown) {
+              typeDropdown.classList.add('dropdown-refreshed');
+              setTimeout(() => typeDropdown.classList.remove('dropdown-refreshed'), 100);
+            }
+            
+            if (regDropdown) {
+              regDropdown.classList.add('dropdown-refreshed');
+              setTimeout(() => regDropdown.classList.remove('dropdown-refreshed'), 100);
+            }
+          });
+        }
+        
+        // Display confirmation that dropdowns have been reset
         if (!window.aircraftSelectionHelpShown) {
           window.aircraftSelectionHelpShown = true;
           
@@ -96,32 +164,57 @@ const RightPanel = ({
           helpMessage.style.left = '50%';
           helpMessage.style.transform = 'translate(-50%, -50%)';
           helpMessage.style.padding = '15px 20px';
-          helpMessage.style.backgroundColor = 'rgba(0, 50, 100, 0.9)';
+          helpMessage.style.backgroundColor = 'rgba(0, 70, 130, 0.95)';
           helpMessage.style.color = 'white';
           helpMessage.style.borderRadius = '8px';
-          helpMessage.style.zIndex = '10000';
+          helpMessage.style.zIndex = '10001'; // Higher than normal
           helpMessage.style.fontFamily = 'sans-serif';
           helpMessage.style.fontSize = '14px';
+          helpMessage.style.fontWeight = 'bold';
           helpMessage.style.maxWidth = '400px';
           helpMessage.style.textAlign = 'center';
-          helpMessage.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+          helpMessage.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
           helpMessage.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 8px; font-size: 16px;">Aircraft Selected!</div>
-            <div>You have selected ${selectedAircraft.registration.split(' (')[0]} (${selectedAircraft.modelType})</div>
-            <div style="margin-top: 10px; font-size: 12px;">Both dropdowns have been reset to allow you to select any aircraft type.</div>
+            <div style="margin-bottom: 8px; font-size: 16px; color: #5dff8d">Aircraft Selected!</div>
+            <div>${selectedAircraft.registration.split(' (')[0]} (${selectedAircraft.modelType})</div>
+            <div style="margin-top: 12px; font-size: 13px; font-weight: normal;">
+              Both dropdowns have been reset to their initial state.<br>
+              You can now select any aircraft type.
+            </div>
           `;
           document.body.appendChild(helpMessage);
           
-          // Remove after 4 seconds
+          // Remove after 5 seconds
           setTimeout(() => {
             if (helpMessage.parentNode) {
               helpMessage.parentNode.removeChild(helpMessage);
             }
-          }, 4000);
+          }, 5000);
         }
-      }, 100);
+        
+        // CRITICAL: Create debug flag to verify reset happened
+        window.lastDropdownReset = {
+          timestamp: Date.now(),
+          selectedAircraft: selectedAircraft?.registration,
+          typeDropdownValue: typeDropdown?.value,
+          regDropdownValue: regDropdown?.value
+        };
+      }, 150); // Slightly longer timeout for reliability
+      
+      // Force a complete rebuild after a short delay
+      setTimeout(() => {
+        // As a last resort, trigger a forced rebuild via event
+        const rebuildEvent = new CustomEvent('force-rerender-dropdowns', {
+          detail: { 
+            forcedRebuild: true,
+            timestamp: Date.now(),
+            aircraft: selectedAircraft.registration
+          }
+        });
+        window.dispatchEvent(rebuildEvent);
+      }, 500);
     }
-  }, [selectedAircraft, forceUpdate]); // Re-run when selectedAircraft changes
+  }, [selectedAircraft, onAircraftTypeChange]); // Only re-run when selectedAircraft changes
   
   // Initial mount effect - run once
   useEffect(() => {
@@ -180,6 +273,22 @@ const RightPanel = ({
         return acc;
       }, {})
     });
+    
+    // CRITICAL FIX: Ensure the selected aircraft display always reflects the correct state
+    if (selectedAircraft) {
+      console.log('Selected aircraft found in state:', selectedAircraft.registration);
+      
+      // Update the selected aircraft display to make sure it shows the current selection
+      const selectedAircraftDisplay = document.querySelector('.selected-aircraft-display');
+      if (selectedAircraftDisplay) {
+        // Add a data attribute to ensure we can verify the current selection
+        selectedAircraftDisplay.setAttribute('data-selected', selectedAircraft.registration);
+        
+        // Force the style to indicate an aircraft is selected
+        selectedAircraftDisplay.style.backgroundColor = 'rgba(0, 102, 153, 0.12)';
+        selectedAircraftDisplay.style.border = '1px solid #ccc';
+      }
+    }
     
     // Check if dropdown has options
     setTimeout(() => {
@@ -416,6 +525,29 @@ const RightPanel = ({
               // Add a slight delay to show a message that aircraft was selected
               setTimeout(() => {
                 console.log('Aircraft selection processed, dropdowns should be reset');
+                
+                // Directly update the Selected Aircraft display
+                const selectedDisplay = document.querySelector('.selected-aircraft-display');
+                if (selectedDisplay) {
+                  // Find the selected aircraft in the aircraftsByType 
+                  const allAircraft = Object.values(aircraftsByType || {}).flat();
+                  const aircraft = allAircraft.find(a => a.registration === newReg);
+                  
+                  if (aircraft) {
+                    // Update the Selected Aircraft display
+                    selectedDisplay.innerHTML = `${aircraft.registration.split(' (')[0]} ${aircraft.modelType ? `(${aircraft.modelType})` : ''}`;
+                    selectedDisplay.style.color = '#4285f4';
+                    console.log('Updated selected aircraft display manually');
+                    
+                    // Also update the TOP CARD with aircraft info
+                    const topCardTitle = document.querySelector('.route-stats-title');
+                    if (topCardTitle) {
+                      // Format like in image 2: "N159RB • AW139" with type in blue
+                      topCardTitle.innerHTML = `<span style="color: white">${aircraft.registration.split(' (')[0]} • </span><span style="color: #4285f4">${aircraft.modelType}</span>`;
+                      console.log('Updated top card title with aircraft info');
+                    }
+                  }
+                }
               }, 100);
             } else {
               // Just call the parent handler normally for empty selection
@@ -533,9 +665,9 @@ const RightPanel = ({
         {/* Show the selected aircraft registration at the bottom with type */}
         <div className="selected-aircraft">
           <label>Selected Aircraft:</label>
-          <div className="selected-aircraft-display" style={{
+          <div className="selected-aircraft-display" id="selected-aircraft-display" style={{
             fontWeight: 'bold',
-            color: selectedAircraft ? '#006699' : '#666'
+            color: selectedAircraft ? '#4285f4' : '#666'
           }}>
             {selectedAircraft ? (
               <>

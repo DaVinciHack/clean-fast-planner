@@ -439,12 +439,18 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
     // Store the current state for reference
     const hadSelectedAircraft = selectedAircraft !== null;
     
-    // Important: Clear the selected aircraft when changing type
-    // This maintains the original behavior from ModularFastPlannerComponent
+    // Important: Only clear the selected aircraft when changing to a specific type
+    // If the user is selecting "-- Change Aircraft Type --" (empty type),
+    // we want to preserve the selected aircraft
     if (type && type !== '' && selectedAircraft) {
-      console.log('Clearing selected aircraft because type is changing');
+      // User is selecting a specific aircraft type
+      console.log('Specific type selected, clearing previous aircraft selection');
       setSelectedAircraft(null);
       setAircraftRegistration('');
+    } else if (!type && selectedAircraft) {
+      // User is selecting "-- Change Aircraft Type --" but we have a selected aircraft
+      console.log('Empty type selected but keeping selected aircraft:', selectedAircraft.registration);
+      // Don't clear selectedAircraft here - preserve it in the "Selected Aircraft:" display
     }
     
     // Update the type filter
@@ -572,21 +578,36 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         window.currentAircraftType = aircraft.modelType;
         window.selectedAircraftObject = aircraft;
         
-        // CRITICAL FIX: 
-        // 1. We immediately clear the TYPE AND REGISTRATION values in the state
-        // 2. This allows showing ALL aircraft types in the dropdown again
-        // 3. But we keep the selectedAircraft value for display at the bottom
-        setAircraftType('');  // CLEAR the type filter
-        setAircraftRegistration(''); // CLEAR the registration in state but keep selectedAircraft
+        // CRITICAL: Completely clear both dropdown selections in state
+        // This forces a FULL RESET of both dropdown contents
+        setAircraftType('');  // <-- Critical: Empty string forces showing ALL types
         
-        // Force reload all aircraft in the current region
+        // IMPORTANT: We still want to preserve the selectedAircraft in state
+        // but need to clear the registration dropdown. We should set this to empty
+        // for UI purposes only, but NOT clear selectedAircraft state
+        setAircraftRegistration(''); // <-- Clear registration input but keep selectedAircraft
+        
+        // CRITICAL: Update the selected aircraft display after a short delay
+        // This ensures the UI reflects the proper selection state
+        setTimeout(() => {
+          const selectedAircraftDisplay = document.querySelector('.selected-aircraft-display');
+          if (selectedAircraftDisplay) {
+            if (aircraft) {
+              // Force update the content to show the selected aircraft
+              selectedAircraftDisplay.innerHTML = `${aircraft.registration.split(' (')[0]} ${aircraft.modelType ? `(${aircraft.modelType})` : ''}`;
+              selectedAircraftDisplay.style.color = '#006699';
+            }
+          }
+        }, 200);
+        
+        // Force reload ALL aircraft in the current region
         if (currentRegion) {
           try {
-            // Get all aircraft in the current region to prepare type buckets
+            // Get ALL aircraft in current region
             const allAircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
             console.log(`Found ${allAircraftInRegion.length} aircraft in region ${currentRegion.name}`);
             
-            // Create ALL standard type buckets
+            // Create empty buckets for ALL standard types - crucial for dropdown to work correctly
             const allTypes = {
               'S92': [],
               'S76': [],
@@ -602,7 +623,7 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
               'A109E': []
             };
             
-            // Fill the buckets with aircraft
+            // Fill buckets with all aircraft in this region
             allAircraftInRegion.forEach(a => {
               const type = a.modelType || 'S92';
               if (allTypes[type]) {
@@ -612,63 +633,170 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
               }
             });
             
-            // This is critical - update the state with ALL aircraft types
+            // Update state with ALL aircraft types
+            // This is critical for resetting the dropdown contents
             setAircraftsByType(allTypes);
             
-            // Log available types for debugging
-            Object.keys(allTypes).filter(t => allTypes[t].length > 0).forEach(t => {
-              console.log(`Type ${t}: ${allTypes[t].length} aircraft`);
-            });
+            // Show a notification with what's happening
+            // This helps debug the dropdown state
+            const notification = document.createElement('div');
+            notification.style.position = 'fixed';
+            notification.style.top = '100px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.backgroundColor = 'rgba(0, 90, 150, 0.9)';
+            notification.style.color = 'white';
+            notification.style.padding = '10px 20px';
+            notification.style.borderRadius = '5px';
+            notification.style.zIndex = '10000';
+            notification.style.fontFamily = 'sans-serif';
+            notification.style.fontSize = '14px';
+            notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3)';
+            notification.textContent = `Aircraft types loaded: ${Object.keys(allTypes).filter(t => allTypes[t].length > 0).length}`;
+            document.body.appendChild(notification);
+            
+            // Remove after 2 seconds
+            setTimeout(() => {
+              if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+              }
+            }, 2000);
           } catch (error) {
             console.error('Error updating aircraft types after selection:', error);
           }
         }
         
-        // Critical DOM manipulation to reset the dropdowns
+        // CRITICAL: Force dropdown UI reset via DOM
+        // This needs to happen after the state updates to ensure the dropdowns show the right options
         setTimeout(() => {
-          // Reset the type dropdown to "-- Change Aircraft Type --"
+          // Reset type dropdown to show all available types again
           const typeDropdown = document.getElementById('aircraft-type');
           if (typeDropdown) {
+            // Set visual display to "-- Change Aircraft Type --"
             typeDropdown.value = 'select';
             console.log('Reset type dropdown to "-- Change Aircraft Type --"');
             
-            // IMPORTANT - dispatch a change event to clear the type filter entirely
+            // Force a change event to refresh the dropdown contents
+            // This is critical for making the dropdown show all types
             const event = new Event('change', { bubbles: true });
             typeDropdown.dispatchEvent(event);
+            
+            // Log the dropdown options to verify it's showing all types
+            if (typeDropdown.options) {
+              console.log(`Type dropdown now has ${typeDropdown.options.length} options`);
+              
+              // Force a re-render by adding a class and removing it
+              typeDropdown.classList.add('force-refresh');
+              setTimeout(() => typeDropdown.classList.remove('force-refresh'), 10);
+            }
           }
           
-          // Reset registration dropdown to "-- Select Aircraft --"
+          // Also reset registration dropdown
           const regDropdown = document.getElementById('aircraft-registration');
           if (regDropdown) {
+            // Set to "-- Select Aircraft --"
             regDropdown.value = '';
-            console.log('Reset registration dropdown to "-- Select Aircraft --"');
+            console.log('Reset registration dropdown to show all aircraft');
             
-            // Dispatch event to clear reg dropdown state
+            // Force a change event to refresh dropdown
             const event = new Event('change', { bubbles: true });
             regDropdown.dispatchEvent(event);
+            
+            // Add and remove class to force re-render
+            regDropdown.classList.add('force-refresh');
+            setTimeout(() => regDropdown.classList.remove('force-refresh'), 10);
           }
           
-          // Show confirmation that aircraft is selected but dropdowns reset
+          // CRITICAL: Directly update the Selected Aircraft display
+          const selectedAircraftDisplay = document.getElementById('selected-aircraft-display');
+          if (selectedAircraftDisplay && aircraft) {
+            // Update both the content and style to indicate selection
+            selectedAircraftDisplay.innerHTML = `${aircraft.registration.split(' (')[0]} ${aircraft.modelType ? `(${aircraft.modelType})` : ''}`;
+            selectedAircraftDisplay.style.color = '#4285f4';
+            console.log('Manually updated selected aircraft display');
+            
+            // Also update the TOP CARD with aircraft info
+            const topCardTitle = document.querySelector('.route-stats-title');
+            if (topCardTitle) {
+              // Format like in image 2: "N159RB • AW139" with type in blue
+              topCardTitle.innerHTML = `<span style="color: white">${aircraft.registration.split(' (')[0]} • </span><span style="color: #4285f4">${aircraft.modelType}</span>`;
+              console.log('Updated top card title with aircraft info');
+            }
+          }
+          
+          // Create a visual notification to confirm aircraft selection
+          const selectionPopup = document.createElement('div');
+          selectionPopup.style.position = 'fixed';
+          selectionPopup.style.top = '50%';
+          selectionPopup.style.left = '50%';
+          selectionPopup.style.transform = 'translate(-50%, -50%)';
+          selectionPopup.style.backgroundColor = 'rgba(0, 70, 130, 0.95)';
+          selectionPopup.style.color = 'white';
+          selectionPopup.style.padding = '15px 20px';
+          selectionPopup.style.borderRadius = '8px';
+          selectionPopup.style.zIndex = '10001';
+          selectionPopup.style.fontFamily = 'sans-serif';
+          selectionPopup.style.fontSize = '14px';
+          selectionPopup.style.fontWeight = 'bold';
+          selectionPopup.style.textAlign = 'center';
+          selectionPopup.innerHTML = `
+            Aircraft Selected!<br>
+            ${aircraft.registration.split(' (')[0]} (${aircraft.modelType})<br>
+            <div style="font-size:12px; margin-top:8px; font-weight:normal;">
+              Both dropdowns have been reset to their initial state.
+            </div>
+          `;
+          document.body.appendChild(selectionPopup);
+          
+          // Remove after 5 seconds
+          setTimeout(() => {
+            if (selectionPopup.parentNode) {
+              selectionPopup.parentNode.removeChild(selectionPopup);
+            }
+          }, 5000);
+          
+          // Create STRONG visual indicator that aircraft is selected but dropdowns are now reset
           const message = document.createElement('div');
           message.style.position = 'fixed';
-          message.style.bottom = '50px';
-          message.style.right = '20px';
-          message.style.backgroundColor = 'rgba(0, 100, 0, 0.8)';
+          message.style.top = '20px';
+          message.style.left = '50%';
+          message.style.transform = 'translateX(-50%)';
+          message.style.backgroundColor = 'rgba(0, 100, 0, 0.9)';
           message.style.color = 'white';
-          message.style.padding = '10px 15px';
-          message.style.borderRadius = '5px';
+          message.style.padding = '15px 25px';
+          message.style.borderRadius = '8px';
           message.style.zIndex = '10000';
           message.style.fontFamily = 'sans-serif';
-          message.textContent = `Aircraft ${registration} (${aircraft.modelType}) selected! Dropdowns reset.`;
+          message.style.fontSize = '16px';
+          message.style.fontWeight = 'bold';
+          message.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+          message.innerHTML = `
+            <div style="text-align:center; margin-bottom: 5px;">✅ Aircraft Selected: ${registration} (${aircraft.modelType})</div>
+            <div style="font-size:12px; text-align:center; font-weight:normal;">Dropdowns reset to initial state</div>
+          `;
           document.body.appendChild(message);
           
-          // Remove the message after 3 seconds
+          // Remove after 3 seconds
           setTimeout(() => {
             if (message.parentNode) {
               message.parentNode.removeChild(message);
             }
           }, 3000);
-        }, 50);
+          
+          // CRITICAL - Set global flag for debugging
+          window.dropdownsReset = true;
+          window.selectedAircraftAfterReset = registration;
+          
+          // Force re-render the entire component tree
+          // This is an extreme measure to make sure everything is rendered properly
+          const event = new CustomEvent('force-rerender-dropdowns', {
+            detail: { 
+              reset: true,
+              timestamp: Date.now()
+            }
+          });
+          window.dispatchEvent(event);
+        }, 100);
         
         // Load any saved settings for this aircraft
         try {
@@ -809,6 +937,51 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
     reserveMethod,
     payloadWeight
   };
+
+  // Track selectedAircraft changes
+  useEffect(() => {
+    if (selectedAircraft) {
+      console.log('SELECTED AIRCRAFT STATE CHANGED:', selectedAircraft.registration);
+      
+      // When selected aircraft changes, force update the display
+      setTimeout(() => {
+        // Update the Selected Aircraft display
+        const selectedAircraftDisplay = document.getElementById('selected-aircraft-display');
+        if (selectedAircraftDisplay) {
+          selectedAircraftDisplay.innerHTML = `${selectedAircraft.registration.split(' (')[0]} ${selectedAircraft.modelType ? `(${selectedAircraft.modelType})` : ''}`;
+          selectedAircraftDisplay.style.color = '#4285f4';
+          console.log('Updated selected aircraft display from state change');
+        }
+        
+        // CRITICAL FIX: Update the TOP CARD with aircraft info
+        const topCardTitle = document.querySelector('.route-stats-title');
+        if (topCardTitle) {
+          // Format like in image 2: "N159RB • AW139" with type in blue 
+          topCardTitle.innerHTML = `<span style="color: white">${selectedAircraft.registration.split(' (')[0]} • </span><span style="color: #4285f4">${selectedAircraft.modelType}</span>`;
+          console.log('Updated top card title with aircraft info');
+        }
+      }, 100);
+    } else {
+      console.log('selectedAircraft state cleared to null');
+      
+      // Also update display to "None Selected" when cleared
+      setTimeout(() => {
+        // Reset the Selected Aircraft display
+        const selectedAircraftDisplay = document.getElementById('selected-aircraft-display');
+        if (selectedAircraftDisplay) {
+          selectedAircraftDisplay.innerHTML = 'None Selected';
+          selectedAircraftDisplay.style.color = '#666';
+        }
+        
+        // Reset the top card title
+        const topCardTitle = document.querySelector('.route-stats-title');
+        if (topCardTitle) {
+          topCardTitle.innerHTML = 'Route Statistics';
+          console.log('Reset top card title to default');
+        }
+      }, 100);
+    }
+  }, [selectedAircraft]);
 
   // Provider value object
   const value = {
