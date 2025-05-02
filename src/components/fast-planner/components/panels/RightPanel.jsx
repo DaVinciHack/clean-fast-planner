@@ -154,20 +154,18 @@ const RightPanel = ({
           selectedValue: typeDropdown.value,
           optionCount: typeDropdown.options?.length || 0
         });
-      }
-      
-      // Auto-select first type if none selected and we have types
-      if (!aircraftType && !selectedAircraft) {
-        const availableTypes = Object.keys(aircraftsByType || {})
-          .filter(type => (aircraftsByType[type] || []).length > 0);
         
-        if (availableTypes.length > 0) {
-          console.log(`No type selected, auto-selecting first type: ${availableTypes[0]}`);
-          onAircraftTypeChange(availableTypes[0]);
+        // CRITICAL: Always make sure the dropdown starts with "-- Change Aircraft Type --"
+        if (typeDropdown.value !== 'select' && !aircraftType) {
+          typeDropdown.value = 'select';
+          console.log('Reset type dropdown to "-- Change Aircraft Type --"');
         }
       }
+      
+      // REMOVED: Auto-select first type. This was causing the issue where the dropdown
+      // would always start with a specific type selected instead of showing all types
     }, 200);
-  }, [aircraftType, aircraftRegistration, selectedAircraft, aircraftsByType, forceUpdate, onAircraftTypeChange]);
+  }, [aircraftType, aircraftRegistration, selectedAircraft, aircraftsByType, forceUpdate]);
   
   const handleFileInputChange = (e) => {
     if (e.target.files.length > 0) {
@@ -294,6 +292,15 @@ const RightPanel = ({
                   regDropdown.value = aircraftRegistration;
                 }
               }
+              
+              // Ensure we see "-- Change Aircraft Type --" in the dropdown
+              setTimeout(() => {
+                const typeDropdown = document.getElementById('aircraft-type');
+                if (typeDropdown) {
+                  typeDropdown.value = 'select';
+                  console.log('Ensured type dropdown shows "-- Change Aircraft Type --"');
+                }
+              }, 50);
             }
           }}
           disabled={aircraftLoading}

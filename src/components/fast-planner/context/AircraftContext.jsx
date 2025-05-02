@@ -10,13 +10,16 @@ const AircraftContext = createContext(null);
  */
 export const AircraftProvider = ({ children, client, currentRegion }) => {
   // Aircraft state
-  const [aircraftType, setAircraftType] = useState('');
+  const [aircraftType, setAircraftType] = useState('');  // IMPORTANT: Initial state is empty string
   const [aircraftRegistration, setAircraftRegistration] = useState('');
   const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [aircraftList, setAircraftList] = useState([]);
   const [aircraftsByType, setAircraftsByType] = useState({});
   const [aircraftLoading, setAircraftLoading] = useState(false);
   const [aircraftManagerInstance, setAircraftManagerInstance] = useState(null);
+  
+  // Flag to track first load
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   
   // Flight parameters state
   const [payloadWeight, setPayloadWeight] = useState(2000);
@@ -257,7 +260,8 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
                 'EC135': [],
                 'EC225': [],
                 'AS350': [],
-                'A119': []
+                'A119': [],
+                'A109E': []
               };
               
               // Fill the buckets with actual aircraft
@@ -284,17 +288,18 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
                 }, {})
               );
               
-              // If no aircraft type is selected yet, auto-select first type with aircraft
-              if (!aircraftType) {
-                const firstTypeWithAircraft = Object.keys(allTypes).find(
-                  type => allTypes[type] && allTypes[type].length > 0
-                );
-                
-                if (firstTypeWithAircraft) {
-                  console.log(`Auto-selecting first type with aircraft: ${firstTypeWithAircraft}`);
-                  setAircraftType(firstTypeWithAircraft);
+              // CRITICAL CHANGE: NEVER auto-select a type on first load
+              // This keeps the dropdown showing all aircraft types
+              setAircraftType('');
+              
+              // IMPORTANT: Reset the dropdown visually
+              setTimeout(() => {
+                const typeDropdown = document.getElementById('aircraft-type');
+                if (typeDropdown) {
+                  typeDropdown.value = 'select';
+                  console.log('Set type dropdown to "-- Change Aircraft Type --"');
                 }
-              }
+              }, 50);
             } catch (error) {
               console.error('Error filtering aircraft for region:', error);
             }
@@ -370,6 +375,20 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         // Update the state with ALL types, even empty ones
         setAircraftsByType(allTypes);
         
+        // CRITICAL: Always ensure the type is empty on region change
+        // This forces the dropdown to show "-- Change Aircraft Type --"
+        setAircraftType('');
+        
+        // Reset UI elements via DOM manipulation to ensure dropdowns show the right values
+        setTimeout(() => {
+          // Reset the type dropdown to "-- Change Aircraft Type --"
+          const typeDropdown = document.getElementById('aircraft-type');
+          if (typeDropdown) {
+            typeDropdown.value = 'select';
+            console.log('Reset type dropdown to "-- Change Aircraft Type --"');
+          }
+        }, 50);
+        
         // Create a visual indicator for the user
         const showMessage = (message) => {
           const messageBox = document.createElement('div');
@@ -405,7 +424,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
       }
       
       // Reset aircraft selection when region changes
-      setAircraftType('');
       setAircraftRegistration('');
       setSelectedAircraft(null);
       
