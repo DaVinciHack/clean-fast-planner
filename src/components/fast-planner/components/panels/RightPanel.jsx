@@ -271,6 +271,11 @@ const RightPanel = ({
               if (regDropdown) {
                 regDropdown.value = '';
               }
+              
+              // Clear the selected aircraft when choosing a new type
+              if (onAircraftRegistrationChange) {
+                onAircraftRegistrationChange('');
+              }
             } else {
               // Scenario 2: "-- Change Aircraft Type --" selected
               console.log('Change Aircraft Type selected (empty value)');
@@ -394,25 +399,69 @@ const RightPanel = ({
               // If we do have aircraft, check if we're filtering by type or showing all
               !aircraftType || aircraftType === '' ? (
                 // No type filter: show all aircraft from all types
-                [...Object.values(aircraftsByType).flat()]
-                  .filter(aircraft => aircraft) // Ensure we have valid aircraft objects
-                  .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
-                  .map(aircraft => (
-                    <option key={aircraft.registration} value={aircraft.registration}>
-                      {aircraft.registration}
+                // MODIFIED: Always show selected aircraft at the top of the list if one is selected
+                selectedAircraft ? (
+                  // If we have a selected aircraft, show it at the top and then all others
+                  <>
+                    {/* Current selected aircraft at the top */}
+                    <option key={selectedAircraft.registration} value={selectedAircraft.registration}>
+                      {selectedAircraft.registration}
                     </option>
-                  ))
-              ) : (
-                // Type filter: check if we have aircraft of this type
-                aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
-                  // Show aircraft for the selected type
-                  [...aircraftsByType[aircraftType]]
+                    
+                    {/* Show all other aircraft except the selected one */}
+                    {[...Object.values(aircraftsByType).flat()]
+                      .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration) 
+                      .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                      .map(aircraft => (
+                        <option key={aircraft.registration} value={aircraft.registration}>
+                          {aircraft.registration}
+                        </option>
+                      ))}
+                  </>
+                ) : (
+                  // No selected aircraft, show all aircraft normally
+                  [...Object.values(aircraftsByType).flat()]
+                    .filter(aircraft => aircraft) // Ensure we have valid aircraft objects
                     .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
                     .map(aircraft => (
                       <option key={aircraft.registration} value={aircraft.registration}>
                         {aircraft.registration}
                       </option>
                     ))
+                )
+              ) : (
+                // Type filter: check if we have aircraft of this type
+                aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
+                  // Show aircraft for the selected type
+                  // MODIFIED: Always show selected aircraft at the top if it's of this type
+                  selectedAircraft && selectedAircraft.modelType === aircraftType ? (
+                    // If we have a selected aircraft of this type, show it at the top and then all others
+                    <>
+                      {/* Current selected aircraft at the top */}
+                      <option key={selectedAircraft.registration} value={selectedAircraft.registration}>
+                        {selectedAircraft.registration}
+                      </option>
+                      
+                      {/* Show all other aircraft of this type except the selected one */}
+                      {[...aircraftsByType[aircraftType]]
+                        .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration)
+                        .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                        .map(aircraft => (
+                          <option key={aircraft.registration} value={aircraft.registration}>
+                            {aircraft.registration}
+                          </option>
+                        ))}
+                    </>
+                  ) : (
+                    // No selected aircraft of this type, show all aircraft of this type normally
+                    [...aircraftsByType[aircraftType]]
+                      .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                      .map(aircraft => (
+                        <option key={aircraft.registration} value={aircraft.registration}>
+                          {aircraft.registration}
+                        </option>
+                      ))
+                  )
                 ) : (
                   // No aircraft of this type
                   <option value="" disabled>

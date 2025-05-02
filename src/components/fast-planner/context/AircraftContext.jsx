@@ -470,6 +470,20 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           // Update the aircraft buckets state
           setAircraftsByType(allTypes);
           console.log('Updated aircraft buckets to show all types');
+          
+          // IMPORTANT: If we have a selected aircraft, keep it selected even when showing all types
+          if (selectedAircraft) {
+            console.log('Keeping selected aircraft even when showing all types');
+            
+            // This ensures the registration dropdown stays populated correctly
+            setTimeout(() => {
+              const regDropdown = document.getElementById('aircraft-registration');
+              if (regDropdown && regDropdown.value !== aircraftRegistration) {
+                regDropdown.value = aircraftRegistration;
+                console.log(`Reset registration dropdown to: ${aircraftRegistration}`);
+              }
+            }, 50);
+          }
         } catch (error) {
           console.error('Error updating aircraft types:', error);
         }
@@ -479,9 +493,10 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         console.log(`Filtering to type ${type}`);
         
         try {
-          // This is the trick - when a specific type is selected,
-          // we still create buckets for ALL types, but only fill
-          // the selected type's bucket with aircraft
+          // When a specific type is selected, we need to:
+          // 1. Create buckets for ALL types for consistent dropdown behavior
+          // 2. But only fill the selected type's bucket with aircraft
+          // 3. Ensure the type is properly selected in the dropdown
           const allTypes = {
             'S92': [],
             'S76': [],
@@ -506,12 +521,21 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           
           // Update the state with ALL types, but only the selected one has aircraft
           setAircraftsByType(allTypes);
+          
+          // Ensure the type dropdown shows the correct value
+          setTimeout(() => {
+            const typeDropdown = document.getElementById('aircraft-type');
+            if (typeDropdown && typeDropdown.value !== type) {
+              typeDropdown.value = type;
+              console.log(`Ensured type dropdown displays: ${type}`);
+            }
+          }, 50);
         } catch (error) {
           console.error('Error filtering aircraft by type:', error);
         }
       }
     }
-  }, [aircraftManagerInstance, currentRegion, selectedAircraft]);
+  }, [aircraftManagerInstance, currentRegion, selectedAircraft, aircraftRegistration]);
 
   // Handle aircraft registration change
   const changeAircraftRegistration = useCallback((registration) => {
@@ -531,14 +555,19 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         window.selectedAircraftObject = aircraft;
         
         // CRITICAL FIX: When an aircraft is selected, we need to:
-        // 1. Keep the actual aircraft type in state (don't clear it)
+        // 1. Store the aircraft's type but CLEAR the type filter
         // 2. Load ALL available types from the current region
         // 3. Reset the type dropdown to visual "-- Change Aircraft Type --"
         // This ensures when the dropdown is clicked, it shows all types
         
-        // Store the current type for reference
+        // Store the current type for reference only
         const currentAircraftType = aircraft.modelType;
         console.log(`Selected aircraft is type: ${currentAircraftType}`);
+        
+        // IMPORTANT: Clear the type filter in state to allow viewing all types
+        // This is the critical change - we're clearing the type filter while keeping the selectedAircraft
+        setAircraftType('');
+        console.log('Cleared type filter to allow viewing all aircraft types');
         
         // IMPORTANT: Load all aircraft from the current region
         // This ensures all types are available when the dropdown is clicked
@@ -575,13 +604,8 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
               }
             });
             
-            // CRITICAL: We maintain the type filter in state
-            // but update the buckets to include ALL types
+            // Update the state with ALL types
             setAircraftsByType(allTypes);
-            
-            // Don't change the aircraftType state - keep it as the selected aircraft's type
-            // This allows the registration dropdown to stay filtered to the aircraft type
-            console.log(`Keeping state aircraft type as: ${currentAircraftType}`);
             
             // Log available types for debugging
             Object.keys(allTypes).filter(t => allTypes[t].length > 0).forEach(t => {
@@ -592,7 +616,7 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           }
         }
         
-        // Reset UI elements via DOM manipulation - not state
+        // Reset UI elements via DOM manipulation
         setTimeout(() => {
           // Reset the type dropdown to "-- Change Aircraft Type --"
           const typeDropdown = document.getElementById('aircraft-type');
@@ -600,9 +624,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
             // Set the DOM value directly - this affects the visual display only
             typeDropdown.value = 'select';
             console.log('Reset type dropdown visual display to "-- Change Aircraft Type --"');
-            
-            // No need to dispatch event - we don't want to change the state
-            // Just visually change the dropdown
           }
           
           // Make sure the registration dropdown still shows the selected registration
