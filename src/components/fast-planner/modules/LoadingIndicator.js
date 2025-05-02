@@ -8,6 +8,12 @@ const LoadingIndicator = (() => {
   // Keep track of all active loaders
   const activeLoaders = new Map();
   let loaderIdCounter = 0;
+  
+  // New message queue system
+  const messageQueue = [];
+  let isProcessingQueue = false;
+  let currentMessage = null;
+  let messageTimer = null;
 
   // Create and inject the CSS if not already present
   const initializeStyles = () => {
@@ -58,7 +64,7 @@ const LoadingIndicator = (() => {
           rgba(0, 180, 255, 0) 100%
         );
         width: 35%; /* Slightly longer bar */
-        animation: fp-elastic-scroll 1.2s infinite cubic-bezier(0.645, 0.045, 0.355, 1);
+        animation: fp-elastic-scroll 1.8s infinite cubic-bezier(0.645, 0.045, 0.355, 1);
         transform-origin: left center;
         border-radius: 1px;
       }
@@ -128,6 +134,39 @@ const LoadingIndicator = (() => {
   };
 
   /**
+   * Process the next message in the queue
+   */
+  const processNextMessage = () => {
+    if (isProcessingQueue || messageQueue.length === 0) return;
+    
+    isProcessingQueue = true;
+    currentMessage = messageQueue.shift();
+    
+    // Update the status indicator with the current message
+    updateStatusIndicatorInternal(currentMessage);
+    
+    // Calculate display time based on message length
+    // Typing animation runs at 1.8s for the full text, so calculate actual time
+    const textLength = currentMessage.length;
+    // Assume 40 chars would take the full animation time, plus minimum display time
+    const displayTime = Math.max(1800 * (textLength / 40), 800) + 1000;
+    
+    // Set a timer to process the next message
+    messageTimer = setTimeout(() => {
+      isProcessingQueue = false;
+      currentMessage = null;
+      
+      // If queue is empty, hide the indicator after the last message
+      if (messageQueue.length === 0) {
+        clearStatusIndicatorInternal();
+      } else {
+        // Process the next message
+        processNextMessage();
+      }
+    }, displayTime);
+  };
+
+  /**
    * Shows a loading indicator in the specified container
    * @param {HTMLElement|string} container - Container element or selector where the loader should appear
    * @param {string} [loadingText] - Optional text to display with the loader
@@ -145,7 +184,7 @@ const LoadingIndicator = (() => {
         document.querySelector('.fp-loading-container')) {
       // Just update the status indicator
       if (loadingText) {
-        updateStatusIndicator(loadingText);
+        queueMessage(loadingText);
       }
       return -1;
     }
@@ -208,7 +247,9 @@ const LoadingIndicator = (() => {
     });
     
     // Also update status indicator in the top card
-    updateStatusIndicator(loadingText);
+    if (loadingText) {
+      queueMessage(loadingText);
+    }
     
     return loaderId;
   };
@@ -234,7 +275,9 @@ const LoadingIndicator = (() => {
     }
     
     // Also update status indicator in the top card
-    updateStatusIndicator(newText);
+    if (newText) {
+      queueMessage(newText);
+    }
     
     return true;
   };
@@ -256,10 +299,8 @@ const LoadingIndicator = (() => {
     activeLoaders.delete(loaderId);
     
     // Clear status indicator after a delay if no other loaders are active
-    if (activeLoaders.size === 0) {
-      setTimeout(() => {
-        clearStatusIndicator();
-      }, 1000);
+    if (activeLoaders.size === 0 && messageQueue.length === 0 && !isProcessingQueue) {
+      clearStatusIndicatorInternal();
     }
     
     return true;
@@ -273,15 +314,54 @@ const LoadingIndicator = (() => {
       hide(id);
     });
     
-    // Clear status indicator
-    clearStatusIndicator();
+    // Clear message queue and status indicator
+    messageQueue.length = 0;
+    clearTimeout(messageTimer);
+    isProcessingQueue = false;
+    currentMessage = null;
+    clearStatusIndicatorInternal();
   };
   
   /**
-   * Updates the status indicator in the top card
+   * Add a message to the queue and start processing if not already running
+   * @param {string} text - The message to display
+   */
+  const queueMessage = (text) => {
+    if (!text) return;
+    
+    // Add message to queue
+    messageQueue.push(text);
+    
+    // Start processing if not already running
+    if (!isProcessingQueue) {
+      processNextMessage();
+    }
+    
+    // Show the loading bar if it's not already visible
+    const loadingContainer = document.querySelector('.fp-loading-container');
+    if (loadingContainer) {
+      loadingContainer.style.display = 'block';
+    }
+  };
+  
+  /**
+   * Updates the status indicator in the top card - public method
    * @param {string} text - The text to display in the status indicator
    */
   const updateStatusIndicator = (text) => {
+    if (!text) return false;
+    
+    // Add message to queue
+    queueMessage(text);
+    return true;
+  };
+  
+  /**
+   * Internal implementation of updating the status indicator
+   * Called by the queue processor, not directly by users
+   * @param {string} text - The text to display
+   */
+  const updateStatusIndicatorInternal = (text) => {
     // Find the status indicator
     const statusIndicator = document.querySelector('.status-indicator');
     if (!statusIndicator) return false;
@@ -310,10 +390,25 @@ const LoadingIndicator = (() => {
   };
   
   /**
-   * Clears the status indicator in the top card
-   * Waits for typewriter animation to complete before removing text
+   * Clears the status indicator in the top card - public method
+   * Waits for queue to be empty and animations to complete
    */
   const clearStatusIndicator = () => {
+    // If we have messages queued or are currently processing,
+    // do not clear yet - it will be cleared when the queue is empty
+    if (messageQueue.length > 0 || isProcessingQueue) {
+      return false;
+    }
+    
+    clearStatusIndicatorInternal();
+    return true;
+  };
+  
+  /**
+   * Internal implementation of clearing the status indicator
+   * Called when queue is empty and all messages are processed
+   */
+  const clearStatusIndicatorInternal = () => {
     // Find the status indicator
     const statusIndicator = document.querySelector('.status-indicator');
     if (!statusIndicator) return false;
@@ -332,14 +427,14 @@ const LoadingIndicator = (() => {
         // Then fade out
         statusIndicator.classList.remove('active');
         
-        // Also hide the loading bar
-        const loadingContainer = document.querySelector('.fp-loading-container');
-        if (loadingContainer) {
-          loadingContainer.style.display = 'none';
-        }
-        
-        // Clear the content after fade animation completes
+        // Hide the loading bar after fade completes
         setTimeout(() => {
+          const loadingContainer = document.querySelector('.fp-loading-container');
+          if (loadingContainer) {
+            loadingContainer.style.display = 'none';
+          }
+          
+          // Clear the content after fade animation completes
           statusIndicator.innerHTML = '';
         }, 300);
       }, remainingTime);
@@ -347,14 +442,14 @@ const LoadingIndicator = (() => {
       // No typewriter text, just fade out
       statusIndicator.classList.remove('active');
       
-      // Also hide the loading bar
-      const loadingContainer = document.querySelector('.fp-loading-container');
-      if (loadingContainer) {
-        loadingContainer.style.display = 'none';
-      }
-      
-      // Clear the content after fade animation completes
+      // Hide the loading bar after fade completes
       setTimeout(() => {
+        const loadingContainer = document.querySelector('.fp-loading-container');
+        if (loadingContainer) {
+          loadingContainer.style.display = 'none';
+        }
+        
+        // Clear the content after fade animation completes
         statusIndicator.innerHTML = '';
       }, 300);
     }
@@ -415,7 +510,13 @@ const LoadingIndicator = (() => {
     hideAll,
     updateStatusIndicator,
     clearStatusIndicator,
-    initializeRouteStatsLoader
+    initializeRouteStatsLoader,
+    // Debug API for testing
+    getQueueStatus: () => ({
+      length: messageQueue.length,
+      currentMessage,
+      isProcessing: isProcessingQueue
+    })
   };
 })();
 

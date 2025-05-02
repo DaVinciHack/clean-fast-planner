@@ -422,8 +422,8 @@ const RightPanel = ({
           
           {aircraftLoading ? (
             <option value="" disabled>
-              {/* Changed to avoid showing "Loading aircraft data..." text */}
-              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Loading aircraft data..."), ""}
+              {/* Update status indicator silently */}
+              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Filtering aircraft data..."), "Loading..."}
             </option>
           ) : (
             // Even if we're not loading, check if we have aircraft data
@@ -530,9 +530,9 @@ const RightPanel = ({
           <option value="">-- Select Aircraft --</option>
           
           {aircraftLoading ? (
-            // Update the loading indicator text but don't display text in dropdown
+            // Update the loading indicator text but display "Loading..." in dropdown
             <option value="" disabled>
-              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Loading aircraft data..."), ""}
+              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Finding available aircraft..."), "Loading..."}
             </option>
           ) : (
             // Start with a check if we have ANY aircraft at all

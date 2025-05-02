@@ -170,7 +170,7 @@ class AircraftManager {
       // Use LoadingIndicator to show loading status in the top card
       // Instead of using the full-page overlay
       if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('Loading all aircraft data...');
+        window.LoadingIndicator.updateStatusIndicator('Loading aircraft data...');
       }
       
       // Check if client exists
@@ -287,9 +287,9 @@ class AircraftManager {
           console.log(`Triggering onAircraftLoaded callback with ${this.aircraftList.length} aircraft`);
           this.triggerCallback('onAircraftLoaded', this.aircraftList);
           
-          // Clear loading status
+          // Update status and then clear loading status
           if (window.LoadingIndicator) {
-            window.LoadingIndicator.clearStatusIndicator();
+            window.LoadingIndicator.updateStatusIndicator(`Loaded ${this.aircraftList.length} aircraft successfully`);
           }
           
           // Return the final aircraft list
@@ -299,9 +299,9 @@ class AircraftManager {
           this.aircraftList = [];
           this.triggerCallback('onAircraftLoaded', []);
           
-          // Clear loading status
+          // Update status and then clear loading status
           if (window.LoadingIndicator) {
-            window.LoadingIndicator.clearStatusIndicator();
+            window.LoadingIndicator.updateStatusIndicator(`No aircraft data found`);
           }
           
           return [];
@@ -317,12 +317,10 @@ class AircraftManager {
       // Trigger error callback
       this.triggerCallback('onError', error);
       
-      // Clear loading status and show error
+      // Update status with error message
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('Error loading aircraft data');
-        setTimeout(() => {
-          window.LoadingIndicator.clearStatusIndicator();
-        }, 3000);
+        window.LoadingIndicator.updateStatusIndicator('Please try again later');
       }
       
       // No mock data, just return empty list

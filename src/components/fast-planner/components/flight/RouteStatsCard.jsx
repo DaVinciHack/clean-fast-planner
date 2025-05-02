@@ -149,13 +149,6 @@ const RouteStatsCard = ({
       // Update the status indicator with a message
       if (LoadingIndicator && LoadingIndicator.updateStatusIndicator) {
         LoadingIndicator.updateStatusIndicator("Calculating route");
-        
-        // Auto-clear after a reasonable delay
-        setTimeout(() => {
-          if (LoadingIndicator && LoadingIndicator.clearStatusIndicator) {
-            LoadingIndicator.clearStatusIndicator();
-          }
-        }, 3000);
       }
     }
   }, [waypoints]);
