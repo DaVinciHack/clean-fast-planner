@@ -421,7 +421,10 @@ const RightPanel = ({
           <option value="select">-- Change Aircraft Type --</option>
           
           {aircraftLoading ? (
-            <option value="" disabled>Loading aircraft data...</option>
+            <option value="" disabled>
+              {/* Changed to avoid showing "Loading aircraft data..." text */}
+              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Loading aircraft data..."), ""}
+            </option>
           ) : (
             // Even if we're not loading, check if we have aircraft data
             aircraftsByType && Object.keys(aircraftsByType).length > 0 ? (
@@ -527,8 +530,10 @@ const RightPanel = ({
           <option value="">-- Select Aircraft --</option>
           
           {aircraftLoading ? (
-            // Show loading indicator while aircraft data is loading
-            <option value="" disabled>Loading aircraft data...</option>
+            // Update the loading indicator text but don't display text in dropdown
+            <option value="" disabled>
+              {window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator("Loading aircraft data..."), ""}
+            </option>
           ) : (
             // Start with a check if we have ANY aircraft at all
             Object.values(aircraftsByType).flat().length > 0 ? (
@@ -616,9 +621,7 @@ const RightPanel = ({
         
         {/* Status indicators */}
         <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
-          {aircraftLoading ? (
-            <span>Loading aircraft data...</span>
-          ) : aircraftsByType && aircraftType && aircraftsByType[aircraftType] ? (
+          {!aircraftLoading && aircraftsByType && aircraftType && aircraftsByType[aircraftType] ? (
             <span>
               {aircraftsByType[aircraftType].length > 0 ? 
                 `${aircraftsByType[aircraftType].length} ${aircraftType} aircraft available` : 

@@ -99,52 +99,65 @@ const RouteStatsCard = ({
     return Math.min(maxByLoad, aircraftMaxPax);
   };
   
-  // Add loading indicator effect
+  // Initialize the route stats loader only once, with a cleanup function to remove any existing loaders first
   useEffect(() => {
-    // Function to show loading indicator
-    const showLoading = (message = "Calculating route") => {
-      // If we already have a loader, hide it first
-      if (loaderIdRef.current !== null) {
-        LoadingIndicator.hide(loaderIdRef.current);
-      }
-      
-      // Show new loading indicator at the top of the card
-      if (cardRef.current) {
-        loaderIdRef.current = LoadingIndicator.show(
-          cardRef.current.querySelector('.route-stats-header'),
-          message,
-          { position: 'bottom' }
-        );
-        
-        // Demo: update message after a delay
-        setTimeout(() => {
-          if (loaderIdRef.current !== null) {
-            LoadingIndicator.updateText(loaderIdRef.current, "Processing waypoints");
-          }
-        }, 1200);
-        
-        // Hide the loader after 3 seconds for demo purposes
-        setTimeout(() => {
-          if (loaderIdRef.current !== null) {
-            LoadingIndicator.hide(loaderIdRef.current);
-            loaderIdRef.current = null;
-          }
-        }, 3000);
-      }
-    };
+    // First, remove any existing loading containers
+    const existingContainers = document.querySelectorAll('.fp-loading-container');
+    existingContainers.forEach(container => {
+      container.remove();
+    });
     
-    // Show loading indicator when waypoints change
-    if (waypoints && waypoints.length >= 2) {
-      showLoading("Calculating route");
+    // Clear any active status indicators
+    if (LoadingIndicator && LoadingIndicator.clearStatusIndicator) {
+      LoadingIndicator.clearStatusIndicator();
     }
     
-    // Cleanup function to remove any remaining loaders
+    // Initialize the loading bar after a short delay to ensure DOM is ready
+    const initTimer = setTimeout(() => {
+      if (LoadingIndicator && LoadingIndicator.initializeRouteStatsLoader) {
+        LoadingIndicator.initializeRouteStatsLoader();
+      }
+    }, 100);
+    
+    // Cleanup function
     return () => {
+      clearTimeout(initTimer);
+      
+      // Remove any loading containers
+      const containers = document.querySelectorAll('.fp-loading-container');
+      containers.forEach(container => {
+        container.remove();
+      });
+      
+      // Clean up any loaders
       if (loaderIdRef.current !== null) {
         LoadingIndicator.hide(loaderIdRef.current);
         loaderIdRef.current = null;
       }
+      
+      // Clear any status messages
+      if (LoadingIndicator && LoadingIndicator.clearStatusIndicator) {
+        LoadingIndicator.clearStatusIndicator();
+      }
     };
+  }, []);
+  
+  // Add loading indicator effect for waypoints changes
+  useEffect(() => {
+    // Show loading message when waypoints change
+    if (waypoints && waypoints.length >= 2) {
+      // Update the status indicator with a message
+      if (LoadingIndicator && LoadingIndicator.updateStatusIndicator) {
+        LoadingIndicator.updateStatusIndicator("Calculating route");
+        
+        // Auto-clear after a reasonable delay
+        setTimeout(() => {
+          if (LoadingIndicator && LoadingIndicator.clearStatusIndicator) {
+            LoadingIndicator.clearStatusIndicator();
+          }
+        }, 3000);
+      }
+    }
   }, [waypoints]);
   
   return (
@@ -161,9 +174,20 @@ const RouteStatsCard = ({
           )}
         </div>
         
-        {/* Add status indicator in the middle */}
-        <div className="status-indicator">
-          {/* Status text will be updated dynamically */}
+        {/* Status indicator positioned in the middle of the header */}
+        <div className="status-indicator-container" style={{
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          right: '0',
+          height: '100%',
+          textAlign: 'center',
+          zIndex: '100',
+          pointerEvents: 'none'
+        }}>
+          <div className="status-indicator">
+            {/* Status text will be updated dynamically with typewriter effect */}
+          </div>
         </div>
         
         {/* Auth status container - always show on the right */}

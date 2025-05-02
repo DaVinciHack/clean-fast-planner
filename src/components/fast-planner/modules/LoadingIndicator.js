@@ -17,16 +17,19 @@ const LoadingIndicator = (() => {
     styleEl.id = 'loading-indicator-styles';
     styleEl.textContent = `
       .fp-loading-container {
-        position: relative;
+        position: absolute;
         width: 100%;
         height: 3px;
         pointer-events: none;
         overflow: hidden;
+        background-color: transparent; /* Transparent background for the track */
+        bottom: 0;
+        left: 0;
       }
       
       .fp-loading-text {
         position: absolute;
-        top: -15px;
+        bottom: 10px;
         left: 50%;
         transform: translateX(-50%);
         font-size: 11px;
@@ -48,16 +51,16 @@ const LoadingIndicator = (() => {
         left: 0;
         height: 2px;
         background: linear-gradient(to right, 
-          rgba(0, 200, 255, 0) 0%, 
-          rgba(0, 200, 255, 0.7) 40%, 
-          rgba(0, 200, 255, 0.9) 50%, 
-          rgba(0, 200, 255, 0.7) 60%, 
-          rgba(0, 200, 255, 0) 100%
+          rgba(0, 180, 255, 0) 0%, 
+          rgba(0, 200, 255, 0.7) 35%, 
+          rgba(190, 255, 255, 1) 50%, 
+          rgba(0, 200, 255, 0.7) 65%, 
+          rgba(0, 180, 255, 0) 100%
         );
-        width: 30%;
-        animation: fp-elastic-scroll 1.5s infinite cubic-bezier(0.645, 0.045, 0.355, 1);
+        width: 35%; /* Slightly longer bar */
+        animation: fp-elastic-scroll 1.2s infinite cubic-bezier(0.645, 0.045, 0.355, 1);
         transform-origin: left center;
-        border-radius: 2px;
+        border-radius: 1px;
       }
       
       @keyframes fp-elastic-scroll {
@@ -81,20 +84,44 @@ const LoadingIndicator = (() => {
       }
       
       .status-indicator {
-        font-size: 11px;
-        color: rgba(150, 200, 255, 0.8);
+        position: absolute; 
+        left: 50%;
+        top: 40%;
+        transform: translateX(-50%);
+        font-size: 10px; /* Slightly smaller */
+        color: rgba(150, 150, 150, 0.95); /* Darker gray */
         text-align: center;
         overflow: hidden;
-        text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 200px;
+        height: 14px;
+        max-width: 400px;
         margin: 0 auto;
         opacity: 0;
         transition: opacity 0.3s ease;
+        font-family: 'Arial Narrow', 'Franklin Gothic Medium', Arial, sans-serif;
+        letter-spacing: 0.5px;
       }
       
       .status-indicator.active {
         opacity: 1;
+      }
+      
+      /* Typewriter effect for status indicator */
+      .typewriter-text {
+        border-right: 2px solid rgba(150, 200, 255, 0.5);
+        white-space: nowrap;
+        overflow: hidden;
+        animation: typing 1.8s steps(40, end), blink-caret 0.75s step-end infinite;
+      }
+      
+      @keyframes typing {
+        from { width: 0 }
+        to { width: 100% }
+      }
+      
+      @keyframes blink-caret {
+        from, to { border-color: transparent }
+        50% { border-color: rgba(150, 200, 255, 0.5) }
       }
     `;
     document.head.appendChild(styleEl);
@@ -110,6 +137,18 @@ const LoadingIndicator = (() => {
    */
   const show = (container, loadingText = "", options = {}) => {
     initializeStyles();
+    
+    // If there's an existing loading bar in the route stats card, use that instead
+    // of creating a new one to avoid duplicates
+    if (document.querySelector('.route-stats-card') && 
+        document.querySelector('.route-stats-header') && 
+        document.querySelector('.fp-loading-container')) {
+      // Just update the status indicator
+      if (loadingText) {
+        updateStatusIndicator(loadingText);
+      }
+      return -1;
+    }
     
     // Make sure we have a DOM element
     const containerEl = typeof container === 'string' 
@@ -247,26 +286,123 @@ const LoadingIndicator = (() => {
     const statusIndicator = document.querySelector('.status-indicator');
     if (!statusIndicator) return false;
     
-    // Update the text
-    statusIndicator.textContent = text;
+    // Clear any existing content first
+    statusIndicator.innerHTML = '';
+    
+    // Create a new div with the typewriter class
+    const typewriterDiv = document.createElement('div');
+    typewriterDiv.className = 'typewriter-text';
+    typewriterDiv.textContent = text;
+    
+    // Add the new typewriter element
+    statusIndicator.appendChild(typewriterDiv);
+    
+    // Make the indicator visible
     statusIndicator.classList.add('active');
+    
+    // Show the loading bar
+    const loadingContainer = document.querySelector('.fp-loading-container');
+    if (loadingContainer) {
+      loadingContainer.style.display = 'block';
+    }
     
     return true;
   };
   
   /**
    * Clears the status indicator in the top card
+   * Waits for typewriter animation to complete before removing text
    */
   const clearStatusIndicator = () => {
     // Find the status indicator
     const statusIndicator = document.querySelector('.status-indicator');
     if (!statusIndicator) return false;
     
-    // Clear the text and hide
-    statusIndicator.classList.remove('active');
-    setTimeout(() => {
-      statusIndicator.textContent = '';
-    }, 300);
+    // Check if there's a typewriter text element
+    const typewriterDiv = statusIndicator.querySelector('.typewriter-text');
+    if (typewriterDiv) {
+      // Get text length to estimate animation duration
+      // Typing animation runs at 1.8s for the full text, so calculate actual time
+      const textLength = typewriterDiv.textContent.length;
+      // Assume 40 chars would take the full animation time
+      const remainingTime = Math.max(1800 * (textLength / 40), 800);
+      
+      // Keep the text visible for the estimated remaining time plus a little extra
+      setTimeout(() => {
+        // Then fade out
+        statusIndicator.classList.remove('active');
+        
+        // Also hide the loading bar
+        const loadingContainer = document.querySelector('.fp-loading-container');
+        if (loadingContainer) {
+          loadingContainer.style.display = 'none';
+        }
+        
+        // Clear the content after fade animation completes
+        setTimeout(() => {
+          statusIndicator.innerHTML = '';
+        }, 300);
+      }, remainingTime);
+    } else {
+      // No typewriter text, just fade out
+      statusIndicator.classList.remove('active');
+      
+      // Also hide the loading bar
+      const loadingContainer = document.querySelector('.fp-loading-container');
+      if (loadingContainer) {
+        loadingContainer.style.display = 'none';
+      }
+      
+      // Clear the content after fade animation completes
+      setTimeout(() => {
+        statusIndicator.innerHTML = '';
+      }, 300);
+    }
+    
+    return true;
+  };
+  
+  /**
+   * Initialize loading indicator in the RouteStatsCard
+   * Makes sure the loading bar appears at the bottom of the card header
+   * but remains hidden until needed
+   */
+  const initializeRouteStatsLoader = () => {
+    // Find route stats card
+    const statsCard = document.querySelector('.route-stats-card');
+    if (!statsCard) return false;
+    
+    // Find the header
+    const header = statsCard.querySelector('.route-stats-header');
+    if (!header) return false;
+    
+    // Make sure header has position relative
+    header.style.position = 'relative';
+    
+    // First, remove any existing loading containers and bars
+    const existingContainers = document.querySelectorAll('.fp-loading-container');
+    existingContainers.forEach(container => {
+      container.remove();
+    });
+    
+    // Create a single loading container at the bottom
+    const loadingContainer = document.createElement('div');
+    loadingContainer.className = 'fp-loading-container';
+    loadingContainer.style.width = '100%';
+    loadingContainer.style.position = 'absolute';
+    loadingContainer.style.bottom = '0';
+    loadingContainer.style.left = '0';
+    loadingContainer.style.height = '3px';
+    // Initially hidden until needed
+    loadingContainer.style.display = 'none';
+    
+    // Create the loading bar
+    const loadingBar = document.createElement('div');
+    loadingBar.className = 'fp-loading-bar';
+    loadingContainer.appendChild(loadingBar);
+    
+    // Add to header
+    header.appendChild(loadingContainer);
     
     return true;
   };
@@ -278,7 +414,8 @@ const LoadingIndicator = (() => {
     hide,
     hideAll,
     updateStatusIndicator,
-    clearStatusIndicator
+    clearStatusIndicator,
+    initializeRouteStatsLoader
   };
 })();
 

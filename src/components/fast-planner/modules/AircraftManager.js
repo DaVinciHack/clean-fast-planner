@@ -167,11 +167,10 @@ class AircraftManager {
       
       console.log(`%c===== LOADING ALL AIRCRAFT DATA FROM OSDK =====`, 'background: #00a; color: #fff; font-size: 16px; font-weight: bold;');
       
-      // Show loading overlay
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.textContent = 'Loading all aircraft data...';
-        loadingOverlay.style.display = 'block';
+      // Use LoadingIndicator to show loading status in the top card
+      // Instead of using the full-page overlay
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Loading all aircraft data...');
       }
       
       // Check if client exists
@@ -288,9 +287,9 @@ class AircraftManager {
           console.log(`Triggering onAircraftLoaded callback with ${this.aircraftList.length} aircraft`);
           this.triggerCallback('onAircraftLoaded', this.aircraftList);
           
-          // Hide loading overlay
-          if (loadingOverlay) {
-            loadingOverlay.style.display = 'none';
+          // Clear loading status
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.clearStatusIndicator();
           }
           
           // Return the final aircraft list
@@ -300,9 +299,9 @@ class AircraftManager {
           this.aircraftList = [];
           this.triggerCallback('onAircraftLoaded', []);
           
-          // Hide loading overlay
-          if (loadingOverlay) {
-            loadingOverlay.style.display = 'none';
+          // Clear loading status
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.clearStatusIndicator();
           }
           
           return [];
@@ -318,10 +317,12 @@ class AircraftManager {
       // Trigger error callback
       this.triggerCallback('onError', error);
       
-      // Hide loading overlay
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
+      // Clear loading status and show error
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Error loading aircraft data');
+        setTimeout(() => {
+          window.LoadingIndicator.clearStatusIndicator();
+        }, 3000);
       }
       
       // No mock data, just return empty list

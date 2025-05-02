@@ -926,8 +926,8 @@ const FastPlannerApp = () => {
 
   return (
     <div className="fast-planner-container">
-      {/* Loading Overlay */}
-      <div id="loading-overlay" className="loading-overlay">
+      {/* Loading Overlay - Only used for critical operations, not for aircraft loading */}
+      <div id="loading-overlay" className="loading-overlay" style={{ display: 'none' }}>
         <div className="loading-spinner"></div>
         <div className="loading-message">Loading...</div>
       </div>
