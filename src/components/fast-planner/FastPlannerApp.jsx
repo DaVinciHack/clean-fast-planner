@@ -277,10 +277,17 @@ const FastPlannerApp = () => {
       favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
       
       // Set up callback for when favorites change
-      favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
-        if (currentRegion) {
-          console.log(`Favorites changed, updating UI for region ${currentRegion.id}`);
-          setFavoriteLocations(favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id));
+      favoriteLocationsManagerRef.current.setCallback('onChange', (favoritesData) => {
+        console.log('Favorites change callback triggered:', favoritesData);
+        
+        // Check if data is for the current region
+        if (currentRegion && favoritesData.region === currentRegion.id) {
+          console.log(`Updating favorites for current region: ${currentRegion.id}`);
+          setFavoriteLocations(favoritesData.favorites);
+        } else if (currentRegion) {
+          console.log(`Favorites changed for region ${favoritesData.region}, but current region is ${currentRegion.id}`);
+        } else {
+          console.log('Current region not set yet, cannot update favorites');
         }
       });
     }
