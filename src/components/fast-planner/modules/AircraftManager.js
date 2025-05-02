@@ -884,13 +884,9 @@ class AircraftManager {
     console.log(`%c===== FILTERING AIRCRAFT =====`, 'background: #ff0; color: #000; font-size: 16px; font-weight: bold;');
     console.log(`Region: "${region}", Type: "${type}"`);
     
-    // Show filtering status in central loader
-    if (window.LoadingIndicator) {
-      const message = type ? 
-        `Filtering ${type} aircraft for ${region || 'all regions'}...` : 
-        `Filtering all aircraft for ${region || 'all regions'}...`;
-      window.LoadingIndicator.updateStatusIndicator(message);
-    }
+    // Log filtering operation
+    console.log(`Filtering aircraft for ${region || 'all regions'}${type ? `, type: ${type}` : ''}`);
+
     
     // STEP 1: First filter by region
     let filtered = [];
@@ -1067,24 +1063,25 @@ class AircraftManager {
   }
   
   /**
-   * Show filtering results using the central loading indicator
+   * Show filtering results in the console
    * @param {number} count - Number of aircraft after filtering
    * @param {string} region - Region filter applied
    * @param {string} type - Type filter applied
    */
   showFilteringResults(count, region, type) {
-    // Use the central loading indicator instead of a separate overlay
-    if (window.LoadingIndicator) {
-      const regionText = region ? this.formatRegionForOSDK(region) : 'All Regions';
-      const typeText = type ? type : 'All Types';
-      
-      // Display the filtering results in the central loader
-      window.LoadingIndicator.updateStatusIndicator(
-        `Aircraft Filtering Results: ${count} aircraft`
-      );
-      
-      // Show message in console for debugging
-      console.log(`Aircraft filtered: ${count} aircraft found for ${regionText}, ${typeText}`);
+    // Just log to console to avoid any issues
+    const regionText = region ? this.formatRegionForOSDK(region) : 'All Regions';
+    const typeText = type ? type : 'All Types';
+    
+    console.log(`Aircraft filtered: ${count} aircraft found for ${regionText}, ${typeText}`);
+    
+    // Only attempt to update the status indicator if it exists and is working properly
+    try {
+      if (window.LoadingIndicator && typeof window.LoadingIndicator.updateStatusIndicator === 'function') {
+        window.LoadingIndicator.updateStatusIndicator(`Found: ${count} aircraft`);
+      }
+    } catch (e) {
+      console.error('Error updating status indicator:', e);
     }
   }
   
