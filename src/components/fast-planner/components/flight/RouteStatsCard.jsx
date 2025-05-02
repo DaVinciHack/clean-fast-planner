@@ -161,6 +161,11 @@ const RouteStatsCard = ({
           )}
         </div>
         
+        {/* Add status indicator in the middle */}
+        <div className="status-indicator">
+          {/* Status text will be updated dynamically */}
+        </div>
+        
         {/* Auth status container - always show on the right */}
         <div className="auth-status-container">
           {/* Username display with script font */}

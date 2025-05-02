@@ -79,6 +79,23 @@ const LoadingIndicator = (() => {
           width: 30%;
         }
       }
+      
+      .status-indicator {
+        font-size: 11px;
+        color: rgba(150, 200, 255, 0.8);
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
+        margin: 0 auto;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      
+      .status-indicator.active {
+        opacity: 1;
+      }
     `;
     document.head.appendChild(styleEl);
   };
@@ -151,6 +168,9 @@ const LoadingIndicator = (() => {
       element: loadingContainer
     });
     
+    // Also update status indicator in the top card
+    updateStatusIndicator(loadingText);
+    
     return loaderId;
   };
   
@@ -174,6 +194,9 @@ const LoadingIndicator = (() => {
       loader.element.insertBefore(newTextEl, loader.element.firstChild);
     }
     
+    // Also update status indicator in the top card
+    updateStatusIndicator(newText);
+    
     return true;
   };
   
@@ -193,6 +216,13 @@ const LoadingIndicator = (() => {
     // Remove from tracking
     activeLoaders.delete(loaderId);
     
+    // Clear status indicator after a delay if no other loaders are active
+    if (activeLoaders.size === 0) {
+      setTimeout(() => {
+        clearStatusIndicator();
+      }, 1000);
+    }
+    
     return true;
   };
   
@@ -203,6 +233,42 @@ const LoadingIndicator = (() => {
     activeLoaders.forEach((loader, id) => {
       hide(id);
     });
+    
+    // Clear status indicator
+    clearStatusIndicator();
+  };
+  
+  /**
+   * Updates the status indicator in the top card
+   * @param {string} text - The text to display in the status indicator
+   */
+  const updateStatusIndicator = (text) => {
+    // Find the status indicator
+    const statusIndicator = document.querySelector('.status-indicator');
+    if (!statusIndicator) return false;
+    
+    // Update the text
+    statusIndicator.textContent = text;
+    statusIndicator.classList.add('active');
+    
+    return true;
+  };
+  
+  /**
+   * Clears the status indicator in the top card
+   */
+  const clearStatusIndicator = () => {
+    // Find the status indicator
+    const statusIndicator = document.querySelector('.status-indicator');
+    if (!statusIndicator) return false;
+    
+    // Clear the text and hide
+    statusIndicator.classList.remove('active');
+    setTimeout(() => {
+      statusIndicator.textContent = '';
+    }, 300);
+    
+    return true;
   };
   
   // Public API
@@ -210,7 +276,9 @@ const LoadingIndicator = (() => {
     show,
     updateText,
     hide,
-    hideAll
+    hideAll,
+    updateStatusIndicator,
+    clearStatusIndicator
   };
 })();
 

@@ -3,6 +3,7 @@
  * 
  * Handles loading, displaying, and interacting with platform/rig data
  */
+import LoadingIndicator from './LoadingIndicator';
 
 class PlatformManager {
   constructor(mapManager) {
@@ -47,6 +48,11 @@ class PlatformManager {
    * @returns {Promise} - Resolves when platforms are loaded
    */
   async loadPlatformsFromFoundry(client, regionName = "GULF OF MEXICO") {
+    // Show loading indicator
+    const loaderId = LoadingIndicator.show('.route-stats-title', 
+      `Loading platform data for ${regionName}...`, 
+      { position: 'bottom' });
+    
     // Only clear platforms if skipNextClear is false
     if (!this.skipNextClear) {
       // Clear any existing data first to ensure fresh load
@@ -65,6 +71,7 @@ class PlatformManager {
     }
     const map = this.mapManager.getMap();
     if (!map) {
+      LoadingIndicator.hide(loaderId);
       return Promise.reject(new Error('Map is not initialized'));
     }
     
@@ -72,6 +79,12 @@ class PlatformManager {
       // Check if we have a client - but don't reject the promise
       if (!client) {
         console.warn("No OSDK client provided - this may be expected on region changes");
+        
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, "No client available - reconnecting...");
+        setTimeout(() => {
+          LoadingIndicator.hide(loaderId);
+        }, 2000);
         
         // Return empty array instead of rejecting to prevent UI errors
         this.platforms = [];
@@ -109,6 +122,9 @@ class PlatformManager {
         // Query for platforms and locations without excessive logging
         console.log(`Querying for platforms and airports in ${regionName}`);
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Querying for platforms in ${regionName}...`);
+        
         // Fetch for this region, explicitly excluding reporting points
         const result = await client(locationObject)
           .where({ 
@@ -135,6 +151,10 @@ class PlatformManager {
           
           // Filter to include only active items (for all types)
           const originalCount = result.data.length;
+          
+          // Update loading indicator
+          LoadingIndicator.updateText(loaderId, `Filtering ${originalCount} locations...`);
+          
           result.data = result.data.filter(item => {
             // CRITICAL FILTER: Only include items with activeSite = "Active"
             if (item.activeSite !== "Active") {
@@ -404,6 +424,9 @@ class PlatformManager {
         const locations = [];
         const processedNames = new Set(); // Track processed items to avoid duplicates
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Processing ${result.data ? result.data.length : 0} locations...`);
+        
         // Debug counters
         let fixedPlatformCount = 0;
         let movablePlatformCount = 0;
@@ -629,15 +652,27 @@ class PlatformManager {
         // Simplified logging - just show summary
         console.log(`Processed ${locations.length} locations (${airportsCount} airports, ${fixedPlatformCount} fixed platforms, ${movablePlatformCount} movable platforms)`);
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Adding ${locations.length} locations to map...`);
+        
         // Add to map even if few or no locations found - this will at least show what we got
         
         // Check if we have at least some locations
         if (locations.length > 0) {
           console.log(`Adding ${locations.length} locations to map`);
           this.addPlatformsToMap(locations);
+          
+          // Hide loading indicator after adding to map (the map loading will show its own indicator)
+          LoadingIndicator.hide(loaderId);
           return locations;
         } else {
           console.warn("No valid locations found with coordinates");
+          
+          // Update loading indicator
+          LoadingIndicator.updateText(loaderId, "No locations found for this region");
+          setTimeout(() => {
+            LoadingIndicator.hide(loaderId);
+          }, 2000);
           
           // Create empty array to avoid errors in the UI
           this.platforms = [];
@@ -647,6 +682,12 @@ class PlatformManager {
         
       } catch (error) {
         console.error('OSDK API error:', error);
+        
+        // Update loading indicator with error
+        LoadingIndicator.updateText(loaderId, `Error loading platforms: ${error.message}`);
+        setTimeout(() => {
+          LoadingIndicator.hide(loaderId);
+        }, 3000);
         
         // Even on error, don't throw so the app won't crash
         console.warn("Error occurred, returning empty locations array");
@@ -658,6 +699,12 @@ class PlatformManager {
       }
     } catch (error) {
       console.error('General error in loadPlatformsFromFoundry:', error);
+      
+      // Update loading indicator with error
+      LoadingIndicator.updateText(loaderId, `Error: ${error.message}`);
+      setTimeout(() => {
+        LoadingIndicator.hide(loaderId);
+      }, 3000);
       
       // Create empty array to avoid errors in the UI
       this.platforms = [];

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { AircraftManager } from '../modules';
+import LoadingIndicator from '../modules/LoadingIndicator';
 
 // Create the context
 const AircraftContext = createContext(null);
@@ -194,27 +195,12 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
   // Load all aircraft when client is available - IMMEDIATELY
   useEffect(() => {
     if (aircraftManagerInstance && client) {
-      // Set loading state and show visual feedback
+      // Set loading state
       setAircraftLoading(true);
       console.log('AircraftContext: Client and manager available, loading aircraft');
       
-      // Create immediate visual feedback
-      const loadingMessage = document.createElement('div');
-      loadingMessage.style.position = 'fixed';
-      loadingMessage.style.top = '50%';
-      loadingMessage.style.left = '50%';
-      loadingMessage.style.transform = 'translate(-50%, -50%)';
-      loadingMessage.style.padding = '20px 25px';
-      loadingMessage.style.backgroundColor = 'rgba(0, 50, 100, 0.9)';
-      loadingMessage.style.color = 'white';
-      loadingMessage.style.borderRadius = '8px';
-      loadingMessage.style.zIndex = '10000';
-      loadingMessage.style.fontFamily = 'sans-serif';
-      loadingMessage.style.fontSize = '18px';
-      loadingMessage.style.fontWeight = 'bold';
-      loadingMessage.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-      loadingMessage.textContent = 'Loading aircraft data...';
-      document.body.appendChild(loadingMessage);
+      // Use the LoadingIndicator module for showing loading status
+      const loaderId = LoadingIndicator.show('.route-stats-title', 'Loading aircraft data...', { position: 'bottom' });
       
       // ALWAYS load aircraft data - don't use global flag
       // This is critical for the application to work correctly
@@ -229,15 +215,12 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           window.aircraftLoadedGlobally = true;
           console.log(`Successfully loaded ${aircraft.length} aircraft from OSDK`);
           
-          // Update the loading message
-          loadingMessage.textContent = `Loaded ${aircraft.length} aircraft successfully!`;
-          loadingMessage.style.backgroundColor = 'rgba(0, 100, 50, 0.9)';
+          // Update the loading indicator text
+          LoadingIndicator.updateText(loaderId, `Loaded ${aircraft.length} aircraft`);
           
-          // Remove the message after a short delay
+          // Hide the loader after a short delay
           setTimeout(() => {
-            if (loadingMessage.parentNode) {
-              loadingMessage.parentNode.removeChild(loadingMessage);
-            }
+            LoadingIndicator.hide(loaderId);
           }, 2000);
           
           // If we have a region, immediately filter to show aircraft in that region
@@ -312,15 +295,12 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         .catch(error => {
           console.error('Error loading aircraft from OSDK:', error);
           
-          // Update the loading message to show the error
-          loadingMessage.textContent = `Error loading aircraft: ${error.message}`;
-          loadingMessage.style.backgroundColor = 'rgba(200, 0, 0, 0.9)';
+          // Show error message with the loading indicator
+          LoadingIndicator.updateText(loaderId, `Error loading aircraft: ${error.message}`);
           
-          // Remove the message after a short delay
+          // Hide the loader after a short delay
           setTimeout(() => {
-            if (loadingMessage.parentNode) {
-              loadingMessage.parentNode.removeChild(loadingMessage);
-            }
+            LoadingIndicator.hide(loaderId);
           }, 3000);
           
           // End loading state
@@ -390,35 +370,18 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           }
         }, 50);
         
-        // Create a visual indicator for the user
-        const showMessage = (message) => {
-          const messageBox = document.createElement('div');
-          messageBox.style.position = 'fixed';
-          messageBox.style.bottom = '20px';
-          messageBox.style.right = '20px';
-          messageBox.style.backgroundColor = 'rgba(0, 50, 100, 0.9)';
-          messageBox.style.color = 'white';
-          messageBox.style.padding = '10px 15px';
-          messageBox.style.borderRadius = '5px';
-          messageBox.style.zIndex = '10000';
-          messageBox.style.fontFamily = 'sans-serif';
-          messageBox.style.fontSize = '14px';
-          messageBox.textContent = message;
-          document.body.appendChild(messageBox);
-          
-          // Auto-remove after 3 seconds
-          setTimeout(() => {
-            if (messageBox.parentNode) {
-              messageBox.parentNode.removeChild(messageBox);
-            }
-          }, 3000);
-        };
-        
-        // Show a message with aircraft counts
+        // Create a visual indicator for the user using LoadingIndicator
         const typesWithAircraft = Object.keys(allTypes).filter(t => allTypes[t].length > 0).length;
         const totalAircraft = Object.values(allTypes).flat().length;
         if (totalAircraft > 0) {
-          showMessage(`Loaded ${totalAircraft} aircraft in ${typesWithAircraft} types for ${currentRegion.name}`);
+          const loaderId = LoadingIndicator.show('.route-stats-title', 
+            `Found ${totalAircraft} aircraft in ${typesWithAircraft} types for ${currentRegion.name}`, 
+            { position: 'bottom' });
+          
+          // Hide the loader after a short delay
+          setTimeout(() => {
+            LoadingIndicator.hide(loaderId);
+          }, 2000);
         }
       } catch (error) {
         console.error('AircraftContext: Error filtering aircraft by region:', error);
@@ -724,36 +687,13 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
             }
           }
           
-          // Create a visual notification to confirm aircraft selection
-          const selectionPopup = document.createElement('div');
-          selectionPopup.style.position = 'fixed';
-          selectionPopup.style.top = '50%';
-          selectionPopup.style.left = '50%';
-          selectionPopup.style.transform = 'translate(-50%, -50%)';
-          selectionPopup.style.backgroundColor = 'rgba(0, 70, 130, 0.95)';
-          selectionPopup.style.color = 'white';
-          selectionPopup.style.padding = '15px 20px';
-          selectionPopup.style.borderRadius = '8px';
-          selectionPopup.style.zIndex = '10001';
-          selectionPopup.style.fontFamily = 'sans-serif';
-          selectionPopup.style.fontSize = '14px';
-          selectionPopup.style.fontWeight = 'bold';
-          selectionPopup.style.textAlign = 'center';
-          selectionPopup.innerHTML = `
-            Aircraft Selected!<br>
-            ${aircraft.registration.split(' (')[0]} (${aircraft.modelType})<br>
-            <div style="font-size:12px; margin-top:8px; font-weight:normal;">
-              Both dropdowns have been reset to their initial state.
-            </div>
-          `;
-          document.body.appendChild(selectionPopup);
+          // Use LoadingIndicator to show selection confirmation
+          const loaderId = LoadingIndicator.show('.route-stats-title', `Aircraft Selected: ${aircraft.registration.split(' (')[0]} (${aircraft.modelType})`, { position: 'bottom' });
           
-          // Remove after 5 seconds
+          // Hide the loader after showing the message for a moment
           setTimeout(() => {
-            if (selectionPopup.parentNode) {
-              selectionPopup.parentNode.removeChild(selectionPopup);
-            }
-          }, 5000);
+            LoadingIndicator.hide(loaderId);
+          }, 2000);
           
           // Create STRONG visual indicator that aircraft is selected but dropdowns are now reset
           const message = document.createElement('div');

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import RegionSelector from '../controls/RegionSelector';
 import FlightSettings from '../flight/FlightSettings';
 import '../../FastPlannerStyles.css';
+import LoadingIndicator from '../../modules/LoadingIndicator';
 
 /**
  * Right Panel Component
@@ -158,37 +159,14 @@ const RightPanel = ({
         if (!window.aircraftSelectionHelpShown) {
           window.aircraftSelectionHelpShown = true;
           
-          const helpMessage = document.createElement('div');
-          helpMessage.style.position = 'fixed';
-          helpMessage.style.top = '50%';
-          helpMessage.style.left = '50%';
-          helpMessage.style.transform = 'translate(-50%, -50%)';
-          helpMessage.style.padding = '15px 20px';
-          helpMessage.style.backgroundColor = 'rgba(0, 70, 130, 0.95)';
-          helpMessage.style.color = 'white';
-          helpMessage.style.borderRadius = '8px';
-          helpMessage.style.zIndex = '10001'; // Higher than normal
-          helpMessage.style.fontFamily = 'sans-serif';
-          helpMessage.style.fontSize = '14px';
-          helpMessage.style.fontWeight = 'bold';
-          helpMessage.style.maxWidth = '400px';
-          helpMessage.style.textAlign = 'center';
-          helpMessage.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
-          helpMessage.innerHTML = `
-            <div style="margin-bottom: 8px; font-size: 16px; color: #5dff8d">Aircraft Selected!</div>
-            <div>${selectedAircraft.registration.split(' (')[0]} (${selectedAircraft.modelType})</div>
-            <div style="margin-top: 12px; font-size: 13px; font-weight: normal;">
-              Both dropdowns have been reset to their initial state.<br>
-              You can now select any aircraft type.
-            </div>
-          `;
-          document.body.appendChild(helpMessage);
+          // Show loading indicator with aircraft selection message
+          const loaderId = LoadingIndicator.show('.route-stats-title', 
+            `Aircraft Selected: ${selectedAircraft.registration.split(' (')[0]} (${selectedAircraft.modelType})`, 
+            { position: 'bottom' });
           
-          // Remove after 5 seconds
+          // Hide after 5 seconds
           setTimeout(() => {
-            if (helpMessage.parentNode) {
-              helpMessage.parentNode.removeChild(helpMessage);
-            }
+            LoadingIndicator.hide(loaderId);
           }, 5000);
         }
         
@@ -235,27 +213,14 @@ const RightPanel = ({
       if (Object.keys(aircraftsByType || {}).length === 0) {
         console.log("No aircraft types found after mount - will wait for data to load");
         
-        // Create a notification
-        const notification = document.createElement('div');
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.left = '50%';
-        notification.style.transform = 'translateX(-50%)';
-        notification.style.padding = '10px 15px';
-        notification.style.backgroundColor = 'rgba(0, 70, 150, 0.9)';
-        notification.style.color = 'white';
-        notification.style.borderRadius = '5px';
-        notification.style.zIndex = '10000';
-        notification.style.fontFamily = 'sans-serif';
-        notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3)';
-        notification.textContent = 'Waiting for aircraft data to load...';
-        document.body.appendChild(notification);
+        // Use loading indicator instead of popup
+        const loaderId = LoadingIndicator.show('.route-stats-title', 
+          'Waiting for aircraft data to load...', 
+          { position: 'bottom' });
         
         // Remove after 4 seconds
         setTimeout(() => {
-          if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-          }
+          LoadingIndicator.hide(loaderId);
         }, 4000);
       }
     }
