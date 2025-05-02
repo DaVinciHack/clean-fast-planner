@@ -20,7 +20,8 @@ import {
   RegionManager, 
   FavoriteLocationsManager, 
   AircraftManager,
-  MapInteractionHandler
+  MapInteractionHandler,
+  AppSettingsManager
 } from './modules';
 import FlightCalculations from './modules/calculations/FlightCalculations';
 
@@ -43,6 +44,7 @@ const FastPlannerApp = () => {
   const aircraftManagerRef = useRef(null); 
   const flightCalculationsRef = useRef(null);
   const mapInteractionHandlerRef = useRef(null);
+  const appSettingsManagerRef = useRef(null);
   
   // UI state
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -93,6 +95,67 @@ const FastPlannerApp = () => {
   const [taxiFuel, setTaxiFuel] = useState(50);
   const [contingencyFuelPercent, setContingencyFuelPercent] = useState(10);
   const [reserveMethod, setReserveMethod] = useState('fixed');
+  
+  // Helper function to update flight settings
+  const updateFlightSetting = (settingName, value) => {
+    // Update the individual setting state
+    switch (settingName) {
+      case 'passengerWeight':
+        setPassengerWeight(value);
+        break;
+      case 'deckTimePerStop':
+        setDeckTimePerStop(value);
+        break;
+      case 'deckFuelFlow':
+        setDeckFuelFlow(value);
+        break;
+      case 'deckFuelPerStop':
+        setDeckFuelPerStop(value);
+        break;
+      case 'taxiFuel':
+        setTaxiFuel(value);
+        break;
+      case 'contingencyFuelPercent':
+        setContingencyFuelPercent(value);
+        break;
+      case 'cargoWeight':
+        setCargoWeight(value);
+        break;
+      case 'reserveMethod':
+        setReserveMethod(value);
+        break;
+      default:
+        console.warn(`Unknown flight setting: ${settingName}`);
+    }
+    
+    // Update the flightSettings object
+    const updatedSettings = {
+      ...flightSettings,
+      [settingName]: value
+    };
+    setFlightSettings(updatedSettings);
+    
+    // Update Flight Calculations module
+    if (flightCalculationsRef.current) {
+      flightCalculationsRef.current.updateConfig(updatedSettings);
+    }
+    
+    // Save to AppSettingsManager
+    if (appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateFlightSettings({
+        [settingName]: value
+      });
+    }
+    
+    // Recalculate route if we have an aircraft and waypoints
+    if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
+      routeCalculatorRef.current.calculateRoute(
+        waypointManagerRef.current.getWaypoints(),
+        selectedAircraft,
+        updatedSettings
+      );
+    }
+  };
 
   // Initialize managers
   useEffect(() => {
@@ -189,6 +252,14 @@ const FastPlannerApp = () => {
     if (!favoriteLocationsManagerRef.current) {
       console.log("FastPlannerApp: Creating FavoriteLocationsManager instance");
       favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
+      
+      // Set up callback for when favorites change
+      favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
+        if (currentRegion) {
+          console.log(`Favorites changed, updating UI for region ${currentRegion.id}`);
+          setFavoriteLocations(favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id));
+        }
+      });
     }
     
     if (!aircraftManagerRef.current) {
@@ -252,6 +323,75 @@ const FastPlannerApp = () => {
         deckTimePerStop,
         deckFuelFlow,
       });
+    }
+    
+    // Initialize the AppSettingsManager 
+    if (!appSettingsManagerRef.current) {
+      console.log("FastPlannerApp: Creating AppSettingsManager instance");
+      appSettingsManagerRef.current = new AppSettingsManager();
+      
+      // Set callbacks for settings changes
+      appSettingsManagerRef.current.setCallback('onRegionChange', (regionId) => {
+        console.log(`AppSettingsManager: Region changed to ${regionId}`);
+        // We don't automatically change the region here to avoid infinite loops
+        // The region is changed via the changeRegion function which also updates the setting
+      });
+      
+      appSettingsManagerRef.current.setCallback('onAircraftChange', (aircraft) => {
+        console.log(`AppSettingsManager: Aircraft changed to ${aircraft.type} ${aircraft.registration}`);
+        // Update aircraft selection if it doesn't match current selection
+        if (aircraft.type !== aircraftType) {
+          setAircraftType(aircraft.type);
+        }
+        if (aircraft.registration !== aircraftRegistration) {
+          setAircraftRegistration(aircraft.registration);
+        }
+      });
+      
+      appSettingsManagerRef.current.setCallback('onFlightSettingsChange', (settings) => {
+        console.log('AppSettingsManager: Flight settings changed');
+        setFlightSettings(settings);
+        
+        // Update individual settings
+        setPassengerWeight(settings.passengerWeight);
+        setContingencyFuelPercent(settings.contingencyFuelPercent);
+        setTaxiFuel(settings.taxiFuel);
+        setReserveFuel(settings.reserveFuel);
+        setDeckTimePerStop(settings.deckTimePerStop);
+        setDeckFuelFlow(settings.deckFuelFlow);
+      });
+      
+      appSettingsManagerRef.current.setCallback('onUISettingsChange', (uiSettings) => {
+        console.log('AppSettingsManager: UI settings changed');
+        // Update UI visibility settings
+        if (leftPanelVisible !== uiSettings.leftPanelVisible) {
+          setLeftPanelVisible(uiSettings.leftPanelVisible);
+        }
+        if (rightPanelVisible !== uiSettings.rightPanelVisible) {
+          setRightPanelVisible(uiSettings.rightPanelVisible);
+        }
+        if (platformsVisible !== uiSettings.platformsVisible) {
+          setPlatformsVisible(uiSettings.platformsVisible);
+        }
+      });
+      
+      // Load any saved settings
+      const savedSettings = appSettingsManagerRef.current.getAllSettings();
+      
+      // Apply flight settings
+      const flightSettings = savedSettings.flightSettings;
+      setPassengerWeight(flightSettings.passengerWeight);
+      setContingencyFuelPercent(flightSettings.contingencyFuelPercent);
+      setTaxiFuel(flightSettings.taxiFuel);
+      setReserveFuel(flightSettings.reserveFuel);
+      setDeckTimePerStop(flightSettings.deckTimePerStop);
+      setDeckFuelFlow(flightSettings.deckFuelFlow);
+      
+      // Apply UI settings
+      const uiSettings = savedSettings.uiSettings;
+      setLeftPanelVisible(uiSettings.leftPanelVisible);
+      setRightPanelVisible(uiSettings.rightPanelVisible);
+      setPlatformsVisible(uiSettings.platformsVisible);
     }
     
     // Create the map interaction handler last, after other managers are initialized
@@ -331,8 +471,12 @@ const FastPlannerApp = () => {
       // Get available regions
       setRegions(regionManagerRef.current.getRegions());
       
-      // Initialize with a default region
-      regionManagerRef.current.initialize('gulf-of-mexico');
+      // Get the initial region from settings if available
+      const initialRegion = appSettingsManagerRef.current ? 
+        appSettingsManagerRef.current.getRegion() : 'gulf-of-mexico';
+      
+      console.log(`Initializing with region: ${initialRegion}`);
+      regionManagerRef.current.initialize(initialRegion);
     }
     
     // Initialize the map interaction handler
@@ -373,11 +517,27 @@ const FastPlannerApp = () => {
   
   // Panel visibility handlers
   const toggleLeftPanel = () => {
-    setLeftPanelVisible(!leftPanelVisible);
+    const newState = !leftPanelVisible;
+    setLeftPanelVisible(newState);
+    
+    // Save to settings
+    if (appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        leftPanelVisible: newState
+      });
+    }
   };
   
   const toggleRightPanel = () => {
-    setRightPanelVisible(!rightPanelVisible);
+    const newState = !rightPanelVisible;
+    setRightPanelVisible(newState);
+    
+    // Save to settings
+    if (appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        rightPanelVisible: newState
+      });
+    }
   };
   
   // Route input handler
@@ -513,9 +673,12 @@ const FastPlannerApp = () => {
   };
   
   const handleAddFavoriteLocation = (location) => {
-    if (favoriteLocationsManagerRef.current) {
-      favoriteLocationsManagerRef.current.addFavoriteLocation(location);
-      setFavoriteLocations([...favoriteLocationsManagerRef.current.getFavoriteLocations()]);
+    if (favoriteLocationsManagerRef.current && currentRegion) {
+      console.log(`Adding favorite location to region ${currentRegion.id}:`, location);
+      favoriteLocationsManagerRef.current.addFavoriteLocation(currentRegion.id, location);
+      setFavoriteLocations(favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id));
+    } else {
+      console.error('Cannot add favorite: No favorite locations manager or current region');
     }
   };
   
@@ -546,17 +709,29 @@ const FastPlannerApp = () => {
     }
   };
   
-  const handleRemoveFavoriteLocation = (index) => {
-    if (favoriteLocationsManagerRef.current) {
-      favoriteLocationsManagerRef.current.removeFavoriteLocation(index);
-      setFavoriteLocations([...favoriteLocationsManagerRef.current.getFavoriteLocations()]);
+  const handleRemoveFavoriteLocation = (locationId) => {
+    if (favoriteLocationsManagerRef.current && currentRegion) {
+      console.log(`Removing favorite location with ID ${locationId} from region ${currentRegion.id}`);
+      favoriteLocationsManagerRef.current.removeFavoriteLocation(currentRegion.id, locationId);
+      setFavoriteLocations(favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id));
+    } else {
+      console.error('Cannot remove favorite: No favorite locations manager or current region');
     }
   };
   
   const togglePlatformsVisibility = () => {
-    setPlatformsVisible(!platformsVisible);
+    const newState = !platformsVisible;
+    setPlatformsVisible(newState);
+    
     if (platformManagerRef.current) {
-      platformManagerRef.current.toggleVisibility(!platformsVisible);
+      platformManagerRef.current.toggleVisibility(newState);
+    }
+    
+    // Save to settings
+    if (appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        platformsVisible: newState
+      });
     }
   };
   
@@ -594,6 +769,18 @@ const FastPlannerApp = () => {
       
       // Set the new region
       regionManagerRef.current.setRegion(regionId);
+      
+      // Load favorite locations for the new region
+      if (favoriteLocationsManagerRef.current) {
+        console.log(`Loading favorite locations for region: ${regionId}`);
+        const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
+        setFavoriteLocations(regionFavorites);
+      }
+      
+      // Save to settings
+      if (appSettingsManagerRef.current) {
+        appSettingsManagerRef.current.setRegion(regionId);
+      }
     }
   };
   
@@ -601,6 +788,11 @@ const FastPlannerApp = () => {
     setAircraftType(type);
     setAircraftRegistration('');  // Clear registration when type changes
     setSelectedAircraft(null);    // Clear selected aircraft
+    
+    // Save to settings
+    if (appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.setAircraft(type, '');
+    }
     
     if (aircraftManagerRef.current && currentRegion) {
       setAircraftLoading(true);
@@ -615,6 +807,11 @@ const FastPlannerApp = () => {
     if (aircraftsByType[aircraftType]) {
       const aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
       setSelectedAircraft(aircraft);
+      
+      // Save to settings
+      if (appSettingsManagerRef.current) {
+        appSettingsManagerRef.current.setAircraft(aircraftType, registration);
+      }
       
       // Recalculate route if we have waypoints
       if (aircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
@@ -776,14 +973,14 @@ const FastPlannerApp = () => {
         taxiFuel={taxiFuel}
         contingencyFuelPercent={contingencyFuelPercent}
         reserveMethod={reserveMethod}
-        onDeckTimeChange={setDeckTimePerStop}
-        onDeckFuelChange={setDeckFuelPerStop}
-        onDeckFuelFlowChange={setDeckFuelFlow}
-        onPassengerWeightChange={setPassengerWeight}
-        onCargoWeightChange={setCargoWeight}
-        onTaxiFuelChange={setTaxiFuel}
-        onContingencyFuelPercentChange={setContingencyFuelPercent}
-        onReserveMethodChange={setReserveMethod}
+        onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}
+        onDeckFuelChange={(value) => updateFlightSetting('deckFuelPerStop', value)}
+        onDeckFuelFlowChange={(value) => updateFlightSetting('deckFuelFlow', value)}
+        onPassengerWeightChange={(value) => updateFlightSetting('passengerWeight', value)}
+        onCargoWeightChange={(value) => updateFlightSetting('cargoWeight', value)}
+        onTaxiFuelChange={(value) => updateFlightSetting('taxiFuel', value)}
+        onContingencyFuelPercentChange={(value) => updateFlightSetting('contingencyFuelPercent', value)}
+        onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
         forceUpdate={forceUpdate}
         // Additional props
         payloadWeight={payloadWeight}

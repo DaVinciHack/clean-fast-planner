@@ -6,6 +6,8 @@ import RegionManager from './RegionManager';
 import FavoriteLocationsManager from './FavoriteLocationsManager';
 import AircraftManager from './AircraftManager';
 import FlightCalculations from './calculations/FlightCalculations';
+import MapInteractionHandler from './MapInteractionHandler';
+import AppSettingsManager from './AppSettingsManager';
 
 export {
   MapManager,
@@ -15,5 +17,7 @@ export {
   RegionManager,
   FavoriteLocationsManager,
   AircraftManager,
-  FlightCalculations
+  FlightCalculations,
+  MapInteractionHandler,
+  AppSettingsManager
 };
