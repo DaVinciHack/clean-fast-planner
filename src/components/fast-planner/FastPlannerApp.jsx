@@ -201,6 +201,21 @@ const FastPlannerApp = () => {
       }, 500);
     }
     
+    // Create favoriteLocationsManager first so it's available to other components
+    if (!favoriteLocationsManagerRef.current) {
+      console.log("FastPlannerApp: Creating FavoriteLocationsManager instance");
+      favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
+      
+      // Set up callback for when favorites change
+      favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
+        if (currentRegion) {
+          console.log(`Favorites changed, updating UI for region ${currentRegion.id}`);
+          const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
+          setFavoriteLocations(regionFavorites);
+        }
+      });
+    }
+    
     // 2. Create platform manager before region manager
     if (!platformManagerRef.current && mapManagerRef.current) {
       console.log("FastPlannerApp: Creating PlatformManager instance");
@@ -208,7 +223,7 @@ const FastPlannerApp = () => {
     }
     
     // 3. Create region manager after platform manager
-    if (!regionManagerRef.current && mapManagerRef.current) {
+    if (!regionManagerRef.current && mapManagerRef.current && platformManagerRef.current) {
       console.log("FastPlannerApp: Creating RegionManager instance");
       regionManagerRef.current = new RegionManager(mapManagerRef.current, platformManagerRef.current);
       
@@ -221,6 +236,14 @@ const FastPlannerApp = () => {
       regionManagerRef.current.setCallback('onRegionChanged', (region) => {
         console.log(`Region changed to: ${region.name}`);
         setCurrentRegion(region);
+        
+        // IMPORTANT: Load favorites for this region
+        if (favoriteLocationsManagerRef.current && region) {
+          console.log(`Loading favorites for region ${region.id}`);
+          const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(region.id);
+          console.log(`Found ${regionFavorites.length} favorites for region ${region.id}:`, regionFavorites);
+          setFavoriteLocations(regionFavorites);
+        }
       });
       
       regionManagerRef.current.setCallback('onError', (error) => {
@@ -540,7 +563,6 @@ const FastPlannerApp = () => {
     }
   };
   
-  // Route input handler
   const handleRouteInputChange = (value) => {
     setRouteInput(value);
   };
@@ -557,6 +579,12 @@ const FastPlannerApp = () => {
         // Direct coordinates array: [lng, lat]
         coords = waypointData;
         name = null;
+      } else if (typeof waypointData === 'string') {
+        // It's just a name - try to find a location with that name
+        // This is used when adding a waypoint by typing the name in the input field
+        console.log(`Looking for location with name: ${waypointData}`);
+        coords = null;
+        name = waypointData;
       } else if (waypointData && typeof waypointData === 'object') {
         // Check if we have a nearest rig within range
         if (waypointData.nearestRig && waypointData.nearestRig.distance <= 2) {
@@ -577,7 +605,7 @@ const FastPlannerApp = () => {
           
           name = waypointData.nearestRig.name;
         }
-        // If we don't have a nearest rig from above, check other formats
+        // Check if coordinates property exists (from favorites or other sources)
         else if (waypointData.coordinates) {
           coords = waypointData.coordinates;
           name = waypointData.name;
@@ -592,6 +620,12 @@ const FastPlannerApp = () => {
       } else {
         console.error('Invalid waypoint data:', waypointData);
         return;
+      }
+      
+      // If we only have a name, try to look up coordinates (this could be enhanced)
+      if (!coords && name) {
+        // TODO: Implement location search by name
+        console.log(`We need to search for location with name: ${name}`);
       }
       
       if (!coords || !Array.isArray(coords) || coords.length !== 2) {
