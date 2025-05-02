@@ -139,8 +139,14 @@ const LoadingIndicator = (() => {
   const processNextMessage = () => {
     if (isProcessingQueue || messageQueue.length === 0) return;
     
+    // Set processing flag
     isProcessingQueue = true;
+    
+    // Get the next message and remove duplicates in the queue
     currentMessage = messageQueue.shift();
+    
+    // Remove any duplicate messages from the queue
+    messageQueue = messageQueue.filter(msg => msg !== currentMessage);
     
     // Update the status indicator with the current message
     updateStatusIndicatorInternal(currentMessage);
@@ -329,8 +335,20 @@ const LoadingIndicator = (() => {
   const queueMessage = (text) => {
     if (!text) return;
     
-    // Add message to queue
-    messageQueue.push(text);
+    // Don't add duplicate of current message
+    if (currentMessage === text) {
+      return;
+    }
+    
+    // Don't add if already in queue
+    if (messageQueue.includes(text)) {
+      return;
+    }
+    
+    // Add message to queue (limit queue size to prevent memory issues)
+    if (messageQueue.length < 10) {
+      messageQueue.push(text);
+    }
     
     // Start processing if not already running
     if (!isProcessingQueue) {

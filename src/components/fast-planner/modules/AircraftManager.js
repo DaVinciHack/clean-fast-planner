@@ -884,6 +884,14 @@ class AircraftManager {
     console.log(`%c===== FILTERING AIRCRAFT =====`, 'background: #ff0; color: #000; font-size: 16px; font-weight: bold;');
     console.log(`Region: "${region}", Type: "${type}"`);
     
+    // Show filtering status in central loader
+    if (window.LoadingIndicator) {
+      const message = type ? 
+        `Filtering ${type} aircraft for ${region || 'all regions'}...` : 
+        `Filtering all aircraft for ${region || 'all regions'}...`;
+      window.LoadingIndicator.updateStatusIndicator(message);
+    }
+    
     // STEP 1: First filter by region
     let filtered = [];
     let formattedRegion = null;
@@ -1059,52 +1067,25 @@ class AircraftManager {
   }
   
   /**
-   * Show filtering results in a temporary overlay for debugging
+   * Show filtering results using the central loading indicator
    * @param {number} count - Number of aircraft after filtering
    * @param {string} region - Region filter applied
    * @param {string} type - Type filter applied
    */
   showFilteringResults(count, region, type) {
-    // Get or create an overlay element
-    let overlay = document.getElementById('debug-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'debug-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.top = '10px';
-      overlay.style.right = '10px';
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.8)';
-      overlay.style.color = 'white';
-      overlay.style.padding = '10px';
-      overlay.style.borderRadius = '5px';
-      overlay.style.zIndex = '9999';
-      overlay.style.fontSize = '14px';
-      overlay.style.fontFamily = 'monospace';
-      overlay.style.maxWidth = '400px';
-      overlay.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-      document.body.appendChild(overlay);
+    // Use the central loading indicator instead of a separate overlay
+    if (window.LoadingIndicator) {
+      const regionText = region ? this.formatRegionForOSDK(region) : 'All Regions';
+      const typeText = type ? type : 'All Types';
+      
+      // Display the filtering results in the central loader
+      window.LoadingIndicator.updateStatusIndicator(
+        `Aircraft Filtering Results: ${count} aircraft`
+      );
+      
+      // Show message in console for debugging
+      console.log(`Aircraft filtered: ${count} aircraft found for ${regionText}, ${typeText}`);
     }
-    
-    // Create the message
-    const regionText = region ? `Region: ${this.formatRegionForOSDK(region)}` : 'All Regions';
-    const typeText = type ? `Type: ${type}` : 'All Types';
-    
-    overlay.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 5px;">Aircraft Filtering Results:</div>
-      <div>${regionText}</div>
-      <div>${typeText}</div>
-      <div style="margin-top: 5px; font-weight: bold; color: ${count > 0 ? '#4CAF50' : '#F44336'}">
-        Found: ${count} aircraft
-      </div>
-      <div style="font-size: 12px; margin-top: 10px;">This message will disappear in 5 seconds</div>
-    `;
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      if (overlay && overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
-    }, 5000);
   }
   
   /**
