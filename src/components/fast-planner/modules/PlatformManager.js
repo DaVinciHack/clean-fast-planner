@@ -1122,10 +1122,13 @@ class PlatformManager {
    * @returns {Object|null} - The nearest platform or null if not found
    */
   findNearestPlatform(lat, lng, maxDistance = 5) {
-    if (!this.platforms || this.platforms.length === 0) return null;
+    if (!this.platforms || this.platforms.length === 0) {
+      console.log('PlatformManager: No platforms loaded, cannot find nearest platform');
+      return null;
+    }
     
     if (!window.turf) {
-      console.error('Turf.js not loaded');
+      console.error('PlatformManager: Turf.js not loaded');
       return null;
     }
     
@@ -1134,6 +1137,11 @@ class PlatformManager {
       let minDistance = Number.MAX_VALUE;
       
       this.platforms.forEach(platform => {
+        // Skip if platform has no coordinates
+        if (!platform.coordinates || platform.coordinates.length !== 2) {
+          return;
+        }
+        
         const coords = platform.coordinates;
         const distance = window.turf.distance(
           window.turf.point([lng, lat]),
@@ -1146,7 +1154,9 @@ class PlatformManager {
           nearestPlatform = {
             name: platform.name,
             operator: platform.operator,
+            // Include both formats for better compatibility
             coords: coords,
+            coordinates: coords,
             lat: coords[1],
             lng: coords[0],
             distance: distance
@@ -1156,10 +1166,13 @@ class PlatformManager {
       
       // Only return if within reasonable distance
       if (minDistance <= maxDistance) {
+        console.log(`PlatformManager: Found nearest platform ${nearestPlatform.name} at distance ${nearestPlatform.distance.toFixed(2)} nm`);
         return nearestPlatform;
+      } else if (nearestPlatform) {
+        console.log(`PlatformManager: Nearest platform ${nearestPlatform.name} is too far (${nearestPlatform.distance.toFixed(2)} nm > ${maxDistance} nm)`);
       }
     } catch (error) {
-      console.error('Error finding nearest platform:', error);
+      console.error('PlatformManager: Error finding nearest platform:', error);
     }
     
     return null;

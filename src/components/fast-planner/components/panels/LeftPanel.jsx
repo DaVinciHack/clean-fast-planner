@@ -16,7 +16,8 @@ const LeftPanel = ({
   onRouteInputChange,
   favoriteLocations, // Receive favorite locations
   onAddFavoriteLocation, // Receive add favorite function
-  onRemoveFavoriteLocation // Receive remove favorite function
+  onRemoveFavoriteLocation, // Receive remove favorite function
+  onReorderWaypoints // Receive reorder waypoints function
 }) => {
   // Keep track of recently added waypoint IDs for highlighting
   const [recentWaypoints, setRecentWaypoints] = useState({});
@@ -145,14 +146,39 @@ const LeftPanel = ({
       // Find source index
       const sourceIndex = waypoints.findIndex(wp => wp.id === draggedId);
       
-      // Call parent handler with reordering info
-      const updatedWaypoints = [...waypoints];
-      const [movedWaypoint] = updatedWaypoints.splice(sourceIndex, 1);
-      updatedWaypoints.splice(targetIndex, 0, movedWaypoint);
+      console.log(`LeftPanel: Reordering waypoint from index ${sourceIndex} to ${targetIndex}`);
       
-      // Update parent component with new order
-      if (onWaypointNameChange) {
-        onWaypointNameChange(draggedId, movedWaypoint.name, updatedWaypoints);
+      // In our waypoint manager, we need source and target waypoint IDs, not just indices
+      const sourceId = draggedId;
+      const targetId = waypoints[targetIndex]?.id;
+      
+      // If the parent component provided a reorder function, call it
+      if (onReorderWaypoints && sourceId && targetId) {
+        console.log(`LeftPanel: Calling onReorderWaypoints with sourceId=${sourceId}, targetId=${targetId}`);
+        onReorderWaypoints(sourceId, targetId);
+      } else {
+        console.log(`LeftPanel: Missing onReorderWaypoints function or invalid IDs`);
+        
+        // Fallback: try to simulate reordering by removing and adding at new index
+        if (onRemoveWaypoint && onAddWaypoint && sourceIndex !== -1) {
+          // Get the waypoint's data before removing
+          const movedWaypoint = waypoints[sourceIndex];
+          
+          // Remove from original position
+          onRemoveWaypoint(sourceId, sourceIndex);
+          
+          // If we have the coordinates, add it at the new position
+          // Note: This is a fallback that won't work well with multiple users
+          if (movedWaypoint && movedWaypoint.coords) {
+            setTimeout(() => {
+              // Add at new position - not ideal as it creates a new waypoint
+              onAddWaypoint({
+                coordinates: movedWaypoint.coords,
+                name: movedWaypoint.name
+              });
+            }, 10);
+          }
+        }
       }
     }
   };
@@ -252,6 +278,7 @@ const LeftPanel = ({
                   className="remove-stop" 
                   onClick={() => {
                     if (onRemoveWaypoint) {
+                      console.log(`LeftPanel: Removing waypoint at index ${index} with ID ${waypoint.id}`);
                       onRemoveWaypoint(waypoint.id, index);
                     }
                   }}
