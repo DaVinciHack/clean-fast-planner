@@ -31,6 +31,7 @@ const LoadingIndicator = (() => {
         background-color: transparent; /* Transparent background for the track */
         bottom: 0;
         left: 0;
+        transition: opacity 0.5s ease;
       }
       
       .fp-loading-text {
@@ -69,6 +70,11 @@ const LoadingIndicator = (() => {
         border-radius: 1px;
       }
       
+      /* When finishing, run animation to completion */
+      .fp-loading-bar.finishing {
+        animation: fp-complete-scroll 1s forwards cubic-bezier(0.215, 0.61, 0.355, 1);
+      }
+      
       @keyframes fp-elastic-scroll {
         0% {
           left: -30%;
@@ -82,6 +88,18 @@ const LoadingIndicator = (() => {
         }
         75% {
           width: 27%;
+        }
+        100% {
+          left: 100%;
+          width: 30%;
+        }
+      }
+      
+      /* Animation for completion - always reaches the end */
+      @keyframes fp-complete-scroll {
+        0% {
+          left: attr(data-current-position);
+          width: 30%;
         }
         100% {
           left: 100%;
@@ -324,6 +342,15 @@ const LoadingIndicator = (() => {
       hide(id);
     });
     
+    // Clean up any intervals
+    const loadingBars = document.querySelectorAll('.fp-loading-bar');
+    loadingBars.forEach(bar => {
+      const intervalId = bar.getAttribute('data-interval-id');
+      if (intervalId) {
+        clearInterval(parseInt(intervalId, 10));
+      }
+    });
+    
     // Clear message queue and status indicator
     messageQueue.length = 0;
     clearTimeout(messageTimer);
@@ -453,34 +480,84 @@ const LoadingIndicator = (() => {
       // Assume 40 chars would take the full animation time
       const remainingTime = Math.max(1800 * (textLength / 40), 800);
       
+      // Add ellipses to show completion
+      const originalText = typewriterDiv.textContent;
+      setTimeout(() => {
+        if (typewriterDiv.parentNode) {
+          typewriterDiv.textContent = originalText + "...";
+        }
+      }, remainingTime / 2);
+      
       // Keep the text visible for the estimated remaining time plus a little extra
       setTimeout(() => {
         // Then fade out
         statusIndicator.classList.remove('active');
         
-        // Hide the loading bar after fade completes
-        setTimeout(() => {
-          const loadingContainer = document.querySelector('.fp-loading-container');
-          if (loadingContainer) {
+        // Make sure the loading bar completes its animation
+        const loadingContainer = document.querySelector('.fp-loading-container');
+        if (loadingContainer) {
+          // Get the loading bar element
+          const loadingBar = loadingContainer.querySelector('.fp-loading-bar');
+          if (loadingBar) {
+            // Add a class to make it complete its animation
+            loadingBar.classList.add('finishing');
+            
+            // Wait for animation to complete before hiding
+            setTimeout(() => {
+              loadingContainer.style.opacity = '0';
+              
+              // Finally remove after fade out
+              setTimeout(() => {
+                loadingContainer.style.display = 'none';
+                loadingContainer.style.opacity = '1';
+                if (loadingBar) {
+                  loadingBar.classList.remove('finishing');
+                }
+              }, 500);
+            }, 1000);
+          } else {
             loadingContainer.style.display = 'none';
           }
-          
-          // Clear the content after fade animation completes
+        }
+        
+        // Clear the content after fade animation completes
+        setTimeout(() => {
           statusIndicator.innerHTML = '';
         }, 300);
-      }, remainingTime);
+      }, remainingTime + 1000); // Added extra time for the ellipses
     } else {
       // No typewriter text, just fade out
       statusIndicator.classList.remove('active');
       
-      // Hide the loading bar after fade completes
-      setTimeout(() => {
-        const loadingContainer = document.querySelector('.fp-loading-container');
-        if (loadingContainer) {
+      // Make sure the loading bar completes its animation
+      const loadingContainer = document.querySelector('.fp-loading-container');
+      if (loadingContainer) {
+        // Get the loading bar element
+        const loadingBar = loadingContainer.querySelector('.fp-loading-bar');
+        if (loadingBar) {
+          // Add a class to make it complete its animation
+          loadingBar.classList.add('finishing');
+          
+          // Wait for animation to complete before hiding
+          setTimeout(() => {
+            loadingContainer.style.opacity = '0';
+            
+            // Finally remove after fade out
+            setTimeout(() => {
+              loadingContainer.style.display = 'none';
+              loadingContainer.style.opacity = '1';
+              if (loadingBar) {
+                loadingBar.classList.remove('finishing');
+              }
+            }, 500);
+          }, 1000);
+        } else {
           loadingContainer.style.display = 'none';
         }
-        
-        // Clear the content after fade animation completes
+      }
+      
+      // Clear the content after fade animation completes
+      setTimeout(() => {
         statusIndicator.innerHTML = '';
       }, 300);
     }
@@ -525,6 +602,28 @@ const LoadingIndicator = (() => {
     // Create the loading bar
     const loadingBar = document.createElement('div');
     loadingBar.className = 'fp-loading-bar';
+    
+    // Add the data-current-position attribute for the completion animation
+    loadingBar.setAttribute('data-current-position', '-30%');
+    
+    // Track animation progress for smooth completion
+    const updatePosition = () => {
+      if (!loadingBar || !loadingBar.parentNode) return;
+      
+      // Get computed style to determine current position
+      const computedStyle = window.getComputedStyle(loadingBar);
+      const leftPos = computedStyle.getPropertyValue('left');
+      
+      // Update the data attribute (for use when finishing animation)
+      loadingBar.setAttribute('data-current-position', leftPos);
+    };
+    
+    // Start position tracking
+    const positionInterval = setInterval(updatePosition, 100);
+    
+    // Store interval ID for cleanup
+    loadingBar.setAttribute('data-interval-id', positionInterval);
+    
     loadingContainer.appendChild(loadingBar);
     
     // Add to header
