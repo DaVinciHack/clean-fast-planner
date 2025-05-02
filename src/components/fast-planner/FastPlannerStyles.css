@@ -832,7 +832,7 @@
 .route-stats-card {
   position: absolute;
   top: 10px;
-  left: 50%;
+  left: calc(50% - 14px); /* Offset to the left by half of the side menu width (28px) */
   transform: translateX(-50%);
   z-index: 12;
   background: linear-gradient(to bottom, 
