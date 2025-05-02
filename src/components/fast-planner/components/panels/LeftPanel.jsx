@@ -27,6 +27,20 @@ const LeftPanel = ({
   const [recentFavorites, setRecentFavorites] = useState({});
   const prevFavoritesRef = useRef([]);
   
+  // Internal state for favorites to ensure UI updates even if parent state doesn't
+  const [internalFavorites, setInternalFavorites] = useState([]);
+  
+  // Keep internal favorites in sync with props
+  useEffect(() => {
+    console.log("LeftPanel: favoriteLocations prop changed:", favoriteLocations.length);
+    setInternalFavorites(favoriteLocations);
+  }, [favoriteLocations]);
+  
+  // Debug output for favorites changes
+  useEffect(() => {
+    console.log("LeftPanel: Internal favorites updated:", internalFavorites.length);
+  }, [internalFavorites]);
+  
   // Check for newly added favorites
   useEffect(() => {
     // Skip first render
@@ -242,10 +256,26 @@ const LeftPanel = ({
                   onClick={() => {
                     if (onAddFavoriteLocation) {
                       const locationName = waypoint.name || `Stop ${index + 1}`;
-                      onAddFavoriteLocation({ 
+                      const newLocation = { 
                         name: locationName, 
                         coords: waypoint.coords 
-                      });
+                      };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${locationName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
+                      if (onAddFavoriteLocation) {
+                        onAddFavoriteLocation(newLocation);
+                      }
                       
                       // Show success message
                       const message = `Added ${locationName} to favorites`;
@@ -366,7 +396,7 @@ const LeftPanel = ({
               justifyContent: 'space-between'
             }}>
               <span>
-                <strong>{favoriteLocations.length}</strong> favorites in this region
+                <strong>{internalFavorites.length}</strong> favorites in this region
               </span>
               <button 
                 style={{
@@ -454,31 +484,44 @@ const LeftPanel = ({
                     if (parts.length === 3 && !isNaN(parts[1]) && !isNaN(parts[2])) {
                       const name = parts[0];
                       const coords = [parseFloat(parts[2]), parseFloat(parts[1])]; // Lon, Lat
+                      const newLocation = { name, coords };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
                       if (onAddFavoriteLocation) {
-                        onAddFavoriteLocation({ name, coords });
-                        e.target.value = ''; // Clear input
-                        
-                        // Show success message with toast notification
-                        const message = `Added ${name} to favorites`;
-                        const toast = document.createElement('div');
-                        toast.style.position = 'fixed';
-                        toast.style.bottom = '20px';
-                        toast.style.left = '50%';
-                        toast.style.transform = 'translateX(-50%)';
-                        toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
-                        toast.style.color = 'white';
-                        toast.style.padding = '10px 20px';
-                        toast.style.borderRadius = '5px';
-                        toast.style.zIndex = '1000';
-                        toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                        toast.textContent = message;
-                        document.body.appendChild(toast);
-                        
-                        // Remove after 1.5 seconds
-                        setTimeout(() => {
-                          document.body.removeChild(toast);
-                        }, 1500);
+                        onAddFavoriteLocation(newLocation);
                       }
+                      
+                      // Show success message with toast notification
+                      const message = `Added ${name} to favorites`;
+                      const toast = document.createElement('div');
+                      toast.style.position = 'fixed';
+                      toast.style.bottom = '20px';
+                      toast.style.left = '50%';
+                      toast.style.transform = 'translateX(-50%)';
+                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                      toast.style.color = 'white';
+                      toast.style.padding = '10px 20px';
+                      toast.style.borderRadius = '5px';
+                      toast.style.zIndex = '1000';
+                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                      toast.textContent = message;
+                      document.body.appendChild(toast);
+                      
+                      // Remove after 1.5 seconds
+                      setTimeout(() => {
+                        document.body.removeChild(toast);
+                      }, 1500);
                     } else {
                       alert("Invalid format. Please use 'Name, Lat, Lon'.");
                     }
@@ -503,31 +546,44 @@ const LeftPanel = ({
                     if (parts.length === 3 && !isNaN(parts[1]) && !isNaN(parts[2])) {
                       const name = parts[0];
                       const coords = [parseFloat(parts[2]), parseFloat(parts[1])]; // Lon, Lat
+                      const newLocation = { name, coords };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
                       if (onAddFavoriteLocation) {
-                        onAddFavoriteLocation({ name, coords });
-                        inputElement.value = ''; // Clear input
-                        
-                        // Show success message with toast notification
-                        const message = `Added ${name} to favorites`;
-                        const toast = document.createElement('div');
-                        toast.style.position = 'fixed';
-                        toast.style.bottom = '20px';
-                        toast.style.left = '50%';
-                        toast.style.transform = 'translateX(-50%)';
-                        toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
-                        toast.style.color = 'white';
-                        toast.style.padding = '10px 20px';
-                        toast.style.borderRadius = '5px';
-                        toast.style.zIndex = '1000';
-                        toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                        toast.textContent = message;
-                        document.body.appendChild(toast);
-                        
-                        // Remove after 1.5 seconds
-                        setTimeout(() => {
-                          document.body.removeChild(toast);
-                        }, 1500);
+                        onAddFavoriteLocation(newLocation);
                       }
+                      
+                      // Show success message with toast notification
+                      const message = `Added ${name} to favorites`;
+                      const toast = document.createElement('div');
+                      toast.style.position = 'fixed';
+                      toast.style.bottom = '20px';
+                      toast.style.left = '50%';
+                      toast.style.transform = 'translateX(-50%)';
+                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                      toast.style.color = 'white';
+                      toast.style.padding = '10px 20px';
+                      toast.style.borderRadius = '5px';
+                      toast.style.zIndex = '1000';
+                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                      toast.textContent = message;
+                      document.body.appendChild(toast);
+                      
+                      // Remove after 1.5 seconds
+                      setTimeout(() => {
+                        document.body.removeChild(toast);
+                      }, 1500);
                     } else {
                       alert("Invalid format. Please use 'Name, Lat, Lon'.");
                     }
