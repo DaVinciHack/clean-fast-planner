@@ -537,6 +537,18 @@ const FastPlannerApp = () => {
         leftPanelVisible: newState
       });
     }
+    
+    // Trigger animation by adding and removing classes
+    const panel = document.querySelector('.route-editor-panel');
+    if (panel) {
+      if (newState) {
+        // Panel becoming visible - slide in
+        panel.style.animation = 'slideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+      } else {
+        // Panel becoming hidden - slide out
+        panel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+      }
+    }
   };
   
   const toggleRightPanel = () => {
@@ -548,6 +560,18 @@ const FastPlannerApp = () => {
       appSettingsManagerRef.current.updateUISettings({
         rightPanelVisible: newState
       });
+    }
+    
+    // Trigger animation by adding and removing classes
+    const panel = document.querySelector('.info-panel');
+    if (panel) {
+      if (newState) {
+        // Panel becoming visible - slide in
+        panel.style.animation = 'slideInFromRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+      } else {
+        // Panel becoming hidden - slide out
+        panel.style.animation = 'slideOutToRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+      }
     }
   };
   
