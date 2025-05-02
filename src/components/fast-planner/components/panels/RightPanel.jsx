@@ -501,7 +501,10 @@ const RightPanel = ({
         {/* Show the selected aircraft registration at the bottom with type */}
         <div className="selected-aircraft">
           <label>Selected Aircraft:</label>
-          <div className="selected-aircraft-display">
+          <div className="selected-aircraft-display" style={{
+            fontWeight: 'bold',
+            color: selectedAircraft ? '#006699' : '#666'
+          }}>
             {selectedAircraft ? (
               <>
                 {/* Extract registration without region */}

@@ -558,12 +558,12 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
   // Handle aircraft registration change
   const changeAircraftRegistration = useCallback((registration) => {
     console.log(`AircraftContext: Changing aircraft registration to ${registration}`);
-    setAircraftRegistration(registration);
     
     if (aircraftManagerInstance && registration) {
       const aircraft = aircraftManagerInstance.getAircraftByRegistration(registration);
       if (aircraft) {
-        // Store selected aircraft
+        // CRITICAL: Store selected aircraft in state but DO NOT update the registration dropdown
+        // We're going to reset both dropdowns while keeping the aircraft selected
         setSelectedAircraft(aircraft);
         console.log('Selected aircraft:', aircraft);
         
@@ -572,23 +572,23 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
         window.currentAircraftType = aircraft.modelType;
         window.selectedAircraftObject = aircraft;
         
-        // CRITICAL FIX: When an aircraft is selected, we need to:
-        // 1. Store the aircraft's type but CLEAR the type filter
-        // 2. Load ALL available types from the current region
-        // 3. Reset the type dropdown to visual "-- Change Aircraft Type --"
-        // This ensures when the dropdown is clicked, it shows all types
+        // CRITICAL FIX: When an aircraft is selected, completely reset BOTH dropdowns
+        // but keep the selected aircraft information displayed at the bottom
         
         // Store the current type for reference only
         const currentAircraftType = aircraft.modelType;
         console.log(`Selected aircraft is type: ${currentAircraftType}`);
         
-        // IMPORTANT: Clear the type filter in state to allow viewing all types
-        // This is the critical change - we're clearing the type filter while keeping the selectedAircraft
+        // STEP 1: Clear the type filter to show all aircraft types
         setAircraftType('');
-        console.log('Cleared type filter to allow viewing all aircraft types');
+        console.log('Reset type filter to empty to show all aircraft types');
         
-        // IMPORTANT: Load all aircraft from the current region
-        // This ensures all types are available when the dropdown is clicked
+        // STEP 2: Also clear the registration dropdown state (but keep selectedAircraft)
+        // This is the key difference - we're also clearing the registration dropdown
+        setAircraftRegistration('');
+        console.log('Reset registration dropdown to empty for visual reset');
+        
+        // STEP 3: Load all aircraft from the current region to ensure all types are available
         if (currentRegion) {
           try {
             // Get all aircraft in the current region
@@ -634,7 +634,7 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           }
         }
         
-        // Reset UI elements via DOM manipulation
+        // STEP 4: Reset BOTH dropdown elements via DOM manipulation
         setTimeout(() => {
           // Reset the type dropdown to "-- Change Aircraft Type --"
           const typeDropdown = document.getElementById('aircraft-type');
@@ -642,15 +642,42 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
             // Set the DOM value directly - this affects the visual display only
             typeDropdown.value = 'select';
             console.log('Reset type dropdown visual display to "-- Change Aircraft Type --"');
+            
+            // Dispatch a change event to ensure the dropdown state is updated
+            const event = new Event('change', { bubbles: true });
+            typeDropdown.dispatchEvent(event);
           }
           
-          // Make sure the registration dropdown still shows the selected registration
+          // Reset registration dropdown to "-- Select Aircraft --"
           const regDropdown = document.getElementById('aircraft-registration');
           if (regDropdown) {
-            // Ensure registration dropdown shows the selected value
-            regDropdown.value = registration;
-            console.log('Ensured registration dropdown shows selected aircraft');
+            // Set the dropdown to empty selection
+            regDropdown.value = '';
+            console.log('Reset registration dropdown to "-- Select Aircraft --"');
           }
+          
+          // Create a notification to confirm the aircraft is selected
+          const flashMessage = document.createElement('div');
+          flashMessage.style.position = 'fixed';
+          flashMessage.style.top = '20px';
+          flashMessage.style.left = '50%';
+          flashMessage.style.transform = 'translateX(-50%)';
+          flashMessage.style.backgroundColor = 'rgba(0, 120, 0, 0.9)';
+          flashMessage.style.color = 'white';
+          flashMessage.style.padding = '10px 20px';
+          flashMessage.style.borderRadius = '5px';
+          flashMessage.style.fontFamily = 'sans-serif';
+          flashMessage.style.fontSize = '14px';
+          flashMessage.style.zIndex = '10000';
+          flashMessage.textContent = `Selected aircraft: ${registration} (${currentAircraftType})`;
+          document.body.appendChild(flashMessage);
+          
+          // Remove after 2 seconds
+          setTimeout(() => {
+            if (flashMessage.parentNode) {
+              flashMessage.parentNode.removeChild(flashMessage);
+            }
+          }, 2000);
         }, 50);
         
         // Load any saved settings for this aircraft
@@ -676,9 +703,11 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
       } else {
         console.warn(`Aircraft with registration ${registration} not found`);
         setSelectedAircraft(null);
+        setAircraftRegistration('');
       }
     } else if (!registration) {
       setSelectedAircraft(null);
+      setAircraftRegistration('');
     }
   }, [aircraftManagerInstance, currentRegion, setDeckTimePerStop, setDeckFuelFlow, setReserveFuel, 
       setPassengerWeight, setCargoWeight, setTaxiFuel, setContingencyFuelPercent, setReserveMethod]);
