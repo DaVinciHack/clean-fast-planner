@@ -262,6 +262,7 @@ const FastPlannerApp = () => {
       waypointManagerRef.current.setPlatformManager(platformManagerRef.current);
     }
     
+    // Remove this duplicate initialization
     if (!routeCalculatorRef.current) {
       console.log("FastPlannerApp: Creating RouteCalculator instance");
       routeCalculatorRef.current = new RouteCalculator();
@@ -269,26 +270,6 @@ const FastPlannerApp = () => {
       // Set up route calculator callbacks
       routeCalculatorRef.current.setCallback('onCalculationComplete', (stats) => {
         setRouteStats(stats);
-      });
-    }
-    
-    if (!favoriteLocationsManagerRef.current) {
-      console.log("FastPlannerApp: Creating FavoriteLocationsManager instance");
-      favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
-      
-      // Set up callback for when favorites change
-      favoriteLocationsManagerRef.current.setCallback('onChange', (favoritesData) => {
-        console.log('Favorites change callback triggered:', favoritesData);
-        
-        // Check if data is for the current region
-        if (currentRegion && favoritesData.region === currentRegion.id) {
-          console.log(`Updating favorites for current region: ${currentRegion.id}`);
-          setFavoriteLocations(favoritesData.favorites);
-        } else if (currentRegion) {
-          console.log(`Favorites changed for region ${favoritesData.region}, but current region is ${currentRegion.id}`);
-        } else {
-          console.log('Current region not set yet, cannot update favorites');
-        }
       });
     }
     
@@ -716,8 +697,15 @@ const FastPlannerApp = () => {
   const handleAddFavoriteLocation = (location) => {
     if (favoriteLocationsManagerRef.current && currentRegion) {
       console.log(`Adding favorite location to region ${currentRegion.id}:`, location);
+      
+      // First add to the manager
       favoriteLocationsManagerRef.current.addFavoriteLocation(currentRegion.id, location);
-      setFavoriteLocations(favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id));
+      
+      // Then immediately update the UI with the new favorites
+      // This is needed because the callback might not be triggered properly
+      const updatedFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
+      console.log(`Manually updating UI with ${updatedFavorites.length} favorites after adding:`, updatedFavorites);
+      setFavoriteLocations(updatedFavorites);
     } else {
       console.error('Cannot add favorite: No favorite locations manager or current region');
     }
