@@ -142,11 +142,15 @@ const LoadingIndicator = (() => {
     // Set processing flag
     isProcessingQueue = true;
     
-    // Get the next message and remove duplicates in the queue
+    // Get the next message
     currentMessage = messageQueue.shift();
     
-    // Remove any duplicate messages from the queue
-    messageQueue = messageQueue.filter(msg => msg !== currentMessage);
+    // Filter remaining queue to remove duplicates of current message
+    for (let i = messageQueue.length - 1; i >= 0; i--) {
+      if (messageQueue[i] === currentMessage) {
+        messageQueue.splice(i, 1);
+      }
+    }
     
     // Update the status indicator with the current message
     updateStatusIndicatorInternal(currentMessage);
