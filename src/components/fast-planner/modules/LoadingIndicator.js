@@ -339,30 +339,39 @@ const LoadingIndicator = (() => {
   const queueMessage = (text) => {
     if (!text) return;
     
-    // Don't add duplicate of current message
-    if (currentMessage === text) {
-      return;
-    }
-    
-    // Don't add if already in queue
-    if (messageQueue.includes(text)) {
-      return;
-    }
-    
-    // Add message to queue (limit queue size to prevent memory issues)
-    if (messageQueue.length < 10) {
-      messageQueue.push(text);
-    }
-    
-    // Start processing if not already running
-    if (!isProcessingQueue) {
-      processNextMessage();
-    }
-    
-    // Show the loading bar if it's not already visible
-    const loadingContainer = document.querySelector('.fp-loading-container');
-    if (loadingContainer) {
-      loadingContainer.style.display = 'block';
+    try {
+      // Don't add duplicate of current message
+      if (currentMessage === text) {
+        return;
+      }
+      
+      // Don't add if already in queue - simple loop to avoid filter method
+      let alreadyQueued = false;
+      for (let i = 0; i < messageQueue.length; i++) {
+        if (messageQueue[i] === text) {
+          alreadyQueued = true;
+          break;
+        }
+      }
+      if (alreadyQueued) return;
+      
+      // Add message to queue (limit queue size to prevent memory issues)
+      if (messageQueue.length < 10) {
+        messageQueue.push(text);
+      }
+      
+      // Start processing if not already running
+      if (!isProcessingQueue) {
+        processNextMessage();
+      }
+      
+      // Show the loading bar if it's not already visible
+      const loadingContainer = document.querySelector('.fp-loading-container');
+      if (loadingContainer) {
+        loadingContainer.style.display = 'block';
+      }
+    } catch (e) {
+      console.error('Error in queueMessage:', e);
     }
   };
   
