@@ -120,6 +120,22 @@ const SettingsCard = ({
             <span className="unit">lbs</span>
           </div>
         </div>
+        
+        <div className="input-group">
+          <div>
+            <label htmlFor="approach-fuel">Approach/ARA Fuel:</label>
+            <input 
+              type="number" 
+              id="approach-fuel" 
+              value="150"
+              min="0" 
+              max="1000"
+              step="10"
+              disabled
+            />
+            <span className="unit">lbs</span>
+          </div>
+        </div>
       
         <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <button 

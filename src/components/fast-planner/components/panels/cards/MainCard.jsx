@@ -29,6 +29,8 @@ const MainCard = ({
   currentRegion = null,
   onRegionChange = () => {},
   regionLoading = false,
+  // Read-only values from settings
+  reserveFuel = 600,
 }) => {
   return (
     <div className="tab-content main-tab">
@@ -349,6 +351,16 @@ const MainCard = ({
               <div className="label">Useful Load</div>
               <div className="value">
                 {selectedAircraft.usefulLoad || 7000}
+                <span className="unit">lbs</span>
+              </div>
+            </div>
+            
+            {/* Reserve Fuel - read-only display from settings */}
+            <div className="aircraft-data-item">
+              <div className="icon">🔄</div>
+              <div className="label">Reserve</div>
+              <div className="value">
+                {reserveFuel}
                 <span className="unit">lbs</span>
               </div>
             </div>

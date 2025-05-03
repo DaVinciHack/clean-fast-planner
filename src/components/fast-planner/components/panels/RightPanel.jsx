@@ -98,6 +98,7 @@ const RightPanel = ({
         currentRegion={currentRegion}
         onRegionChange={onRegionChange}
         regionLoading={regionLoading}
+        reserveFuel={reserveFuel}
       />
       
       {/* Settings Card */}
