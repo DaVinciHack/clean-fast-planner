@@ -243,18 +243,60 @@
 }
 
 /* Tab content styles */
-.tab-content {
+.tab-content, .card-content {
   width: 320px;
   height: 100%;
   transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+  position: relative; /* Add relative positioning */
 }
 
+/* Animation classes for tab content transitions */
 .tab-content.slide-in {
-  animation: slideInFromRight 0.4s ease-out forwards;
+  animation: slideInFromRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .tab-content.slide-out {
+  animation: slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Card container styling */
+.cards-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.card-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Animation classes for card transitions */
+.card-wrapper.exiting {
+  position: absolute;
+  z-index: 1;
+}
+
+.card-wrapper.exit-left {
   animation: slideOutToLeft 0.4s ease-out forwards;
+}
+
+.card-wrapper.exit-right {
+  animation: slideOutToRight 0.4s ease-out forwards;
+}
+
+.card-wrapper.enter-right {
+  animation: slideInFromRight 0.4s ease-out forwards;
+}
+
+.card-wrapper.enter-left {
+  animation: slideInFromLeft 0.4s ease-out forwards;
 }
 
 /* Settings-specific styles */
