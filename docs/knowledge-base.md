@@ -33,9 +33,15 @@ These components handle the visual presentation and user interactions.
 | MapComponent | Renders the map | Refactored | ModularFastPlannerComponent.jsx | `/components/map/MapComponent.jsx` |
 | LeftPanel | Route editor panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/LeftPanel.jsx` |
 | RightPanel | Controls and statistics panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/RightPanel.jsx` |
+| RightPanelContainer | Container for card components | Implemented | N/A | `/components/panels/RightPanelContainer.jsx` |
+| MainCard | Main controls and region selection | Implemented | RightPanel.jsx | `/components/panels/cards/MainCard.jsx` |
+| SettingsCard | Flight settings controls | Implemented | RightPanel.jsx | `/components/panels/cards/SettingsCard.jsx` |
+| PerformanceCard | Performance calculations | Implemented | RightPanel.jsx | `/components/panels/cards/PerformanceCard.jsx` |
+| WeatherCard | Weather settings controls | Implemented | RightPanel.jsx | `/components/panels/cards/WeatherCard.jsx` |
+| FinanceCard | Finance calculations | Implemented | RightPanel.jsx | `/components/panels/cards/FinanceCard.jsx` |
+| EvacuationCard | Evacuation planning | Implemented | RightPanel.jsx | `/components/panels/cards/EvacuationCard.jsx` |
 | RouteStatsCard | Displays route statistics | Refactored | ModularFastPlannerComponent.jsx | `/components/flight/RouteStatsCard.jsx` |
-| FlightSettings | Flight calculation settings | In Progress | ModularFastPlannerComponent.jsx | `/components/flight/FlightSettings.jsx` |
-| AircraftSelection | Aircraft filtering and selection | Pending | ModularFastPlannerComponent.jsx | TBD |
+| S92PerformanceCard | S92 helicopter calculator | Pending | N/A | `/components/panels/cards/performance/S92PerformanceCard.jsx` |
 
 ### Context Providers
 These provide state management and data sharing between components.
@@ -63,18 +69,21 @@ These provide state management and data sharing between components.
 - Established context providers
 - Implemented basic route functionality
 - Created version switcher in FastPlannerPage
+- Refactored RightPanel into card-based architecture
+- Implemented smooth card animations
+- Created separate card components for different functionality
 
 ### In Progress
-- Extracting AircraftSelection component from RightPanel
-- Implementing FlightSettings component
+- Implementing S92 dropdown calculator
+- Extracting AircraftSelection component from MainCard
 - Refining route calculation logic
 - Improving event handling between components
 
 ### Next Steps
 - Extract WaypointEditor component
-- Improve loading indicators
-- Add error boundaries
 - Implement comprehensive testing
+- Add error boundaries around components
+- Improve loading indicators
 
 ## Developer Notes
 
@@ -103,6 +112,9 @@ Route calculations are performed in these steps:
 
 **Issue**: Route calculations show incorrect values
 **Solution**: Verify that the latest flight settings are being passed to the RouteCalculator
+
+**Issue**: Aircraft selection dropdowns not resetting after selection
+**Solution**: This was fixed in commit 6102f3b. The approach uses React state management in FastPlannerApp.jsx to properly reset dropdown values while maintaining the selected aircraft state. Direct DOM manipulation was removed from MainCard.jsx to avoid conflicts with React's virtual DOM.
 
 ## References & Resources
 

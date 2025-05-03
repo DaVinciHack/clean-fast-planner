@@ -94,6 +94,9 @@ To maintain manageable file sizes (under 500 lines) and improve code organizatio
      - UI sections (panels, cards, forms)
      - Logical functionality groups (aircraft selection, route editing)
      - Data management (loading, filtering, calculations)
+   - When refactoring, ensure state management flows properly between components
+   - Avoid direct DOM manipulation in React components - use state and props instead
+   - For interactive elements like dropdowns with complex behavior, make sure state flows through parent components
 
 2. **Context Usage**:
    - Move shared state to context providers
@@ -127,18 +130,32 @@ To avoid breaking functionality during refactoring:
 
 Based on the current state, here are the next components to refactor:
 
-1. **AircraftSelection Component**:
-   - Extract from RightPanel.jsx
+1. ~~**Modular RightPanel Architecture**:~~ ✅ COMPLETED
+   - ~~Create a card-based structure for RightPanel to replace the current large component~~
+   - ~~Implement a container component (RightPanelContainer.jsx) to manage layout and coordinate visible cards~~
+   - ~~Create individual card components:~~
+     - ~~MainCard.jsx - For main controls and region selection~~
+     - ~~SettingsCard.jsx - For flight settings~~
+     - ~~PerformanceCard.jsx - For performance calculations~~
+     - ~~WeatherCard.jsx - For weather settings~~
+     - ~~FinanceCard.jsx - For finance calculations~~
+     - ~~EvacuationCard.jsx - For evacuation planning~~
+   - ~~Implement tab/accordion system with sliding animations~~
+   - ~~Each card maintains its own local state~~
+   - ~~CSS transitions for smooth sliding animations~~
+
+2. **S92 Performance Calculator Implementation**:
+   - Implement the S92DropdownCalculator component from the provided code
+   - Integrate it with the PerformanceCard component
+   - Add necessary context connections for aircraft data
+
+3. **Additional Aircraft Component Extraction**:
+   - Extract AircraftSelection from MainCard.jsx
    - Add to a new file in components/aircraft/AircraftSelection.jsx
    - Create an AircraftContext to manage aircraft state
 
-2. **FlightSettings Component**:
-   - Extract from RightPanel.jsx
-   - Add to components/flight/FlightSettings.jsx
-   - Create FlightSettingsContext for managing settings
-
-3. **WaypointEditor Component**:
-   - Extract from LeftPanel.jsx
+4. **LeftPanel Component Extraction**:
+   - Extract WaypointEditor from LeftPanel.jsx
    - Add to components/waypoints/WaypointEditor.jsx
    - Connect to RouteContext
 
