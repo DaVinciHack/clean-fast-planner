@@ -210,38 +210,74 @@ class MapInteractionHandler {
     // First check for nearest rig within 2 nautical miles
     const nearestRig = this.platformManager.findNearestPlatform(lngLat.lat, lngLat.lng, 2);
     
-    console.log(`MapInteractionHandler: Checking for nearest rig at [${lngLat.lng}, ${lngLat.lat}]`);
+    console.log(`MapInteractionHandler: 🌐 Map click at [${lngLat.lng}, ${lngLat.lat}]`);
     
     if (nearestRig) {
-      console.log(`MapInteractionHandler: Found nearest rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
+      console.log(`MapInteractionHandler: 🌐 Found nearest rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
     } else {
-      console.log(`MapInteractionHandler: No rig found within 2 nautical miles`);
+      console.log(`MapInteractionHandler: 🌐 No rig found within 2 nautical miles`);
     }
 
     // Either use callback or direct add
     if (this.callbacks.onMapClick) {
       // Include the nearest rig info in the callback data
-      // Ensure the nearestRig has the right coordinate format
-      const callbackData = { lngLat };
+      const callbackData = { 
+        lngLat: lngLat,
+        coordinates: [lngLat.lng, lngLat.lat], // Ensure we have coordinates in array format
+        mapClickSource: 'directClick' // CRITICAL FIX: Flag to identify this is a map click
+      };
       
       if (nearestRig) {
+        // Make sure coordinates are in the right format - check all possible formats
+        let rigCoordinates;
+        if (Array.isArray(nearestRig.coordinates)) {
+          rigCoordinates = nearestRig.coordinates;
+        } else if (Array.isArray(nearestRig.coords)) {
+          rigCoordinates = nearestRig.coords;
+        } else if (nearestRig.lng !== undefined && nearestRig.lat !== undefined) {
+          rigCoordinates = [nearestRig.lng, nearestRig.lat];
+        } else {
+          console.error('MapInteractionHandler: 🌐 Invalid rig coordinates format:', nearestRig);
+          rigCoordinates = [lngLat.lng, lngLat.lat]; // Fallback to clicked point
+        }
+        
         callbackData.nearestRig = {
           ...nearestRig,
-          // Make sure coordinates are in the right format
-          coordinates: nearestRig.coords || [nearestRig.lng, nearestRig.lat]
+          coordinates: rigCoordinates,
+          name: nearestRig.name || 'Unknown'
         };
       }
       
+      console.log(`MapInteractionHandler: 🌐 Triggering onMapClick with data:`, callbackData);
       this.triggerCallback('onMapClick', callbackData);
     } else {
       // Direct add - use nearest rig if available within distance
       if (nearestRig && nearestRig.distance <= 2) {
-        console.log(`MapInteractionHandler: Snapping to rig ${nearestRig.name}`);
+        console.log(`MapInteractionHandler: 🌐 Snapping to rig ${nearestRig.name}`);
         const coordinates = nearestRig.coords || [nearestRig.lng, nearestRig.lat];
         this.waypointManager.addWaypoint(coordinates, nearestRig.name);
+        
+        // CRITICAL FIX: Make sure route is updated immediately after adding waypoint
+        // We need to force a reflow by adding a small delay
+        setTimeout(() => {
+          console.log(`MapInteractionHandler: 🌐 Forcing route update for map click`);
+          if (this.waypointManager && this.waypointManager.updateRoute) {
+            this.waypointManager.updateRoute();
+          }
+        }, 50);
       } else {
         // No nearby rig, just add the clicked point
+        console.log(`MapInteractionHandler: 🌐 Adding waypoint at clicked point`);
         this.waypointManager.addWaypoint([lngLat.lng, lngLat.lat]);
+        
+        // CRITICAL FIX: Make sure route is updated immediately after adding waypoint
+        // We need to force a reflow by adding a small delay
+        setTimeout(() => {
+          console.log(`MapInteractionHandler: 🌐 Forcing route update for map click`);
+          if (this.waypointManager && this.waypointManager.updateRoute) {
+            this.waypointManager.updateRoute();
+          }
+        }, 50);
       }
     }
   }

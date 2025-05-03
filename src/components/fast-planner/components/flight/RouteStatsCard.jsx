@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import LoadingIndicator from '../../modules/LoadingIndicator';
 
@@ -20,7 +20,10 @@ const RouteStatsCard = ({
   cargoWeight = 0,
   taxiFuel = 50,
   contingencyFuelPercent = 10,
-  reserveFuel = 600
+  reserveFuel = 600,
+  weather = { windSpeed: 0, windDirection: 0 },
+  // Add optional stopCards prop to get data from StopCardsContainer
+  stopCards = []
 }) => {
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
@@ -31,8 +34,102 @@ const RouteStatsCard = ({
   // Reference to track the active loader ID
   const loaderIdRef = useRef(null);
   
+  // Force rerendering when routeStats or waypoints change
+  const [forceRerender, setForceRerender] = useState(0);
+  
+  // Force a rerender when routeStats change
+  useEffect(() => {
+    console.log("💥 RouteStatsCard - routeStats changed, forcing rerender");
+    setForceRerender(prev => prev + 1);
+  }, [routeStats]);
+  
+  // Force a rerender when waypoints change
+  useEffect(() => {
+    if (waypoints && waypoints.length >= 2) {
+      console.log("💥 RouteStatsCard - waypoints changed, forcing rerender");
+      setForceRerender(prev => prev + 1);
+    }
+  }, [waypoints]);
+  
   // Add debug logging to track the routeStats data
-  console.log("RouteStatsCard - received stats:", routeStats);
+  console.log("💥 RouteStatsCard - received stats:", {
+    forceRerender,
+    timeHours: routeStats?.timeHours,
+    estimatedTime: routeStats?.estimatedTime,
+    totalDistance: routeStats?.totalDistance,
+    legs: routeStats?.legs?.length || 0
+  });
+  
+  // Extra validation to catch zero time values
+  if (routeStats && routeStats.timeHours === 0 && routeStats.estimatedTime === '00:00' && 
+      routeStats.totalDistance && parseFloat(routeStats.totalDistance) > 0) {
+    console.error("⚠️ RouteStatsCard - Invalid zero time with non-zero distance!", {
+      totalDistance: routeStats.totalDistance,
+      estimatedTime: routeStats.estimatedTime
+    });
+    
+    // CRITICAL FIX: If zero time was received but we have distance and a valid selected aircraft, 
+    // fix the time calculation immediately
+    if (selectedAircraft && selectedAircraft.cruiseSpeed) {
+      console.log("⚠️ RouteStatsCard - Fixing zero time with manual calculation");
+      
+      // Calculate time based on distance and cruise speed
+      const totalDistance = parseFloat(routeStats.totalDistance);
+      const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+      
+      // Format time string
+      const hours = Math.floor(timeHours);
+      const minutes = Math.floor((timeHours - hours) * 60);
+      const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Update the routeStats object directly
+      routeStats.timeHours = timeHours;
+      routeStats.estimatedTime = estimatedTime;
+      
+      console.log("⚠️ RouteStatsCard - Fixed time values:", {
+        timeHours,
+        estimatedTime
+      });
+    }
+  }
+  
+  if (routeStats && routeStats.windAdjusted) {
+    console.log("✅ Wind-adjusted stats detected in RouteStatsCard:", {
+      windSpeed: routeStats.windData?.windSpeed,
+      windDirection: routeStats.windData?.windDirection,
+      estimatedTime: routeStats.estimatedTime,
+      timeHours: routeStats.timeHours,
+      avgHeadwind: routeStats.windData?.avgHeadwind
+    });
+  } else {
+    console.log("❌ Route stats WITHOUT wind adjustment in RouteStatsCard");
+  }
+  
+  // Determine if time has been adjusted due to wind
+  const isWindAdjusted = routeStats && routeStats.windAdjusted && routeStats.windData;
+  
+  // Get wind effect direction from actual weather data
+  const windEffect = isWindAdjusted ? routeStats.windData.avgHeadwind : 0;
+  
+  useEffect(() => {
+    // Add CSS for wind-adjusted time highlight if it doesn't exist
+    if (!document.getElementById('wind-adjusted-style')) {
+      const style = document.createElement('style');
+      style.id = 'wind-adjusted-style';
+      style.innerHTML = `
+        .wind-adjusted-time {
+          position: relative;
+        }
+        .wind-adjusted-time::after {
+          content: ' ★';
+          font-size: 0.7em;
+          color: ${routeStats?.windData?.windSpeed > 0 ? '#e74c3c' : '#2ecc71'};
+          vertical-align: super;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, [routeStats]);
   
   // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
   const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;
@@ -58,19 +155,21 @@ const RouteStatsCard = ({
     operationalRadius: '85'
   };
   
-  // Format total time (flight time + deck time)
+  // Calculate total time (flight time + deck time)
   const calculateTotalTime = () => {
     // Use totalTimeFormatted from stats if available
     if (stats.totalTimeFormatted) {
       return stats.totalTimeFormatted;
     }
     
-    if (!stats.timeHours && stats.timeHours !== 0) return '00:00';
+    // Get flight time from stats
+    const flightTimeHours = stats.timeHours || 0;
     
     // Convert deck time from minutes to hours
     const deckTimeHours = totalDeckTime / 60;
+    
     // Add flight time and deck time
-    const totalTimeHours = stats.timeHours + deckTimeHours;
+    const totalTimeHours = flightTimeHours + deckTimeHours;
     
     // Format as HH:MM
     const hours = Math.floor(totalTimeHours);
@@ -78,8 +177,7 @@ const RouteStatsCard = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
   
-  // Use totalFuel from stats if available, or calculate from components if those are available,
-  // or fall back to basic calculation as last resort
+  // Calculate total fuel from components in routeStats
   const totalFuel = stats.totalFuel || 
                     (stats.tripFuel && stats.deckFuel && stats.contingencyFuel && stats.taxiFuel && stats.reserveFuel) ? 
                       (parseInt(stats.tripFuel) + parseInt(stats.deckFuel) + parseInt(stats.contingencyFuel) + parseInt(stats.taxiFuel) + parseInt(stats.reserveFuel)) : 
@@ -219,8 +317,26 @@ const RouteStatsCard = ({
           
           {/* Column 3: Flight Time and Total Time */}
           <div className="route-stat-item">
-            <div className="route-stat-label">Flight Time:</div>
-            <div className="route-stat-value">{stats.estimatedTime || '00:00'}</div>
+            <div className="route-stat-label">
+              Flight Time:
+              {isWindAdjusted && routeStats.windData.avgHeadwind !== 0 && (
+                <span style={{ 
+                  fontSize: '0.8em', 
+                  marginLeft: '4px', 
+                  color: routeStats.windData.avgHeadwind > 0 ? '#e74c3c' : '#2ecc71',
+                  fontWeight: 'bold'
+                }}
+                title={`${Math.abs(routeStats.windData.avgHeadwind)} kt ${routeStats.windData.avgHeadwind > 0 ? 'headwind' : 'tailwind'}`}>
+                  {routeStats.windData.avgHeadwind > 0 ? 
+                    ` (+${routeStats.windData.avgHeadwind}kt)` : 
+                    ` (${routeStats.windData.avgHeadwind}kt)`}
+                </span>
+              )}
+            </div>
+            <div className="route-stat-value">
+              {/* Display estimatedTime from routeStats */}
+              {stats.estimatedTime || "00:00"}
+            </div>
           </div>
           
           {/* Column 4: Total Fuel and Passengers */}

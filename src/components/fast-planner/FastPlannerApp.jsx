@@ -72,6 +72,7 @@ const FastPlannerApp = () => {
   const [rigsLoading, setRigsLoading] = useState(false);
   const [rigsError, setRigsError] = useState(null);
   const [waypoints, setWaypoints] = useState([]);
+  const [stopCards, setStopCards] = useState([]);
   
   // Region state
   const [regions, setRegions] = useState([]);
@@ -89,6 +90,7 @@ const FastPlannerApp = () => {
   const [payloadWeight, setPayloadWeight] = useState(2000);
   const [reserveFuel, setReserveFuel] = useState(600);
   const [routeStats, setRouteStats] = useState(null);
+  const [weather, setWeather] = useState({ windSpeed: 0, windDirection: 0 });
   
   // Flight calculation settings
   const [flightSettings, setFlightSettings] = useState({
@@ -168,9 +170,10 @@ const FastPlannerApp = () => {
       
       // Calculate route statistics using the correct method
       routeCalculatorRef.current.calculateRouteStats(coordinates, {
-        aircraftType: selectedAircraft.modelType || 's92',
+        selectedAircraft: selectedAircraft, // Pass the full aircraft object
         payloadWeight: cargoWeight || 0,
-        reserveFuel: updatedSettings.reserveFuel || reserveFuel
+        reserveFuel: updatedSettings.reserveFuel || reserveFuel,
+        weather: weather // Include weather data in calculations
       });
     }
   };
@@ -290,8 +293,49 @@ const FastPlannerApp = () => {
       
       // Set up route calculator callbacks
       routeCalculatorRef.current.setCallback('onCalculationComplete', (stats) => {
+        console.log('🔄 Route calculation complete with stats:', {
+          totalDistance: stats?.totalDistance, 
+          estimatedTime: stats?.estimatedTime,
+          timeHours: stats?.timeHours,
+          legCount: stats?.legs?.length || 0,
+          hasWind: stats?.windAdjusted || false
+        });
+        
+        // Check if stats are valid before updating
+        if (!stats || !stats.timeHours || stats.timeHours === 0) {
+          console.error('🔄 Received invalid route stats with zero time:', stats);
+          return; // Don't update with invalid stats
+        }
+        
+        // Store previous route stats
+        const prevStats = {...routeStats};
+        
+        // Update the route stats state with the new data
         setRouteStats(stats);
+        
+        // When route stats are updated, update stop cards too
+        if (stats && waypoints.length >= 2 && selectedAircraft) {
+          console.log('🔄 Generating stop cards with stats:', {
+            totalDistance: stats.totalDistance,
+            estimatedTime: stats.estimatedTime,
+            timeHours: stats.timeHours
+          });
+          
+          // Generate stop cards with the new stats
+          const newStopCards = generateStopCardsData(waypoints, stats, selectedAircraft, weather);
+          console.log('🔄 Generated stop cards:', newStopCards.map(card => ({
+            leg: card.index + 1,
+            legTime: card.legTime,
+            totalTime: card.totalTime
+          })));
+          
+          // Update the stop cards state
+          setStopCards(newStopCards);
+        }
       });
+      
+      // We no longer need the DirectTimeFix as RouteCalculator now uses the same calculation method as StopCards
+      console.log("FastPlannerApp: RouteCalculator configured with accurate wind calculations");
     }
     
     if (!aircraftManagerRef.current) {
@@ -446,38 +490,114 @@ const FastPlannerApp = () => {
         }
       });
       
-      mapInteractionHandlerRef.current.setCallback('onMapClick', (data) => {
-        console.log('Map click callback received', data);
-        addWaypoint(data); // Pass the data object with lngLat property
-      });
-      
-      mapInteractionHandlerRef.current.setCallback('onPlatformClick', (data) => {
-        console.log('Platform click callback received', data);
-        addWaypoint(data); // Pass the data object with coordinates and name
-      });
-      
-      mapInteractionHandlerRef.current.setCallback('onRouteClick', (data) => {
-        console.log('Route click callback received', data);
-        
-        // If we have a nearest rig and it's close
-        if (data.nearestRig && data.nearestRig.distance < 1) {
-          // Add the rig instead of the clicked point
-          waypointManagerRef.current.addWaypointAtIndex(
-            data.nearestRig.coordinates, 
-            data.nearestRig.name, 
-            data.insertIndex
-          );
-        } else {
-          // Add the clicked point
-          waypointManagerRef.current.addWaypointAtIndex(
-            [data.lngLat.lng, data.lngLat.lat], 
-            null, 
-            data.insertIndex
-          );
+      mapInteractionHandlerRef.current.setCallback('onMapClick', async (data) => {
+        console.log('🗺️ Map click callback received', data);
+        // Don't return anything from this callback to avoid async issues
+        try {
+          // Create a local copy of the data to avoid reference issues
+          const clickData = {...data};
+          // Process the waypoint addition
+          await addWaypoint(clickData);
+        } catch (error) {
+          console.error('Error processing map click:', error);
         }
+      });
+      
+      mapInteractionHandlerRef.current.setCallback('onPlatformClick', async (data) => {
+        console.log('🏢 Platform click callback received', data);
+        // Don't return anything from this callback to avoid async issues
+        try {
+          // Create a local copy of the data to avoid reference issues
+          const clickData = {...data};
+          // Process the waypoint addition
+          await addWaypoint(clickData);
+        } catch (error) {
+          console.error('Error processing platform click:', error);
+        }
+      });
+      
+      mapInteractionHandlerRef.current.setCallback('onRouteClick', async (data) => {
+        console.log('🛣️ Route click callback received', data);
         
-        // Update the waypoints state
-        setWaypoints([...waypointManagerRef.current.getWaypoints()]);
+        try {
+          // Create a local copy of the data
+          const clickData = {...data};
+          
+          // If we have a nearest rig and it's close
+          if (clickData.nearestRig && clickData.nearestRig.distance < 1) {
+            // Add the rig instead of the clicked point
+            console.log('🛣️ Adding rig at route click:', clickData.nearestRig.name);
+            waypointManagerRef.current.addWaypointAtIndex(
+              clickData.nearestRig.coordinates, 
+              clickData.nearestRig.name, 
+              clickData.insertIndex
+            );
+          } else {
+            // Add the clicked point
+            console.log('🛣️ Adding waypoint at route click');
+            waypointManagerRef.current.addWaypointAtIndex(
+              [clickData.lngLat.lng, clickData.lngLat.lat], 
+              null, 
+              clickData.insertIndex
+            );
+          }
+          
+          // Get updated waypoints
+          const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+          
+          // Update the waypoints state - wait for it to complete
+          await new Promise(resolve => {
+            setWaypoints([...updatedWaypoints]);
+            setTimeout(resolve, 0);
+          });
+          
+          // CRITICAL FIX: Recalculate route MANUALLY and update stats directly
+          if (updatedWaypoints.length >= 2 && selectedAircraft) {
+            // Extract coordinates from waypoints
+            const coordinates = updatedWaypoints.map(wp => wp.coords);
+            
+            console.log('🛣️ Manually recalculating route for route click');
+            
+            // First calculate directly to get immediate results
+            if (routeCalculatorRef.current) {
+              console.log('🛣️ Direct calculation for route click');
+              const calcResults = routeCalculatorRef.current.calculateRouteStats(coordinates, {
+                selectedAircraft: selectedAircraft,
+                payloadWeight: cargoWeight || 0,
+                reserveFuel: reserveFuel,
+                weather: weather
+              });
+              
+              // Directly update route stats
+              if (calcResults && calcResults.timeHours > 0) {
+                console.log('🛣️ Directly updating route stats from calculation:', {
+                  distance: calcResults.totalDistance,
+                  time: calcResults.estimatedTime
+                });
+                
+                // Update the state - wait for it to complete
+                await new Promise(resolve => {
+                  setRouteStats(calcResults);
+                  setTimeout(resolve, 0);
+                });
+                
+                // Generate stop cards with the FRESH calculation results
+                const newStopCards = generateStopCardsData(updatedWaypoints, calcResults, selectedAircraft, weather);
+                
+                // Update stop cards - wait for it to complete
+                await new Promise(resolve => {
+                  setStopCards(newStopCards);
+                  setTimeout(resolve, 0);
+                });
+                
+                // Force a rerender
+                setForceUpdate(prev => prev + 1);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error processing route click:', error);
+        }
       });
       
       mapInteractionHandlerRef.current.setCallback('onError', (error) => {
@@ -533,7 +653,8 @@ const FastPlannerApp = () => {
             routeCalculatorRef.current.calculateRouteStats(coordinates, {
               aircraftType: selectedAircraft.modelType || 's92',
               payloadWeight: settings.cargoWeight || cargoWeight || 0,
-              reserveFuel: settings.reserveFuel || reserveFuel
+              reserveFuel: settings.reserveFuel || reserveFuel,
+              weather: weather // Include weather data in calculations
             });
           }
           
@@ -564,10 +685,15 @@ const FastPlannerApp = () => {
         if (selectedAircraft) {
           // Calculate route statistics using the correct method
           routeCalculatorRef.current.calculateRouteStats(coordinates, {
-            aircraftType: selectedAircraft.modelType || 's92',
+            selectedAircraft: selectedAircraft, // Pass the full aircraft object
             payloadWeight: cargoWeight || 0,
-            reserveFuel: reserveFuel
+            reserveFuel: reserveFuel,
+            weather: weather // Include weather data in calculations
           });
+          
+          // Also update stop cards when settings change
+          const newStopCards = generateStopCardsData(waypoints, routeStats, selectedAircraft, weather);
+          setStopCards(newStopCards);
         }
       }
     };
@@ -588,11 +714,11 @@ const FastPlannerApp = () => {
 
   // Map initialization handler
   const handleMapReady = (mapInstance) => {
-    console.log("Map is ready", mapInstance);
+    console.log("🗺️ Map is ready", mapInstance);
     
     // When map is ready, initialize other components that depend on the map
     if (regionManagerRef.current) {
-      console.log("Initializing regions...");
+      console.log("🗺️ Initializing regions...");
       setRegionLoading(true);
       
       // Get available regions
@@ -602,24 +728,53 @@ const FastPlannerApp = () => {
       const initialRegion = appSettingsManagerRef.current ? 
         appSettingsManagerRef.current.getRegion() : 'gulf-of-mexico';
       
-      console.log(`Initializing with region: ${initialRegion}`);
+      console.log(`🗺️ Initializing with region: ${initialRegion}`);
       regionManagerRef.current.initialize(initialRegion);
     }
     
     // Initialize the map interaction handler
     if (mapInteractionHandlerRef.current) {
-      console.log("Initializing map interaction handler...");
+      console.log("🗺️ Initializing map interaction handler...");
       
       // Make sure the waypointManager is properly connected
       if (waypointManagerRef.current) {
         // Set up the waypoint manager's callbacks
         waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
-          console.log(`Waypoints changed, now ${updatedWaypoints.length} waypoints`);
+          console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
+          
+          // Update the waypoints state
           setWaypoints([...updatedWaypoints]);
+          
+          // CRITICAL FIX: Always calculate distance regardless of aircraft selection
+          if (updatedWaypoints.length >= 2 && routeCalculatorRef.current) {
+            // Extract coordinates for calculation
+            const coordinates = updatedWaypoints.map(wp => wp.coords);
+            
+            // Always do a distance-only calculation for basic stats
+            console.log('🗺️ Calculating basic distance for updated waypoints');
+            const distanceResults = routeCalculatorRef.current.calculateDistanceOnly(coordinates);
+            
+            // If we don't have aircraft-based stats yet, use the distance-only results
+            if (!routeStats || !routeStats.timeHours) {
+              console.log('🗺️ No aircraft-based stats available, using distance-only results');
+              setRouteStats(distanceResults);
+            }
+            
+            // If we have an aircraft, also do the full calculation
+            if (selectedAircraft) {
+              console.log('🗺️ Calculating full route stats with aircraft');
+              routeCalculatorRef.current.calculateRouteStats(coordinates, {
+                selectedAircraft: selectedAircraft,
+                payloadWeight: cargoWeight || 0,
+                reserveFuel: reserveFuel,
+                weather: weather
+              });
+            }
+          }
         });
         
         waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
-          console.log(`Route updated with ${routeData.waypoints.length} waypoints`);
+          console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
           
           // Always calculate basic distance even without an aircraft
           if (routeCalculatorRef.current && routeData.coordinates && routeData.coordinates.length >= 2) {
@@ -635,7 +790,8 @@ const FastPlannerApp = () => {
             routeCalculatorRef.current.calculateRouteStats(coordinates, {
               aircraftType: selectedAircraft.modelType || 's92',
               payloadWeight: cargoWeight || 0,
-              reserveFuel: reserveFuel
+              reserveFuel: reserveFuel,
+              weather: weather // Include weather data in calculations
             });
           }
         });
@@ -704,13 +860,244 @@ const FastPlannerApp = () => {
     setRouteInput(value);
   };
   
+  // Generate stop cards data
+  const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather) => {
+    if (waypoints.length < 2 || !selectedAircraft) {
+      return [];
+    }
+    
+    // Check if aircraft has all required properties
+    if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
+      console.log('generateStopCardsData: Aircraft missing required properties');
+      return [];
+    }
+    
+    console.log('Generating stop cards with weather data:', weather);
+    
+    // Create data for each stop
+    const cards = [];
+    let cumulativeDistance = 0;
+    let cumulativeTime = 0;
+    let cumulativeFuel = 0;
+    
+    // Get aircraft data for calculations
+    const aircraft = selectedAircraft;
+    
+    // Add taxi fuel to the total
+    const taxiFuelValue = taxiFuel || 50; // Default value
+    cumulativeFuel += taxiFuelValue;
+    
+    // Add reserve fuel to the total
+    cumulativeFuel += reserveFuel;
+    
+    // Check if window.turf is available
+    if (!window.turf && routeCalculatorRef.current) {
+      console.warn('Turf.js not loaded, using routeStats legs for distances');
+    }
+    
+    // For each leg (between waypoints)
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const fromWaypoint = waypoints[i];
+      const toWaypoint = waypoints[i + 1];
+      
+      // Create a unique ID for this stop
+      const stopId = toWaypoint.id || `waypoint-${i}`;
+      
+      // Get leg distance from routeStats if available
+      let legDistance = 0;
+      if (routeStats && routeStats.legs && routeStats.legs[i]) {
+        legDistance = parseFloat(routeStats.legs[i].distance);
+      } else if (window.turf) {
+        // Calculate distance using turf if available
+        const from = window.turf.point(fromWaypoint.coords);
+        const to = window.turf.point(toWaypoint.coords);
+        const options = { units: 'nauticalmiles' };
+        
+        legDistance = window.turf.distance(from, to, options);
+      }
+      
+      // Calculate leg timing and fuel with wind adjustments
+      let legTimeHours = 0;
+      let legFuel = 0;
+      let legGroundSpeed = aircraft.cruiseSpeed;
+      let headwindComponent = 0;
+      
+      // Check if we have coordinates - either as separate lat/lon or as coords array
+      const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) || 
+                           (fromWaypoint.coords && fromWaypoint.coords.length === 2);
+      const toHasCoords = (toWaypoint.lat && toWaypoint.lon) || 
+                         (toWaypoint.coords && toWaypoint.coords.length === 2);
+      
+      // Import the wind calculation functions if needed
+      // Use window.WindCalculations which we've made globally available
+      
+      if (fromHasCoords && toHasCoords) {
+        // Create lat/lon objects from either format
+        const fromCoords = {
+          lat: fromWaypoint.lat || fromWaypoint.coords[1],
+          lon: fromWaypoint.lon || fromWaypoint.coords[0]
+        };
+        
+        const toCoords = {
+          lat: toWaypoint.lat || toWaypoint.coords[1],
+          lon: toWaypoint.lon || toWaypoint.coords[0]
+        };
+        
+        // Use wind calculations if available
+        if (window.WindCalculations) {
+          try {
+            console.log(`Calculating leg ${i} with wind: ${fromCoords.lat},${fromCoords.lon} to ${toCoords.lat},${toCoords.lon}`);
+            const legDetails = window.WindCalculations.calculateLegWithWind(
+              fromCoords,
+              toCoords,
+              legDistance,
+              aircraft,
+              weather
+            );
+            
+            console.log(`Leg ${i} calculation results:`, {
+              time: legDetails.time,
+              fuel: legDetails.fuel,
+              groundSpeed: legDetails.groundSpeed,
+              headwind: legDetails.headwindComponent
+            });
+            
+            legTimeHours = legDetails.time;
+            legFuel = Math.round(legDetails.fuel);
+            legGroundSpeed = Math.round(legDetails.groundSpeed);
+            headwindComponent = Math.round(legDetails.headwindComponent);
+          } catch (error) {
+            console.warn('Error calculating leg with wind:', error);
+            // Basic calculation without wind as fallback
+            legTimeHours = legDistance / aircraft.cruiseSpeed;
+            legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+            legGroundSpeed = aircraft.cruiseSpeed;
+            headwindComponent = 0;
+          }
+        } else {
+          // Basic calculation without wind as fallback
+          legTimeHours = legDistance / aircraft.cruiseSpeed;
+          legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+          legGroundSpeed = aircraft.cruiseSpeed;
+          headwindComponent = 0;
+          console.warn('WindCalculations not available, using basic time calculation');
+        }
+      } else {
+        // Fall back to simple calculation without wind
+        legTimeHours = legDistance / aircraft.cruiseSpeed;
+        legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+      }
+      
+      // Update cumulative values
+      cumulativeDistance += legDistance;
+      
+      // Add this leg's time to cumulative time
+      console.log(`Leg ${i} time: ${legTimeHours}, cumulative before: ${cumulativeTime}`);
+      cumulativeTime += legTimeHours;
+      console.log(`Cumulative time after adding leg time: ${cumulativeTime}`);
+      
+      cumulativeFuel += legFuel;
+      
+      // Add deck time and fuel for all stops except the final destination
+      if (i < waypoints.length - 2) {
+        const deckTimeHours = deckTimePerStop / 60; // Convert minutes to hours
+        const deckFuel = Math.round(deckTimeHours * deckFuelFlow);
+        
+        console.log(`Adding deck time at stop ${i+1}: ${deckTimeHours}`);
+        cumulativeTime += deckTimeHours;
+        console.log(`Cumulative time after adding deck time: ${cumulativeTime}`);
+        
+        cumulativeFuel += deckFuel;
+      }
+      
+      // Calculate max passengers based on remaining load
+      let maxPassengers = 0;
+      if (selectedAircraft) {
+        const usableLoad = Math.max(
+          0, 
+          selectedAircraft.maxTakeoffWeight - 
+          selectedAircraft.emptyWeight - 
+          cumulativeFuel
+        );
+        maxPassengers = Math.floor(usableLoad / passengerWeight);
+        
+        // Ensure we don't exceed aircraft capacity
+        maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
+      }
+      
+      // Create the card data
+      // Make a deep copy of all values to prevent reference issues
+      const cardData = {
+        index: i,
+        id: stopId,
+        stopName: toWaypoint.name,
+        legDistance: legDistance.toFixed(1),
+        totalDistance: cumulativeDistance.toFixed(1),
+        legTime: Number(legTimeHours),
+        totalTime: Number(cumulativeTime),
+        legFuel: Number(legFuel),
+        totalFuel: Number(cumulativeFuel),
+        maxPassengers: Number(maxPassengers),
+        groundSpeed: Number(legGroundSpeed),
+        headwind: Number(headwindComponent)
+      };
+      
+      console.log(`Stop card ${i} data:`, JSON.stringify(cardData));
+      cards.push(cardData);
+    }
+    
+    console.log('All stop cards generated:', JSON.stringify(cards));
+    return cards;
+  };
+
+  // Weather settings handler
+  const updateWeatherSettings = (windSpeed, windDirection) => {
+    const windSpeedNum = parseInt(windSpeed) || 0;
+    const windDirectionNum = parseInt(windDirection) || 0;
+    
+    const newWeather = { 
+      windSpeed: windSpeedNum, 
+      windDirection: windDirectionNum 
+    };
+    
+    console.log(`Updating weather settings: Wind ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
+    setWeather(newWeather);
+    
+    // We're now using accurate wind calculations directly in RouteCalculator
+    // No need to update separate wind settings
+    
+    // Recalculate route if we have an aircraft and waypoints
+    if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
+      // Extract coordinates from waypoints
+      const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+      
+      // Calculate route statistics with weather
+      console.log(`Recalculating route with weather: Wind ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
+      routeCalculatorRef.current.calculateRouteStats(coordinates, {
+        selectedAircraft: selectedAircraft, // Pass the full aircraft object
+        payloadWeight: cargoWeight || 0,
+        reserveFuel: reserveFuel,
+        weather: newWeather // Pass the new weather object
+      });
+      
+      // Generate stop cards data with the new weather settings immediately
+      if (waypoints.length >= 2 && selectedAircraft) {
+        console.log(`Generating new stop cards with updated weather: ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
+        const newStopCards = generateStopCardsData(waypoints, routeStats, selectedAircraft, newWeather);
+        setStopCards(newStopCards);
+      }
+    }
+  };
+  
   // Basic handlers
-  const addWaypoint = (waypointData) => {
+  const addWaypoint = async (waypointData) => {
     if (waypointManagerRef.current) {
       // Handle different input formats
       let coords, name;
+      // CRITICAL FIX: Add flag to identify map clicks
+      let isMapClick = false;
       
-      console.log('FastPlannerApp: Adding waypoint with data:', waypointData);
+      console.log('🌐 FastPlannerApp: Adding waypoint with data:', waypointData);
       
       if (Array.isArray(waypointData)) {
         // Direct coordinates array: [lng, lat]
@@ -719,13 +1106,19 @@ const FastPlannerApp = () => {
       } else if (typeof waypointData === 'string') {
         // It's just a name - try to find a location with that name
         // This is used when adding a waypoint by typing the name in the input field
-        console.log(`Looking for location with name: ${waypointData}`);
+        console.log(`🌐 Looking for location with name: ${waypointData}`);
         coords = null;
         name = waypointData;
       } else if (waypointData && typeof waypointData === 'object') {
+        // CRITICAL FIX: Check if this is a map click operation
+        if (waypointData.mapClickSource === 'directClick') {
+          console.log('🌐 Detected direct map click operation');
+          isMapClick = true;
+        }
+        
         // Check if we have a nearest rig within range
         if (waypointData.nearestRig && waypointData.nearestRig.distance <= 2) {
-          console.log(`FastPlannerApp: Snapping to nearest rig: ${waypointData.nearestRig.name} (${waypointData.nearestRig.distance.toFixed(2)} nm away)`);
+          console.log(`🌐 FastPlannerApp: Snapping to nearest rig: ${waypointData.nearestRig.name} (${waypointData.nearestRig.distance.toFixed(2)} nm away)`);
           
           // Get coordinates, checking different possible formats
           if (waypointData.nearestRig.coordinates) {
@@ -737,7 +1130,12 @@ const FastPlannerApp = () => {
           } else {
             console.error('Invalid nearestRig coordinates format:', waypointData.nearestRig);
             // Fall back to the clicked point
-            coords = [waypointData.lngLat.lng, waypointData.lngLat.lat];
+            if (waypointData.lngLat) {
+              coords = [waypointData.lngLat.lng, waypointData.lngLat.lat];
+            } else {
+              console.error('No valid coordinates found in nearestRig or lngLat');
+              return;
+            }
           }
           
           name = waypointData.nearestRig.name;
@@ -762,7 +1160,7 @@ const FastPlannerApp = () => {
       // If we only have a name, try to look up coordinates (this could be enhanced)
       if (!coords && name) {
         // TODO: Implement location search by name
-        console.log(`We need to search for location with name: ${name}`);
+        console.log(`🌐 We need to search for location with name: ${name}`);
       }
       
       if (!coords || !Array.isArray(coords) || coords.length !== 2) {
@@ -770,28 +1168,174 @@ const FastPlannerApp = () => {
         return;
       }
       
-      console.log(`FastPlannerApp: Adding waypoint at [${coords}] with name "${name || 'Unnamed'}"`);
+      console.log(`🌐 FastPlannerApp: Adding waypoint at [${coords}] with name "${name || 'Unnamed'}", isMapClick=${isMapClick}`);
       waypointManagerRef.current.addWaypoint(coords, name);
-      setWaypoints([...waypointManagerRef.current.getWaypoints()]);
       
-      // Recalculate route stats if we have at least 2 waypoints
-      if (waypointManagerRef.current.getWaypoints().length >= 2) {
+      // Get the updated waypoints list
+      const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+      console.log(`🌐 Updated waypoints (${updatedWaypoints.length}):`, updatedWaypoints);
+      
+      // Update the state - wait for it to complete
+      await new Promise(resolve => {
+        setWaypoints([...updatedWaypoints]);
+        // Use setTimeout to ensure the state update has time to complete
+        setTimeout(resolve, 0);
+      });
+      
+      // CRITICAL FIX: Manually recalculate route stats
+      if (updatedWaypoints.length >= 2) {
         // Extract coordinates from waypoints
-        const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+        const coordinates = updatedWaypoints.map(wp => wp.coords);
+        console.log(`🌐 Recalculating routes for ${coordinates.length} coordinates, isMapClick=${isMapClick}`);
         
         // Always calculate basic distance
         if (routeCalculatorRef.current) {
+          console.log(`🌐 Calculating route distance`);
           routeCalculatorRef.current.calculateDistanceOnly(coordinates);
         }
         
         // Calculate full stats if we have an aircraft 
         if (selectedAircraft) {
-          // Calculate route statistics using the correct method
-          routeCalculatorRef.current.calculateRouteStats(coordinates, {
-            aircraftType: selectedAircraft.modelType || 's92',
-            payloadWeight: cargoWeight || 0,
-            reserveFuel: reserveFuel
-          });
+          console.log('🌐 Calculating full route stats with aircraft:', selectedAircraft.registration);
+          
+          // DIRECT CALCULATION: Calculate directly and use the results immediately
+          if (routeCalculatorRef.current) {
+            // Log aircraft information to debug time calculation issues
+            console.log('🌐 Aircraft verification:', {
+              modelType: selectedAircraft.modelType,
+              cruiseSpeed: selectedAircraft.cruiseSpeed,
+              fuelBurn: selectedAircraft.fuelBurn
+            });
+            
+            // CRITICAL FIX: For map clicks, ensure we pass accurate options
+            const calcOptions = {
+              selectedAircraft: selectedAircraft,
+              payloadWeight: cargoWeight || 0,
+              reserveFuel: reserveFuel,
+              weather: weather
+            };
+            
+            // For map clicks, add a special flag to ensure time is calculated
+            if (isMapClick) {
+              calcOptions.forceTimeCalculation = true;
+            }
+            
+            const calcResults = routeCalculatorRef.current.calculateRouteStats(coordinates, calcOptions);
+            
+            // Log raw results for debugging
+            console.log('🌐 Raw calculation results:', calcResults ? {
+              totalDistance: calcResults.totalDistance,
+              estimatedTime: calcResults.estimatedTime,
+              timeHours: calcResults.timeHours,
+              legs: calcResults.legs?.length || 0
+            } : 'No results');
+            
+            // CRITICAL FIX: If we have distance but timeHours is zero, fix it manually
+            if (calcResults && calcResults.totalDistance && (calcResults.timeHours === 0 || calcResults.estimatedTime === '00:00')) {
+              console.log('🌐 FIXING ZERO TIME ISSUE: Manual time calculation');
+              
+              // Manual time calculation based on distance and cruise speed
+              const totalDistance = parseFloat(calcResults.totalDistance);
+              if (totalDistance > 0 && selectedAircraft.cruiseSpeed > 0) {
+                const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+                const hours = Math.floor(timeHours);
+                const minutes = Math.floor((timeHours - hours) * 60);
+                
+                // Update the calculation results
+                calcResults.timeHours = timeHours;
+                calcResults.estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                
+                console.log('🌐 Fixed time calculation:', {
+                  distance: totalDistance,
+                  cruiseSpeed: selectedAircraft.cruiseSpeed,
+                  timeHours: timeHours,
+                  estimatedTime: calcResults.estimatedTime
+                });
+              }
+            }
+            
+            // Check if we have valid results after potential fixes
+            if (calcResults && calcResults.timeHours > 0) {
+              console.log('🌐 Final calculation results:', {
+                distance: calcResults.totalDistance,
+                time: calcResults.estimatedTime,
+                timeHours: calcResults.timeHours,
+                legs: calcResults.legs?.length || 0
+              });
+              
+              // Directly update the routeStats state with the calculation results - wait for it to complete
+              await new Promise(resolve => {
+                setRouteStats(calcResults);
+                setTimeout(resolve, 0);
+              });
+              
+              // Generate stop cards using the fresh calculation results
+              const newStopCards = generateStopCardsData(updatedWaypoints, calcResults, selectedAircraft, weather);
+              
+              // Update stop cards - wait for it to complete
+              await new Promise(resolve => {
+                setStopCards(newStopCards);
+                setTimeout(resolve, 0);
+              });
+              
+              // CRITICAL FIX: Force a rerender with a slight delay to ensure all updates propagate
+              setTimeout(() => {
+                setForceUpdate(prev => prev + 1);
+                console.log('🌐 Forced update after map click calculation');
+              }, 50);
+            } else {
+              console.error('🌐 Invalid calculation results even after fixes:', calcResults);
+              
+              // CRITICAL FIX: Create emergency backup calculation as last resort
+              console.log('🌐 Creating emergency backup calculation');
+              
+              // Calculate distance manually as a last resort
+              let totalDistance = 0;
+              for (let i = 0; i < coordinates.length - 1; i++) {
+                const from = window.turf.point(coordinates[i]);
+                const to = window.turf.point(coordinates[i+1]);
+                const options = { units: 'nauticalmiles' };
+                totalDistance += window.turf.distance(from, to, options);
+              }
+              
+              // Calculate basic time
+              const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+              const hours = Math.floor(timeHours);
+              const minutes = Math.floor((timeHours - hours) * 60);
+              const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+              
+              // Create minimal valid result
+              const backupResults = {
+                totalDistance: totalDistance.toFixed(1),
+                estimatedTime: estimatedTime,
+                timeHours: timeHours,
+                fuelRequired: Math.round(timeHours * selectedAircraft.fuelBurn),
+                tripFuel: Math.round(timeHours * selectedAircraft.fuelBurn),
+                windAdjusted: false
+              };
+              
+              console.log('🌐 Emergency backup calculation results:', backupResults);
+              
+              // Update with backup results
+              await new Promise(resolve => {
+                setRouteStats(backupResults);
+                setTimeout(resolve, 0);
+              });
+              
+              // Generate stop cards with backup results
+              const emergencyStopCards = generateStopCardsData(updatedWaypoints, backupResults, selectedAircraft, weather);
+              await new Promise(resolve => {
+                setStopCards(emergencyStopCards);
+                setTimeout(resolve, 0);
+              });
+              
+              // Force a rerender with delay
+              setTimeout(() => {
+                setForceUpdate(prev => prev + 1);
+                console.log('🌐 Forced emergency update');
+              }, 50);
+            }
+          }
         }
       }
     }
@@ -821,12 +1365,17 @@ const FastPlannerApp = () => {
       // Only proceed if we have a valid ID and index
       if (id && index !== -1) {
         waypointManagerRef.current.removeWaypoint(id, index);
-        setWaypoints([...waypointManagerRef.current.getWaypoints()]);
+        
+        // Get updated waypoints
+        const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+        
+        // Update the state
+        setWaypoints([...updatedWaypoints]);
         
         // Recalculate route stats if we have at least 2 waypoints
-        if (waypointManagerRef.current.getWaypoints().length >= 2) {
+        if (updatedWaypoints.length >= 2) {
           // Extract coordinates from waypoints
-          const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+          const coordinates = updatedWaypoints.map(wp => wp.coords);
           
           // Always calculate basic distance
           if (routeCalculatorRef.current) {
@@ -835,12 +1384,21 @@ const FastPlannerApp = () => {
           
           // Calculate full stats if we have an aircraft
           if (selectedAircraft) {
+            console.log('Recalculating route after removing waypoint');
+            
             // Calculate route statistics using the correct method
             routeCalculatorRef.current.calculateRouteStats(coordinates, {
-              aircraftType: selectedAircraft.modelType || 's92',
+              selectedAircraft: selectedAircraft, // Pass the full aircraft object
               payloadWeight: cargoWeight || 0,
-              reserveFuel: reserveFuel
+              reserveFuel: reserveFuel,
+              weather: weather // Include weather data in calculations
             });
+            
+            // Force generate new stop cards with the updated waypoints
+            setTimeout(() => {
+              const newStopCards = generateStopCardsData(updatedWaypoints, routeStats, selectedAircraft, weather);
+              setStopCards(newStopCards);
+            }, 100);
           }
         } else {
           // Clear route stats if we don't have enough waypoints
@@ -912,9 +1470,10 @@ const FastPlannerApp = () => {
         if (selectedAircraft) {
           // Calculate route statistics using the correct method
           routeCalculatorRef.current.calculateRouteStats(coordinates, {
-            aircraftType: selectedAircraft.modelType || 's92',
+            selectedAircraft: selectedAircraft, // Pass the full aircraft object
             payloadWeight: cargoWeight || 0,
-            reserveFuel: reserveFuel
+            reserveFuel: reserveFuel,
+            weather: weather // Include weather data in calculations
           });
         }
       }
@@ -1015,12 +1574,21 @@ const FastPlannerApp = () => {
   };
   
   const changeAircraftRegistration = (registration) => {
+    console.log(`⚡ Changing aircraft registration to: ${registration}`);
     setAircraftRegistration(registration);
     
     // Find the selected aircraft in the aircraftsByType
+    let aircraft = null;
     if (aircraftsByType[aircraftType]) {
-      const aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
+      aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
       setSelectedAircraft(aircraft);
+      
+      console.log(`⚡ Selected aircraft:`, {
+        registration: aircraft?.registration,
+        type: aircraft?.modelType,
+        cruiseSpeed: aircraft?.cruiseSpeed,
+        fuelBurn: aircraft?.fuelBurn
+      });
       
       // Save to settings
       if (appSettingsManagerRef.current) {
@@ -1132,16 +1700,46 @@ const FastPlannerApp = () => {
       }
       
       // Recalculate route if we have waypoints
-      if (aircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
-        // Extract coordinates from waypoints
-        const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
-        
-        // Calculate route statistics using the correct method
-        routeCalculatorRef.current.calculateRouteStats(coordinates, {
-          aircraftType: aircraft.modelType || 's92',
-          payloadWeight: cargoWeight || 0,
-          reserveFuel: reserveFuel
-        });
+      if (aircraft && waypointManagerRef.current) {
+        const existingWaypoints = waypointManagerRef.current.getWaypoints();
+        if (existingWaypoints.length >= 2) {
+          // Extract coordinates from waypoints
+          const coordinates = existingWaypoints.map(wp => wp.coords);
+          
+          console.log(`⚡ Recalculating route for ${existingWaypoints.length} waypoints after aircraft selection`);
+          
+          // CRITICAL FIX: Force immediate route calculation and stop cards update
+          if (routeCalculatorRef.current) {
+            console.log(`⚡ Forcing route calculation after aircraft selection`);
+            
+            // Make sure to use the current aircraft we just selected
+            const calcResults = routeCalculatorRef.current.calculateRouteStats(coordinates, {
+              selectedAircraft: aircraft, // Use the aircraft we just found
+              payloadWeight: cargoWeight || 0,
+              reserveFuel: reserveFuel,
+              weather: weather // Include weather data
+            });
+            
+            console.log(`⚡ Direct calculation results:`, {
+              estimatedTime: calcResults?.estimatedTime,
+              timeHours: calcResults?.timeHours,
+              totalDistance: calcResults?.totalDistance
+            });
+            
+            // Directly update the routeStats state
+            if (calcResults && calcResults.timeHours > 0) {
+              console.log(`⚡ Directly updating route stats`);
+              setRouteStats(calcResults);
+              
+              // Generate stop cards with the new stats
+              const directStopCards = generateStopCardsData(existingWaypoints, calcResults, aircraft, weather);
+              setStopCards(directStopCards);
+              
+              // Force UI refresh
+              setForceUpdate(prev => prev + 1);
+            }
+          }
+        }
       }
     }
   };
@@ -1238,6 +1836,8 @@ const FastPlannerApp = () => {
         taxiFuel={taxiFuel}
         contingencyFuelPercent={contingencyFuelPercent}
         reserveFuel={reserveFuel}
+        weather={weather}
+        stopCards={stopCards}
       />
       
       {/* Map Component */}
@@ -1313,6 +1913,9 @@ const FastPlannerApp = () => {
         onPayloadWeightChange={setPayloadWeight}
         reserveFuel={reserveFuel}
         onReserveFuelChange={setReserveFuel}
+        // Weather props
+        weather={weather}
+        onWeatherUpdate={updateWeatherSettings}
       />
     </div>
   );
