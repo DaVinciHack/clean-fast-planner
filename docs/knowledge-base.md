@@ -40,8 +40,8 @@ These components handle the visual presentation and user interactions.
 | WeatherCard | Weather settings controls | Implemented | RightPanel.jsx | `/components/panels/cards/WeatherCard.jsx` |
 | FinanceCard | Finance calculations | Implemented | RightPanel.jsx | `/components/panels/cards/FinanceCard.jsx` |
 | EvacuationCard | Evacuation planning | Implemented | RightPanel.jsx | `/components/panels/cards/EvacuationCard.jsx` |
-| RouteStatsCard | Displays route statistics | Refactored | ModularFastPlannerComponent.jsx | `/components/flight/RouteStatsCard.jsx` |
-| S92PerformanceCard | S92 helicopter calculator | Pending | N/A | `/components/panels/cards/performance/S92PerformanceCard.jsx` |
+| StopCard | Displays single stop information | Implemented | N/A | `/components/flight/stops/StopCard.jsx` |
+| StopCardsContainer | Manages route stop cards with animations | Implemented | N/A | `/components/flight/stops/StopCardsContainer.jsx` |
 
 ### Context Providers
 These provide state management and data sharing between components.
@@ -102,7 +102,24 @@ Route calculations are performed in these steps:
 4. Fuel requirements are calculated based on flight settings
 5. Passenger capacity is determined based on fuel load and aircraft capacity
 
-### Common Issues & Solutions
+#### Route Stop Cards System
+The StopCards system provides a visual representation of each stop in the route with the following features:
+
+| Feature | Description |
+|---------|-------------|
+| Leg Data Display | Shows distance, time, fuel, and passenger data for each leg |
+| FLIP Animations | Smooth animations when route waypoints are reordered |
+| SVG Icons | Custom blue SVG icons for each metric in the cards |
+| Card Highlighting | Visual feedback for active and newly added stops |
+| Responsive Design | Cards adapt to available space without scrolling |
+
+The system consists of:
+- `StopCard.jsx` - Individual stop card component showing leg data
+- `StopCardsContainer.jsx` - Container that manages cards and animations
+- `StopIcons.jsx` - SVG icons used in the cards
+- `StopCards.css` - Styling for the card system
+
+## Common Issues & Solutions
 
 **Issue**: Map not displaying after load
 **Solution**: Check if MapManager's initialization is complete before trying to add layers

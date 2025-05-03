@@ -144,17 +144,25 @@ Based on the current state, here are the next components to refactor:
    - ~~Each card maintains its own local state~~
    - ~~CSS transitions for smooth sliding animations~~
 
-2. **S92 Performance Calculator Implementation**:
-   - Implement the S92DropdownCalculator component from the provided code
-   - Integrate it with the PerformanceCard component
-   - Add necessary context connections for aircraft data
+2. ~~**S92 Performance Calculator Implementation**:~~ ✅ COMPLETED
+   - ~~Implement the S92DropdownCalculator component from the provided code~~
+   - ~~Integrate it with the PerformanceCard component~~
+   - ~~Add necessary context connections for aircraft data~~
 
-3. **Additional Aircraft Component Extraction**:
+3. **Route StopCards Enhancement**:
+   - ✅ Implemented compact, elegant card styling
+   - ✅ Added smooth FLIP animations for reordering
+   - ✅ Created custom blue-themed SVG icons
+   - ✅ Eliminated scrolling by dynamically expanding card container
+   - ⏳ Optimize calculations to match aircraft data and flight settings
+
+4. **Aircraft Integration**:
    - Extract AircraftSelection from MainCard.jsx
    - Add to a new file in components/aircraft/AircraftSelection.jsx
    - Create an AircraftContext to manage aircraft state
+   - Properly connect aircraft performance data to route calculations
 
-4. **LeftPanel Component Extraction**:
+5. **LeftPanel Component Extraction**:
    - Extract WaypointEditor from LeftPanel.jsx
    - Add to components/waypoints/WaypointEditor.jsx
    - Connect to RouteContext
