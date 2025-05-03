@@ -91,60 +91,12 @@ const MainCard = ({
             const value = e.target.value === 'select' ? '' : e.target.value;
             console.log(`Aircraft type dropdown changed to: ${value || 'empty'}`);
             
-            // CRITICAL FIX: In the original code, there are two scenarios:
-            // 1. Type dropdown is clicked and a new type is selected
-            // 2. Type dropdown is clicked but "-- Change Aircraft Type --" is selected
+            // Call handler to update the type filter
+            onAircraftTypeChange(value);
             
-            if (value) {
-              // Scenario 1: Selecting a specific type
-              console.log('Selecting specific aircraft type:', value);
-              
-              // If we already had a selected aircraft, clear it
-              // This matches the original behavior
-              if (selectedAircraft) {
-                console.log('Had selected aircraft, clearing it for new type selection');
-              }
-              
-              // Call handler to update the type filter
-              onAircraftTypeChange(value);
-              
-              // And clear the registration dropdown
-              const regDropdown = document.getElementById('aircraft-registration');
-              if (regDropdown) {
-                regDropdown.value = '';
-              }
-              
-              // Clear the selected aircraft when choosing a new type
-              if (onAircraftRegistrationChange) {
-                onAircraftRegistrationChange('');
-              }
-            } else {
-              // Scenario 2: "-- Change Aircraft Type --" selected
-              console.log('Change Aircraft Type selected (empty value)');
-              
-              // In the original, this shows all aircraft types
-              // but keeps the current aircraft selected
-              onAircraftTypeChange('');
-              
-              // If we had a selected aircraft, keep it selected
-              if (selectedAircraft && aircraftRegistration) {
-                console.log('Keeping selected aircraft while showing all types');
-                
-                // Make sure registration dropdown still shows selected aircraft
-                const regDropdown = document.getElementById('aircraft-registration');
-                if (regDropdown) {
-                  regDropdown.value = aircraftRegistration;
-                }
-              }
-              
-              // Ensure we see "-- Change Aircraft Type --" in the dropdown
-              setTimeout(() => {
-                const typeDropdown = document.getElementById('aircraft-type');
-                if (typeDropdown) {
-                  typeDropdown.value = 'select';
-                  console.log('Ensured type dropdown shows "-- Change Aircraft Type --"');
-                }
-              }, 50);
+            // When changing aircraft type, clear the aircraft registration
+            if (onAircraftRegistrationChange) {
+              onAircraftRegistrationChange('');
             }
           }}
           disabled={aircraftLoading}
@@ -216,39 +168,13 @@ const MainCard = ({
             console.log(`Aircraft registration changed to: ${newReg || 'empty'}`);
             
             if (newReg) {
-              console.log('Specific aircraft selected, will reset both dropdowns');
+              console.log('Specific aircraft selected, passing to parent component');
               
-              // CRITICAL FIX: Call the handler immediately to select the aircraft
-              // The context will handle resetting both dropdowns
+              // Call the handler to select the aircraft - let React handle the state
               onAircraftRegistrationChange(newReg);
               
-              // Add a slight delay to show a message that aircraft was selected
-              setTimeout(() => {
-                console.log('Aircraft selection processed, dropdowns should be reset');
-                
-                // Directly update the Selected Aircraft display
-                const selectedDisplay = document.querySelector('.selected-aircraft-display');
-                if (selectedDisplay) {
-                  // Find the selected aircraft in the aircraftsByType 
-                  const allAircraft = Object.values(aircraftsByType || {}).flat();
-                  const aircraft = allAircraft.find(a => a.registration === newReg);
-                  
-                  if (aircraft) {
-                    // Update the Selected Aircraft display
-                    selectedDisplay.innerHTML = `${aircraft.registration.split(' (')[0]} ${aircraft.modelType ? `(${aircraft.modelType})` : ''}`;
-                    selectedDisplay.style.color = '#4285f4';
-                    console.log('Updated selected aircraft display manually');
-                    
-                    // Also update the TOP CARD with aircraft info
-                    const topCardTitle = document.querySelector('.route-stats-title');
-                    if (topCardTitle) {
-                      // Format like in image 2: "N159RB • AW139" with type in blue
-                      topCardTitle.innerHTML = `<span style="color: white">${aircraft.registration.split(' (')[0]} • </span><span style="color: #4285f4">${aircraft.modelType}</span>`;
-                      console.log('Updated top card title with aircraft info');
-                    }
-                  }
-                }
-              }, 100);
+              // Don't manipulate DOM directly, just let React state flow update UI
+              console.log('Aircraft selection processed, parent component will handle updates');
             } else {
               // Just call the parent handler normally for empty selection
               onAircraftRegistrationChange(newReg);

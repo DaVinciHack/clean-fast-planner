@@ -866,6 +866,23 @@ const FastPlannerApp = () => {
         appSettingsManagerRef.current.setAircraft(aircraftType, registration);
       }
       
+      // Handle the case when an aircraft is selected (non-empty registration)
+      if (registration) {
+        // After selecting an aircraft, reset dropdown values for next selection
+        // but maintain the actual selected aircraft in state
+        setTimeout(() => {
+          // Reset type dropdown value but DO NOT change state
+          setAircraftType('');
+          // Reset registration dropdown value but DO NOT clear selected aircraft
+          setAircraftRegistration('');
+          
+          // Force a UI update to refresh the dropdown components
+          setForceUpdate(prev => prev + 1);
+          
+          console.log("Reset dropdowns after aircraft selection while keeping selectedAircraft");
+        }, 100);
+      }
+      
       // Recalculate route if we have waypoints
       if (aircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
         routeCalculatorRef.current.calculateRoute(
