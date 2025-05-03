@@ -520,8 +520,31 @@ const FastPlannerApp = () => {
       }
     };
     
+    // Add event listener for settings-changed to force UI update
+    const handleSettingsChanged = () => {
+      console.log("Settings changed event received, forcing UI update");
+      setForceUpdate(prev => prev + 1);
+      
+      // Recalculate route if needed
+      if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
+        routeCalculatorRef.current.calculateRoute(
+          waypointManagerRef.current.getWaypoints(),
+          selectedAircraft,
+          {
+            passengerWeight,
+            contingencyFuelPercent,
+            taxiFuel,
+            reserveFuel,
+            deckTimePerStop,
+            deckFuelFlow
+          }
+        );
+      }
+    };
+    
     // Add event listener for aircraft settings
     window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    window.addEventListener('settings-changed', handleSettingsChanged);
     
     // Force a rerender after initializing all managers
     setForceUpdate(prev => prev + 1);
@@ -529,6 +552,7 @@ const FastPlannerApp = () => {
     // Clean up event listener on unmount
     return () => {
       window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+      window.removeEventListener('settings-changed', handleSettingsChanged);
     };
   }, [passengerWeight, contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow, waypoints.length, selectedAircraft]);
 

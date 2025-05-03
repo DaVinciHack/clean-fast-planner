@@ -62,6 +62,10 @@ const SettingsCard = ({
     if (newSettings.contingencyFuelPercent !== undefined) {
       onContingencyFuelPercentChange(newSettings.contingencyFuelPercent);
     }
+    
+    // Force update UI after settings change
+    const event = new Event('settings-changed');
+    window.dispatchEvent(event);
   };
   
   // Prepare settings for FlightSettings component
@@ -92,16 +96,17 @@ const SettingsCard = ({
             <input 
               type="number" 
               id="cargo-weight" 
-              value={cargoWeight}
+              value={cargoWeight || ''}
               min="0" 
               max="5000"
+              step="10"
               onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
             />
             <span className="unit">lbs</span>
           </div>
         </div>
       
-        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <button 
             className="control-button"
             onClick={() => {
@@ -124,7 +129,7 @@ const SettingsCard = ({
                 localStorage.setItem('fastPlanner_passengerWeight', passengerWeight);
                 localStorage.setItem('fastPlanner_cargoWeight', cargoWeight);
                 localStorage.setItem('fastPlanner_reserveMethod', reserveMethod);
-                localStorage.setItem('fastPlanner_reserveFuel', taxiFuel);
+                localStorage.setItem('fastPlanner_reserveFuel', reserveFuel);
                 localStorage.setItem('fastPlanner_taxiFuel', taxiFuel);
                 localStorage.setItem('fastPlanner_contingencyFuelPercent', contingencyFuelPercent);
                 console.log('Global flight settings saved to localStorage');
@@ -135,6 +140,48 @@ const SettingsCard = ({
           >
             Save as Global
           </button>
+          
+          {aircraftType && aircraftType !== '' && (
+            <button 
+              className="control-button"
+              style={{ 
+                backgroundColor: '#004488', 
+                backgroundImage: 'linear-gradient(to bottom, #0066cc, #004488)'
+              }}
+              onClick={() => {
+                // Create settings object
+                const settings = {
+                  deckTimePerStop,
+                  deckFuelPerStop,
+                  deckFuelFlow,
+                  taxiFuel,
+                  contingencyFuelPercent,
+                  reserveMethod,
+                  passengerWeight,
+                  cargoWeight
+                };
+                
+                // Show confirmation message
+                const loadingOverlay = document.getElementById('loading-overlay');
+                if (loadingOverlay) {
+                  loadingOverlay.textContent = `Settings saved for all ${aircraftType} aircraft!`;
+                  loadingOverlay.style.display = 'block';
+                  
+                  setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                  }, 1500);
+                }
+                
+                // Call the saveAircraftSettings function via a custom event
+                const event = new CustomEvent('save-aircraft-settings', {
+                  detail: { key: aircraftType, settings }
+                });
+                window.dispatchEvent(event);
+              }}
+            >
+              Save for {aircraftType} Type
+            </button>
+          )}
           
           {selectedAircraft && (
             <button 
@@ -178,48 +225,6 @@ const SettingsCard = ({
               }}
             >
               Save for {selectedAircraft?.registration?.split(' (')[0]}
-            </button>
-          )}
-          
-          {aircraftType && aircraftType !== '' && (
-            <button 
-              className="control-button"
-              style={{ 
-                backgroundColor: '#004488', 
-                backgroundImage: 'linear-gradient(to bottom, #0066cc, #004488)'
-              }}
-              onClick={() => {
-                // Create settings object
-                const settings = {
-                  deckTimePerStop,
-                  deckFuelPerStop,
-                  deckFuelFlow,
-                  taxiFuel,
-                  contingencyFuelPercent,
-                  reserveMethod,
-                  passengerWeight,
-                  cargoWeight
-                };
-                
-                // Show confirmation message
-                const loadingOverlay = document.getElementById('loading-overlay');
-                if (loadingOverlay) {
-                  loadingOverlay.textContent = `Settings saved for all ${aircraftType} aircraft!`;
-                  loadingOverlay.style.display = 'block';
-                  
-                  setTimeout(() => {
-                    loadingOverlay.style.display = 'none';
-                  }, 1500);
-                }
-                
-                // Call the saveAircraftSettings function via a custom event
-                const event = new CustomEvent('save-aircraft-settings', {
-                  detail: { key: aircraftType, settings }
-                });
-                window.dispatchEvent(event);
-              }}
-            >
-              Save for {aircraftType} Type
             </button>
           )}
         </div>

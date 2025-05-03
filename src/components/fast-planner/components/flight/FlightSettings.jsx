@@ -16,14 +16,21 @@ const FlightSettings = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    // Convert to number and update
-    const numValue = parseFloat(value);
-    
-    if (!isNaN(numValue)) {
+    // Convert to number and update (allow empty string for better UX)
+    if (value === '') {
+      // Allow empty string during editing, send 0 to maintain number type
       onSettingsChange({
         ...settings,
-        [name]: numValue
+        [name]: 0
       });
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        onSettingsChange({
+          ...settings,
+          [name]: numValue
+        });
+      }
     }
   };
   
@@ -40,10 +47,11 @@ const FlightSettings = ({
               type="number"
               id="passengerWeight"
               name="passengerWeight"
-              value={settings.passengerWeight}
+              value={settings.passengerWeight || ''}
               onChange={handleChange}
               min="100"
               max="300"
+              step="5"
             />
             <span className="unit">lbs</span>
           </div>
@@ -61,10 +69,11 @@ const FlightSettings = ({
               type="number"
               id="taxiFuel"
               name="taxiFuel"
-              value={settings.taxiFuel}
+              value={settings.taxiFuel || ''}
               onChange={handleChange}
               min="0"
               max="500"
+              step="5"
             />
             <span className="unit">lbs</span>
           </div>
@@ -76,10 +85,11 @@ const FlightSettings = ({
               type="number"
               id="reserveFuel"
               name="reserveFuel"
-              value={settings.reserveFuel}
+              value={settings.reserveFuel || ''}
               onChange={handleChange}
               min="0"
               max="2000"
+              step="10"
             />
             <span className="unit">lbs</span>
           </div>
@@ -94,10 +104,11 @@ const FlightSettings = ({
               type="number"
               id="contingencyFuelPercent"
               name="contingencyFuelPercent"
-              value={settings.contingencyFuelPercent}
+              value={settings.contingencyFuelPercent || ''}
               onChange={handleChange}
               min="0"
               max="100"
+              step="1"
             />
             <span className="unit">%</span>
           </div>
@@ -114,10 +125,11 @@ const FlightSettings = ({
               type="number"
               id="deckTimePerStop"
               name="deckTimePerStop"
-              value={settings.deckTimePerStop}
+              value={settings.deckTimePerStop || ''}
               onChange={handleChange}
               min="1"
               max="60"
+              step="1"
             />
             <span className="unit">mins</span>
           </div>
@@ -129,10 +141,11 @@ const FlightSettings = ({
               type="number"
               id="deckFuelFlow"
               name="deckFuelFlow"
-              value={settings.deckFuelFlow}
+              value={settings.deckFuelFlow || ''}
               onChange={handleChange}
               min="100"
               max="1000"
+              step="10"
             />
             <span className="unit">lbs/hr</span>
           </div>
