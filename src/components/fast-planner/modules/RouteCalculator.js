@@ -118,6 +118,8 @@ class RouteCalculator {
     let totalDistance = 0;
     let legs = [];
     
+    console.log('RouteCalculator: Calculating distance for', coordinates.length, 'waypoints');
+    
     for (let i = 0; i < coordinates.length - 1; i++) {
       const from = window.turf.point(coordinates[i]);
       const to = window.turf.point(coordinates[i + 1]);
@@ -126,12 +128,16 @@ class RouteCalculator {
       const legDistance = window.turf.distance(from, to, options);
       totalDistance += legDistance;
       
+      console.log(`RouteCalculator: Leg ${i+1} distance: ${legDistance.toFixed(1)} nm`);
+      
       legs.push({
         from: coordinates[i],
         to: coordinates[i + 1],
         distance: legDistance.toFixed(1)
       });
     }
+    
+    console.log('RouteCalculator: Total distance calculated:', totalDistance.toFixed(1), 'nm');
     
     // Calculate time based on cruise speed (hours)
     const timeHours = totalDistance / aircraft.cruiseSpeed;

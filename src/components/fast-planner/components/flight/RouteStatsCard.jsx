@@ -206,7 +206,14 @@ const RouteStatsCard = ({
           {/* Column 1: Total Distance and Trip Fuel */}
           <div className="route-stat-item">
             <div className="route-stat-label">Total Distance:</div>
-            <div className="route-stat-value">{stats.totalDistance || '0'} NM</div>
+            <div className="route-stat-value" style={waypoints.length >= 2 ? {fontWeight: 'bold', color: '#0077cc'} : {}}>
+              {stats.totalDistance || '0'} NM
+              {waypoints.length >= 2 && stats.legs && (
+                <div style={{fontSize: '0.7em', color: '#666', marginTop: '2px'}}>
+                  {stats.legs.length} leg{stats.legs.length !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
           </div>
           
           {/* Column 2: Deck Time and Deck Fuel */}
