@@ -51,7 +51,6 @@ const FlightSettings = ({
               min="100"
               max="300"
               step="5"
-              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -74,7 +73,6 @@ const FlightSettings = ({
               min="0"
               max="500"
               step="5"
-              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -91,7 +89,6 @@ const FlightSettings = ({
               min="0"
               max="2000"
               step="10"
-              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -111,7 +108,6 @@ const FlightSettings = ({
               min="0"
               max="100"
               step="1"
-              style={{width: '70px'}}
             />
             <span className="unit">%</span>
           </div>
@@ -133,7 +129,6 @@ const FlightSettings = ({
               min="1"
               max="60"
               step="1"
-              style={{width: '70px'}}
             />
             <span className="unit">mins</span>
           </div>
@@ -150,7 +145,6 @@ const FlightSettings = ({
               min="100"
               max="1000"
               step="10"
-              style={{width: '70px'}}
             />
             <span className="unit">lbs/hr</span>
           </div>
