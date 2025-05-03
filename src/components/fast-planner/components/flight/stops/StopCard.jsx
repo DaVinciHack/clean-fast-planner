@@ -7,7 +7,8 @@ import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon } from './StopIcons';
  * Displays information about a single stop in the route
  * including location, distance, time, fuel, and passenger capacity
  */
-const StopCard = ({
+const StopCard = React.forwardRef(({
+  id,
   index,
   stopName,
   legDistance,
@@ -18,8 +19,9 @@ const StopCard = ({
   totalFuel,
   maxPassengers,
   isActive,
-  onClick
-}) => {
+  onClick,
+  className = ''
+}, ref) => {
   // Function to format time as HH:MM
   const formatTime = (timeHours) => {
     if (!timeHours && timeHours !== 0) return '00:00';
@@ -28,9 +30,14 @@ const StopCard = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  // Combine all class names
+  const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${className}`;
+
   return (
     <div 
-      className={`stop-card ${isActive ? 'stop-card-active' : ''}`}
+      id={id}
+      ref={ref}
+      className={cardClasses}
       onClick={onClick}
       data-index={index}
     >
@@ -62,6 +69,6 @@ const StopCard = ({
       </div>
     </div>
   );
-};
+});
 
 export default StopCard;

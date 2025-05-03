@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import StopCard from './StopCard';
 
 /**
  * StopCardsContainer Component
  * 
  * Manages and displays a collection of StopCard components
- * based on the current route waypoints
+ * based on the current route waypoints with smooth reordering animations
  */
 const StopCardsContainer = ({
   waypoints = [],
@@ -18,12 +18,33 @@ const StopCardsContainer = ({
 }) => {
   const [stopCards, setStopCards] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
+  const [cardPositions, setCardPositions] = useState({});
+  const [animatingCards, setAnimatingCards] = useState({});
+  const prevWaypointsRef = useRef([]);
+  const cardRefs = useRef({});
+  const containerRef = useRef(null);
   
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
     if (waypoints.length < 2) {
       setStopCards([]);
+      prevWaypointsRef.current = [];
       return;
+    }
+    
+    // Store current card positions before update
+    const currentPositions = {};
+    stopCards.forEach(card => {
+      const cardId = `stop-${card.id || card.index}`;
+      const cardElement = document.getElementById(cardId);
+      if (cardElement) {
+        currentPositions[cardId] = cardElement.getBoundingClientRect();
+      }
+    });
+    
+    // If we have positions, store them
+    if (Object.keys(currentPositions).length > 0) {
+      setCardPositions(currentPositions);
     }
     
     // Create data for each stop
@@ -51,6 +72,9 @@ const StopCardsContainer = ({
     for (let i = 0; i < waypoints.length - 1; i++) {
       const fromWaypoint = waypoints[i];
       const toWaypoint = waypoints[i + 1];
+      
+      // Create a unique ID for this stop
+      const stopId = toWaypoint.id || `waypoint-${i}`;
       
       // Get leg distance from routeStats if available
       let legDistance = 0;
@@ -96,6 +120,7 @@ const StopCardsContainer = ({
       // Create the card data
       cards.push({
         index: i,
+        id: stopId,
         stopName: toWaypoint.name,
         legDistance: legDistance.toFixed(1),
         totalDistance: cumulativeDistance.toFixed(1),
@@ -103,16 +128,91 @@ const StopCardsContainer = ({
         totalTime: cumulativeTime,
         legFuel: legFuel,
         totalFuel: cumulativeFuel,
-        maxPassengers: maxPassengers
+        maxPassengers: maxPassengers,
+        isNew: prevWaypointsRef.current.findIndex(wp => wp.id === toWaypoint.id) === -1
       });
     }
     
+    // Update cards state
     setStopCards(cards);
+    
+    // Update previous waypoints
+    prevWaypointsRef.current = [...waypoints];
   }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow]);
+  
+  // Apply FLIP animation after cards update
+  useEffect(() => {
+    if (Object.keys(cardPositions).length === 0 || stopCards.length === 0) {
+      return;
+    }
+    
+    // Calculate final positions and prepare animations
+    requestAnimationFrame(() => {
+      const newAnimating = {};
+      
+      stopCards.forEach(card => {
+        const cardId = `stop-${card.id}`;
+        const cardElement = document.getElementById(cardId);
+        
+        if (cardElement && cardPositions[cardId]) {
+          // Get the old and new positions
+          const oldPos = cardPositions[cardId];
+          const newPos = cardElement.getBoundingClientRect();
+          
+          // Calculate the difference
+          const deltaY = oldPos.top - newPos.top;
+          
+          // If there's a significant change, animate it
+          if (Math.abs(deltaY) > 5) {
+            // Set the initial position
+            cardElement.style.transform = `translateY(${deltaY}px)`;
+            cardElement.style.transition = 'none';
+            
+            // Force reflow
+            cardElement.offsetHeight;
+            
+            // Add moving class and set transition back
+            cardElement.classList.add('moving');
+            cardElement.style.transform = '';
+            cardElement.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            
+            // Track which cards are animating
+            newAnimating[cardId] = true;
+            
+            // Clean up after animation
+            setTimeout(() => {
+              if (cardElement) {
+                cardElement.classList.remove('moving');
+                setAnimatingCards(prev => {
+                  const updated = {...prev};
+                  delete updated[cardId];
+                  return updated;
+                });
+              }
+            }, 500);
+          }
+        }
+      });
+      
+      if (Object.keys(newAnimating).length > 0) {
+        setAnimatingCards(newAnimating);
+      }
+      
+      // Clear stored positions
+      setCardPositions({});
+    });
+  }, [stopCards, cardPositions]);
   
   // Handle card click
   const handleCardClick = (index) => {
     setActiveCardIndex(index === activeCardIndex ? null : index);
+  };
+  
+  // Save reference to card element
+  const setCardRef = (id, el) => {
+    if (el) {
+      cardRefs.current[id] = el;
+    }
   };
   
   // If there are no cards, don't render anything
@@ -121,28 +221,42 @@ const StopCardsContainer = ({
   }
   
   return (
-    <div className="stop-cards-container">
-      <div className="stop-cards-header">
-        <h4>Route Stops</h4>
-      </div>
+    <div className="route-stops">
+      <h4 className="route-stops-title">ROUTE STOPS</h4>
       
-      <div className="stop-cards-stack">
-        {stopCards.map((card, index) => (
-          <StopCard
-            key={`stop-${index}`}
-            index={card.index}
-            stopName={card.stopName}
-            legDistance={card.legDistance}
-            totalDistance={card.totalDistance}
-            legTime={card.legTime}
-            totalTime={card.totalTime}
-            legFuel={card.legFuel}
-            totalFuel={card.totalFuel}
-            maxPassengers={card.maxPassengers}
-            isActive={index === activeCardIndex}
-            onClick={() => handleCardClick(index)}
-          />
-        ))}
+      <div className="stop-cards-container">
+        <div className="stop-cards-stack" ref={containerRef}>
+          {stopCards.map((card, index) => {
+            const cardId = `stop-${card.id}`;
+            let className = '';
+            
+            if (card.isNew) {
+              className = 'new-card';
+            } else if (animatingCards[cardId]) {
+              className = 'moving';
+            }
+            
+            return (
+              <StopCard
+                key={cardId}
+                id={cardId}
+                index={card.index}
+                stopName={card.stopName}
+                legDistance={card.legDistance}
+                totalDistance={card.totalDistance}
+                legTime={card.legTime}
+                totalTime={card.totalTime}
+                legFuel={card.legFuel}
+                totalFuel={card.totalFuel}
+                maxPassengers={card.maxPassengers}
+                isActive={index === activeCardIndex}
+                onClick={() => handleCardClick(index)}
+                className={className}
+                ref={el => setCardRef(cardId, el)}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );

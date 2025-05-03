@@ -1,6 +1,7 @@
 import React from 'react';
 import RegionSelector from '../../controls/RegionSelector';
 import { StopCardsContainer } from '../../flight/stops';
+import '../../flight/stops/StopCards.css';
 
 /**
  * MainCard Component
@@ -375,16 +376,7 @@ const MainCard = ({
       </div>
       
       <div className="control-section">
-        <h4>Route Statistics</h4>
-        <div id="route-stats" className="route-stats">
-          <div><strong>Total Distance:</strong> <span id="total-distance">{routeStats?.totalDistance || '0'}</span> nm</div>
-          <div><strong>Estimated Time:</strong> <span id="estimated-time">{routeStats?.estimatedTime || '00:00'}</span></div>
-          <div><strong>Fuel Required:</strong> <span id="fuel-required">{routeStats?.fuelRequired || '0'}</span> lbs</div>
-          <div><strong>Usable Load:</strong> <span id="usable-load">{routeStats?.usableLoad || '0'}</span> lbs</div>
-          <div><strong>Max Passengers:</strong> <span id="max-passengers">{routeStats?.maxPassengers || '0'}</span></div>
-        </div>
-        
-        {/* Stop Cards */}
+        {/* Stop Cards - taking full space now since Route Statistics is removed */}
         {waypoints.length >= 2 && (
           <StopCardsContainer
             waypoints={waypoints}
@@ -396,108 +388,6 @@ const MainCard = ({
             deckFuelFlow={deckFuelFlow}
           />
         )}
-      </div>
-      
-      <div id="auth-status" className="control-section">
-        <h4>Connection Status</h4>
-        {/* Add debug info in development */}
-        <div style={{fontSize: '10px', color: '#888', marginBottom: '4px'}}>
-          Auth state: {String(isAuthenticated)} | User: {authUserName || 'None'}
-        </div>
-        <div id="auth-message" className={isAuthenticated ? "auth-success" : "auth-error"}>
-          {isAuthenticated 
-            ? `Connected to Foundry${authUserName ? " as " + authUserName : ""}` 
-            : "Not connected to Foundry"}
-        </div>
-        {!isAuthenticated && (
-          <button 
-            id="login-button" 
-            className="control-button" 
-            onClick={(e) => {
-              e.preventDefault();
-              // Add a visual feedback
-              const messageEl = document.getElementById('auth-message');
-              if (messageEl) {
-                messageEl.innerHTML = 'Connecting to Foundry...';
-                messageEl.className = 'auth-pending';
-              }
-              
-              // Call the login function
-              if (onLogin) {
-                onLogin();
-                
-                // Force immediate UI update - this helps with the visual feedback
-                setTimeout(() => {
-                  const authMessage = document.getElementById('auth-message');
-                  if (authMessage) {
-                    if (window.isFoundryAuthenticated) {
-                      authMessage.innerHTML = `Connected to Foundry as Duncan Burbury`;
-                      authMessage.className = 'auth-success';
-                      
-                      // Hide login button
-                      const loginBtn = document.getElementById('login-button');
-                      if (loginBtn) loginBtn.style.display = 'none';
-                    }
-                  }
-                }, 2000);
-              }
-            }}
-          >
-            Login to Foundry
-          </button>
-        )}
-        {/* Debug button to refresh state */}
-        <button 
-          style={{
-            fontSize: '10px', 
-            padding: '2px 4px', 
-            backgroundColor: '#555', 
-            color: 'white',
-            marginTop: '5px',
-            cursor: 'pointer',
-            border: 'none',
-            borderRadius: '3px'
-          }}
-          onClick={() => {
-            console.log("Checking localStorage for auth state...");
-            try {
-              // Check localStorage
-              const storedAuth = localStorage.getItem('fastPlanner_isAuthenticated');
-              console.log("localStorage auth state:", storedAuth);
-              
-              // Force refresh auth state from localStorage
-              if (storedAuth === 'true') {
-                console.log("Found true auth state in localStorage, refreshing UI...");
-                
-                // Get user details
-                const userDetails = localStorage.getItem('fastPlanner_userDetails');
-                console.log("User details in localStorage:", userDetails ? "FOUND" : "NOT FOUND");
-                
-                // Create a flash message
-                const loadingOverlay = document.getElementById('loading-overlay');
-                if (loadingOverlay) {
-                  loadingOverlay.textContent = 'Refreshing authentication state...';
-                  loadingOverlay.style.display = 'block';
-                  
-                  setTimeout(() => {
-                    loadingOverlay.style.display = 'none';
-                    window.location.reload(); // Force page reload as a last resort
-                  }, 1000);
-                }
-              } else {
-                console.log("No valid auth state in localStorage");
-                if (onLogin) {
-                  console.log("Calling login function...");
-                  onLogin();
-                }
-              }
-            } catch (e) {
-              console.error("Error checking auth state:", e);
-            }
-          }}
-        >
-          Refresh connection
-        </button>
       </div>
     </div>
   );

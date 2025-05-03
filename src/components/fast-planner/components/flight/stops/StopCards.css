@@ -1,62 +1,61 @@
 /* StopCards.css */
 .stop-cards-container {
-  margin-top: 10px;
+  margin-top: 15px;
   padding-top: 5px;
 }
 
 .stop-cards-header {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding-left: 3px;
 }
 
 .stop-cards-header h4 {
   margin: 0;
-  color: var(--label-color, #ccc);
+  color: #3498db;
   font-size: 0.9em;
   font-weight: 600;
+  text-transform: uppercase;
 }
 
+/* Stop cards container for FLIP animations */
 .stop-cards-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
+  gap: 3px;
   padding-right: 5px;
-  scrollbar-width: thin;
-  scrollbar-color: #444 #222;
+  padding-bottom: 5px;
+  position: relative; /* Important for absolute positioning during animation */
 }
 
-.stop-cards-stack::-webkit-scrollbar {
-  width: 4px;
-}
-
-.stop-cards-stack::-webkit-scrollbar-track {
-  background: #222;
-  border-radius: 3px;
-}
-
-.stop-cards-stack::-webkit-scrollbar-thumb {
-  background-color: #444;
-  border-radius: 3px;
-}
-
+/* Base card styling */
 .stop-card {
-  background-color: rgba(30, 35, 40, 0.6);
+  background-color: rgba(45, 45, 45, 0.85);
   border-left: 3px solid #3498db;
   border-radius: 3px;
   padding: 8px 10px;
-  transition: all 0.3s ease;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease,
+              background-color 0.3s ease;
+  will-change: transform, opacity;
+  z-index: 1;
+  position: relative;
   cursor: pointer;
 }
 
-.stop-card:hover {
-  background-color: rgba(40, 45, 50, 0.8);
+/* Animation states */
+.stop-card.moving {
+  z-index: 2;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); 
 }
 
-.stop-card-active {
-  background-color: rgba(30, 45, 65, 0.7);
-  border-left-color: #5dade2;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+.stop-card.new-card {
+  animation: cardAppear 0.3s ease-out;
+}
+
+.stop-card.removing {
+  animation: cardRemove 0.3s ease-in forwards;
 }
 
 .stop-header {
@@ -77,6 +76,7 @@
   font-size: 0.75em;
   font-weight: bold;
   margin-right: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .stop-name {
@@ -87,30 +87,43 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 180px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .stop-details {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
   align-items: center;
+  padding: 0;
+  margin-top: 0;
+  width: 100%;
 }
 
 .stop-metric {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .stop-metric .icon {
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: #3498db;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+  flex-shrink: 0;
 }
 
 .metric-value {
-  font-size: 0.8em;
-  color: white;
+  font-size: 0.75em;
+  font-weight: 500;
+  color: #f5f5f5;
   display: flex;
   align-items: center;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .leg-value {
@@ -123,23 +136,57 @@
   margin-left: 3px;
 }
 
+/* Style for route stops container */
+.route-stops {
+  background-color: rgba(35, 35, 35, 0.85);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 15px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Route stops header styling */
+.route-stops-title {
+  color: #3498db;
+  font-size: 0.95em;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.stop-card:hover {
+  background-color: rgba(55, 55, 55, 0.85);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.stop-card-active {
+  background-color: rgba(50, 60, 75, 0.85);
+  border-left-color: #5dade2;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
 /* Animation for new cards */
 @keyframes cardAppear {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateY(-20px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
-.stop-card {
-  animation: cardAppear 0.3s ease-out;
-}
-
-/* Animation for card reordering */
-.card-reordering {
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+/* Animation for card removal */
+@keyframes cardRemove {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
 }
