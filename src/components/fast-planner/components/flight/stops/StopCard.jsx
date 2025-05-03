@@ -1,4 +1,5 @@
 import React from 'react';
+import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon } from './StopIcons';
 
 /**
  * StopCard Component
@@ -40,44 +41,23 @@ const StopCard = ({
       
       <div className="stop-details">
         <div className="stop-metric">
-          <span className="icon">🛣️</span>
-          <div className="metric-values">
-            <div className="metric-label">Distance</div>
-            <div className="metric-value">
-              <span className="leg-value">{legDistance || '0'}</span>
-              <span className="total-value">/ {totalDistance || '0'} nm</span>
-            </div>
-          </div>
+          <span className="icon"><DistanceIcon /></span>
+          <div className="metric-value">{legDistance || '0'} nm</div>
         </div>
         
         <div className="stop-metric">
-          <span className="icon">⏱️</span>
-          <div className="metric-values">
-            <div className="metric-label">Time</div>
-            <div className="metric-value">
-              <span className="leg-value">{formatTime(legTime)}</span>
-              <span className="total-value">/ {formatTime(totalTime)}</span>
-            </div>
-          </div>
+          <span className="icon"><TimeIcon /></span>
+          <div className="metric-value">{formatTime(legTime)}</div>
         </div>
         
         <div className="stop-metric">
-          <span className="icon">⛽</span>
-          <div className="metric-values">
-            <div className="metric-label">Fuel</div>
-            <div className="metric-value">
-              <span className="leg-value">{legFuel || '0'}</span>
-              <span className="total-value">/ {totalFuel || '0'} lbs</span>
-            </div>
-          </div>
+          <span className="icon"><FuelIcon /></span>
+          <div className="metric-value">{legFuel || '0'} lbs</div>
         </div>
         
         <div className="stop-metric">
-          <span className="icon">👥</span>
-          <div className="metric-values">
-            <div className="metric-label">Passengers</div>
-            <div className="metric-value">{maxPassengers || '0'}</div>
-          </div>
+          <span className="icon"><PassengerIcon /></span>
+          <div className="metric-value">{maxPassengers || '0'}</div>
         </div>
       </div>
     </div>

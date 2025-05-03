@@ -126,7 +126,7 @@ const StopCardsContainer = ({
         <h4>Route Stops</h4>
       </div>
       
-      <div className="stop-cards-scroll">
+      <div className="stop-cards-stack">
         {stopCards.map((card, index) => (
           <StopCard
             key={`stop-${index}`}
