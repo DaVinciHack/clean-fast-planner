@@ -311,17 +311,13 @@ const StopCardsContainer = ({
                 id={cardId}
                 index={card.index}
                 stopName={card.stopName}
-                legDistance={card.legDistance}
                 totalDistance={card.totalDistance}
-                legTime={card.legTime}
                 totalTime={card.totalTime}
-                legFuel={card.legFuel}
                 totalFuel={card.totalFuel}
                 maxPassengers={card.maxPassengers}
                 groundSpeed={card.groundSpeed}
                 headwind={card.headwind}
                 deckTime={card.deckTime}
-                deckFuel={card.deckFuel}
                 isActive={index === activeCardIndex}
                 onClick={() => handleCardClick(index)}
                 className={className}

@@ -4,25 +4,20 @@ import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon, WindIcon } from './Sto
 /**
  * StopCard Component
  * 
- * Displays information about a single stop in the route
- * including location, distance, time, fuel, passenger capacity, and wind data
- * Shows both leg-specific and cumulative information
+ * Displays cumulative information about a stop in the route
+ * Only shows the total values at this point in the journey
  */
 const StopCard = React.forwardRef(({
   id,
   index,
   stopName,
-  legDistance,
   totalDistance,
-  legTime,
   totalTime,
-  legFuel,
   totalFuel,
   maxPassengers,
   groundSpeed,
   headwind,
   deckTime,
-  deckFuel,
   isActive,
   onClick,
   className = ''
@@ -38,36 +33,6 @@ const StopCard = React.forwardRef(({
   // Combine all class names
   const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${className}`;
   
-  // For expanded cards, we'll show both leg and cumulative information
-  const expandedCard = isActive;
-  
-  // Styles for the cumulative vs leg values
-  const styles = {
-    metricValues: {
-      display: 'flex',
-      flexDirection: 'column'
-    },
-    totalValue: {
-      fontWeight: 'bold',
-      fontSize: '13px', 
-      color: 'white'
-    },
-    legValue: {
-      fontSize: '12px',
-      color: '#a0a0a0'
-    },
-    legValueSmall: {
-      fontSize: '10px',
-      color: '#808080',
-      marginTop: '2px'
-    },
-    deckValue: {
-      fontSize: '10px',
-      color: '#00bcd4',
-      marginTop: '2px'
-    }
-  };
-
   return (
     <div 
       id={id}
@@ -82,63 +47,22 @@ const StopCard = React.forwardRef(({
       </div>
       
       <div className="stop-details">
-        {/* Distance information */}
+        {/* Total Distance */}
         <div className="stop-metric">
           <span className="icon"><DistanceIcon /></span>
-          <div style={styles.metricValues}>
-            {expandedCard ? (
-              <>
-                <div style={styles.legValue} title="Leg distance">Leg: {legDistance || '0'} nm</div>
-                <div style={styles.totalValue} title="Total distance">Total: {totalDistance || '0'} nm</div>
-              </>
-            ) : (
-              // When collapsed, show the total distance first, then leg in smaller text
-              <>
-                <div className="metric-value">{totalDistance || '0'} nm</div>
-                <div style={styles.legValueSmall}>Leg: {legDistance || '0'} nm</div>
-              </>
-            )}
-          </div>
+          <div className="metric-value">{totalDistance || '0'} nm</div>
         </div>
         
-        {/* Time information */}
+        {/* Total Time */}
         <div className="stop-metric">
           <span className="icon"><TimeIcon /></span>
-          <div style={styles.metricValues}>
-            {expandedCard ? (
-              <>
-                <div style={styles.legValue} title="Leg time">Leg: {formatTime(legTime)}</div>
-                {deckTime > 0 && <div style={styles.deckValue} title="Deck time">Deck: {Math.round(deckTime)} min</div>}
-                <div style={styles.totalValue} title="Total time">Total: {formatTime(totalTime)}</div>
-              </>
-            ) : (
-              // When collapsed, show the total time first, then leg in smaller text
-              <>
-                <div className="metric-value">{formatTime(totalTime)}</div>
-                <div style={styles.legValueSmall}>Leg: {formatTime(legTime)}</div>
-              </>
-            )}
-          </div>
+          <div className="metric-value">{formatTime(totalTime)}</div>
         </div>
         
-        {/* Fuel information */}
+        {/* Total Fuel */}
         <div className="stop-metric">
           <span className="icon"><FuelIcon /></span>
-          <div style={styles.metricValues}>
-            {expandedCard ? (
-              <>
-                <div style={styles.legValue} title="Leg fuel">Leg: {legFuel || '0'} lbs</div>
-                {deckFuel > 0 && <div style={styles.deckValue} title="Deck fuel">Deck: {deckFuel} lbs</div>}
-                <div style={styles.totalValue} title="Total fuel">Total: {totalFuel || '0'} lbs</div>
-              </>
-            ) : (
-              // When collapsed, show the total fuel first, then leg in smaller text
-              <>
-                <div className="metric-value">{totalFuel || '0'} lbs</div>
-                <div style={styles.legValueSmall}>Leg: {legFuel || '0'} lbs</div>
-              </>
-            )}
-          </div>
+          <div className="metric-value">{totalFuel || '0'} lbs</div>
         </div>
         
         {/* Passenger information */}

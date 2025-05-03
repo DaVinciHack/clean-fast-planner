@@ -362,17 +362,34 @@ class WaypointManager {
         legFuel = Math.round(timeHours * fuelBurn);
       }
       
-      // Create the label text in a single line with dashes between values and arrow at the end
-      // Make sure there are no line breaks by explicitly creating one string with all values
+      // Format distance value
       let distanceText = `${distance.toFixed(1)} nm`;
+      
+      // Format leg time value (enhanced)
       let timeText = legTime ? `${legTime}` : "";
+      
+      // Format fuel value (enhanced)
       let fuelText = legFuel ? `${legFuel} lbs` : "";
       
-      // Combine all values in a single line with dashes
-      let labelText = distanceText;
-      if (timeText) labelText += ` - ${timeText}`;
-      if (fuelText) labelText += ` - ${fuelText}`;
-      labelText += ' ➜'; // Add larger arrow at the end (➜ instead of →)
+      // Create a clear, enhanced label with more information
+      // Shows distance, time, and fuel on separate lines for better readability
+      let labelText = '';
+      
+      // Always show distance
+      labelText += distanceText;
+      
+      // Add time if available
+      if (timeText) {
+        labelText += `\n${timeText}`;
+      }
+      
+      // Add fuel if available
+      if (fuelText) {
+        labelText += `\n${fuelText}`;
+      }
+      
+      // Add arrow indicator
+      labelText += ' ➜';
       
       // Determine the adjusted bearing for text orientation
       // Make the text parallel to the line and ensure it's never upside down
@@ -614,21 +631,23 @@ class WaypointManager {
         'layout': {
           'symbol-placement': 'point',
           'text-field': ['get', 'text'], // Use direct text field
-          'text-size': 11,               // Slightly smaller text to fit better
+          'text-size': 12,               // Slightly larger text for better readability
           'text-font': ['Arial Unicode MS Bold'],
-          'text-offset': [0, -1.5],      // Position further above the line
+          'text-offset': [0, -0.5],      // Position closer to the line
           'text-anchor': 'center',
           'text-rotate': ['get', 'textBearing'], // Use the adjusted bearing for proper orientation
           'text-rotation-alignment': 'map',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
-          'text-max-width': 30,          // Ensure text doesn't wrap to multiple lines
+          'text-max-width': 12,          // Allow text to wrap to multiple lines
+          'text-line-height': 1.2,       // Add some line spacing for multiline text
           'symbol-sort-key': 3           // Ensure labels appear above everything
         },
         'paint': {
           'text-color': '#ffffff',
           'text-halo-color': '#000000',
-          'text-halo-width': 2.5         // Slightly thicker for better readability
+          'text-halo-width': 3,         // Thicker halo for better readability
+          'text-opacity': 0.9
         },
         'filter': ['has', 'isLabel']     // Only show labels, not arrows
       });
