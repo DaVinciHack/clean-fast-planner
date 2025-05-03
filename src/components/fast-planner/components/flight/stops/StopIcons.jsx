@@ -33,6 +33,13 @@ export const PassengerIcon = () => (
   </svg>
 );
 
+export const WindIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 5C14 3.9 13.1 3 12 3C10.9 3 10 3.9 10 5C10 6.1 10.9 7 12 7H20V9H12C9.24 9 7 6.76 7 4C7 1.24 9.24 -1 12 -1C14.76 -1 17 1.24 17 4V5H14ZM4 13C4 14.1 4.9 15 6 15C7.1 15 8 14.1 8 13C8 11.9 7.1 11 6 11H2V9H6C8.76 9 11 11.24 11 14C11 16.76 8.76 19 6 19C3.24 19 1 16.76 1 14V13H4ZM13 17C13 18.66 11.66 20 10 20C8.34 20 7 18.66 7 17C7 15.34 8.34 14 10 14H22V16H10C9.45 16 9 16.45 9 17C9 17.55 9.45 18 10 18H13V17Z" 
+      fill="#3498db" />
+  </svg>
+);
+
 // Icon set as a component with name props
 export const StopIcon = ({ name }) => {
   switch (name) {
@@ -44,6 +51,8 @@ export const StopIcon = ({ name }) => {
       return <FuelIcon />;
     case 'passenger':
       return <PassengerIcon />;
+    case 'wind':
+      return <WindIcon />;
     default:
       return null;
   }

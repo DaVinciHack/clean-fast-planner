@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import StopCard from './StopCard';
+import { calculateWindAdjustedTime, calculateLegWithWind } from '../../../modules/calculations/WindCalculations';
 
 /**
  * StopCardsContainer Component
  * 
  * Manages and displays a collection of StopCard components
  * based on the current route waypoints with smooth reordering animations
+ * Includes wind calculations for more accurate timing and fuel estimates
  */
 const StopCardsContainer = ({
   waypoints = [],
@@ -14,7 +16,8 @@ const StopCardsContainer = ({
   passengerWeight = 220,
   reserveFuel = 600,
   deckTimePerStop = 5,
-  deckFuelFlow = 400
+  deckFuelFlow = 400,
+  weather = { windSpeed: 0, windDirection: 0 } // Default to no wind
 }) => {
   const [stopCards, setStopCards] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
@@ -82,11 +85,31 @@ const StopCardsContainer = ({
         legDistance = parseFloat(routeStats.legs[i].distance);
       }
       
-      // Calculate leg time based on aircraft speed
-      const legTimeHours = legDistance / aircraft.cruiseSpeed;
+      // Calculate leg timing and fuel with wind adjustments
+      let legTimeHours = 0;
+      let legFuel = 0;
+      let legGroundSpeed = aircraft.cruiseSpeed;
+      let headwindComponent = 0;
       
-      // Calculate leg fuel based on burn rate
-      const legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+      if (fromWaypoint.lat && fromWaypoint.lon && toWaypoint.lat && toWaypoint.lon) {
+        // Use wind calculations if we have full coordinates
+        const legDetails = calculateLegWithWind(
+          fromWaypoint,
+          toWaypoint,
+          legDistance,
+          aircraft,
+          weather
+        );
+        
+        legTimeHours = legDetails.time;
+        legFuel = Math.round(legDetails.fuel);
+        legGroundSpeed = Math.round(legDetails.groundSpeed);
+        headwindComponent = Math.round(legDetails.headwindComponent);
+      } else {
+        // Fall back to simple calculation without wind
+        legTimeHours = legDistance / aircraft.cruiseSpeed;
+        legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+      }
       
       // Update cumulative values
       cumulativeDistance += legDistance;
@@ -129,7 +152,9 @@ const StopCardsContainer = ({
         legFuel: legFuel,
         totalFuel: cumulativeFuel,
         maxPassengers: maxPassengers,
-        isNew: prevWaypointsRef.current.findIndex(wp => wp.id === toWaypoint.id) === -1
+        isNew: prevWaypointsRef.current.findIndex(wp => wp.id === toWaypoint.id) === -1,
+        groundSpeed: legGroundSpeed,
+        headwind: headwindComponent
       });
     }
     
@@ -138,7 +163,7 @@ const StopCardsContainer = ({
     
     // Update previous waypoints
     prevWaypointsRef.current = [...waypoints];
-  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow]);
+  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow, weather]);
   
   // Apply FLIP animation after cards update
   useEffect(() => {

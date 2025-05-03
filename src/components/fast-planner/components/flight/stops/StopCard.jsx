@@ -1,11 +1,11 @@
 import React from 'react';
-import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon } from './StopIcons';
+import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon, WindIcon } from './StopIcons';
 
 /**
  * StopCard Component
  * 
  * Displays information about a single stop in the route
- * including location, distance, time, fuel, and passenger capacity
+ * including location, distance, time, fuel, passenger capacity, and wind data
  */
 const StopCard = React.forwardRef(({
   id,
@@ -18,6 +18,8 @@ const StopCard = React.forwardRef(({
   legFuel,
   totalFuel,
   maxPassengers,
+  groundSpeed,
+  headwind,
   isActive,
   onClick,
   className = ''
@@ -66,6 +68,19 @@ const StopCard = React.forwardRef(({
           <span className="icon"><PassengerIcon /></span>
           <div className="metric-value">{maxPassengers || '0'}</div>
         </div>
+        
+        {headwind !== undefined && (
+          <div className="stop-metric wind-info" title={`Groundspeed: ${groundSpeed || 0} kts`}>
+            <span className="icon"><WindIcon /></span>
+            <div 
+              className="metric-value"
+              data-positive={headwind > 0}
+              data-negative={headwind < 0}
+            >
+              {headwind > 0 ? `+${headwind}` : headwind} kts
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

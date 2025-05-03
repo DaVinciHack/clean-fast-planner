@@ -39,6 +39,14 @@ const MainCard = ({
   deckTimePerStop = 5,
   deckFuelFlow = 400,
 }) => {
+  // Default weather data - later we'll fetch this from API or weather tab
+  const [weatherData, setWeatherData] = React.useState({
+    windSpeed: 15,     // Wind speed in knots
+    windDirection: 270, // Direction wind is coming FROM in degrees (270 = from west)
+    temperature: 15,    // Temperature in Celsius
+    pressure: 1013.25   // Pressure in hPa
+  });
+  
   return (
     <div className="tab-content main-tab">
       <div className="panel-header">
@@ -373,6 +381,50 @@ const MainCard = ({
             </div>
           </div>
         )}
+        
+        {/* Temporary Weather Control Section - Will be moved to Weather card later */}
+        <div className="weather-control-section">
+          <h4>Wind Settings</h4>
+          <div className="settings-group">
+            <div>
+              <label htmlFor="wind-speed">Wind Speed:</label>
+              <div className="input-with-unit">
+                <input
+                  id="wind-speed"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={weatherData.windSpeed}
+                  onChange={(e) => setWeatherData({
+                    ...weatherData,
+                    windSpeed: parseInt(e.target.value) || 0
+                  })}
+                />
+                <span className="unit">kts</span>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="wind-direction">Direction From:</label>
+              <div className="input-with-unit">
+                <input
+                  id="wind-direction"
+                  type="number"
+                  min="0"
+                  max="359"
+                  value={weatherData.windDirection}
+                  onChange={(e) => setWeatherData({
+                    ...weatherData,
+                    windDirection: parseInt(e.target.value) || 0
+                  })}
+                />
+                <span className="unit">°</span>
+              </div>
+            </div>
+          </div>
+          <div className="small-hint">
+            Direction is where the wind is coming FROM (270° = West to East)
+          </div>
+        </div>
       </div>
       
       <div className="control-section">
@@ -386,6 +438,7 @@ const MainCard = ({
             reserveFuel={reserveFuel}
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}
+            weather={weatherData}
           />
         )}
       </div>
