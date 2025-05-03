@@ -879,11 +879,13 @@ const FastPlannerApp = () => {
     let cumulativeDistance = 0;
     let cumulativeTime = 0;
     let cumulativeFuel = 0;
+    let cumulativeDeckTime = 0;
+    let cumulativeDeckFuel = 0;
     
     // Get aircraft data for calculations
     const aircraft = selectedAircraft;
     
-    // Add taxi fuel to the total
+    // Add taxi fuel to the total immediately
     const taxiFuelValue = taxiFuel || 50; // Default value
     cumulativeFuel += taxiFuelValue;
     
@@ -990,24 +992,23 @@ const FastPlannerApp = () => {
       
       // Update cumulative values
       cumulativeDistance += legDistance;
-      
-      // Add this leg's time to cumulative time
-      console.log(`Leg ${i} time: ${legTimeHours}, cumulative before: ${cumulativeTime}`);
       cumulativeTime += legTimeHours;
-      console.log(`Cumulative time after adding leg time: ${cumulativeTime}`);
-      
       cumulativeFuel += legFuel;
       
-      // Add deck time and fuel for all stops except the final destination
-      if (i < waypoints.length - 2) {
-        const deckTimeHours = deckTimePerStop / 60; // Convert minutes to hours
-        const deckFuel = Math.round(deckTimeHours * deckFuelFlow);
+      // Add deck time and fuel for this stop if it's not the final destination
+      // IMPORTANT: Only add deck time to future stops, since the current stop
+      // hasn't had its deck time yet - it will be added to the NEXT leg
+      let deckTimeHours = 0;
+      let deckFuel = 0;
+
+      // Add deck time only if this is not the final leg
+      // This adds deck time for the PREVIOUS stop, not the current one
+      if (i > 0) {
+        deckTimeHours = deckTimePerStop / 60; // Convert minutes to hours
+        deckFuel = Math.round(deckTimeHours * deckFuelFlow);
         
-        console.log(`Adding deck time at stop ${i+1}: ${deckTimeHours}`);
-        cumulativeTime += deckTimeHours;
-        console.log(`Cumulative time after adding deck time: ${cumulativeTime}`);
-        
-        cumulativeFuel += deckFuel;
+        cumulativeDeckTime += deckTimeHours;
+        cumulativeDeckFuel += deckFuel;
       }
       
       // Calculate max passengers based on remaining load
@@ -1017,7 +1018,7 @@ const FastPlannerApp = () => {
           0, 
           selectedAircraft.maxTakeoffWeight - 
           selectedAircraft.emptyWeight - 
-          cumulativeFuel
+          cumulativeFuel - cumulativeDeckFuel
         );
         maxPassengers = Math.floor(usableLoad / passengerWeight);
         
@@ -1034,19 +1035,35 @@ const FastPlannerApp = () => {
         legDistance: legDistance.toFixed(1),
         totalDistance: cumulativeDistance.toFixed(1),
         legTime: Number(legTimeHours),
-        totalTime: Number(cumulativeTime),
+        // Include cumulative deck time in the total time calculation
+        totalTime: Number(cumulativeTime + cumulativeDeckTime),
         legFuel: Number(legFuel),
-        totalFuel: Number(cumulativeFuel),
+        // Include cumulative deck fuel in the total fuel calculation
+        totalFuel: Number(cumulativeFuel + cumulativeDeckFuel),
         maxPassengers: Number(maxPassengers),
         groundSpeed: Number(legGroundSpeed),
-        headwind: Number(headwindComponent)
+        headwind: Number(headwindComponent),
+        // Add explicit deck time values for display
+        deckTime: Number(cumulativeDeckTime * 60), // Convert back to minutes for display
+        deckFuel: Number(cumulativeDeckFuel)
       };
       
-      console.log(`Stop card ${i} data:`, JSON.stringify(cardData));
+      console.log(`Stop card ${i} data:`, {
+        stopName: cardData.stopName,
+        legTime: cardData.legTime,
+        cumulativeTime: cumulativeTime,
+        deckTime: cumulativeDeckTime * 60,
+        totalTime: cardData.totalTime,
+        legFuel: cardData.legFuel,
+        cumulativeFuel: cumulativeFuel,
+        deckFuel: cumulativeDeckFuel,
+        totalFuel: cardData.totalFuel
+      });
+      
       cards.push(cardData);
     }
     
-    console.log('All stop cards generated:', JSON.stringify(cards));
+    console.log('All stop cards generated, cards count:', cards.length);
     return cards;
   };
 

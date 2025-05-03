@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import StopCard from './StopCard';
-import { calculateWindAdjustedTime, calculateLegWithWind } from '../../../modules/calculations/WindCalculations';
+// Import statement removed; we'll access WindCalculations from the window
 
 /**
  * StopCardsContainer Component
@@ -35,6 +35,9 @@ const StopCardsContainer = ({
       return;
     }
     
+    // Add debug logging for weather data
+    console.log('StopCardsContainer: Processing with weather data:', weather);
+    
     // Store current card positions before update
     const currentPositions = {};
     stopCards.forEach(card => {
@@ -57,12 +60,21 @@ const StopCardsContainer = ({
     let cumulativeFuel = 0;
     
     // Get aircraft data for calculations
-    const aircraft = selectedAircraft || {
-      // Default values if no aircraft selected
-      cruiseSpeed: 145,
-      fuelBurn: 1100,
-      maxPassengers: 19
-    };
+    // If no aircraft is selected, we'll show zeros
+    if (!selectedAircraft) {
+      console.log('StopCardsContainer: No aircraft selected, setting empty stop cards');
+      setStopCards([]);
+      return;
+    }
+    
+    // Check if aircraft has all required properties
+    if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
+      console.log('StopCardsContainer: Aircraft missing required properties, setting empty stop cards');
+      setStopCards([]);
+      return;
+    }
+    
+    const aircraft = selectedAircraft;
     
     // Add taxi fuel to the total
     const taxiFuel = 50; // Default value
@@ -91,15 +103,47 @@ const StopCardsContainer = ({
       let legGroundSpeed = aircraft.cruiseSpeed;
       let headwindComponent = 0;
       
-      if (fromWaypoint.lat && fromWaypoint.lon && toWaypoint.lat && toWaypoint.lon) {
+      // Check if we have coordinates - either as separate lat/lon or as coords array
+      const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) || 
+                           (fromWaypoint.coords && fromWaypoint.coords.length === 2);
+      const toHasCoords = (toWaypoint.lat && toWaypoint.lon) || 
+                         (toWaypoint.coords && toWaypoint.coords.length === 2);
+      
+      if (fromHasCoords && toHasCoords) {
+        // Create lat/lon objects from either format
+        const fromCoords = {
+          lat: fromWaypoint.lat || fromWaypoint.coords[1],
+          lon: fromWaypoint.lon || fromWaypoint.coords[0]
+        };
+        
+        const toCoords = {
+          lat: toWaypoint.lat || toWaypoint.coords[1],
+          lon: toWaypoint.lon || toWaypoint.coords[0]
+        };
+        
         // Use wind calculations if we have full coordinates
-        const legDetails = calculateLegWithWind(
-          fromWaypoint,
-          toWaypoint,
-          legDistance,
-          aircraft,
-          weather
-        );
+        let legDetails;
+        if (window.WindCalculations) {
+          legDetails = window.WindCalculations.calculateLegWithWind(
+            fromCoords,
+            toCoords,
+            legDistance,
+            aircraft,
+            weather
+          );
+        } else {
+          // Fallback calculation if WindCalculations isn't available
+          const time = legDistance / aircraft.cruiseSpeed;
+          const fuel = time * aircraft.fuelBurn;
+          legDetails = {
+            time,
+            fuel,
+            groundSpeed: aircraft.cruiseSpeed,
+            headwindComponent: 0,
+            course: 0
+          };
+          console.warn('WindCalculations not available, using basic calculations');
+        }
         
         legTimeHours = legDetails.time;
         legFuel = Math.round(legDetails.fuel);
@@ -274,6 +318,10 @@ const StopCardsContainer = ({
                 legFuel={card.legFuel}
                 totalFuel={card.totalFuel}
                 maxPassengers={card.maxPassengers}
+                groundSpeed={card.groundSpeed}
+                headwind={card.headwind}
+                deckTime={card.deckTime}
+                deckFuel={card.deckFuel}
                 isActive={index === activeCardIndex}
                 onClick={() => handleCardClick(index)}
                 className={className}
