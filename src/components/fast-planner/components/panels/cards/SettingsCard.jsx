@@ -107,22 +107,6 @@ const SettingsCard = ({
             <span className="unit">lbs</span>
           </div>
           <div>
-            <label htmlFor="reserve-fuel">Reserve Fuel:</label>
-            <input 
-              type="number" 
-              id="reserve-fuel" 
-              value={reserveFuel || ''}
-              min="0" 
-              max="2000"
-              step="10"
-              onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-        </div>
-        
-        <div className="input-group">
-          <div>
             <label htmlFor="approach-fuel">Approach/ARA Fuel:</label>
             <input 
               type="number" 
