@@ -16,18 +16,17 @@ const FlightSettings = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     
-    // Convert to number and update (allow empty string for better UX)
+    // Allow any input to pass through (empty string or number)
     if (value === '') {
-      // Allow empty string during editing, send 0 to maintain number type
-      onSettingsChange({
-        ...settings,
-        [name]: 0
-      });
+      // Allow empty string during editing
+      console.log(`Setting ${name} to empty string temporarily`);
+      e.target.value = '';
     } else {
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
+        console.log(`Setting ${name} to ${numValue}`);
+        // Send the updated value to the parent
         onSettingsChange({
-          ...settings,
           [name]: numValue
         });
       }
@@ -47,11 +46,12 @@ const FlightSettings = ({
               type="number"
               id="passengerWeight"
               name="passengerWeight"
-              value={settings.passengerWeight || ''}
+              defaultValue={settings.passengerWeight || 220}
               onChange={handleChange}
               min="100"
               max="300"
               step="5"
+              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -69,11 +69,12 @@ const FlightSettings = ({
               type="number"
               id="taxiFuel"
               name="taxiFuel"
-              value={settings.taxiFuel || ''}
+              defaultValue={settings.taxiFuel || 50}
               onChange={handleChange}
               min="0"
               max="500"
               step="5"
+              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -85,11 +86,12 @@ const FlightSettings = ({
               type="number"
               id="reserveFuel"
               name="reserveFuel"
-              value={settings.reserveFuel || ''}
+              defaultValue={settings.reserveFuel || 600}
               onChange={handleChange}
               min="0"
               max="2000"
               step="10"
+              style={{width: '70px'}}
             />
             <span className="unit">lbs</span>
           </div>
@@ -104,11 +106,12 @@ const FlightSettings = ({
               type="number"
               id="contingencyFuelPercent"
               name="contingencyFuelPercent"
-              value={settings.contingencyFuelPercent || ''}
+              defaultValue={settings.contingencyFuelPercent || 10}
               onChange={handleChange}
               min="0"
               max="100"
               step="1"
+              style={{width: '70px'}}
             />
             <span className="unit">%</span>
           </div>
@@ -125,11 +128,12 @@ const FlightSettings = ({
               type="number"
               id="deckTimePerStop"
               name="deckTimePerStop"
-              value={settings.deckTimePerStop || ''}
+              defaultValue={settings.deckTimePerStop || 5}
               onChange={handleChange}
               min="1"
               max="60"
               step="1"
+              style={{width: '70px'}}
             />
             <span className="unit">mins</span>
           </div>
@@ -141,11 +145,12 @@ const FlightSettings = ({
               type="number"
               id="deckFuelFlow"
               name="deckFuelFlow"
-              value={settings.deckFuelFlow || ''}
+              defaultValue={settings.deckFuelFlow || 400}
               onChange={handleChange}
               min="100"
               max="1000"
               step="10"
+              style={{width: '70px'}}
             />
             <span className="unit">lbs/hr</span>
           </div>

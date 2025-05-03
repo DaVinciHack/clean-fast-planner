@@ -99,10 +99,11 @@ const SettingsCard = ({
             <input 
               type="number" 
               id="cargo-weight" 
-              value={cargoWeight || ''}
+              defaultValue={cargoWeight || 0}
               min="0" 
               max="5000"
               step="10"
+              style={{width: '70px'}}
               onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
             />
             <span className="unit">lbs</span>
@@ -112,11 +113,17 @@ const SettingsCard = ({
             <input 
               type="number" 
               id="approach-fuel" 
-              value="150"
+              defaultValue="150"
               min="0" 
               max="1000"
               step="10"
-              disabled
+              style={{width: '70px'}}
+              onChange={(e) => {
+                // Allow input value to be edited
+                const value = parseInt(e.target.value, 10) || 0;
+                console.log(`Approach Fuel changed to ${value}`);
+                // No actual state update handler yet
+              }}
             />
             <span className="unit">lbs</span>
           </div>
