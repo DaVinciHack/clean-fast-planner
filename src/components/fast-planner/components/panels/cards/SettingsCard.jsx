@@ -140,7 +140,7 @@ const SettingsCard = ({
                 // Get the key to use for storage
                 const storageKey = `aircraft_${selectedAircraft.registration}`;
                 
-                // Create settings object
+                // Create settings object with ALL settings
                 const settings = {
                   deckTimePerStop,
                   deckFuelPerStop,
@@ -153,15 +153,9 @@ const SettingsCard = ({
                   reserveFuel
                 };
                 
-                // Show confirmation message
-                const loadingOverlay = document.getElementById('loading-overlay');
-                if (loadingOverlay) {
-                  loadingOverlay.textContent = `Settings saved for ${selectedAircraft.registration}!`;
-                  loadingOverlay.style.display = 'block';
-                  
-                  setTimeout(() => {
-                    loadingOverlay.style.display = 'none';
-                  }, 1500);
+                // Show confirmation message using LoadingIndicator
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(`Settings saved for ${selectedAircraft.registration}!`);
                 }
                 
                 // Call the saveAircraftSettings function via a custom event
@@ -184,7 +178,7 @@ const SettingsCard = ({
                 backgroundImage: 'linear-gradient(to bottom, #0066cc, #004488)'
               }}
               onClick={() => {
-                // Create settings object
+                // Create settings object with ALL settings
                 const settings = {
                   deckTimePerStop,
                   deckFuelPerStop,
@@ -197,15 +191,9 @@ const SettingsCard = ({
                   reserveFuel
                 };
                 
-                // Show confirmation message
-                const loadingOverlay = document.getElementById('loading-overlay');
-                if (loadingOverlay) {
-                  loadingOverlay.textContent = `Settings saved for all ${aircraftType} aircraft!`;
-                  loadingOverlay.style.display = 'block';
-                  
-                  setTimeout(() => {
-                    loadingOverlay.style.display = 'none';
-                  }, 1500);
+                // Show confirmation message using LoadingIndicator
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(`Settings saved for all ${aircraftType} aircraft!`);
                 }
                 
                 // Call the saveAircraftSettings function via a custom event
@@ -223,15 +211,9 @@ const SettingsCard = ({
           <button 
             className="control-button"
             onClick={() => {
-              // Create a flash message to confirm settings are saved
-              const loadingOverlay = document.getElementById('loading-overlay');
-              if (loadingOverlay) {
-                loadingOverlay.textContent = 'Global flight settings saved!';
-                loadingOverlay.style.display = 'block';
-                
-                setTimeout(() => {
-                  loadingOverlay.style.display = 'none';
-                }, 1500);
+              // Show confirmation message using LoadingIndicator
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator('Global flight settings saved!');
               }
               
               // Save to localStorage for persistence as global settings

@@ -3,6 +3,15 @@ import { useAuth } from '../../context/AuthContext';
 import client from '../../client';
 import './FastPlannerStyles.css';
 
+// Initialize loading indicator effect
+const initializeLoadingIndicator = () => {
+  if (window.LoadingIndicator && window.LoadingIndicator.initializeRouteStatsLoader) {
+    setTimeout(() => {
+      window.LoadingIndicator.initializeRouteStatsLoader();
+    }, 1000); // Delay to ensure the DOM is ready
+  }
+};
+
 // Import UI components
 import {
   LeftPanel,
@@ -45,6 +54,11 @@ const FastPlannerApp = () => {
   const flightCalculationsRef = useRef(null);
   const mapInteractionHandlerRef = useRef(null);
   const appSettingsManagerRef = useRef(null);
+  
+  // Initialize loading indicator on first render
+  useEffect(() => {
+    initializeLoadingIndicator();
+  }, []);
   
   // UI state
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -990,14 +1004,8 @@ const FastPlannerApp = () => {
             }
             
             // Show a message that settings were loaded
-            const loadingOverlay = document.getElementById('loading-overlay');
-            if (loadingOverlay) {
-              loadingOverlay.textContent = `Loaded saved settings for ${aircraft.registration}`;
-              loadingOverlay.style.display = 'block';
-              
-              setTimeout(() => {
-                loadingOverlay.style.display = 'none';
-              }, 1500);
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(`Loaded saved settings for ${aircraft.registration}`);
             }
           } else {
             // If no aircraft-specific settings, try to load type-specific settings
@@ -1035,14 +1043,8 @@ const FastPlannerApp = () => {
               }
               
               // Show a message that type settings were loaded
-              const loadingOverlay = document.getElementById('loading-overlay');
-              if (loadingOverlay) {
-                loadingOverlay.textContent = `Loaded ${aircraftType} type settings`;
-                loadingOverlay.style.display = 'block';
-                
-                setTimeout(() => {
-                  loadingOverlay.style.display = 'none';
-                }, 1500);
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(`Loaded ${aircraftType} type settings`);
               }
             }
           }
