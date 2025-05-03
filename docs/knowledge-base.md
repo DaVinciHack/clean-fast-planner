@@ -1,0 +1,125 @@
+# Fast Planner Knowledge Base
+
+## Project Overview
+The Fast Planner is a React application connecting to Palantir's OSDK that provides flight planning functionality for managing routes between oil rigs, airports, and platforms. The project is currently in a refactoring phase to improve code organization and maintainability.
+
+## Project Environments
+- Original version: http://localhost:8080/
+- Refactored version: http://localhost:8080/?context=new
+
+## Components Reference
+
+### Core Modules
+These modules handle the business logic and data flow.
+
+| Module Name | Purpose | Status | Key Files |
+|-------------|---------|--------|-----------|
+| MapManager | Handles map display and interactions | In Use | `modules/MapManager.js` |
+| WaypointManager | Manages route waypoints and coordinates | In Use | `modules/WaypointManager.js` |
+| PlatformManager | Loads and displays rig/platform data | In Use | `modules/PlatformManager.js` |
+| AircraftManager | Loads and filters aircraft data | In Use | `modules/AircraftManager.js` |
+| RouteCalculator | Calculates route statistics | In Use | `modules/RouteCalculator.js` |
+| RegionManager | Manages different geographical regions | In Use | `modules/RegionManager.js` |
+| FavoriteLocationsManager | Handles saved favorite locations | In Use | `modules/FavoriteLocationsManager.js` |
+| MapInteractionHandler | Manages user interactions with the map | In Use | `modules/MapInteractionHandler.js` |
+| AppSettingsManager | Handles application settings and preferences | In Use | `modules/AppSettingsManager.js` |
+| FlightCalculations | Performs flight-specific calculations | In Use | `modules/calculations/FlightCalculations.js` |
+
+### UI Components
+These components handle the visual presentation and user interactions.
+
+| Component | Purpose | Status | Source File | Refactored File |
+|-----------|---------|--------|-------------|-----------------|
+| MapComponent | Renders the map | Refactored | ModularFastPlannerComponent.jsx | `/components/map/MapComponent.jsx` |
+| LeftPanel | Route editor panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/LeftPanel.jsx` |
+| RightPanel | Controls and statistics panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/RightPanel.jsx` |
+| RouteStatsCard | Displays route statistics | Refactored | ModularFastPlannerComponent.jsx | `/components/flight/RouteStatsCard.jsx` |
+| FlightSettings | Flight calculation settings | In Progress | ModularFastPlannerComponent.jsx | `/components/flight/FlightSettings.jsx` |
+| AircraftSelection | Aircraft filtering and selection | Pending | ModularFastPlannerComponent.jsx | TBD |
+
+### Context Providers
+These provide state management and data sharing between components.
+
+| Context | Purpose | Status | File |
+|---------|---------|--------|------|
+| RegionContext | Manages region selection and data | Implemented | `/context/RegionContext.jsx` |
+| AircraftContext | Handles aircraft selection and data | Implemented | `/context/AircraftContext.jsx` |
+| RouteContext | Maintains route data and calculations | Implemented | `/context/RouteContext.jsx` |
+| MapContext | Manages map view state | Implemented | `/context/MapContext.jsx` |
+
+## Data Flow
+1. Authentication with Foundry happens via OAuth (handled by AuthContext)
+2. The application loads platform data for the selected region
+3. Aircraft data is loaded and filtered by region and type
+4. Users create routes by clicking on the map or selecting locations
+5. Route statistics are calculated based on selected aircraft and waypoints
+
+## Current Work & Progress
+
+### Completed Tasks
+- Set up basic project structure with module system
+- Implemented core manager classes
+- Created initial UI components
+- Established context providers
+- Implemented basic route functionality
+- Created version switcher in FastPlannerPage
+
+### In Progress
+- Extracting AircraftSelection component from RightPanel
+- Implementing FlightSettings component
+- Refining route calculation logic
+- Improving event handling between components
+
+### Next Steps
+- Extract WaypointEditor component
+- Improve loading indicators
+- Add error boundaries
+- Implement comprehensive testing
+
+## Developer Notes
+
+### Aircraft Module Behavior
+The AircraftManager follows this sequence:
+1. Loads all aircraft from Foundry
+2. Filters aircraft by current region
+3. Groups aircraft by type
+4. Further filters when an aircraft type is selected
+
+### Route Calculation Process
+Route calculations are performed in these steps:
+1. WaypointManager provides waypoint coordinates
+2. Distance between waypoints is calculated
+3. Aircraft performance data is applied
+4. Fuel requirements are calculated based on flight settings
+5. Passenger capacity is determined based on fuel load and aircraft capacity
+
+### Common Issues & Solutions
+
+**Issue**: Map not displaying after load
+**Solution**: Check if MapManager's initialization is complete before trying to add layers
+
+**Issue**: Aircraft filtering not working
+**Solution**: Ensure region is properly loaded and AircraftManager has the correct region ID
+
+**Issue**: Route calculations show incorrect values
+**Solution**: Verify that the latest flight settings are being passed to the RouteCalculator
+
+## References & Resources
+
+### Documentation
+- [Palantir OSDK Documentation](https://foundry-docs.palantir.com/docs/osdk/)
+- [MapLibre GL JS Documentation](https://maplibre.org/maplibre-gl-js-docs/)
+- [React Context API Guide](https://reactjs.org/docs/context.html)
+
+### Project Links
+- [Project Repository](https://github.com/your-org/Fast-Planner-Clean)
+- [Issue Tracker](https://github.com/your-org/Fast-Planner-Clean/issues)
+- [Deployment Pipeline](https://jenkins.your-org.com/job/fast-planner/)
+
+### Team Contacts
+- Duncan (Project Lead) - duncan@example.com
+- Flight Operations Team - flight-ops@example.com
+- OSDK Support Team - osdk-support@example.com
+
+## Template Instructions
+This knowledge base template can be maintained in any of the recommended tools like Notion, Confluence, or GitBook. Update sections as work progresses to keep this document accurate and helpful for all developers on the project.
