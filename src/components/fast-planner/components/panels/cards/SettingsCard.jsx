@@ -31,6 +31,38 @@ const SettingsCard = ({
   aircraftType
 }) => {
   
+  // Add state for approach fuel
+  const [approachFuel, setApproachFuel] = React.useState(150);
+  
+  // Load saved approach fuel when a new aircraft is selected
+  React.useEffect(() => {
+    if (selectedAircraft) {
+      // Try to load aircraft-specific approachFuel
+      try {
+        const storageKey = `aircraft_${selectedAircraft.registration}`;
+        const savedSettingsJson = localStorage.getItem(`fastPlanner_settings_${storageKey}`);
+        
+        if (savedSettingsJson) {
+          const savedSettings = JSON.parse(savedSettingsJson);
+          if (savedSettings.approachFuel !== undefined) {
+            setApproachFuel(savedSettings.approachFuel);
+          }
+        } else if (aircraftType) {
+          // Try type-specific settings
+          const typeSettingsJson = localStorage.getItem(`fastPlanner_settings_${aircraftType}`);
+          if (typeSettingsJson) {
+            const typeSettings = JSON.parse(typeSettingsJson);
+            if (typeSettings.approachFuel !== undefined) {
+              setApproachFuel(typeSettings.approachFuel);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading approach fuel setting:', error);
+      }
+    }
+  }, [selectedAircraft, aircraftType]);
+  
   // Handler for settings changes
   const handleFlightSettingsChange = (newSettings) => {
     console.log("Flight settings changed:", newSettings);
@@ -112,15 +144,15 @@ const SettingsCard = ({
             <input 
               type="number" 
               id="approach-fuel" 
-              defaultValue="150"
+              value={approachFuel}
               min="0" 
               max="1000"
               step="10"
               onChange={(e) => {
-                // Allow input value to be edited
+                // Update state value immediately
                 const value = parseInt(e.target.value, 10) || 0;
+                setApproachFuel(value);
                 console.log(`Approach Fuel changed to ${value}`);
-                // No actual state update handler yet
               }}
             />
             <span className="unit">lbs</span>
@@ -150,7 +182,8 @@ const SettingsCard = ({
                   reserveMethod,
                   passengerWeight,
                   cargoWeight,
-                  reserveFuel
+                  reserveFuel,
+                  approachFuel
                 };
                 
                 // Show confirmation message using LoadingIndicator
@@ -188,7 +221,8 @@ const SettingsCard = ({
                   reserveMethod,
                   passengerWeight,
                   cargoWeight,
-                  reserveFuel
+                  reserveFuel,
+                  approachFuel
                 };
                 
                 // Show confirmation message using LoadingIndicator
