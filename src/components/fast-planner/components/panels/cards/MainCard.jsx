@@ -19,10 +19,6 @@ const MainCard = ({
   selectedAircraft,
   aircraftsByType,
   aircraftLoading,
-  payloadWeight,
-  onPayloadWeightChange,
-  reserveFuel,
-  onReserveFuelChange,
   routeStats,
   isAuthenticated,
   authUserName,
@@ -356,46 +352,8 @@ const MainCard = ({
                 <span className="unit">lbs</span>
               </div>
             </div>
-            
-            {/* Reserve Fuel */}
-            <div className="aircraft-data-item">
-              <div className="icon">🔄</div>
-              <div className="label">Reserve</div>
-              <div className="value">
-                {reserveFuel}
-                <span className="unit">lbs</span>
-              </div>
-            </div>
           </div>
         )}
-
-        {/* Compact input layout using the new input-group class */}
-        <div className="input-group">
-          <div>
-            <label htmlFor="payload-weight">Payload:</label>
-            <input 
-              type="number" 
-              id="payload-weight" 
-              value={payloadWeight}
-              min="0" 
-              max="10000"
-              onChange={(e) => onPayloadWeightChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-          <div>
-            <label htmlFor="reserve-fuel">Reserve:</label>
-            <input 
-              type="number" 
-              id="reserve-fuel" 
-              value={reserveFuel}
-              min="0" 
-              max="2000"
-              onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-        </div>
       </div>
       
       <div className="control-section">

@@ -16,6 +16,7 @@ const SettingsCard = ({
   taxiFuel = 50,
   contingencyFuelPercent = 10,
   reserveMethod = 'fixed',
+  reserveFuel = 600,
   onDeckTimeChange = () => {},
   onDeckFuelChange = () => {},
   onDeckFuelFlowChange = () => {},
@@ -24,6 +25,7 @@ const SettingsCard = ({
   onTaxiFuelChange = () => {},
   onContingencyFuelPercentChange = () => {},
   onReserveMethodChange = () => {},
+  onReserveFuelChange = () => {},
   // Selected aircraft info
   selectedAircraft,
   aircraftType
@@ -92,7 +94,7 @@ const SettingsCard = ({
         
         <div className="input-group">
           <div>
-            <label htmlFor="cargo-weight">Additional Cargo:</label>
+            <label htmlFor="cargo-weight">Payload:</label>
             <input 
               type="number" 
               id="cargo-weight" 
@@ -101,6 +103,19 @@ const SettingsCard = ({
               max="5000"
               step="10"
               onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
+            />
+            <span className="unit">lbs</span>
+          </div>
+          <div>
+            <label htmlFor="reserve-fuel">Reserve Fuel:</label>
+            <input 
+              type="number" 
+              id="reserve-fuel" 
+              value={reserveFuel || ''}
+              min="0" 
+              max="2000"
+              step="10"
+              onChange={(e) => onReserveFuelChange(parseInt(e.target.value, 10) || 0)}
             />
             <span className="unit">lbs</span>
           </div>
@@ -158,7 +173,8 @@ const SettingsCard = ({
                   contingencyFuelPercent,
                   reserveMethod,
                   passengerWeight,
-                  cargoWeight
+                  cargoWeight,
+                  reserveFuel
                 };
                 
                 // Show confirmation message
@@ -203,7 +219,8 @@ const SettingsCard = ({
                   contingencyFuelPercent,
                   reserveMethod,
                   passengerWeight,
-                  cargoWeight
+                  cargoWeight,
+                  reserveFuel
                 };
                 
                 // Show confirmation message
