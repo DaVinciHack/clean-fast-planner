@@ -1,5 +1,6 @@
 import React from 'react';
 import RegionSelector from '../../controls/RegionSelector';
+import { StopCardsContainer } from '../../flight/stops';
 
 /**
  * MainCard Component
@@ -31,6 +32,11 @@ const MainCard = ({
   regionLoading = false,
   // Read-only values from settings
   reserveFuel = 600,
+  // Waypoints for stop cards
+  waypoints = [],
+  passengerWeight = 220,
+  deckTimePerStop = 5,
+  deckFuelFlow = 400,
 }) => {
   return (
     <div className="tab-content main-tab">
@@ -377,6 +383,19 @@ const MainCard = ({
           <div><strong>Usable Load:</strong> <span id="usable-load">{routeStats?.usableLoad || '0'}</span> lbs</div>
           <div><strong>Max Passengers:</strong> <span id="max-passengers">{routeStats?.maxPassengers || '0'}</span></div>
         </div>
+        
+        {/* Stop Cards */}
+        {waypoints.length >= 2 && (
+          <StopCardsContainer
+            waypoints={waypoints}
+            routeStats={routeStats}
+            selectedAircraft={selectedAircraft}
+            passengerWeight={passengerWeight}
+            reserveFuel={reserveFuel}
+            deckTimePerStop={deckTimePerStop}
+            deckFuelFlow={deckFuelFlow}
+          />
+        )}
       </div>
       
       <div id="auth-status" className="control-section">

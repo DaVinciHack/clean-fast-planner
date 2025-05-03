@@ -99,6 +99,10 @@ const RightPanel = ({
         onRegionChange={onRegionChange}
         regionLoading={regionLoading}
         reserveFuel={reserveFuel}
+        waypoints={waypoints}
+        passengerWeight={passengerWeight}
+        deckTimePerStop={deckTimePerStop}
+        deckFuelFlow={deckFuelFlow}
       />
       
       {/* Settings Card */}
