@@ -163,11 +163,15 @@ const FastPlannerApp = () => {
     
     // Recalculate route if we have an aircraft and waypoints
     if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
-      routeCalculatorRef.current.calculateRoute(
-        waypointManagerRef.current.getWaypoints(),
-        selectedAircraft,
-        updatedSettings
-      );
+      // Extract coordinates from waypoints
+      const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+      
+      // Calculate route statistics using the correct method
+      routeCalculatorRef.current.calculateRouteStats(coordinates, {
+        aircraftType: selectedAircraft.modelType || 's92',
+        payloadWeight: cargoWeight || 0,
+        reserveFuel: updatedSettings.reserveFuel || reserveFuel
+      });
     }
   };
 
@@ -519,11 +523,15 @@ const FastPlannerApp = () => {
           
           // Recalculate route if needed
           if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
-            routeCalculatorRef.current.calculateRoute(
-              waypointManagerRef.current.getWaypoints(),
-              selectedAircraft,
-              settings
-            );
+            // Extract coordinates from waypoints
+            const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+            
+            // Calculate route statistics using the correct method
+            routeCalculatorRef.current.calculateRouteStats(coordinates, {
+              aircraftType: selectedAircraft.modelType || 's92',
+              payloadWeight: settings.cargoWeight || cargoWeight || 0,
+              reserveFuel: settings.reserveFuel || reserveFuel
+            });
           }
           
           // Force UI update
@@ -541,18 +549,15 @@ const FastPlannerApp = () => {
       
       // Recalculate route if needed
       if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
-        routeCalculatorRef.current.calculateRoute(
-          waypointManagerRef.current.getWaypoints(),
-          selectedAircraft,
-          {
-            passengerWeight,
-            contingencyFuelPercent,
-            taxiFuel,
-            reserveFuel,
-            deckTimePerStop,
-            deckFuelFlow
-          }
-        );
+        // Extract coordinates from waypoints
+        const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+        
+        // Calculate route statistics using the correct method
+        routeCalculatorRef.current.calculateRouteStats(coordinates, {
+          aircraftType: selectedAircraft.modelType || 's92',
+          payloadWeight: cargoWeight || 0,
+          reserveFuel: reserveFuel
+        });
       }
     };
     
@@ -607,11 +612,15 @@ const FastPlannerApp = () => {
           
           // Recalculate route stats if we have an aircraft and at least 2 waypoints
           if (selectedAircraft && routeData.waypoints.length >= 2) {
-            routeCalculatorRef.current.calculateRoute(
-              routeData.waypoints,
-              selectedAircraft,
-              flightSettings
-            );
+            // Extract coordinates from waypoints
+            const coordinates = routeData.waypoints.map(wp => wp.coords);
+            
+            // Calculate route statistics using the correct method
+            routeCalculatorRef.current.calculateRouteStats(coordinates, {
+              aircraftType: selectedAircraft.modelType || 's92',
+              payloadWeight: cargoWeight || 0,
+              reserveFuel: reserveFuel
+            });
           }
         });
       }
@@ -751,11 +760,15 @@ const FastPlannerApp = () => {
       
       // Recalculate route stats if we have an aircraft and at least 2 waypoints
       if (selectedAircraft && waypointManagerRef.current.getWaypoints().length >= 2) {
-        routeCalculatorRef.current.calculateRoute(
-          waypointManagerRef.current.getWaypoints(),
-          selectedAircraft,
-          flightSettings
-        );
+        // Extract coordinates from waypoints
+        const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+        
+        // Calculate route statistics using the correct method
+        routeCalculatorRef.current.calculateRouteStats(coordinates, {
+          aircraftType: selectedAircraft.modelType || 's92',
+          payloadWeight: cargoWeight || 0,
+          reserveFuel: reserveFuel
+        });
       }
     }
   };
@@ -788,11 +801,15 @@ const FastPlannerApp = () => {
         
         // Recalculate route stats if we have an aircraft and at least 2 waypoints
         if (selectedAircraft && waypointManagerRef.current.getWaypoints().length >= 2) {
-          routeCalculatorRef.current.calculateRoute(
-            waypointManagerRef.current.getWaypoints(),
-            selectedAircraft,
-            flightSettings
-          );
+          // Extract coordinates from waypoints
+          const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+          
+          // Calculate route statistics using the correct method
+          routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            aircraftType: selectedAircraft.modelType || 's92',
+            payloadWeight: cargoWeight || 0,
+            reserveFuel: reserveFuel
+          });
         } else {
           // Clear route stats if we don't have enough waypoints
           setRouteStats(null);
@@ -851,11 +868,15 @@ const FastPlannerApp = () => {
       // Recalculate route stats if we have an aircraft and at least 2 waypoints
       const updatedWaypoints = waypointManagerRef.current.getWaypoints();
       if (selectedAircraft && updatedWaypoints.length >= 2) {
-        routeCalculatorRef.current.calculateRoute(
-          updatedWaypoints,
-          selectedAircraft,
-          flightSettings
-        );
+        // Extract coordinates from waypoints
+        const coordinates = updatedWaypoints.map(wp => wp.coords);
+        
+        // Calculate route statistics using the correct method
+        routeCalculatorRef.current.calculateRouteStats(coordinates, {
+          aircraftType: selectedAircraft.modelType || 's92',
+          payloadWeight: cargoWeight || 0,
+          reserveFuel: reserveFuel
+        });
       }
     } else {
       console.error('Cannot reorder: Missing waypoint manager or invalid IDs');
@@ -1072,11 +1093,15 @@ const FastPlannerApp = () => {
       
       // Recalculate route if we have waypoints
       if (aircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
-        routeCalculatorRef.current.calculateRoute(
-          waypointManagerRef.current.getWaypoints(),
-          aircraft,
-          flightSettings
-        );
+        // Extract coordinates from waypoints
+        const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
+        
+        // Calculate route statistics using the correct method
+        routeCalculatorRef.current.calculateRouteStats(coordinates, {
+          aircraftType: aircraft.modelType || 's92',
+          payloadWeight: cargoWeight || 0,
+          reserveFuel: reserveFuel
+        });
       }
     }
   };

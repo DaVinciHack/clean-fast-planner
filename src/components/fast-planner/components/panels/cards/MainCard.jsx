@@ -376,18 +376,6 @@ const MainCard = ({
           <div><strong>Fuel Required:</strong> <span id="fuel-required">{routeStats?.fuelRequired || '0'}</span> lbs</div>
           <div><strong>Usable Load:</strong> <span id="usable-load">{routeStats?.usableLoad || '0'}</span> lbs</div>
           <div><strong>Max Passengers:</strong> <span id="max-passengers">{routeStats?.maxPassengers || '0'}</span></div>
-          {routeStats?.legs && (
-            <div style={{ marginTop: '10px', fontSize: '0.9em', color: '#666' }}>
-              <strong>Route Legs:</strong>
-              <div style={{ maxHeight: '100px', overflowY: 'auto', marginTop: '5px' }}>
-                {routeStats.legs.map((leg, index) => (
-                  <div key={index} style={{ marginBottom: '2px' }}>
-                    Leg {index + 1}: {leg.distance} nm
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
       
