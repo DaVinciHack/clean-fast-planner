@@ -394,7 +394,7 @@ const FastPlannerApp = () => {
       setPassengerWeight(flightSettings.passengerWeight);
       setContingencyFuelPercent(flightSettings.contingencyFuelPercent);
       setTaxiFuel(flightSettings.taxiFuel);
-      setReserveFuel(flightSettings.reserveFuel);
+      setReserveFuel(flightSettings.reserveFuel || 600); // Ensure we have a default value
       setDeckTimePerStop(flightSettings.deckTimePerStop);
       setDeckFuelFlow(flightSettings.deckFuelFlow);
       

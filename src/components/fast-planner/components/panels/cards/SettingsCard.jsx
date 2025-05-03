@@ -76,7 +76,8 @@ const SettingsCard = ({
     taxiFuel,
     contingencyFuelPercent,
     deckTimePerStop,
-    deckFuelFlow
+    deckFuelFlow,
+    reserveFuel
   };
   
   return (
