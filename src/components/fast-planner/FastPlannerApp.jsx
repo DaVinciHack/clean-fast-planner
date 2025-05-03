@@ -466,9 +466,71 @@ const FastPlannerApp = () => {
       // We'll initialize it in the handleMapReady function when the map is ready
     }
     
+    // ADD EVENT LISTENER FOR SAVING AIRCRAFT SETTINGS
+    // This handles the custom event from the SettingsCard to save aircraft-specific settings
+    const handleSaveAircraftSettings = (event) => {
+      const { key, settings } = event.detail;
+      console.log(`Saving settings for ${key}:`, settings);
+      
+      try {
+        // Save the settings to localStorage
+        localStorage.setItem(`fastPlanner_settings_${key}`, JSON.stringify(settings));
+        console.log(`Successfully saved settings for ${key}`);
+        
+        // If this is also the current aircraft, update the active settings
+        if (selectedAircraft && key === `aircraft_${selectedAircraft.registration}`) {
+          console.log('Updating current flight settings with saved aircraft settings');
+          
+          // Update all the settings
+          if (settings.passengerWeight !== undefined) setPassengerWeight(settings.passengerWeight);
+          if (settings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(settings.contingencyFuelPercent);
+          if (settings.taxiFuel !== undefined) setTaxiFuel(settings.taxiFuel);
+          if (settings.reserveFuel !== undefined) setReserveFuel(settings.reserveFuel);
+          if (settings.deckTimePerStop !== undefined) setDeckTimePerStop(settings.deckTimePerStop);
+          if (settings.deckFuelFlow !== undefined) setDeckFuelFlow(settings.deckFuelFlow);
+          if (settings.deckFuelPerStop !== undefined) setDeckFuelPerStop(settings.deckFuelPerStop);
+          if (settings.cargoWeight !== undefined) setCargoWeight(settings.cargoWeight);
+          
+          // Update AppSettingsManager if it exists
+          if (appSettingsManagerRef.current) {
+            appSettingsManagerRef.current.updateFlightSettings({
+              passengerWeight: settings.passengerWeight,
+              contingencyFuelPercent: settings.contingencyFuelPercent,
+              taxiFuel: settings.taxiFuel,
+              reserveFuel: settings.reserveFuel,
+              deckTimePerStop: settings.deckTimePerStop,
+              deckFuelFlow: settings.deckFuelFlow
+            });
+          }
+          
+          // Recalculate route if needed
+          if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
+            routeCalculatorRef.current.calculateRoute(
+              waypointManagerRef.current.getWaypoints(),
+              selectedAircraft,
+              settings
+            );
+          }
+          
+          // Force UI update
+          setForceUpdate(prev => prev + 1);
+        }
+      } catch (error) {
+        console.error(`Error saving settings for ${key}:`, error);
+      }
+    };
+    
+    // Add event listener for aircraft settings
+    window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    
     // Force a rerender after initializing all managers
     setForceUpdate(prev => prev + 1);
-  }, [passengerWeight, contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow, waypoints.length]);
+    
+    // Clean up event listener on unmount
+    return () => {
+      window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    };
+  }, [passengerWeight, contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow, waypoints.length, selectedAircraft]);
 
   // Map initialization handler
   const handleMapReady = (mapInstance) => {
@@ -866,6 +928,105 @@ const FastPlannerApp = () => {
         appSettingsManagerRef.current.setAircraft(aircraftType, registration);
       }
       
+      // Load aircraft-specific settings if they exist
+      if (aircraft) {
+        try {
+          const storageKey = `aircraft_${aircraft.registration}`;
+          const savedSettingsJson = localStorage.getItem(`fastPlanner_settings_${storageKey}`);
+          
+          if (savedSettingsJson) {
+            const savedSettings = JSON.parse(savedSettingsJson);
+            console.log(`Found saved settings for ${aircraft.registration}:`, savedSettings);
+            
+            // Apply the saved settings
+            if (savedSettings.passengerWeight !== undefined) setPassengerWeight(savedSettings.passengerWeight);
+            if (savedSettings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(savedSettings.contingencyFuelPercent);
+            if (savedSettings.taxiFuel !== undefined) setTaxiFuel(savedSettings.taxiFuel);
+            if (savedSettings.reserveFuel !== undefined) setReserveFuel(savedSettings.reserveFuel);
+            if (savedSettings.deckTimePerStop !== undefined) setDeckTimePerStop(savedSettings.deckTimePerStop);
+            if (savedSettings.deckFuelFlow !== undefined) setDeckFuelFlow(savedSettings.deckFuelFlow);
+            if (savedSettings.deckFuelPerStop !== undefined) setDeckFuelPerStop(savedSettings.deckFuelPerStop);
+            if (savedSettings.cargoWeight !== undefined) setCargoWeight(savedSettings.cargoWeight);
+            
+            // Update flightSettings object
+            const updatedSettings = {
+              ...flightSettings,
+              passengerWeight: savedSettings.passengerWeight || flightSettings.passengerWeight,
+              contingencyFuelPercent: savedSettings.contingencyFuelPercent || flightSettings.contingencyFuelPercent,
+              taxiFuel: savedSettings.taxiFuel || flightSettings.taxiFuel,
+              reserveFuel: savedSettings.reserveFuel || flightSettings.reserveFuel,
+              deckTimePerStop: savedSettings.deckTimePerStop || flightSettings.deckTimePerStop,
+              deckFuelFlow: savedSettings.deckFuelFlow || flightSettings.deckFuelFlow
+            };
+            setFlightSettings(updatedSettings);
+            
+            // Update FlightCalculations module
+            if (flightCalculationsRef.current) {
+              flightCalculationsRef.current.updateConfig(updatedSettings);
+            }
+            
+            // Show a message that settings were loaded
+            const loadingOverlay = document.getElementById('loading-overlay');
+            if (loadingOverlay) {
+              loadingOverlay.textContent = `Loaded saved settings for ${aircraft.registration}`;
+              loadingOverlay.style.display = 'block';
+              
+              setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+              }, 1500);
+            }
+          } else {
+            // If no aircraft-specific settings, try to load type-specific settings
+            const typeSettingsJson = localStorage.getItem(`fastPlanner_settings_${aircraftType}`);
+            
+            if (typeSettingsJson) {
+              const typeSettings = JSON.parse(typeSettingsJson);
+              console.log(`Found saved settings for aircraft type ${aircraftType}:`, typeSettings);
+              
+              // Apply the type settings
+              if (typeSettings.passengerWeight !== undefined) setPassengerWeight(typeSettings.passengerWeight);
+              if (typeSettings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(typeSettings.contingencyFuelPercent);
+              if (typeSettings.taxiFuel !== undefined) setTaxiFuel(typeSettings.taxiFuel);
+              if (typeSettings.reserveFuel !== undefined) setReserveFuel(typeSettings.reserveFuel);
+              if (typeSettings.deckTimePerStop !== undefined) setDeckTimePerStop(typeSettings.deckTimePerStop);
+              if (typeSettings.deckFuelFlow !== undefined) setDeckFuelFlow(typeSettings.deckFuelFlow);
+              if (typeSettings.deckFuelPerStop !== undefined) setDeckFuelPerStop(typeSettings.deckFuelPerStop);
+              if (typeSettings.cargoWeight !== undefined) setCargoWeight(typeSettings.cargoWeight);
+              
+              // Update flightSettings object
+              const updatedSettings = {
+                ...flightSettings,
+                passengerWeight: typeSettings.passengerWeight || flightSettings.passengerWeight,
+                contingencyFuelPercent: typeSettings.contingencyFuelPercent || flightSettings.contingencyFuelPercent,
+                taxiFuel: typeSettings.taxiFuel || flightSettings.taxiFuel,
+                reserveFuel: typeSettings.reserveFuel || flightSettings.reserveFuel,
+                deckTimePerStop: typeSettings.deckTimePerStop || flightSettings.deckTimePerStop,
+                deckFuelFlow: typeSettings.deckFuelFlow || flightSettings.deckFuelFlow
+              };
+              setFlightSettings(updatedSettings);
+              
+              // Update FlightCalculations module
+              if (flightCalculationsRef.current) {
+                flightCalculationsRef.current.updateConfig(updatedSettings);
+              }
+              
+              // Show a message that type settings were loaded
+              const loadingOverlay = document.getElementById('loading-overlay');
+              if (loadingOverlay) {
+                loadingOverlay.textContent = `Loaded ${aircraftType} type settings`;
+                loadingOverlay.style.display = 'block';
+                
+                setTimeout(() => {
+                  loadingOverlay.style.display = 'none';
+                }, 1500);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error loading saved settings for ${registration}:`, error);
+        }
+      }
+      
       // Handle the case when an aircraft is selected (non-empty registration)
       if (registration) {
         // After selecting an aircraft, reset dropdown values for next selection
@@ -980,8 +1141,12 @@ const FastPlannerApp = () => {
         waypoints={waypoints}
         deckTimePerStop={deckTimePerStop}
         deckFuelPerStop={deckFuelPerStop}
+        deckFuelFlow={deckFuelFlow}
         passengerWeight={passengerWeight}
         cargoWeight={cargoWeight}
+        taxiFuel={taxiFuel}
+        contingencyFuelPercent={contingencyFuelPercent}
+        reserveFuel={reserveFuel}
       />
       
       {/* Map Component */}

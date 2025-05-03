@@ -15,8 +15,12 @@ const RouteStatsCard = ({
   waypoints,
   deckTimePerStop = 5,
   deckFuelPerStop = 100,
+  deckFuelFlow = 400,
   passengerWeight = 220,
-  cargoWeight = 0
+  cargoWeight = 0,
+  taxiFuel = 50,
+  contingencyFuelPercent = 10,
+  reserveFuel = 600
 }) => {
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
