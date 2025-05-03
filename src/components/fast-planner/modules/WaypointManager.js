@@ -633,11 +633,18 @@ class WaypointManager {
         'filter': ['has', 'isLabel']     // Only show labels, not arrows
       });
       
-      // Trigger route updated callback
-      this.triggerCallback('onRouteUpdated', {
+      // Trigger route updated callback with coordinates
+      const routeData = {
         waypoints: this.waypoints,
         coordinates: coordinates
-      });
+      };
+      this.triggerCallback('onRouteUpdated', routeData);
+      
+      // Always calculate basic distance even when no aircraft is selected
+      // This ensures distance is displayed regardless of aircraft selection
+      if (window.routeCalculator) {
+        window.routeCalculator.calculateDistanceOnly(coordinates);
+      }
     }
   }
   

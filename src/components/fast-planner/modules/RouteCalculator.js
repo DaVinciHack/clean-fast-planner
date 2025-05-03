@@ -102,6 +102,54 @@ class RouteCalculator {
   }
   
   /**
+   * Calculate distance only without requiring aircraft
+   * @param {Array} coordinates - Array of [lng, lat] coordinates
+   * @returns {Object} - Distance results
+   */
+  calculateDistanceOnly(coordinates) {
+    if (!window.turf) {
+      console.error('Turf.js not loaded');
+      return null;
+    }
+    
+    // Calculate total distance
+    let totalDistance = 0;
+    let legs = [];
+    
+    console.log('RouteCalculator: Calculating distance for', coordinates.length, 'waypoints');
+    
+    for (let i = 0; i < coordinates.length - 1; i++) {
+      const from = window.turf.point(coordinates[i]);
+      const to = window.turf.point(coordinates[i + 1]);
+      const options = { units: 'nauticalmiles' };
+      
+      const legDistance = window.turf.distance(from, to, options);
+      totalDistance += legDistance;
+      
+      console.log(`RouteCalculator: Leg ${i+1} distance: ${legDistance.toFixed(1)} nm`);
+      
+      legs.push({
+        from: coordinates[i],
+        to: coordinates[i + 1],
+        distance: legDistance.toFixed(1)
+      });
+    }
+    
+    console.log('RouteCalculator: Total distance calculated:', totalDistance.toFixed(1), 'nm');
+    
+    // Compile results
+    const result = {
+      totalDistance: totalDistance.toFixed(1),
+      legs: legs
+    };
+    
+    // Trigger callback with results
+    this.triggerCallback('onCalculationComplete', result);
+    
+    return result;
+  }
+  
+  /**
    * Calculate route statistics locally without API calls
    * @param {Array} coordinates - Array of [lng, lat] coordinates
    * @param {Object} aircraftTypes - Aircraft performance data

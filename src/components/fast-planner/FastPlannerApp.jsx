@@ -285,6 +285,9 @@ const FastPlannerApp = () => {
       console.log("FastPlannerApp: Creating RouteCalculator instance");
       routeCalculatorRef.current = new RouteCalculator();
       
+      // Make the route calculator accessible globally for basic calculations
+      window.routeCalculator = routeCalculatorRef.current;
+      
       // Set up route calculator callbacks
       routeCalculatorRef.current.setCallback('onCalculationComplete', (stats) => {
         setRouteStats(stats);
@@ -548,16 +551,24 @@ const FastPlannerApp = () => {
       setForceUpdate(prev => prev + 1);
       
       // Recalculate route if needed
-      if (selectedAircraft && waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
+      if (waypointManagerRef.current && waypointManagerRef.current.getWaypoints().length >= 2) {
         // Extract coordinates from waypoints
         const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
         
-        // Calculate route statistics using the correct method
-        routeCalculatorRef.current.calculateRouteStats(coordinates, {
-          aircraftType: selectedAircraft.modelType || 's92',
-          payloadWeight: cargoWeight || 0,
-          reserveFuel: reserveFuel
-        });
+        // Always calculate basic distance
+        if (routeCalculatorRef.current) {
+          routeCalculatorRef.current.calculateDistanceOnly(coordinates);
+        }
+        
+        // Calculate full stats if we have an aircraft
+        if (selectedAircraft) {
+          // Calculate route statistics using the correct method
+          routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            aircraftType: selectedAircraft.modelType || 's92',
+            payloadWeight: cargoWeight || 0,
+            reserveFuel: reserveFuel
+          });
+        }
       }
     };
     
@@ -610,7 +621,12 @@ const FastPlannerApp = () => {
         waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
           console.log(`Route updated with ${routeData.waypoints.length} waypoints`);
           
-          // Recalculate route stats if we have an aircraft and at least 2 waypoints
+          // Always calculate basic distance even without an aircraft
+          if (routeCalculatorRef.current && routeData.coordinates && routeData.coordinates.length >= 2) {
+            routeCalculatorRef.current.calculateDistanceOnly(routeData.coordinates);
+          }
+          
+          // Calculate full route stats if we have an aircraft and waypoints
           if (selectedAircraft && routeData.waypoints.length >= 2) {
             // Extract coordinates from waypoints
             const coordinates = routeData.waypoints.map(wp => wp.coords);
@@ -758,17 +774,25 @@ const FastPlannerApp = () => {
       waypointManagerRef.current.addWaypoint(coords, name);
       setWaypoints([...waypointManagerRef.current.getWaypoints()]);
       
-      // Recalculate route stats if we have an aircraft and at least 2 waypoints
-      if (selectedAircraft && waypointManagerRef.current.getWaypoints().length >= 2) {
+      // Recalculate route stats if we have at least 2 waypoints
+      if (waypointManagerRef.current.getWaypoints().length >= 2) {
         // Extract coordinates from waypoints
         const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
         
-        // Calculate route statistics using the correct method
-        routeCalculatorRef.current.calculateRouteStats(coordinates, {
-          aircraftType: selectedAircraft.modelType || 's92',
-          payloadWeight: cargoWeight || 0,
-          reserveFuel: reserveFuel
-        });
+        // Always calculate basic distance
+        if (routeCalculatorRef.current) {
+          routeCalculatorRef.current.calculateDistanceOnly(coordinates);
+        }
+        
+        // Calculate full stats if we have an aircraft 
+        if (selectedAircraft) {
+          // Calculate route statistics using the correct method
+          routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            aircraftType: selectedAircraft.modelType || 's92',
+            payloadWeight: cargoWeight || 0,
+            reserveFuel: reserveFuel
+          });
+        }
       }
     }
   };
@@ -799,17 +823,25 @@ const FastPlannerApp = () => {
         waypointManagerRef.current.removeWaypoint(id, index);
         setWaypoints([...waypointManagerRef.current.getWaypoints()]);
         
-        // Recalculate route stats if we have an aircraft and at least 2 waypoints
-        if (selectedAircraft && waypointManagerRef.current.getWaypoints().length >= 2) {
+        // Recalculate route stats if we have at least 2 waypoints
+        if (waypointManagerRef.current.getWaypoints().length >= 2) {
           // Extract coordinates from waypoints
           const coordinates = waypointManagerRef.current.getWaypoints().map(wp => wp.coords);
           
-          // Calculate route statistics using the correct method
-          routeCalculatorRef.current.calculateRouteStats(coordinates, {
-            aircraftType: selectedAircraft.modelType || 's92',
-            payloadWeight: cargoWeight || 0,
-            reserveFuel: reserveFuel
-          });
+          // Always calculate basic distance
+          if (routeCalculatorRef.current) {
+            routeCalculatorRef.current.calculateDistanceOnly(coordinates);
+          }
+          
+          // Calculate full stats if we have an aircraft
+          if (selectedAircraft) {
+            // Calculate route statistics using the correct method
+            routeCalculatorRef.current.calculateRouteStats(coordinates, {
+              aircraftType: selectedAircraft.modelType || 's92',
+              payloadWeight: cargoWeight || 0,
+              reserveFuel: reserveFuel
+            });
+          }
         } else {
           // Clear route stats if we don't have enough waypoints
           setRouteStats(null);
@@ -865,18 +897,26 @@ const FastPlannerApp = () => {
       // Get updated waypoints
       setWaypoints([...waypointManagerRef.current.getWaypoints()]);
       
-      // Recalculate route stats if we have an aircraft and at least 2 waypoints
+      // Recalculate route stats if we have at least 2 waypoints
       const updatedWaypoints = waypointManagerRef.current.getWaypoints();
-      if (selectedAircraft && updatedWaypoints.length >= 2) {
+      if (updatedWaypoints.length >= 2) {
         // Extract coordinates from waypoints
         const coordinates = updatedWaypoints.map(wp => wp.coords);
         
-        // Calculate route statistics using the correct method
-        routeCalculatorRef.current.calculateRouteStats(coordinates, {
-          aircraftType: selectedAircraft.modelType || 's92',
-          payloadWeight: cargoWeight || 0,
-          reserveFuel: reserveFuel
-        });
+        // Always calculate basic distance
+        if (routeCalculatorRef.current) {
+          routeCalculatorRef.current.calculateDistanceOnly(coordinates);
+        }
+        
+        // Calculate full stats if we have an aircraft
+        if (selectedAircraft) {
+          // Calculate route statistics using the correct method
+          routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            aircraftType: selectedAircraft.modelType || 's92',
+            payloadWeight: cargoWeight || 0,
+            reserveFuel: reserveFuel
+          });
+        }
       }
     } else {
       console.error('Cannot reorder: Missing waypoint manager or invalid IDs');
