@@ -1168,8 +1168,53 @@ const FastPlannerApp = () => {
         // It's just a name - try to find a location with that name
         // This is used when adding a waypoint by typing the name in the input field
         console.log(`🌐 Looking for location with name: ${waypointData}`);
-        coords = null;
-        name = waypointData;
+        
+        // CRITICAL FIX: Search for platform by name when string is passed
+        if (platformManagerRef.current) {
+          console.log(`🌐 Searching for platform with name: ${waypointData}`);
+          const platform = platformManagerRef.current.findPlatformByName(waypointData);
+          
+          if (platform) {
+            console.log(`🌐 Found platform: ${platform.name} at ${platform.coordinates}`);
+            coords = platform.coordinates;
+            name = platform.name;
+          } else {
+            console.log(`🌐 Platform not found with name: ${waypointData}`);
+            
+            // Show error message to user
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(`Platform "${waypointData}" not found. Please check spelling or click on map.`, 'error');
+            } else {
+              // Fallback error - create a toast notification
+              const toast = document.createElement('div');
+              toast.style.position = 'fixed';
+              toast.style.bottom = '20px';
+              toast.style.left = '50%';
+              toast.style.transform = 'translateX(-50%)';
+              toast.style.backgroundColor = 'rgba(220, 53, 69, 0.9)';
+              toast.style.color = 'white';
+              toast.style.padding = '10px 20px';
+              toast.style.borderRadius = '5px';
+              toast.style.zIndex = '1000';
+              toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+              toast.textContent = `Platform "${waypointData}" not found. Please check spelling or click on map.`;
+              document.body.appendChild(toast);
+              
+              // Remove toast after 3 seconds
+              setTimeout(() => {
+                document.body.removeChild(toast);
+              }, 3000);
+            }
+            
+            // Set coords to null so we'll return early without adding an invalid waypoint
+            coords = null;
+            name = waypointData;
+          }
+        } else {
+          console.log(`🌐 Platform manager not available`);
+          coords = null;
+          name = waypointData;
+        }
       } else if (waypointData && typeof waypointData === 'object') {
         // CRITICAL FIX: Check if this is a map click operation
         if (waypointData.mapClickSource === 'directClick') {
@@ -1226,6 +1271,18 @@ const FastPlannerApp = () => {
       
       if (!coords || !Array.isArray(coords) || coords.length !== 2) {
         console.error('Invalid coordinates format:', coords);
+        // Don't add waypoint with invalid coordinates
+        return;
+      }
+      
+      // Additional validation to ensure coordinates are numbers
+      if (typeof coords[0] !== 'number' || typeof coords[1] !== 'number' || 
+          isNaN(coords[0]) || isNaN(coords[1])) {
+        console.error('Coordinates must be valid numbers:', coords);
+        // Show error message to user
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(`Invalid coordinates. Please try again.`, 'error');
+        }
         return;
       }
       

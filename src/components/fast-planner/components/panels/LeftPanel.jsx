@@ -200,7 +200,13 @@ const LeftPanel = ({
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && routeInput.trim() !== "") {
       if (onAddWaypoint) {
+        console.log('LeftPanel: Enter key pressed with input:', routeInput.trim());
         onAddWaypoint(routeInput.trim());
+        
+        // Clear the input field after search attempt
+        if (onRouteInputChange) {
+          onRouteInputChange('');
+        }
       }
     }
   };
@@ -363,8 +369,13 @@ const LeftPanel = ({
                 justifyContent: "center"
               }}
               onClick={() => {
-                if (onAddWaypoint) {
-                  onAddWaypoint(routeInput.trim() || "New Stop");
+                if (onAddWaypoint && routeInput.trim()) {
+                  console.log('LeftPanel: Add button clicked with input:', routeInput.trim());
+                  onAddWaypoint(routeInput.trim());
+                  // Clear the input field after adding
+                  if (onRouteInputChange) {
+                    onRouteInputChange('');
+                  }
                 }
               }}
             >

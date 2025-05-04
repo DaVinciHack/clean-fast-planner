@@ -1286,6 +1286,46 @@ class PlatformManager {
     
     return results;
   }
+  
+  /**
+   * Find a single platform by name (exact or close match)
+   * @param {string} name - The platform name to find
+   * @returns {Object|null} - The platform object or null if not found
+   */
+  findPlatformByName(name) {
+    if (!name || !this.platforms || this.platforms.length === 0) {
+      return null;
+    }
+    
+    const normalizedName = name.toLowerCase().trim();
+    
+    // If empty name after trimming, return null
+    if (!normalizedName) {
+      return null;
+    }
+    
+    console.log(`PlatformManager: Looking for platform with name: ${normalizedName}`);
+    
+    // First try exact match
+    let platform = this.platforms.find(p => 
+      p.name.toLowerCase() === normalizedName
+    );
+    
+    // If not found, try case-insensitive match
+    if (!platform) {
+      platform = this.platforms.find(p => 
+        p.name.toLowerCase().includes(normalizedName)
+      );
+    }
+    
+    if (platform) {
+      console.log(`PlatformManager: Found platform "${platform.name}" at coordinates [${platform.coordinates}]`);
+      return platform;
+    } else {
+      console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
+      return null;
+    }
+  }
 }
 
 export default PlatformManager;
