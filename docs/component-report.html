@@ -67,7 +67,7 @@
     .progress-fill {
       height: 100%;
       background: #4CAF50;
-      width: 95.3%;
+      width: 137.2%;
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -189,7 +189,7 @@
 <body>
   <div class="container">
     <h1>Fast Planner Refactoring Dashboard</h1>
-    <div class="timestamp">Last updated: 5/3/2025, 11:35:10 AM</div>
+    <div class="timestamp">Last updated: 5/4/2025, 4:26:52 PM</div>
     
     <div class="summary-cards">
       <div class="card">
@@ -199,12 +199,12 @@
       </div>
       <div class="card">
         <h3>Refactored Code</h3>
-        <div class="value">2456</div>
+        <div class="value">3537</div>
         <div>lines of code</div>
       </div>
       <div class="card">
         <h3>Code Ratio</h3>
-        <div class="value">95.3%</div>
+        <div class="value">137.2%</div>
         <div>refactored / original</div>
       </div>
       <div class="card">
@@ -217,7 +217,7 @@
     <div class="progress-container">
       <h2>Refactoring Progress</h2>
       <div class="progress-bar">
-        <div class="progress-fill">95.3%</div>
+        <div class="progress-fill">137.2%</div>
       </div>
       <div>Based on total lines of code refactored compared to original.</div>
     </div>
@@ -237,12 +237,13 @@
         <h3>Code Structure</h3>
         <div class="code-block">
 ModularFastPlannerComponent.jsx: 2578 lines
-FastPlannerApp.jsx: 1048 lines
-Leftpanel.jsx: 737 lines
-Rightpanel.jsx: 145 lines
-Routestats.jsx: 257 lines
-Mapcomponent.jsx: 120 lines
-Flightsettings.jsx: 149 lines
+FastPlannerApp.jsx: 1987 lines
+leftpanel.jsx: 737 lines
+rightpanel.jsx: 153 lines
+routestats.jsx: 379 lines
+mapcomponent.jsx: 120 lines
+flightsettings.jsx: 161 lines
+
         </div>
       </div>
     </div>
@@ -252,6 +253,8 @@ Flightsettings.jsx: 149 lines
       <ul>
         <li><strong>Aircraft Selection Component</strong>: Extract from RightPanel.jsx</li>
         <li><strong>WaypointEditor Component</strong>: Extract from LeftPanel.jsx</li>
+        <li><strong>Add fuel consumption display</strong> to route line</li>
+        <li><strong>Add passenger capacity information</strong> to route line</li>
         <li><strong>Add visual indicators</strong> to clearly show which version is being used</li>
       </ul>
     </div>
@@ -269,45 +272,45 @@ Flightsettings.jsx: 149 lines
       <tbody>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js leftpanel\nto see detailed information about this component')">Leftpanel</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js leftpanel\nto see detailed information about this component')">leftpanel</a></td>
           <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
           <td>737</td>
-          <td>Displays and manages the route waypoints/stops list, including drag-and-drop reordering and waypoint editing.</td>
+          <td></td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js rightpanel\nto see detailed information about this component')">Rightpanel</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js rightpanel\nto see detailed information about this component')">rightpanel</a></td>
           <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>145</td>
-          <td>Contains controls for region selection, aircraft selection, and flight settings.</td>
+          <td>153</td>
+          <td></td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js routestats\nto see detailed information about this component')">Routestats</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js routestats\nto see detailed information about this component')">routestats</a></td>
           <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>257</td>
-          <td>Displays route statistics including distance, fuel requirements, and flight duration.</td>
+          <td>379</td>
+          <td></td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js mapcomponent\nto see detailed information about this component')">Mapcomponent</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js mapcomponent\nto see detailed information about this component')">mapcomponent</a></td>
           <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
           <td>120</td>
-          <td>Renders the interactive map using MapLibre GL JS with layers for platforms, routes, and waypoints.</td>
+          <td></td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js flightsettings\nto see detailed information about this component')">Flightsettings</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js flightsettings\nto see detailed information about this component')">flightsettings</a></td>
           <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>149</td>
-          <td>Provides controls for configuring flight parameters like passenger weight, fuel settings, and deck time.</td>
+          <td>161</td>
+          <td></td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js aircraftselection\nto see detailed information about this component')">Aircraftselection</a></td>
+          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js aircraftselection\nto see detailed information about this component')">aircraftselection</a></td>
           <td><span class="status" style="background-color: #FF9800; color: white;">Not Started</span></td>
           <td>0</td>
-          <td>Allows filtering and selection of aircraft by type and registration. Next component to be refactored.</td>
+          <td></td>
         </tr>
         
       </tbody>
