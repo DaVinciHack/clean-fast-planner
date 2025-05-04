@@ -72,6 +72,9 @@ These provide state management and data sharing between components.
 - Refactored RightPanel into card-based architecture
 - Implemented smooth card animations
 - Created separate card components for different functionality
+- Implemented comprehensive wind effect handling throughout UI
+- Fixed route line display to properly update with wind-adjusted times
+- Created two-step redraw process to ensure display consistency
 
 ### In Progress
 - Implementing S92 dropdown calculator
@@ -84,6 +87,9 @@ These provide state management and data sharing between components.
 - Implement comprehensive testing
 - Add error boundaries around components
 - Improve loading indicators
+- Add fuel consumption display to route line
+- Add passenger capacity information to route line
+- Improve handling of long routes with many waypoints
 
 ## Developer Notes
 
@@ -101,6 +107,28 @@ Route calculations are performed in these steps:
 3. Aircraft performance data is applied
 4. Fuel requirements are calculated based on flight settings
 5. Passenger capacity is determined based on fuel load and aircraft capacity
+
+### Wind Effect Handling
+The application accurately calculates and displays wind effects on flight time and fuel consumption:
+
+1. **Wind Calculation Flow**:
+   - The `WindCalculations.js` module calculates headwind/tailwind components for each route leg
+   - `RouteCalculator.js` integrates these calculations into time and fuel estimates
+   - `FastPlannerApp.jsx` handles weather state updates and triggers route recalculations
+   - `WaypointManager.js` updates route displays with wind-adjusted times
+
+2. **Key Components**:
+   - `updateWeatherSettings()` in FastPlannerApp.jsx triggers a two-step redraw process
+   - `onCalculationComplete` callback updates all UI components with consistent data
+   - `createArrowsAlongLine()` in WaypointManager.js formats the route line labels
+
+3. **Implementation Details**:
+   - Route display uses a clearing step followed by a redraw to ensure data freshness
+   - Times are displayed with consistent formatting across all UI components
+   - Wind-adjusted times are displayed without redundant indicators on route lines
+   - Global state management ensures all components access the same calculation results
+
+All flight time calculations incorporate wind effects automatically, with no need for fallback data or safety corrections.
 
 #### Route Stop Cards System
 The StopCards system provides a visual representation of each stop in the route with the following features:
@@ -132,6 +160,12 @@ The system consists of:
 
 **Issue**: Aircraft selection dropdowns not resetting after selection
 **Solution**: This was fixed in commit 6102f3b. The approach uses React state management in FastPlannerApp.jsx to properly reset dropdown values while maintaining the selected aircraft state. Direct DOM manipulation was removed from MainCard.jsx to avoid conflicts with React's virtual DOM.
+
+**Issue**: Route line not updating when wind settings change
+**Solution**: This was fixed in commit e983c7d. The solution implements a two-step redraw process that first clears the route display with `updateRoute(null)` and then redraws with the updated stats after a short delay. This ensures all cached route data is properly refreshed.
+
+**Issue**: Wind correction times inconsistent across UI components
+**Solution**: This was also fixed in commit e983c7d. The fix ensures all UI components access the same calculation results by using global state management and passing the complete `routeStats` object to all components that need it.
 
 ## References & Resources
 
