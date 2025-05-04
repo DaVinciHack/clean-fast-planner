@@ -290,10 +290,10 @@ const StopCardsContainer = ({
   }
   
   return (
-    <div className="route-stops" style={{ marginTop: '0' }}>
-      <h4 className="route-stops-title" style={{ margin: '0 0 8px 0', fontSize: '0.95em' }}>ROUTE STOPS</h4>
+    <div className="route-stops" style={{ margin: '0', padding: '4px 10px' }}>
+      <h4 className="route-stops-title" style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}>ROUTE STOPS</h4>
       
-      <div className="stop-cards-container">
+      <div className="stop-cards-container" style={{ marginTop: '0', paddingTop: '0' }}>
         <div className="stop-cards-stack" ref={containerRef}>
           {stopCards.map((card, index) => {
             const cardId = `stop-${card.id}`;

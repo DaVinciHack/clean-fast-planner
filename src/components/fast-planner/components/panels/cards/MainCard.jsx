@@ -56,10 +56,6 @@ const MainCard = ({
         </div>
       </div>
       
-      <p style={{ fontSize: "0.8em", color: "var(--label-color)", margin: "0 0 10px 0" }}>
-        Click on map to add waypoints or use Route Editor
-      </p>
-      
       <div className="control-section">
         <button 
           id="clear-route" 
@@ -379,11 +375,11 @@ const MainCard = ({
         )}
         
         {/* Compact Wind Settings Section */}
-        <div className="weather-control-section" style={{ marginBottom: '8px' }}>
+        <div className="weather-control-section" style={{ marginBottom: '0', marginTop: '4px' }}>
           <div className="settings-group" style={{ display: 'flex', gap: '8px', marginBottom: '0' }}>
-            <div>
-              <label htmlFor="wind-direction" style={{ fontSize: '0.9em' }}>Wind From:</label>
-              <div className="input-with-unit">
+            <div style={{ flex: '1' }}>
+              <label htmlFor="wind-direction" style={{ fontSize: '0.85em' }}>Wind From:</label>
+              <div className="input-with-unit" style={{ width: '100%' }}>
                 <input
                   id="wind-direction"
                   type="number"
@@ -394,14 +390,14 @@ const MainCard = ({
                     const newDirection = parseInt(e.target.value) || 0;
                     onWeatherUpdate(weather.windSpeed, newDirection);
                   }}
-                  style={{ width: '55px' }}
+                  style={{ width: '100%', height: '28px', fontSize: '0.9em' }}
                 />
                 <span className="unit">°</span>
               </div>
             </div>
-            <div>
-              <label htmlFor="wind-speed" style={{ fontSize: '0.9em' }}>Speed:</label>
-              <div className="input-with-unit">
+            <div style={{ flex: '1' }}>
+              <label htmlFor="wind-speed" style={{ fontSize: '0.85em' }}>Speed:</label>
+              <div className="input-with-unit" style={{ width: '100%' }}>
                 <input
                   id="wind-speed"
                   type="number"
@@ -412,7 +408,7 @@ const MainCard = ({
                     const newSpeed = parseInt(e.target.value) || 0;
                     onWeatherUpdate(newSpeed, weather.windDirection);
                   }}
-                  style={{ width: '45px' }}
+                  style={{ width: '100%', height: '28px', fontSize: '0.9em' }}
                 />
                 <span className="unit">kts</span>
               </div>
@@ -421,7 +417,8 @@ const MainCard = ({
         </div>
       </div>
       
-      <div className="control-section" style={{ marginTop: '0' }}>
+      {/* Remove padding in the control section that renders StopCardsContainer */}
+      <div className="control-section" style={{ margin: '0', padding: '0' }}>
         {/* Stop Cards with reduced padding above */}
         {waypoints.length >= 2 && (
           <StopCardsContainer

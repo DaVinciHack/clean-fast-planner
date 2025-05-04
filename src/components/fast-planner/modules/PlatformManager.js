@@ -1139,12 +1139,13 @@ class PlatformManager {
     try {
       // Toggle visibility of all platform and airfield layers
       const allLayers = [
-        'platforms-fixed-layer',
-        'platforms-movable-layer', 
-        'platforms-fixed-labels',
-        'platforms-movable-labels',
-        'airfields-layer',
-        'airfields-labels'
+        'platforms-layer',             // Main fixed platforms layer
+        'platforms-fixed-layer',       // Alternative fixed platforms layer
+        'platforms-movable-layer',     // Movable platforms layer
+        'platforms-fixed-labels',      // Fixed platform labels
+        'platforms-movable-labels',    // Movable platform labels
+        'airfields-layer',             // Airfield markers
+        'airfields-labels'             // Airfield labels
       ];
       const visibility = this.isVisible ? 'visible' : 'none';
       
