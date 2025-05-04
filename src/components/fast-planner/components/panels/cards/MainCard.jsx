@@ -38,14 +38,10 @@ const MainCard = ({
   passengerWeight = 220,
   deckTimePerStop = 5,
   deckFuelFlow = 400,
+  // Weather props
+  weather = { windSpeed: 15, windDirection: 270 },
+  onWeatherUpdate = () => {},
 }) => {
-  // Default weather data - later we'll fetch this from API or weather tab
-  const [weatherData, setWeatherData] = React.useState({
-    windSpeed: 15,     // Wind speed in knots
-    windDirection: 270, // Direction wind is coming FROM in degrees (270 = from west)
-    temperature: 15,    // Temperature in Celsius
-    pressure: 1013.25   // Pressure in hPa
-  });
   
   return (
     <div className="tab-content main-tab">
@@ -326,8 +322,8 @@ const MainCard = ({
               <div className="icon">✈️</div>
               <div className="label">Cruise Speed</div>
               <div className="value">
-                {selectedAircraft.cruiseSpeed || 145}
-                <span className="unit">kts</span>
+                {selectedAircraft.cruiseSpeed || 'N/A'}
+                <span className="unit">{selectedAircraft.cruiseSpeed ? 'kts' : ''}</span>
               </div>
             </div>
             
@@ -336,8 +332,8 @@ const MainCard = ({
               <div className="icon">⛽</div>
               <div className="label">Fuel Flow</div>
               <div className="value">
-                {selectedAircraft.fuelBurn || 1100}
-                <span className="unit">lbs/hr</span>
+                {selectedAircraft.fuelBurn || 'N/A'}
+                <span className="unit">{selectedAircraft.fuelBurn ? 'lbs/hr' : ''}</span>
               </div>
             </div>
             
@@ -346,7 +342,7 @@ const MainCard = ({
               <div className="icon">👥</div>
               <div className="label">Max Pax</div>
               <div className="value">
-                {selectedAircraft.maxPassengers || 19}
+                {selectedAircraft.maxPassengers || 'N/A'}
               </div>
             </div>
             
@@ -355,8 +351,8 @@ const MainCard = ({
               <div className="icon">🔋</div>
               <div className="label">Max Fuel</div>
               <div className="value">
-                {selectedAircraft.maxFuel || 5000}
-                <span className="unit">lbs</span>
+                {selectedAircraft.maxFuel || 'N/A'}
+                <span className="unit">{selectedAircraft.maxFuel ? 'lbs' : ''}</span>
               </div>
             </div>
             
@@ -365,8 +361,8 @@ const MainCard = ({
               <div className="icon">⚖️</div>
               <div className="label">Useful Load</div>
               <div className="value">
-                {selectedAircraft.usefulLoad || 7000}
-                <span className="unit">lbs</span>
+                {selectedAircraft.usefulLoad || 'N/A'}
+                <span className="unit">{selectedAircraft.usefulLoad ? 'lbs' : ''}</span>
               </div>
             </div>
             
@@ -382,53 +378,51 @@ const MainCard = ({
           </div>
         )}
         
-        {/* Temporary Weather Control Section - Will be moved to Weather card later */}
-        <div className="weather-control-section">
-          <h4>Wind Settings</h4>
-          <div className="settings-group">
+        {/* Compact Wind Settings Section */}
+        <div className="weather-control-section" style={{ marginBottom: '8px' }}>
+          <div className="settings-group" style={{ display: 'flex', gap: '8px', marginBottom: '0' }}>
             <div>
-              <label htmlFor="wind-speed">Wind Speed:</label>
-              <div className="input-with-unit">
-                <input
-                  id="wind-speed"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={weatherData.windSpeed}
-                  onChange={(e) => setWeatherData({
-                    ...weatherData,
-                    windSpeed: parseInt(e.target.value) || 0
-                  })}
-                />
-                <span className="unit">kts</span>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="wind-direction">Direction From:</label>
+              <label htmlFor="wind-direction" style={{ fontSize: '0.9em' }}>Wind From:</label>
               <div className="input-with-unit">
                 <input
                   id="wind-direction"
                   type="number"
                   min="0"
                   max="359"
-                  value={weatherData.windDirection}
-                  onChange={(e) => setWeatherData({
-                    ...weatherData,
-                    windDirection: parseInt(e.target.value) || 0
-                  })}
+                  value={weather.windDirection}
+                  onChange={(e) => {
+                    const newDirection = parseInt(e.target.value) || 0;
+                    onWeatherUpdate(weather.windSpeed, newDirection);
+                  }}
+                  style={{ width: '55px' }}
                 />
                 <span className="unit">°</span>
               </div>
             </div>
-          </div>
-          <div className="small-hint">
-            Direction is where the wind is coming FROM (270° = West to East)
+            <div>
+              <label htmlFor="wind-speed" style={{ fontSize: '0.9em' }}>Speed:</label>
+              <div className="input-with-unit">
+                <input
+                  id="wind-speed"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={weather.windSpeed}
+                  onChange={(e) => {
+                    const newSpeed = parseInt(e.target.value) || 0;
+                    onWeatherUpdate(newSpeed, weather.windDirection);
+                  }}
+                  style={{ width: '45px' }}
+                />
+                <span className="unit">kts</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="control-section">
-        {/* Stop Cards - taking full space now since Route Statistics is removed */}
+      <div className="control-section" style={{ marginTop: '0' }}>
+        {/* Stop Cards with reduced padding above */}
         {waypoints.length >= 2 && (
           <StopCardsContainer
             waypoints={waypoints}
@@ -438,7 +432,7 @@ const MainCard = ({
             reserveFuel={reserveFuel}
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}
-            weather={weatherData}
+            weather={weather}
           />
         )}
       </div>

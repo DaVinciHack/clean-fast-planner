@@ -1,7 +1,7 @@
 /* StopCards.css */
 .stop-cards-container {
-  margin-top: 15px;
-  padding-top: 5px;
+  margin-top: 5px;
+  padding-top: 2px;
 }
 
 .stop-cards-header {
@@ -158,18 +158,18 @@
 .route-stops {
   background-color: rgba(35, 35, 35, 0.85);
   border-radius: 4px;
-  padding: 10px 12px;
-  margin-top: 15px;
+  padding: 8px 10px;
+  margin-top: 5px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
 }
 
 /* Route stops header styling */
 .route-stops-title {
   color: #3498db;
-  font-size: 0.95em;
+  font-size: 0.85em;
   font-weight: 600;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   letter-spacing: 0.5px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
 }
@@ -211,8 +211,9 @@
 
 /* Weather control styling */
 .weather-control-section {
-  margin-top: 15px;
-  padding: 10px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
   background-color: rgba(30, 35, 40, 0.6);
   border-radius: 5px;
   border: 1px solid var(--border-color);
@@ -221,12 +222,12 @@
 .weather-control-section h4 {
   color: #3498db;
   margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 0.9em;
+  margin-bottom: 5px;
+  font-size: 0.85em;
 }
 
 .weather-control-section .small-hint {
   font-size: 0.7em;
   color: #888;
-  margin-top: 4px;
+  margin-top: 2px;
 }
