@@ -315,6 +315,21 @@ class WaypointManager {
       };
     }
     
+    // CRITICAL FIX: Add a safety check to verify if routeStats contains sane time values
+    // For a single leg, check if the total time makes sense for the total distance
+    if (routeStats && routeStats.timeHours && routeStats.totalDistance) {
+      const totalDistance = parseFloat(routeStats.totalDistance);
+      const cruiseSpeed = 135; // Default S92 speed
+      const expectedTimeHours = totalDistance / cruiseSpeed;
+      const timeHoursDifference = Math.abs(routeStats.timeHours - expectedTimeHours);
+      
+      if (timeHoursDifference > 1) { // More than 1 hour difference
+        console.error(`❌ Route time value is unreasonable! Got ${routeStats.timeHours.toFixed(2)} hours but expected ~${expectedTimeHours.toFixed(2)} hours based on distance ${totalDistance} nm at ${cruiseSpeed} kts`);
+        console.log('❌ Setting window.currentRouteStats to null to prevent incorrect time display');
+        window.currentRouteStats = null;
+      }
+    }
+    
     const features = [];
     
     // Process each segment of the route
@@ -349,47 +364,126 @@ class WaypointManager {
       
       // Try to get aircraft data from routeStats or window.currentRouteStats
       const stats = routeStats || window.currentRouteStats;
-      if (stats && stats.aircraft) {
-        const speed = stats.aircraft.cruiseSpeed || 145;
+      
+      // Log available stats for debugging
+      console.log(`Drawing leg ${i+1} with stats:`, {
+        hasStats: !!stats,
+        hasLegs: !!(stats && stats.legs),
+        legCount: stats?.legs?.length || 0,
+        legHasTime: !!(stats?.legs && stats?.legs[i]?.time),
+        windAdjusted: stats?.windAdjusted || false
+      });
+      
+      if (stats && stats.legs && stats.legs[i]) {
+        // CRITICAL FIX: Always use the time from legs data, which includes wind effects
+        if (stats.legs[i].time !== undefined) {
+          const timeHours = stats.legs[i].time;
+          
+          // Use a more flexible safety check for reasonable time values
+          // based on aircraft speed (default 135kts if not available)
+          const cruiseSpeed = stats.aircraft?.cruiseSpeed || 135;
+          const expectedTimeHours = distance / cruiseSpeed;
+          
+          // Allow more variation to account for wind effects (60 minutes instead of 30)
+          const isTimeReasonable = Math.abs(timeHours - expectedTimeHours) < 1.0; 
+          
+          // Format time as minutes only, rounded to the nearest minute
+          const totalMinutes = Math.round(timeHours * 60);
+          const expectedMinutes = Math.round(expectedTimeHours * 60);
+          
+          if (!isTimeReasonable) {
+            console.error(`❌ Leg ${i+1} time is unreasonable! Got ${timeHours.toFixed(2)} hours (${totalMinutes}m) but expected ~${expectedTimeHours.toFixed(2)} hours (${expectedMinutes}m) based on distance ${distance.toFixed(1)} nm at ${cruiseSpeed} kts`);
+            // Use the expected time instead of clearly wrong value
+            legTime = `${expectedMinutes}m`;
+          } else {
+            legTime = `${totalMinutes}m`;
+            
+            // If the time includes wind adjustments, add a visual indicator
+            if (stats.windAdjusted && stats.legs[i].groundSpeed) {
+              // Add the wind-adjusted marker to the time
+              const headwind = stats.legs[i].headwind;
+              if (headwind && Math.abs(headwind) > 5) {
+                legTime = `${totalMinutes}m*`; // Add an asterisk to indicate wind adjusted time
+              }
+            }
+          }
+          
+          console.log(`Using leg time for leg ${i+1}: ${legTime} (${timeHours.toFixed(3)} hours, ${totalMinutes} minutes, wind-adjusted: ${stats.windAdjusted})`);
+        }
+        
+        // Use the pre-calculated fuel if available
+        if (stats.legs[i].fuel) {
+          legFuel = Math.round(stats.legs[i].fuel);
+        }
+      }
+      else if (stats && stats.aircraft && stats.aircraft.cruiseSpeed) {
+        // If leg-specific time not available, calculate based on aircraft speed
+        // This is a fallback and won't include wind effects
+        const speed = stats.aircraft.cruiseSpeed;
         const timeHours = distance / speed;
         
         // Format time as minutes only, rounded to the nearest minute
         const totalMinutes = Math.round(timeHours * 60);
         legTime = `${totalMinutes}m`;
         
-        // Calculate fuel for this leg
-        const fuelBurn = stats.aircraft.fuelBurn || 1100;
-        legFuel = Math.round(timeHours * fuelBurn);
+        console.log(`Calculated time for leg ${i+1}: ${legTime} based on distance ${distance.toFixed(1)} nm at speed ${speed} kts (NO WIND ADJUSTMENT)`);
+        
+        // Calculate fuel for this leg if we have fuel burn data
+        if (stats.aircraft.fuelBurn) {
+          const fuelBurn = stats.aircraft.fuelBurn;
+          legFuel = Math.round(timeHours * fuelBurn);
+        }
+      }
+      // REMOVED: Dangerous fallback calculation when no aircraft data is available
+      
+      // CRITICAL FIX: All text on one line
+      // Format elements
+      const distanceText = `${distance.toFixed(1)} nm`;
+      
+      // Format the time with wind indicator if needed
+      let timeText = "";
+      if (legTime) {
+        // If the time already has the wind marker (*), use it as is
+        if (legTime.includes('*')) {
+          // For wind-adjusted time, add wind-specific styling
+          timeText = legTime;
+        } else {
+          timeText = legTime;
+        }
       }
       
-      // Format distance value
-      let distanceText = `${distance.toFixed(1)} nm`;
+      // We'll keep fuel hidden for now
       
-      // Format leg time value (enhanced)
-      let timeText = legTime ? `${legTime}` : "";
+      // Left/right arrow based on direction
+      const startLng = startPoint[0];
+      const endLng = endPoint[0];
+      const goingLeftToRight = endLng > startLng;
+      const leftArrow = '←';
+      const rightArrow = '→';
       
-      // Format fuel value (enhanced)
-      let fuelText = legFuel ? `${legFuel} lbs` : "";
-      
-      // Create a clear, enhanced label with more information
-      // Shows distance, time, and fuel on separate lines for better readability
+      // Create label with proper arrow placement - ALL ON ONE LINE
       let labelText = '';
       
-      // Always show distance
+      // Add left arrow at beginning if going right to left
+      if (!goingLeftToRight) {
+        labelText += leftArrow + ' ';
+      }
+      
+      // Add distance
       labelText += distanceText;
       
-      // Add time if available
+      // Add time if available - on same line with dot separator
       if (timeText) {
-        labelText += `\n${timeText}`;
+        labelText += ` • ${timeText}`;
+        
+        // We've removed the wind indicator display from route lines
+        // Wind correction is already shown in the top card and stop cards
       }
       
-      // Add fuel if available
-      if (fuelText) {
-        labelText += `\n${fuelText}`;
+      // Add right arrow at end if going left to right
+      if (goingLeftToRight) {
+        labelText += ' ' + rightArrow;
       }
-      
-      // Add arrow indicator
-      labelText += ' ➜';
       
       // Determine the adjusted bearing for text orientation
       // Make the text parallel to the line and ensure it's never upside down
@@ -631,23 +725,23 @@ class WaypointManager {
         'layout': {
           'symbol-placement': 'point',
           'text-field': ['get', 'text'], // Use direct text field
-          'text-size': 12,               // Slightly larger text for better readability
+          'text-size': 11,               // Smaller text
           'text-font': ['Arial Unicode MS Bold'],
-          'text-offset': [0, -0.5],      // Position closer to the line
+          'text-offset': [0, -0.5],      // Original offset
           'text-anchor': 'center',
           'text-rotate': ['get', 'textBearing'], // Use the adjusted bearing for proper orientation
           'text-rotation-alignment': 'map',
           'text-allow-overlap': true,
           'text-ignore-placement': true,
-          'text-max-width': 12,          // Allow text to wrap to multiple lines
-          'text-line-height': 1.2,       // Add some line spacing for multiline text
+          'text-max-width': 30,          // Wider to keep everything on one line
+          'text-line-height': 1.0,       // Tighter line height
           'symbol-sort-key': 3           // Ensure labels appear above everything
         },
         'paint': {
           'text-color': '#ffffff',
-          'text-halo-color': '#000000',
-          'text-halo-width': 3,         // Thicker halo for better readability
-          'text-opacity': 0.9
+          'text-halo-color': '#000000',  // Original halo color
+          'text-halo-width': 3,          // Original halo width
+          'text-opacity': 0.9            // Original opacity
         },
         'filter': ['has', 'isLabel']     // Only show labels, not arrows
       });

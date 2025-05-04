@@ -313,6 +313,29 @@ const FastPlannerApp = () => {
         // Update the route stats state with the new data
         setRouteStats(stats);
         
+        // CRITICAL FIX: Make the route stats accessible globally for WaypointManager
+        window.currentRouteStats = stats;
+        
+        // CRITICAL FIX: Force route display update when weather stats change
+        // This ensures the route line labels are updated with new time values
+        if (waypointManagerRef.current) {
+          // Check if weather data has changed from previous stats
+          const hasWindChanged = prevStats?.windData?.windSpeed !== stats?.windData?.windSpeed || 
+                                 prevStats?.windData?.windDirection !== stats?.windData?.windDirection;
+          
+          // Force route update whenever new calculation occurs, especially with wind changes
+          console.log('🔄 Forcing route display update with new stats, wind changed:', hasWindChanged);
+          
+          // First clear the route display to ensure a clean redraw
+          waypointManagerRef.current.updateRoute(null);
+          
+          // Then redraw with the new stats after a small delay
+          setTimeout(() => {
+            waypointManagerRef.current.updateRoute(stats);
+            console.log('🔄 Route display updated with new stats');
+          }, 50);
+        }
+        
         // When route stats are updated, update stop cards too
         if (stats && waypoints.length >= 2 && selectedAircraft) {
           console.log('🔄 Generating stop cards with stats:', {
@@ -1090,12 +1113,33 @@ const FastPlannerApp = () => {
       
       // Calculate route statistics with weather
       console.log(`Recalculating route with weather: Wind ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
+      
+      // CRITICAL FIX: First, force the route to update with existing stats to clear the old display
+      if (waypointManagerRef.current) {
+        console.log('Forcing immediate route display update to clear old wind data');
+        waypointManagerRef.current.updateRoute(null);
+      }
+      
+      // Then calculate new route stats with the updated weather
       routeCalculatorRef.current.calculateRouteStats(coordinates, {
         selectedAircraft: selectedAircraft, // Pass the full aircraft object
         payloadWeight: cargoWeight || 0,
         reserveFuel: reserveFuel,
         weather: newWeather // Pass the new weather object
       });
+      
+      // CRITICAL FIX: Force route display update with a delay to ensure the route calculator has time to finish
+      setTimeout(() => {
+        if (waypointManagerRef.current) {
+          // Get the latest route stats from our state
+          const currentStats = window.currentRouteStats || routeStats;
+          console.log('Forcing delayed route display update after weather change with stats:', 
+                      currentStats ? {time: currentStats.estimatedTime, windAdjusted: currentStats.windAdjusted} : 'No stats');
+          
+          // Update the route with the latest stats to refresh the time display
+          waypointManagerRef.current.updateRoute(currentStats);
+        }
+      }, 200);
       
       // Generate stop cards data with the new weather settings immediately
       if (waypoints.length >= 2 && selectedAircraft) {
@@ -1283,6 +1327,8 @@ const FastPlannerApp = () => {
               // Directly update the routeStats state with the calculation results - wait for it to complete
               await new Promise(resolve => {
                 setRouteStats(calcResults);
+                // CRITICAL FIX: Make route stats available to WaypointManager
+                window.currentRouteStats = calcResults;
                 setTimeout(resolve, 0);
               });
               
