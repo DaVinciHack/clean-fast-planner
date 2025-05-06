@@ -94,10 +94,10 @@ const FastPlannerApp = () => {
   
   // Flight calculation settings
   const [flightSettings, setFlightSettings] = useState({
-    passengerWeight: 0,
+    passengerWeight: 220,
     contingencyFuelPercent: 10,
     taxiFuel: 50,
-    reserveFuel: 0,
+    reserveFuel: 600,
     deckTimePerStop: 5,
     deckFuelFlow: 400,
   });

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fast Flight Planner (Clean)</title>
+    <script type="module" crossorigin src="./assets/index-C5enLCAU.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/osdk-vendors-dAfwx3MD.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-vendors-BiGCDtqC.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-ClFz_ONm.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- Simple one-time dropdown fix script -->
+    <script>
+      // Wait for the app to fully load
+      window.addEventListener('load', function() {
+        // Give the React app time to initialize
+        setTimeout(function() {
+          // Create a global reset function for the aircraft selection UI
+          window.resetAircraftDropdowns = function() {
+            // Only reset if we have a selected aircraft
+            const selectedDisplay = document.querySelector('.selected-aircraft-display');
+            if (selectedDisplay && selectedDisplay.textContent.trim() !== 'None Selected') {
+              console.log('Resetting dropdowns after aircraft selection');
+              
+              // Force type dropdown to reset to "-- Change Aircraft Type --"
+              const typeDropdown = document.getElementById('aircraft-type');
+              if (typeDropdown) {
+                typeDropdown.value = 'select';
+              }
+              
+              // Reset registration dropdown
+              const regDropdown = document.getElementById('aircraft-registration');
+              if (regDropdown) {
+                regDropdown.value = '';
+              }
+            }
+          };
+          
+          // Add a click handler to the selected aircraft display
+          document.addEventListener('click', function(e) {
+            // If clicking on the selected aircraft display, reset dropdowns
+            if (e.target.classList.contains('selected-aircraft-display') || 
+                e.target.closest('.selected-aircraft-display')) {
+              window.resetAircraftDropdowns();
+            }
+          });
+          
+          console.log('Aircraft dropdown reset function available globally');
+        }, 1500);
+      });
+    </script>
+  </body>
+</html>

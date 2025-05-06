@@ -11,10 +11,10 @@ class FlightCalculations {
   constructor() {
     // Default values for calculations
     this.defaults = {
-      passengerWeight: 0, // lbs per passenger including baggage
+      passengerWeight: 220, // lbs per passenger including baggage
       contingencyFuelPercent: 10, // 10% contingency fuel
       taxiFuel: 50, // lbs
-      reserveFuel: 0, // lbs
+      reserveFuel: 600, // lbs
       deckTimePerStop: 5, // minutes
       deckFuelFlow: 400, // lbs per hour during deck operations
       callbacks: {} // For notifying UI of calculation results
@@ -93,11 +93,11 @@ class FlightCalculations {
     // Extract aircraft parameters, using defaults for missing values
     const {
       cruseSpeed = 145, // knots - note the field is spelled "cruseSpeed" in the data
-      fuelBurn = 0,   // lbs per hour
+      fuelBurn = 1100,   // lbs per hour
       maxFuelCapacity = 5000, // lbs
       maxFuel = 5000, // lbs (alternative field name)
       dryOperatingWeightLbs = 15000, // lbs (empty weight)
-      emptyWeight = 0, // lbs (alternative field name)
+      emptyWeight = 15000, // lbs (alternative field name)
       usefulLoad = 7000, // lbs
       maxPassengers = 19
     } = aircraft;

@@ -36,88 +36,88 @@ class AircraftManager {
     // Default aircraft performance data by type
     this.defaultPerformanceData = {
       's92': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,   // lbs per hour
+        cruiseSpeed: 145, // knots
+        fuelBurn: 1100,   // lbs per hour
         maxFuel: 5000,    // lbs
         maxPassengers: 19,
         maxRange: 450,    // nm
         usefulLoad: 7000  // lbs
       },
       's76': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 140, // knots
+        fuelBurn: 700,    // lbs per hour
         maxFuel: 3000,    // lbs
         maxPassengers: 12,
         maxRange: 400,    // nm
         usefulLoad: 5000  // lbs
       },
       's76d': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 150, // knots
+        fuelBurn: 730,    // lbs per hour
         maxFuel: 3300,    // lbs
         maxPassengers: 12,
         maxRange: 420,    // nm
         usefulLoad: 5200  // lbs
       },
       'aw139': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 150, // knots
+        fuelBurn: 850,    // lbs per hour
         maxFuel: 4000,    // lbs
         maxPassengers: 15,
         maxRange: 400,    // nm
         usefulLoad: 6000  // lbs
       },
       'aw189': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 150, // knots
+        fuelBurn: 950,    // lbs per hour
         maxFuel: 4500,    // lbs
         maxPassengers: 16,
         maxRange: 430,    // nm
         usefulLoad: 6300  // lbs
       },
       'h175': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 150, // knots
+        fuelBurn: 900,    // lbs per hour
         maxFuel: 4200,    // lbs
         maxPassengers: 16,
         maxRange: 440,    // nm
         usefulLoad: 6500  // lbs
       },
       'h160': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 140, // knots
+        fuelBurn: 700,    // lbs per hour
         maxFuel: 3200,    // lbs
         maxPassengers: 12,
         maxRange: 420,    // nm
         usefulLoad: 4800  // lbs
       },
       'ec135': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 130, // knots
+        fuelBurn: 550,    // lbs per hour
         maxFuel: 2000,    // lbs
         maxPassengers: 7,
         maxRange: 350,    // nm
         usefulLoad: 3300  // lbs
       },
       'ec225': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,   // lbs per hour
+        cruiseSpeed: 142, // knots
+        fuelBurn: 1000,   // lbs per hour
         maxFuel: 4800,    // lbs
         maxPassengers: 19,
         maxRange: 450,    // nm
         usefulLoad: 6800  // lbs
       },
       'as350': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 120, // knots
+        fuelBurn: 400,    // lbs per hour
         maxFuel: 1500,    // lbs
         maxPassengers: 6,
         maxRange: 360,    // nm
         usefulLoad: 2500  // lbs
       },
       'a119': {
-        cruiseSpeed: 0, // knots
-        fuelBurn: 0,    // lbs per hour
+        cruiseSpeed: 135, // knots
+        fuelBurn: 500,    // lbs per hour
         maxFuel: 1800,    // lbs
         maxPassengers: 7,
         maxRange: 380,    // nm
