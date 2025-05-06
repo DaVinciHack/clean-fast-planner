@@ -1,5 +1,6 @@
 import React from 'react';
 import RegionSelector from '../../controls/RegionSelector';
+import { SaveFlightButton } from '../../controls';
 import { StopCardsContainer } from '../../flight/stops';
 import '../../flight/stops/StopCards.css';
 
@@ -42,6 +43,22 @@ const MainCard = ({
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {},
 }) => {
+  // Status message handlers for the Save Flight button
+  const handleSaveSuccess = (message) => {
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator(message, 'success');
+    } else {
+      alert(message);
+    }
+  };
+  
+  const handleSaveError = (error) => {
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator(error, 'error');
+    } else {
+      alert(error);
+    }
+  };
   
   return (
     <div className="tab-content main-tab">
@@ -72,6 +89,15 @@ const MainCard = ({
         >
           {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}
         </button>
+        {/* Add Save Flight button */}
+        <SaveFlightButton
+          selectedAircraft={selectedAircraft}
+          waypoints={waypoints}
+          routeStats={routeStats}
+          currentRegion={currentRegion}
+          onSuccess={handleSaveSuccess}
+          onError={handleSaveError}
+        />
         {/* Manual reload button - hidden by default but useful for development */}
         <button 
           id="reload-data" 

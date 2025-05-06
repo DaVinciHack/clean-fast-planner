@@ -108,6 +108,8 @@ const RightPanel = ({
         deckFuelFlow={deckFuelFlow}
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
+        // Added cargoWeight for the Save Flight button to calculate payload
+        cargoWeight={cargoWeight}
       />
       
       {/* Settings Card */}
