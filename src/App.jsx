@@ -6,7 +6,9 @@ import './index.css';
 function App() {
   return (
     <AuthProvider>
-      <FastPlannerPage />
+      <div className="app-container">
+        <FastPlannerPage />
+      </div>
     </AuthProvider>
   );
 }

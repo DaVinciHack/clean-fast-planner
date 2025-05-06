@@ -24,36 +24,52 @@ const DEFAULT_AIRCRAFT_TYPES = {
     name: "Sikorsky S-92",
     cruiseSpeed: 145, // knots
     fuelBurn: 1450,   // lbs per hour
-    maxFuel: 5200,    // lbs
+    fuelCapacity: 5200,    // lbs
     maxTakeoffWeight: 26500, // lbs
     emptyWeight: 17000, // lbs
-    passengerWeight: 220 // lbs per passenger
+    passengerWeight: 220, // lbs per passenger
+    registration: "N892PW",
+    maxPax: 19,
+    endurance: 3.4, // hours (excluding reserve)
+    operationalRadius: 150 // NM
   },
   aw139: {
     name: "Leonardo AW139",
     cruiseSpeed: 150, // knots
     fuelBurn: 1100,   // lbs per hour
-    maxFuel: 3900,    // lbs
+    fuelCapacity: 3900,    // lbs
     maxTakeoffWeight: 14991, // lbs
     emptyWeight: 10250, // lbs
-    passengerWeight: 220 // lbs per passenger
+    passengerWeight: 220, // lbs per passenger
+    registration: "N603PW",
+    maxPax: 12,
+    endurance: 2.3, // hours (excluding reserve)
+    operationalRadius: 85 // NM
   },
   h175: {
     name: "Airbus H175",
     cruiseSpeed: 150, // knots
     fuelBurn: 980,    // lbs per hour
-    maxFuel: 4400,    // lbs
+    fuelCapacity: 4400,    // lbs
     maxTakeoffWeight: 17196, // lbs
     emptyWeight: 10800, // lbs
-    passengerWeight: 220 // lbs per passenger
+    passengerWeight: 220, // lbs per passenger
+    registration: "N175PW",
+    maxPax: 16,
+    endurance: 3.8, // hours (excluding reserve)
+    operationalRadius: 140 // NM
   },
   h160: {
     name: "Airbus H160",
     cruiseSpeed: 150, // knots
     fuelBurn: 750,    // lbs per hour
-    maxFuel: 3000,    // lbs
+    fuelCapacity: 3000,    // lbs
     maxTakeoffWeight: 13338, // lbs
     emptyWeight: 8100, // lbs
-    passengerWeight: 220 // lbs per passenger
+    passengerWeight: 220, // lbs per passenger
+    registration: "N160PW",
+    maxPax: 12,
+    endurance: 3.2, // hours (excluding reserve)
+    operationalRadius: 110 // NM
   }
 };

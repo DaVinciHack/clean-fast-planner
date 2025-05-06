@@ -1,0 +1,44 @@
+/* Flight Settings Component Styles */
+
+.flight-settings {
+  margin-bottom: 20px;
+}
+
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.input-with-unit input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.input-with-unit .unit {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--label-color);
+  width: 30px;
+}
+
+.flight-settings h4 {
+  font-size: 14px;
+  margin-top: 15px;
+  margin-bottom: 8px;
+  color: var(--accent-cyan);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.small-hint {
+  font-size: 10px;
+  color: var(--label-color);
+  margin-top: -3px;
+  margin-bottom: 10px;
+}

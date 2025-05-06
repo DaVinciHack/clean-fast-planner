@@ -2,14 +2,18 @@
  * Components index - exports all Fast Planner UI components
  */
 
-import LeftPanel from './LeftPanel';
-import RightPanel from './RightPanel';
-import MapComponent from './MapComponent';
-import RegionSelector from './RegionSelector';
+import LeftPanel from './panels/LeftPanel';
+import RightPanel from './panels/RightPanel';
+import MapComponent from './map/MapComponent';
+import RegionSelector from './controls/RegionSelector';
+import RouteStatsCard from './flight/RouteStatsCard';
+import FlightSettings from './flight/FlightSettings';
 
 export {
   LeftPanel,
   RightPanel,
   MapComponent,
-  RegionSelector
+  RegionSelector,
+  RouteStatsCard,
+  FlightSettings
 };

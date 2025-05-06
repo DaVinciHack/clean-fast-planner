@@ -15,14 +15,88 @@ document.addEventListener('DOMContentLoaded', function() {
   // Set up UI event handlers
   setupEventHandlers();
   
+  // Initialize region selector if present
+  const regionSelect = document.getElementById('region-select');
+  if (regionSelect) {
+    // Default to Gulf of Mexico or use URL parameter if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const regionParam = urlParams.get('region');
+    
+    if (regionParam) {
+      // Find the option with this value
+      for (let i = 0; i < regionSelect.options.length; i++) {
+        if (regionSelect.options[i].value === regionParam) {
+          regionSelect.selectedIndex = i;
+          break;
+        }
+      }
+    }
+    
+    // Update page title based on selected region
+    document.title = `Fast Planner - ${regionSelect.options[regionSelect.selectedIndex].text} Edition`;
+  }
+  
+  // Initialize aircraft card with default data
+  updateAircraftCard({
+    id: 'N603PW',
+    type: 'AW139',
+    endurance: '2.3',
+    missionFuel: '3070',
+    fuelUplift: '2039',
+    takeoffWeight: '24807',
+    operationalRadius: '85'
+  });
+  
+  // DISABLED: We now use React's Authentication Context
   // Check for authentication token
-  checkAuthenticationStatus();
+  // checkAuthenticationStatus();
+  
+  console.log('Legacy auth check disabled - using React authentication context');
 });
 
 /**
- * Check for authentication token and update UI
+ * Update the aircraft card at the top of the page
+ * @param {Object} aircraftData The aircraft data
+ */
+function updateAircraftCard(aircraftData) {
+  // Update the aircraft ID and type
+  if (aircraftData.id && aircraftData.type) {
+    document.getElementById('aircraft-id').textContent = `${aircraftData.id} - ${aircraftData.type}`;
+  }
+  
+  // Update the values in the card
+  if (aircraftData.endurance) {
+    document.getElementById('endurance-value').textContent = aircraftData.endurance;
+  }
+  
+  if (aircraftData.missionFuel) {
+    document.getElementById('mission-fuel-value').textContent = aircraftData.missionFuel;
+  }
+  
+  if (aircraftData.fuelUplift) {
+    document.getElementById('fuel-uplift-value').textContent = aircraftData.fuelUplift;
+  }
+  
+  if (aircraftData.takeoffWeight) {
+    document.getElementById('takeoff-weight-value').textContent = aircraftData.takeoffWeight;
+  }
+  
+  if (aircraftData.operationalRadius) {
+    document.getElementById('operational-radius-value').textContent = aircraftData.operationalRadius;
+  }
+}
+
+/**
+ * DISABLED: Check for authentication token and update UI
+ * We now use React's Authentication Context instead
  */
 function checkAuthenticationStatus() {
+  console.log('Legacy authentication check called - this function is deprecated');
+  
+  // DISABLED - this function should no longer be used
+  return;
+  
+  /*
   // First try to get token from our app's storage
   let token = getStoredToken();
   
@@ -51,6 +125,7 @@ function checkAuthenticationStatus() {
   
   const userInfo = token ? extractUserInfoFromToken(token) : null;
   updateAuthUI(token, userInfo);
+  */
 }
 
 /**
@@ -97,16 +172,26 @@ function extractUserInfoFromToken(token) {
 }
 
 /**
- * Update authentication UI based on token and user info
+ * DISABLED: Update authentication UI based on token and user info
+ * We now use React's Authentication Context instead
+ * 
  * @param {string|null} token Auth token
  * @param {Object|null} userInfo User info
  */
 function updateAuthUI(token, userInfo) {
+  console.log('Legacy updateAuthUI called - this function is deprecated');
+  
+  // This function is now active again but simplified
   const authMessage = document.getElementById('auth-message');
   const loginButton = document.getElementById('login-button');
   
+  if (!authMessage || !loginButton) {
+    console.log('Auth UI elements not found');
+    return;
+  }
+  
   if (token) {
-    authMessage.innerHTML = `Connected to Foundry${userInfo?.email ? ' as ' + userInfo.email : ''}`;
+    authMessage.innerHTML = 'Connected to Foundry';
     authMessage.className = 'auth-success';
     loginButton.textContent = 'Logout';
     loginButton.onclick = handleLogout;
@@ -135,6 +220,7 @@ function updateAuthUI(token, userInfo) {
     loginButton.textContent = 'Login to Foundry';
     // Keep original href for login
   }
+  */
 }
 
 /**
@@ -159,6 +245,29 @@ function handleLogout(e) {
  */
 function setupEventHandlers() {
   console.log('Setting up event handlers');
+  
+  // Region selector
+  const regionSelect = document.getElementById('region-select');
+  if (regionSelect) {
+    regionSelect.addEventListener('change', function() {
+      // Handle region change
+      const selectedRegion = regionSelect.value;
+      console.log('Region changed to:', selectedRegion);
+      
+      // Update page title based on region
+      document.title = `Fast Planner - ${regionSelect.options[regionSelect.selectedIndex].text} Edition`;
+      
+      // Clear any existing route and data
+      if (typeof clearRoute === 'function') {
+        clearRoute();
+      }
+      
+      // If we have a map and we're authenticated, reload rig data for the selected region
+      if (map && map.loaded()) {
+        loadRigData(selectedRegion);
+      }
+    });
+  }
   
   // Clear route button
   const clearRouteButton = document.getElementById('clear-route');
@@ -210,6 +319,52 @@ function setupEventHandlers() {
   const aircraftTypeSelect = document.getElementById('aircraft-type');
   if (aircraftTypeSelect) {
     aircraftTypeSelect.addEventListener('change', function() {
+      // Get the selected aircraft type
+      const aircraftType = aircraftTypeSelect.value;
+      
+      // Update aircraft card based on selection
+      if (aircraftType === 'aw139') {
+        updateAircraftCard({
+          id: 'N603PW',
+          type: 'AW139',
+          endurance: '2.3',
+          missionFuel: '3070',
+          fuelUplift: '2039',
+          takeoffWeight: '24807',
+          operationalRadius: '85'
+        });
+      } else if (aircraftType === 's92') {
+        updateAircraftCard({
+          id: 'N892PW',
+          type: 'S-92',
+          endurance: '3.4',
+          missionFuel: '4600',
+          fuelUplift: '3510',
+          takeoffWeight: '26500',
+          operationalRadius: '150'
+        });
+      } else if (aircraftType === 'h175') {
+        updateAircraftCard({
+          id: 'N175PW',
+          type: 'H175',
+          endurance: '3.8',
+          missionFuel: '3800',
+          fuelUplift: '2950',
+          takeoffWeight: '17196',
+          operationalRadius: '140'
+        });
+      } else if (aircraftType === 'h160') {
+        updateAircraftCard({
+          id: 'N160PW',
+          type: 'H160',
+          endurance: '3.2',
+          missionFuel: '2400',
+          fuelUplift: '1980',
+          takeoffWeight: '13338',
+          operationalRadius: '110'
+        });
+      }
+      
       // Update route stats if we have waypoints
       if (typeof waypoints !== 'undefined' && waypoints.length >= 2) {
         updateRoute();
@@ -264,9 +419,13 @@ function setupEventHandlers() {
 
 /**
  * Load rig data
+ * @param {string} region Optional region identifier
  */
-function loadRigData() {
-  console.log('Loading rig data...');
+function loadRigData(region) {
+  const selectedRegion = region || (document.getElementById('region-select') ? 
+    document.getElementById('region-select').value : 'gulf-of-mexico');
+  
+  console.log(`Loading rig data for region: ${selectedRegion}`);
   
   // Check if map is available
   if (!map) {
@@ -274,7 +433,7 @@ function loadRigData() {
     return;
   }
   
-  document.getElementById('loading-overlay').textContent = 'Loading rig data...';
+  document.getElementById('loading-overlay').textContent = `Loading rig data for ${selectedRegion}...`;
   document.getElementById('loading-overlay').style.display = 'block';
   
   // Wait for map to be fully loaded

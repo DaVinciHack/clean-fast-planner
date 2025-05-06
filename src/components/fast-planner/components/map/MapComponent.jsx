@@ -39,6 +39,7 @@ const MapComponent = ({
         console.log('MapComponent initMap: Initializing map...');
         if (mapContainerRef.current) {
           // Initialize map using the captured mapManager reference
+          // CRITICAL: Use 'fast-planner-map' as the ID to match what other components expect
           const mapInstance = await mapManager.initializeMap('fast-planner-map');
           mapInitializedRef.current = true; // Mark as initialized
           console.log('MapComponent initMap: Map instance created, calling onReady.');
@@ -48,6 +49,22 @@ const MapComponent = ({
           // Call the onMapReady callback provided by the parent
           if (onMapReady) {
             onMapReady(mapInstance); // Pass the newly created map instance
+
+            // SIMPLIFIED FIX: Only dispatch event if handlers haven't been initialized
+            console.log("🚀 Setting up single delayed initialization for map click handlers...");
+            
+            // Single attempt with a delay to ensure map is ready
+            setTimeout(() => {
+              console.log("MapComponent: Delayed click handler initialization check");
+              if (mapInstance && !window.mapHandlersInitialized) {
+                // Only dispatch event if handlers haven't been initialized yet
+                console.log("Handlers not yet initialized, triggering event");
+                const event = new CustomEvent('reinitialize-map-handlers');
+                window.dispatchEvent(event);
+              } else {
+                console.log("Handlers already initialized, skipping event dispatch");
+              }
+            }, 1000);
           } else {
              console.warn("MapComponent initMap: onMapReady callback is not defined.");
           }
@@ -79,18 +96,14 @@ const MapComponent = ({
       mapInitializedRef.current = false; 
     };
   }, []); // Empty dependency array ensures this runs only once on mount/unmount
-  // Handle showing/hiding the loading overlay
+  // Disable loading overlay completely
   useEffect(() => {
+    // Hide any existing loading overlay immediately
     const loadingOverlay = document.getElementById('loading-overlay');
     if (loadingOverlay) {
-      if (loading) {
-        loadingOverlay.textContent = loadingMessage;
-        loadingOverlay.style.display = 'flex';
-      } else {
-        loadingOverlay.style.display = 'none';
-      }
+      loadingOverlay.style.display = 'none';
     }
-  }, [loading, loadingMessage]);
+  }, []);
   
   return (
     <>
@@ -99,11 +112,6 @@ const MapComponent = ({
         className={className || "fast-planner-map"} 
         ref={mapContainerRef}
       ></div>
-      
-      {/* Loading overlay */}
-      <div id="loading-overlay" className="loading-overlay">
-        {loadingMessage}
-      </div>
     </>
   );
 };

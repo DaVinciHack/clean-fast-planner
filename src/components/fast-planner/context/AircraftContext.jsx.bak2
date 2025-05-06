@@ -1,0 +1,427 @@
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { AircraftManager } from '../modules';
+
+// Create the context
+const AircraftContext = createContext(null);
+
+/**
+ * AircraftProvider component
+ * Manages aircraft state and provides it to all child components
+ */
+export const AircraftProvider = ({ children, client, currentRegion }) => {
+  // Aircraft state
+  const [aircraftType, setAircraftType] = useState('');
+  const [aircraftRegistration, setAircraftRegistration] = useState('');
+  const [selectedAircraft, setSelectedAircraft] = useState(null);
+  const [aircraftList, setAircraftList] = useState([]);
+  const [aircraftsByType, setAircraftsByType] = useState({});
+  const [aircraftLoading, setAircraftLoading] = useState(false);
+  const [aircraftManagerInstance, setAircraftManagerInstance] = useState(null);
+  
+  // Flight parameters state
+  const [payloadWeight, setPayloadWeight] = useState(2000);
+  const [reserveFuel, setReserveFuel] = useState(600);
+  
+  // Additional settings from the full component
+  const [deckTimePerStop, setDeckTimePerStop] = useState(5);
+  const [deckFuelPerStop, setDeckFuelPerStop] = useState(100);
+  const [deckFuelFlow, setDeckFuelFlow] = useState(400);
+  const [passengerWeight, setPassengerWeight] = useState(220);
+  const [cargoWeight, setCargoWeight] = useState(0);
+  const [taxiFuel, setTaxiFuel] = useState(50);
+  const [contingencyFuelPercent, setContingencyFuelPercent] = useState(10);
+  const [reserveMethod, setReserveMethod] = useState('fixed');
+
+  // Initialize the aircraft manager
+  useEffect(() => {
+    const manager = new AircraftManager();
+    
+    // Set up callbacks
+    manager.setCallback('onAircraftLoaded', (allAircraft) => {
+      console.log(`AircraftContext: Loaded ${allAircraft.length} aircraft`);
+      setAircraftList(allAircraft);
+      setAircraftLoading(false);
+    });
+    
+    manager.setCallback('onAircraftFiltered', (filteredAircraft) => {
+      console.log(`AircraftContext: Filtered to ${filteredAircraft.length} aircraft`);
+      
+      // If we get detailed data with byType, use it
+      if (filteredAircraft.byType) {
+        console.log('AircraftContext: Received detailed type data from manager');
+        setAircraftsByType(filteredAircraft.byType);
+      } else {
+        // Group the filtered aircraft by type manually
+        const byType = {};
+        
+        // Get all available types first
+        const types = [...new Set(filteredAircraft.map(a => a.modelType))].filter(Boolean);
+        
+        // For each type, filter the aircraft
+        types.forEach(type => {
+          byType[type] = filteredAircraft.filter(a => a.modelType === type);
+        });
+        
+        console.log(`AircraftContext: Grouped aircraft by ${Object.keys(byType).length} types`);
+        setAircraftsByType(byType);
+      }
+      
+      setAircraftLoading(false);
+    });
+    
+    manager.setCallback('onAircraftSelected', (aircraft) => {
+      console.log('AircraftContext: Aircraft selected from manager:', aircraft);
+      setSelectedAircraft(aircraft);
+      if (aircraft) {
+        // Ensure the aircraft type is updated to match the selected aircraft
+        console.log(`Setting aircraft type to match selected aircraft: ${aircraft.modelType}`);
+        setAircraftType(aircraft.modelType);
+      }
+    });
+    
+    manager.setCallback('onError', (error) => {
+      console.error('AircraftManager error:', error);
+      setAircraftLoading(false);
+    });
+    
+    setAircraftManagerInstance(manager);
+  }, []);
+
+  // Load all aircraft when client is available
+  useEffect(() => {
+    if (aircraftManagerInstance && client) {
+      setAircraftLoading(true);
+      
+      // Use a flag to prevent redundant loading
+      if (!window.aircraftLoadedGlobally) {
+        console.log('AircraftContext: First time loading all aircraft from OSDK');
+        window.aircraftLoadedGlobally = true;
+        
+        // Create a debug message for feedback
+        const debugMessage = document.createElement('div');
+        debugMessage.style.position = 'fixed';
+        debugMessage.style.bottom = '20px';
+        debugMessage.style.left = '20px';
+        debugMessage.style.backgroundColor = 'rgba(0, 100, 0, 0.8)';
+        debugMessage.style.color = 'white';
+        debugMessage.style.padding = '10px';
+        debugMessage.style.borderRadius = '5px';
+        debugMessage.style.zIndex = '10000';
+        debugMessage.style.fontFamily = 'monospace';
+        debugMessage.textContent = 'Loading aircraft data from OSDK...';
+        document.body.appendChild(debugMessage);
+        
+        // Load all aircraft
+        aircraftManagerInstance.loadAircraftFromOSDK(client)
+          .then(aircraft => {
+            debugMessage.textContent = `Loaded ${aircraft.length} aircraft successfully!`;
+            setTimeout(() => {
+              if (debugMessage.parentNode) {
+                debugMessage.parentNode.removeChild(debugMessage);
+              }
+            }, 3000);
+          })
+          .catch(error => {
+            debugMessage.textContent = `Error loading aircraft: ${error.message}`;
+            debugMessage.style.backgroundColor = 'rgba(100, 0, 0, 0.8)';
+            setTimeout(() => {
+              if (debugMessage.parentNode) {
+                debugMessage.parentNode.removeChild(debugMessage);
+              }
+            }, 3000);
+          });
+      } else {
+        console.log('AircraftContext: Aircraft already loaded globally');
+      }
+    }
+  }, [aircraftManagerInstance, client]);
+
+  // Filter aircraft when region changes
+  useEffect(() => {
+    if (aircraftManagerInstance && currentRegion) {
+      setAircraftLoading(true);
+      console.log(`AircraftContext: Filtering aircraft for region ${currentRegion.id}`);
+      
+      try {
+        // Get the aircraft by region
+        const aircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
+        console.log(`AircraftContext: Found ${aircraftInRegion.length} aircraft in region ${currentRegion.id}`);
+        
+        // Get the aircraft by type for UI display
+        const types = aircraftManagerInstance.getAvailableTypesInRegion(currentRegion.id);
+        console.log(`AircraftContext: Available types in region: ${types.join(', ')}`);
+        
+        // Create aircraft by type mapping for the UI
+        const byType = {};
+        types.forEach(type => {
+          const aircraftOfType = aircraftManagerInstance.filterAircraft(currentRegion.id, type);
+          console.log(`AircraftContext: Type ${type} has ${aircraftOfType.length} aircraft`);
+          byType[type] = aircraftOfType;
+        });
+        
+        // Update the state
+        setAircraftsByType(byType);
+      } catch (error) {
+        console.error('AircraftContext: Error filtering aircraft by region:', error);
+      }
+      
+      // Reset aircraft selection when region changes
+      setAircraftType('');
+      setAircraftRegistration('');
+      setSelectedAircraft(null);
+      
+      setAircraftLoading(false);
+    }
+  }, [aircraftManagerInstance, currentRegion]);
+
+  // Handle aircraft type change
+  const changeAircraftType = useCallback((type) => {
+    console.log(`AircraftContext: Changing aircraft type to ${type}`);
+    setAircraftType(type);
+    setAircraftRegistration('');
+    
+    if (aircraftManagerInstance && currentRegion) {
+      // If a type is selected, filter to that type
+      if (type && type !== 'all' && type !== '') {
+        console.log(`AircraftContext: Filtering to type ${type}`);
+        const filteredAircraft = aircraftManagerInstance.filterAircraft(currentRegion.id, type);
+        console.log(`AircraftContext: Found ${filteredAircraft.length} aircraft of type ${type}`);
+        
+        // Handle the filtered aircraft directly since the callback might not be used
+        const byType = {};
+        byType[type] = filteredAircraft;
+        setAircraftsByType(byType);
+      } else {
+        // If no type specified, show all aircraft in this region
+        console.log('AircraftContext: No type specified, filtering by region only');
+        const aircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
+        
+        // Group by type
+        const byType = {};
+        aircraftInRegion.forEach(aircraft => {
+          const modelType = aircraft.modelType || 'Unknown';
+          if (!byType[modelType]) {
+            byType[modelType] = [];
+          }
+          byType[modelType].push(aircraft);
+        });
+        
+        console.log(`AircraftContext: Found ${Object.keys(byType).length} types in region`);
+        setAircraftsByType(byType);
+      }
+    }
+  }, [aircraftManagerInstance, currentRegion]);
+
+  // Handle aircraft registration change
+  const changeAircraftRegistration = useCallback((registration) => {
+    console.log(`AircraftContext: Changing aircraft registration to ${registration}`);
+    setAircraftRegistration(registration);
+    
+    if (aircraftManagerInstance && registration) {
+      const aircraft = aircraftManagerInstance.getAircraftByRegistration(registration);
+      if (aircraft) {
+        // Store selected aircraft
+        setSelectedAircraft(aircraft);
+        console.log('Selected aircraft:', aircraft);
+        
+        // Set a global reference for the current registration and type
+        window.currentAircraftRegistration = registration;
+        window.currentAircraftType = aircraft.modelType;
+        window.selectedAircraftObject = aircraft;
+        
+        // Reset other UI elements
+        setTimeout(() => {
+          // Reset the aircraft type dropdown to show "Change Aircraft Type"
+          const typeDropdown = document.getElementById('aircraft-type');
+          if (typeDropdown) {
+            typeDropdown.value = 'select';
+            console.log('Reset aircraft type dropdown to "Change Aircraft Type"');
+          }
+        }, 50);
+        
+        // Load any saved settings for this aircraft
+        try {
+          const savedSettings = localStorage.getItem(`aircraft_${registration}`);
+          if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            console.log(`Loaded saved settings for ${registration}`, settings);
+            
+            // Apply the saved settings
+            if (settings.deckTimePerStop !== undefined) setDeckTimePerStop(settings.deckTimePerStop);
+            if (settings.deckFuelFlow !== undefined) setDeckFuelFlow(settings.deckFuelFlow);
+            if (settings.reserveFuel !== undefined) setReserveFuel(settings.reserveFuel);
+            if (settings.passengerWeight !== undefined) setPassengerWeight(settings.passengerWeight);
+            if (settings.cargoWeight !== undefined) setCargoWeight(settings.cargoWeight);
+            if (settings.taxiFuel !== undefined) setTaxiFuel(settings.taxiFuel);
+            if (settings.contingencyFuelPercent !== undefined) setContingencyFuelPercent(settings.contingencyFuelPercent);
+            if (settings.reserveMethod !== undefined) setReserveMethod(settings.reserveMethod);
+          }
+        } catch (error) {
+          console.error('Error loading aircraft settings:', error);
+        }
+      } else {
+        console.warn(`Aircraft with registration ${registration} not found`);
+        setSelectedAircraft(null);
+      }
+    } else if (!registration) {
+      setSelectedAircraft(null);
+    }
+  }, [aircraftManagerInstance, setDeckTimePerStop, setDeckFuelFlow, setReserveFuel, 
+      setPassengerWeight, setCargoWeight, setTaxiFuel, setContingencyFuelPercent, setReserveMethod]);
+
+  // Load settings from localStorage
+  useEffect(() => {
+    try {
+      const loadSettings = () => {
+        const deckTime = localStorage.getItem('fastPlanner_deckTimePerStop');
+        if (deckTime) setDeckTimePerStop(parseInt(deckTime, 10));
+        
+        const deckFuel = localStorage.getItem('fastPlanner_deckFuelPerStop');
+        if (deckFuel) setDeckFuelPerStop(parseInt(deckFuel, 10));
+        
+        const fuelFlow = localStorage.getItem('fastPlanner_deckFuelFlow');
+        if (fuelFlow) setDeckFuelFlow(parseInt(fuelFlow, 10));
+        
+        const paxWeight = localStorage.getItem('fastPlanner_passengerWeight');
+        if (paxWeight) setPassengerWeight(parseInt(paxWeight, 10));
+        
+        const cargo = localStorage.getItem('fastPlanner_cargoWeight');
+        if (cargo) setCargoWeight(parseInt(cargo, 10));
+        
+        const reserve = localStorage.getItem('fastPlanner_reserveFuel');
+        if (reserve) setReserveFuel(parseInt(reserve, 10));
+        
+        const taxi = localStorage.getItem('fastPlanner_taxiFuel');
+        if (taxi) setTaxiFuel(parseInt(taxi, 10));
+        
+        const contingency = localStorage.getItem('fastPlanner_contingencyFuelPercent');
+        if (contingency) setContingencyFuelPercent(parseInt(contingency, 10));
+        
+        const method = localStorage.getItem('fastPlanner_reserveMethod');
+        if (method) setReserveMethod(method);
+      };
+      
+      loadSettings();
+      
+      // Event listener for save-aircraft-settings events
+      const saveHandler = (event) => {
+        if (event.detail && event.detail.key && event.detail.settings) {
+          localStorage.setItem(`fastPlanner_${event.detail.key}`, JSON.stringify(event.detail.settings));
+          console.log(`Saved settings for ${event.detail.key}`);
+        }
+      };
+      
+      window.addEventListener('save-aircraft-settings', saveHandler);
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('save-aircraft-settings', saveHandler);
+      };
+    } catch (error) {
+      console.error('Error loading settings from localStorage:', error);
+    }
+  }, []);
+
+  // Helper functions for settings
+  const handlePayloadWeightChange = (weight) => {
+    setPayloadWeight(weight);
+  };
+
+  const handleReserveFuelChange = (fuel) => {
+    setReserveFuel(fuel);
+  };
+
+  const handleDeckTimeChange = (time) => {
+    setDeckTimePerStop(time);
+  };
+
+  const handleDeckFuelPerStopChange = (fuel) => {
+    setDeckFuelPerStop(fuel);
+  };
+
+  const handleDeckFuelFlowChange = (flow) => {
+    setDeckFuelFlow(flow);
+  };
+
+  const handlePassengerWeightChange = (weight) => {
+    setPassengerWeight(weight);
+  };
+
+  const handleCargoWeightChange = (weight) => {
+    setCargoWeight(weight);
+  };
+
+  const handleTaxiFuelChange = (fuel) => {
+    setTaxiFuel(fuel);
+  };
+
+  const handleContingencyFuelPercentChange = (percent) => {
+    setContingencyFuelPercent(percent);
+  };
+
+  const handleReserveMethodChange = (method) => {
+    setReserveMethod(method);
+  };
+
+  // Create a settings object that can be passed to components
+  const flightSettings = {
+    deckTimePerStop,
+    deckFuelPerStop,
+    deckFuelFlow,
+    passengerWeight,
+    cargoWeight,
+    reserveFuel,
+    taxiFuel,
+    contingencyFuelPercent,
+    reserveMethod,
+    payloadWeight
+  };
+
+  // Provider value object
+  const value = {
+    // Aircraft state
+    aircraftType,
+    aircraftRegistration,
+    selectedAircraft,
+    aircraftList,
+    aircraftsByType,
+    aircraftLoading,
+    changeAircraftType,
+    changeAircraftRegistration,
+    aircraftManager: aircraftManagerInstance,
+    
+    // Flight parameters
+    payloadWeight,
+    reserveFuel,
+    setPayloadWeight: handlePayloadWeightChange,
+    setReserveFuel: handleReserveFuelChange,
+    
+    // Full settings
+    flightSettings,
+    setDeckTimePerStop: handleDeckTimeChange,
+    setDeckFuelPerStop: handleDeckFuelPerStopChange,
+    setDeckFuelFlow: handleDeckFuelFlowChange,
+    setPassengerWeight: handlePassengerWeightChange,
+    setCargoWeight: handleCargoWeightChange,
+    setTaxiFuel: handleTaxiFuelChange,
+    setContingencyFuelPercent: handleContingencyFuelPercentChange,
+    setReserveMethod: handleReserveMethodChange
+  };
+
+  return (
+    <AircraftContext.Provider value={value}>
+      {children}
+    </AircraftContext.Provider>
+  );
+};
+
+// Custom hook for using the aircraft context
+export const useAircraft = () => {
+  const context = useContext(AircraftContext);
+  if (!context) {
+    throw new Error('useAircraft must be used within an AircraftProvider');
+  }
+  return context;
+};
+
+export default AircraftContext;

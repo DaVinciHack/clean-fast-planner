@@ -4,6 +4,7 @@ import React from 'react';
  * Region Selector Component
  * 
  * Displays a dropdown menu for selecting different operational regions
+ * Integrated with the right panel card design
  */
 const RegionSelector = ({ 
   regions, 

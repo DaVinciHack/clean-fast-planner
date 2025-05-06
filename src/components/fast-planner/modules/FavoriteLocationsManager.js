@@ -155,8 +155,16 @@ class FavoriteLocationsManager {
       // Save to localStorage after adding
       this.saveToLocalStorage();
       
-      // Trigger callback
-      this.triggerCallback('onChange', this.favoriteLocations);
+      // IMPORTANT: Pass specific data for the current region to callback
+      if (this.callbacks.onChange) {
+        console.log(`Triggering onChange callback for region ${regionId} with ${this.favoriteLocations[regionId].length} favorites`);
+        this.callbacks.onChange({
+          region: regionId,
+          favorites: this.favoriteLocations[regionId]
+        });
+      } else {
+        console.log('No onChange callback registered');
+      }
     } else {
       console.log(`Favorite location "${location.name}" already exists in region "${regionId}"`);
     }
@@ -182,8 +190,16 @@ class FavoriteLocationsManager {
         // Save to localStorage after removing
         this.saveToLocalStorage();
         
-        // Trigger callback
-        this.triggerCallback('onChange', this.favoriteLocations);
+        // IMPORTANT: Pass specific data for the current region to callback
+        if (this.callbacks.onChange) {
+          console.log(`Triggering onChange callback for region ${regionId} with ${this.favoriteLocations[regionId].length} favorites after removal`);
+          this.callbacks.onChange({
+            region: regionId,
+            favorites: this.favoriteLocations[regionId]
+          });
+        } else {
+          console.log('No onChange callback registered');
+        }
       } else {
         console.log(`Favorite location with ID "${locationId}" not found in region "${regionId}"`);
         console.log(`Available IDs:`, this.favoriteLocations[regionId].map(loc => loc.id));

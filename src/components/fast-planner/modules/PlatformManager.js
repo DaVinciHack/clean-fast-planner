@@ -3,6 +3,7 @@
  * 
  * Handles loading, displaying, and interacting with platform/rig data
  */
+import LoadingIndicator from './LoadingIndicator';
 
 class PlatformManager {
   constructor(mapManager) {
@@ -14,6 +15,8 @@ class PlatformManager {
       onVisibilityChanged: null,
       onError: null
     };
+    // Flag to prevent duplicate source/layer creation
+    this.skipNextClear = false;
   }
   
   /**
@@ -45,8 +48,20 @@ class PlatformManager {
    * @returns {Promise} - Resolves when platforms are loaded
    */
   async loadPlatformsFromFoundry(client, regionName = "GULF OF MEXICO") {
-    // Clear any existing data first to ensure fresh load
-    this.clearPlatforms();
+    // Show loading indicator
+    const loaderId = LoadingIndicator.show('.route-stats-title', 
+      `Loading platform data for ${regionName}...`, 
+      { position: 'bottom' });
+    
+    // Only clear platforms if skipNextClear is false
+    if (!this.skipNextClear) {
+      // Clear any existing data first to ensure fresh load
+      this.clearPlatforms();
+    } else {
+      console.log(`Skipping clearPlatforms due to skipNextClear flag for region: ${regionName}`);
+      // Reset the flag for next time
+      this.skipNextClear = false;
+    }
     console.log(`Loading platforms for region: ${regionName}`);
     
     // Validate region name
@@ -56,6 +71,7 @@ class PlatformManager {
     }
     const map = this.mapManager.getMap();
     if (!map) {
+      LoadingIndicator.hide(loaderId);
       return Promise.reject(new Error('Map is not initialized'));
     }
     
@@ -63,6 +79,12 @@ class PlatformManager {
       // Check if we have a client - but don't reject the promise
       if (!client) {
         console.warn("No OSDK client provided - this may be expected on region changes");
+        
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, "No client available - reconnecting...");
+        setTimeout(() => {
+          LoadingIndicator.hide(loaderId);
+        }, 2000);
         
         // Return empty array instead of rejecting to prevent UI errors
         this.platforms = [];
@@ -100,6 +122,9 @@ class PlatformManager {
         // Query for platforms and locations without excessive logging
         console.log(`Querying for platforms and airports in ${regionName}`);
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Querying for platforms in ${regionName}...`);
+        
         // Fetch for this region, explicitly excluding reporting points
         const result = await client(locationObject)
           .where({ 
@@ -126,6 +151,10 @@ class PlatformManager {
           
           // Filter to include only active items (for all types)
           const originalCount = result.data.length;
+          
+          // Update loading indicator
+          LoadingIndicator.updateText(loaderId, `Filtering ${originalCount} locations...`);
+          
           result.data = result.data.filter(item => {
             // CRITICAL FILTER: Only include items with activeSite = "Active"
             if (item.activeSite !== "Active") {
@@ -395,6 +424,9 @@ class PlatformManager {
         const locations = [];
         const processedNames = new Set(); // Track processed items to avoid duplicates
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Processing ${result.data ? result.data.length : 0} locations...`);
+        
         // Debug counters
         let fixedPlatformCount = 0;
         let movablePlatformCount = 0;
@@ -620,15 +652,27 @@ class PlatformManager {
         // Simplified logging - just show summary
         console.log(`Processed ${locations.length} locations (${airportsCount} airports, ${fixedPlatformCount} fixed platforms, ${movablePlatformCount} movable platforms)`);
         
+        // Update loading indicator
+        LoadingIndicator.updateText(loaderId, `Adding ${locations.length} locations to map...`);
+        
         // Add to map even if few or no locations found - this will at least show what we got
         
         // Check if we have at least some locations
         if (locations.length > 0) {
           console.log(`Adding ${locations.length} locations to map`);
           this.addPlatformsToMap(locations);
+          
+          // Hide loading indicator after adding to map (the map loading will show its own indicator)
+          LoadingIndicator.hide(loaderId);
           return locations;
         } else {
           console.warn("No valid locations found with coordinates");
+          
+          // Update loading indicator
+          LoadingIndicator.updateText(loaderId, "No locations found for this region");
+          setTimeout(() => {
+            LoadingIndicator.hide(loaderId);
+          }, 2000);
           
           // Create empty array to avoid errors in the UI
           this.platforms = [];
@@ -638,6 +682,12 @@ class PlatformManager {
         
       } catch (error) {
         console.error('OSDK API error:', error);
+        
+        // Update loading indicator with error
+        LoadingIndicator.updateText(loaderId, `Error loading platforms: ${error.message}`);
+        setTimeout(() => {
+          LoadingIndicator.hide(loaderId);
+        }, 3000);
         
         // Even on error, don't throw so the app won't crash
         console.warn("Error occurred, returning empty locations array");
@@ -649,6 +699,12 @@ class PlatformManager {
       }
     } catch (error) {
       console.error('General error in loadPlatformsFromFoundry:', error);
+      
+      // Update loading indicator with error
+      LoadingIndicator.updateText(loaderId, `Error: ${error.message}`);
+      setTimeout(() => {
+        LoadingIndicator.hide(loaderId);
+      }, 3000);
       
       // Create empty array to avoid errors in the UI
       this.platforms = [];
@@ -781,24 +837,52 @@ class PlatformManager {
       }
       
       try {
-        // Remove existing layers first if they exist
-        const platformLayers = [
-          'platforms-fixed-layer',
-          'platforms-movable-layer',
-          'platforms-fixed-labels',
-          'platforms-movable-labels',
-          'airfields-layer',
-          'airfields-labels'
-        ];
-        
-        platformLayers.forEach(layerId => {
-          if (map.getLayer(layerId)) {
-            map.removeLayer(layerId);
-          }
-        });
-        if (map.getSource('major-platforms')) {
-          map.removeSource('major-platforms');
+        // CRITICAL FIX: Check if we should skip removing/recreating sources
+        // to avoid the "already exists" error during region changes
+        if (!this.skipNextClear) {
+          console.log("Removing existing platform layers and sources...");
+          // Remove existing layers first if they exist
+          const platformLayers = [
+            'platforms-layer',         // Check for old layer name too
+            'platforms-fixed-layer',
+            'platforms-movable-layer',
+            'platforms-fixed-labels',
+            'platforms-movable-labels',
+            'airfields-layer',
+            'airfields-labels'
+          ];
+          
+          // First remove all layers
+          platformLayers.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              try {
+                map.removeLayer(layerId);
+              } catch (e) {
+                console.warn(`Error removing layer ${layerId}:`, e);
+              }
+            }
+          });
+          
+          // IMPORTANT: Wait briefly before removing the source
+          // This helps avoid "source in use" errors
+          setTimeout(() => {
+            // Then remove source
+            if (map.getSource('major-platforms')) {
+              try {
+                map.removeSource('major-platforms');
+              } catch (e) {
+                console.warn("Error removing source:", e);
+              }
+            }
+          }, 50);
+        } else {
+          console.log("SKIPPING source/layer removal due to skipNextClear flag");
+          // Reset the flag for next time
+          this.skipNextClear = false;
         }
+        
+        // Check if source already exists to prevent duplicate error
+        const sourceExists = map.getSource('major-platforms');
         
         // Debug - check for specific platforms before mapping
         const debugPlatforms = ["ENLE", "ENWS", "ENWV", "ENZV"];
@@ -859,13 +943,47 @@ class PlatformManager {
         
         console.log("Adding source with features data");
         // Add source
-        map.addSource('major-platforms', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: features
+        // Add source only if it doesn't exist yet
+        if (!sourceExists) {
+          try {
+            map.addSource('major-platforms', {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: features
+              }
+            });
+          } catch (e) {
+            // If source already exists error, try to update it
+            if (e.message && e.message.includes("already exists")) {
+              console.log("Source already exists, trying to update data instead");
+              try {
+                const source = map.getSource('major-platforms');
+                if (source && typeof source.setData === 'function') {
+                  source.setData({
+                    type: 'FeatureCollection',
+                    features: features
+                  });
+                }
+              } catch (updateError) {
+                console.error("Error updating source data:", updateError);
+              }
+            }
           }
-        });
+        } else {
+          // If source exists, update its data
+          try {
+            const source = map.getSource('major-platforms');
+            if (source && typeof source.setData === 'function') {
+              source.setData({
+                type: 'FeatureCollection',
+                features: features
+              });
+            }
+          } catch (updateError) {
+            console.error("Error updating source data:", updateError);
+          }
+        }
 
         console.log("Adding fixed platforms layer");
         // Add FIXED platforms with teal ring and darker blue center
@@ -1021,12 +1139,13 @@ class PlatformManager {
     try {
       // Toggle visibility of all platform and airfield layers
       const allLayers = [
-        'platforms-fixed-layer',
-        'platforms-movable-layer', 
-        'platforms-fixed-labels',
-        'platforms-movable-labels',
-        'airfields-layer',
-        'airfields-labels'
+        'platforms-layer',             // Main fixed platforms layer
+        'platforms-fixed-layer',       // Alternative fixed platforms layer
+        'platforms-movable-layer',     // Movable platforms layer
+        'platforms-fixed-labels',      // Fixed platform labels
+        'platforms-movable-labels',    // Movable platform labels
+        'airfields-layer',             // Airfield markers
+        'airfields-labels'             // Airfield labels
       ];
       const visibility = this.isVisible ? 'visible' : 'none';
       
@@ -1051,10 +1170,13 @@ class PlatformManager {
    * @returns {Object|null} - The nearest platform or null if not found
    */
   findNearestPlatform(lat, lng, maxDistance = 5) {
-    if (!this.platforms || this.platforms.length === 0) return null;
+    if (!this.platforms || this.platforms.length === 0) {
+      console.log('PlatformManager: No platforms loaded, cannot find nearest platform');
+      return null;
+    }
     
     if (!window.turf) {
-      console.error('Turf.js not loaded');
+      console.error('PlatformManager: Turf.js not loaded');
       return null;
     }
     
@@ -1063,6 +1185,11 @@ class PlatformManager {
       let minDistance = Number.MAX_VALUE;
       
       this.platforms.forEach(platform => {
+        // Skip if platform has no coordinates
+        if (!platform.coordinates || platform.coordinates.length !== 2) {
+          return;
+        }
+        
         const coords = platform.coordinates;
         const distance = window.turf.distance(
           window.turf.point([lng, lat]),
@@ -1075,7 +1202,9 @@ class PlatformManager {
           nearestPlatform = {
             name: platform.name,
             operator: platform.operator,
+            // Include both formats for better compatibility
             coords: coords,
+            coordinates: coords,
             lat: coords[1],
             lng: coords[0],
             distance: distance
@@ -1085,10 +1214,13 @@ class PlatformManager {
       
       // Only return if within reasonable distance
       if (minDistance <= maxDistance) {
+        console.log(`PlatformManager: Found nearest platform ${nearestPlatform.name} at distance ${nearestPlatform.distance.toFixed(2)} nm`);
         return nearestPlatform;
+      } else if (nearestPlatform) {
+        console.log(`PlatformManager: Nearest platform ${nearestPlatform.name} is too far (${nearestPlatform.distance.toFixed(2)} nm > ${maxDistance} nm)`);
       }
     } catch (error) {
-      console.error('Error finding nearest platform:', error);
+      console.error('PlatformManager: Error finding nearest platform:', error);
     }
     
     return null;
@@ -1154,6 +1286,46 @@ class PlatformManager {
     ].slice(0, limit);
     
     return results;
+  }
+  
+  /**
+   * Find a single platform by name (exact or close match)
+   * @param {string} name - The platform name to find
+   * @returns {Object|null} - The platform object or null if not found
+   */
+  findPlatformByName(name) {
+    if (!name || !this.platforms || this.platforms.length === 0) {
+      return null;
+    }
+    
+    const normalizedName = name.toLowerCase().trim();
+    
+    // If empty name after trimming, return null
+    if (!normalizedName) {
+      return null;
+    }
+    
+    console.log(`PlatformManager: Looking for platform with name: ${normalizedName}`);
+    
+    // First try exact match
+    let platform = this.platforms.find(p => 
+      p.name.toLowerCase() === normalizedName
+    );
+    
+    // If not found, try case-insensitive match
+    if (!platform) {
+      platform = this.platforms.find(p => 
+        p.name.toLowerCase().includes(normalizedName)
+      );
+    }
+    
+    if (platform) {
+      console.log(`PlatformManager: Found platform "${platform.name}" at coordinates [${platform.coordinates}]`);
+      return platform;
+    } else {
+      console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
+      return null;
+    }
   }
 }
 

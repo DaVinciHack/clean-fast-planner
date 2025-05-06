@@ -13,6 +13,15 @@ class AircraftManager {
     // Store filtered aircraft data (by region, type, etc.)
     this.filteredAircraft = [];
     
+    // Store aircraft organized by region and type
+    this.aircraftByRegion = {};
+    
+    // Store available types by region
+    this.typesByRegion = {};
+    
+    // Track whether we've loaded all aircraft
+    this.allAircraftLoaded = false;
+    
     // Currently selected aircraft
     this.selectedAircraft = null;
     
@@ -140,20 +149,28 @@ class AircraftManager {
   }
 
   /**
-   * Load aircraft data from Palantir OSDK
+   * Load ALL aircraft data from Palantir OSDK and organize by region
    * @param {Object} client - The OSDK client instance
-   * @param {string} region - The region to filter by (optional)
    * @returns {Promise} - Resolves with the loaded aircraft data
    */
-  async loadAircraftFromOSDK(client, region = null) {
+  async loadAircraftFromOSDK(client) {
     try {
-      console.log(`===== Loading aircraft data from OSDK${region ? ` for region: ${region}` : ''} =====`);
+      // Only fetch all aircraft once to improve performance
+      if (this.allAircraftLoaded && this.aircraftList.length > 0) {
+        console.log(`%c===== USING EXISTING AIRCRAFT DATA =====`, 'background: #00a; color: #fff; font-size: 16px; font-weight: bold;');
+        console.log(`Using existing ${this.aircraftList.length} aircraft already loaded in memory`);
+        
+        // Just trigger the callback with the existing data
+        this.triggerCallback('onAircraftLoaded', this.aircraftList);
+        return this.aircraftList;
+      }
       
-      // Show loading overlay
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.textContent = 'Loading aircraft data...';
-        loadingOverlay.style.display = 'block';
+      console.log(`%c===== LOADING ALL AIRCRAFT DATA FROM OSDK =====`, 'background: #00a; color: #fff; font-size: 16px; font-weight: bold;');
+      
+      // Use LoadingIndicator to show loading status in the top card
+      // Instead of using the full-page overlay
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Loading aircraft data...');
       }
       
       // Check if client exists
@@ -161,174 +178,149 @@ class AircraftManager {
         throw new Error('OSDK client is not provided');
       }
       
-      // Use the dynamic import to get the Asset interface
-      const sdk = await import('@flight-app/sdk');
-      
-      // Log SDK keys to debug
-      console.log('SDK keys:', Object.keys(sdk));
-      
-      // Based on the screenshots, we're looking for Asset (not AircraftAsset)
-      const Asset = sdk.Asset;
-      
-      if (!Asset) {
-        throw new Error(`Required 'Asset' object not found in SDK: ${Object.keys(sdk).join(', ')}`);
-      }
-      
-      console.log(`Querying aircraft data${region ? ` for region: ${region}` : ''}`);
-      
-      // Format region if provided
-      let query = null;
-      
-      // Build the query using the pattern from the documentation
-      if (region) {
-        const formattedRegion = this.formatRegionForOSDK(region);
-        console.log(`Filtering by region: ${formattedRegion}`);
+      try {
+        // Use the dynamic import to get the Asset interface
+        const sdk = await import('@flight-app/sdk');
         
-        // Use where clause with regionName
-        query = client(Asset).where({
-          regionName: formattedRegion
-        });
-      } else {
-        // No filter
-        query = client(Asset);
-      }
-      
-      // Fetch the data
-      console.log('Executing fetchPage query...');
-      const response = await query.fetchPage({
-        $pageSize: 100
-      });
-      
-      console.log(`Query returned ${response.data ? response.data.length : 0} aircraft`);
-      
-      // Process the response
-      if (response && response.data) {
-        // Log sample data to understand the structure
-        if (response.data.length > 0) {
-          console.log('Sample aircraft data structure:', Object.keys(response.data[0]).join(', '));
-          console.log('Sample data for first aircraft:', JSON.stringify(response.data[0], null, 2));
+        // Based on the screenshots, we're looking for Asset (not AircraftAsset)
+        const Asset = sdk.Asset;
+        
+        if (!Asset) {
+          throw new Error(`Required 'Asset' object not found in SDK: ${Object.keys(sdk).join(', ')}`);
         }
         
-        this.aircraftList = response.data.map(aircraft => {
-          // Extract aircraft region from regionName field
-          let region = aircraft.regionName || '';
-          // Extract registration from assetIdentifier
-          let registration = aircraft.assetIdentifier || '';
-          // Extract model type from acModelName or model
-          let modelName = aircraft.acModelName || aircraft.model || '';
-          let modelType = '';
+        console.log(`Querying ALL aircraft data from OSDK...`);
+        
+        // Query for ALL aircraft - no region filtering
+        const query = client(Asset);
+        
+        // Fetch the data with larger page size to get all aircraft
+        console.log('Executing fetchPage query for all aircraft...');
+        const response = await query.fetchPage({
+          $pageSize: 1000 // Increased to get all aircraft in one request
+        });
+        
+        console.log(`Query returned ${response.data ? response.data.length : 0} aircraft`);
+        
+        // Process the response
+        if (response && response.data) {
+          console.log(`%c===== PROCESSING AIRCRAFT DATA =====`, 'background: #070; color: #fff; font-size: 14px;');
           
-          // Determine aircraft type based on model name
-          modelType = this.determineAircraftType(modelName);
+          // Log sample data to understand the structure
+          if (response.data.length > 0) {
+            console.log('Sample aircraft data fields:', Object.keys(response.data[0]).join(', '));
+          }
           
-          // Create a display registration with both registration and region
-          const displayRegistration = `${registration} (${region})`;
+          // Process each aircraft and create standardized objects
+          this.aircraftList = response.data.map(aircraft => {
+            // Extract aircraft region from regionName field
+            let region = aircraft.regionName || '';
+            // Extract org unit field
+            let orgUnit = aircraft.orgUnit || '';
+            // Extract registration from assetIdentifier
+            let registration = aircraft.assetIdentifier || '';
+            // Extract model type from acModelName or model
+            let modelName = aircraft.acModelName || aircraft.model || '';
+            let modelType = '';
+            
+            // Determine aircraft type based on model name
+            modelType = this.determineAircraftType(modelName);
+            
+            // Create a display registration with both registration and region
+            const displayRegistration = `${registration} (${region})`;
+            
+            // Create standardized aircraft object
+            return {
+              assetId: aircraft.assetIdx || '',
+              registration: displayRegistration, // Use the combined format
+              rawRegistration: registration, // Keep the original registration
+              modelName: modelName,
+              modelType: modelType,
+              maxPassengers: aircraft.maxPassengers || 0,
+              cruiseSpeed: aircraft.cruseSpeed || 0,
+              fuelBurn: aircraft.fuelBurn || 0,
+              maxFuel: aircraft.maxFuelCapacity || 0,
+              dryWeight: aircraft.dryOperatingWeightLbs || 0,
+              usefulLoad: aircraft.usefulLoad || 0,
+              company: aircraft.company || aircraft.orgName || 'Unknown',
+              region: region,
+              orgUnit: orgUnit, // Store the orgUnit field
+              status: aircraft.acStatus || 'ACTIVE',
+              rawData: aircraft // Keep the full data for reference
+            };
+          });
           
-          // Extract the properties using the exact field names from your property list
-          return {
-            assetId: aircraft.assetIdx || '',
-            registration: displayRegistration, // Use the combined format
-            rawRegistration: registration, // Keep the original registration
-            modelName: modelName,
-            modelType: modelType,
-            maxPassengers: aircraft.maxPassengers || 0,
-            cruiseSpeed: aircraft.cruseSpeed || 0,
-            fuelBurn: aircraft.fuelBurn || 0,
-            maxFuel: aircraft.maxFuelCapacity || 0,
-            dryWeight: aircraft.dryOperatingWeightLbs || 0,
-            usefulLoad: aircraft.usefulLoad || 0,
-            company: aircraft.company || aircraft.orgName || 'Unknown',
-            region: region,
-            status: aircraft.acStatus || 'ACTIVE',
-            rawData: aircraft // Keep the full data for reference
-          };
-        });
-        
-        // Filter out aircraft with invalid data
-        this.aircraftList = this.aircraftList.filter(aircraft => 
-          aircraft.registration && 
-          aircraft.modelName && 
-          (aircraft.status !== 'INACTIVE' && aircraft.status !== 'RETIRED')
-        );
-        
-        console.log(`Processed ${this.aircraftList.length} valid aircraft`);
-        
-        // Log aircraft by region
-        const regionCount = {};
-        this.aircraftList.forEach(aircraft => {
-          const region = aircraft.region || 'Unknown';
-          regionCount[region] = (regionCount[region] || 0) + 1;
-        });
-        console.log('Aircraft by region:', regionCount);
-        
-        // Log aircraft types found
-        const typeCount = {};
-        this.aircraftList.forEach(aircraft => {
-          const type = aircraft.modelType;
-          typeCount[type] = (typeCount[type] || 0) + 1;
-        });
-        console.log('Aircraft by type:', typeCount);
-        
-        // Initial filtering (by region if provided)
-        this.filteredAircraft = [...this.aircraftList];
-        if (region) {
-          this.filterAircraft(region);
+          // Filter out aircraft with invalid data, inactive status, or in long-term maintenance
+          this.aircraftList = this.aircraftList.filter(aircraft => {
+            // Check for required fields
+            if (!aircraft.registration || !aircraft.modelName) {
+              return false;
+            }
+            
+            // Check for inactive statuses
+            if (aircraft.status === 'INACTIVE' || aircraft.status === 'RETIRED') {
+              return false;
+            }
+            
+            // Check for long-term maintenance
+            if (aircraft.status && 
+                (aircraft.status.toUpperCase().includes('MAINTENANCE') || 
+                 aircraft.status.toUpperCase().includes('REPAIR') || 
+                 aircraft.status.toUpperCase().includes('OVERHAUL'))) {
+              console.log(`Filtering out aircraft in maintenance: ${aircraft.registration}, Status: ${aircraft.status}`);
+              return false;
+            }
+            
+            return true;
+          });
+          
+          console.log(`Processed ${this.aircraftList.length} valid aircraft`);
+          
+          // Now organize aircraft by region and type for quick access
+          console.log(`Organizing aircraft by region and type...`);
+          this.organizeAircraftByRegion();
+          
+          // Mark that we've loaded all aircraft
+          this.allAircraftLoaded = true;
+          
+          // Trigger the callback with ALL aircraft
+          console.log(`Triggering onAircraftLoaded callback with ${this.aircraftList.length} aircraft`);
+          this.triggerCallback('onAircraftLoaded', this.aircraftList);
+          
+          // Update status and then clear loading status
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(`Loaded ${this.aircraftList.length} aircraft successfully`);
+          }
+          
+          // Return the final aircraft list
+          return this.aircraftList;
+        } else {
+          console.warn('No aircraft data in response');
+          this.aircraftList = [];
+          this.triggerCallback('onAircraftLoaded', []);
+          
+          // Update status and then clear loading status
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(`No aircraft data found`);
+          }
+          
+          return [];
         }
-        
-        // Trigger the callback with ALL aircraft first
-        this.triggerCallback('onAircraftLoaded', this.aircraftList);
-        
-        // Then trigger the filtered callback
-        this.triggerCallback('onAircraftFiltered', this.filteredAircraft);
-        
-        // Hide loading overlay
-        if (loadingOverlay) {
-          loadingOverlay.style.display = 'none';
-        }
-        
-        return this.aircraftList;
-      } else {
-        console.warn('No aircraft data in response');
-        this.aircraftList = [];
-        this.triggerCallback('onAircraftLoaded', []);
-        
-        // Hide loading overlay
-        if (loadingOverlay) {
-          loadingOverlay.style.display = 'none';
-        }
-        
-        return [];
+      } catch (sdkError) {
+        console.error('Error with SDK import or query:', sdkError);
+        throw sdkError;
       }
     } catch (error) {
       // Provide detailed error logging
       console.error('Error loading aircraft from OSDK:', error);
       
-      if (error.message) {
-        console.error('Error message:', error.message);
-      }
-      
-      if (error.stack) {
-        console.error('Error stack:', error.stack);
-      }
-      
-      // Try to log more details about the SDK import
-      try {
-        import('@flight-app/sdk').then(sdk => {
-          console.log('SDK exported keys:', Object.keys(sdk));
-        }).catch(importError => {
-          console.error('Error importing SDK:', importError);
-        });
-      } catch (importError) {
-        console.error('Cannot import SDK for debugging:', importError);
-      }
-      
       // Trigger error callback
       this.triggerCallback('onError', error);
       
-      // Hide loading overlay
-      const loadingOverlay = document.getElementById('loading-overlay');
-      if (loadingOverlay) {
-        loadingOverlay.style.display = 'none';
+      // Update status with error message
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Error loading aircraft data');
+        window.LoadingIndicator.updateStatusIndicator('Please try again later');
       }
       
       // No mock data, just return empty list
@@ -337,6 +329,204 @@ class AircraftManager {
       
       return this.aircraftList;
     }
+  }
+  
+  /**
+   * Organize aircraft by region and type for quick filtering
+   * Called after loading all aircraft data
+   */
+  organizeAircraftByRegion() {
+    console.log(`%c===== ORGANIZING AIRCRAFT BY REGION AND TYPE =====`, 'background: #005; color: #fff; font-size: 14px;');
+    
+    // Clear the existing data
+    this.aircraftByRegion = {};
+    this.typesByRegion = {};
+    
+    // First count aircraft by region for logging
+    const regionCount = {};
+    
+    // Count aircraft by region AND type
+    const typeCountByRegion = {};
+    
+    // Create a set of all known aircraft types
+    const allKnownTypes = new Set();
+    
+    // Log raw aircraft data to diagnose issues
+    console.log(`Total aircraft in raw list: ${this.aircraftList.length}`);
+    
+    // Log a sample aircraft to check structure
+    if (this.aircraftList.length > 0) {
+      console.log("Sample aircraft data:", {
+        region: this.aircraftList[0].region,
+        type: this.aircraftList[0].modelType,
+        registration: this.aircraftList[0].registration
+      });
+    }
+    
+    // Check active status before organizing
+    const activeAircraft = this.aircraftList.filter(aircraft => 
+      aircraft.status !== 'INACTIVE' && aircraft.status !== 'RETIRED'
+    );
+    console.log(`Total active aircraft: ${activeAircraft.length} of ${this.aircraftList.length}`);
+    
+    // Process all aircraft
+    this.aircraftList.forEach(aircraft => {
+      const region = aircraft.region || 'Unknown';
+      const type = aircraft.modelType || 'S92';
+      
+      // Track all known types
+      allKnownTypes.add(type);
+      
+      // Count aircraft by region
+      regionCount[region] = (regionCount[region] || 0) + 1;
+      
+      // Count by region and type
+      if (!typeCountByRegion[region]) {
+        typeCountByRegion[region] = {};
+      }
+      typeCountByRegion[region][type] = (typeCountByRegion[region][type] || 0) + 1;
+      
+      // Initialize region in aircraftByRegion if not exists
+      if (!this.aircraftByRegion[region]) {
+        this.aircraftByRegion[region] = {
+          all: [], // All aircraft in this region
+          byType: {} // Aircraft by type in this region
+        };
+      }
+      
+      // Add to all aircraft for this region
+      this.aircraftByRegion[region].all.push(aircraft);
+      
+      // Add to byType for this region
+      if (!this.aircraftByRegion[region].byType[type]) {
+        this.aircraftByRegion[region].byType[type] = [];
+      }
+      this.aircraftByRegion[region].byType[type].push(aircraft);
+      
+      // Update typesByRegion
+      if (!this.typesByRegion[region]) {
+        this.typesByRegion[region] = [];
+      }
+      if (!this.typesByRegion[region].includes(type)) {
+        this.typesByRegion[region].push(type);
+      }
+    });
+    
+    // Print detailed aircraft counts by type for GULF OF MEXICO
+    if (typeCountByRegion['GULF OF MEXICO']) {
+      console.log(`%c===== GULF OF MEXICO AIRCRAFT BY TYPE =====`, 'background: #00a; color: #fff;');
+      Object.entries(typeCountByRegion['GULF OF MEXICO']).forEach(([type, count]) => {
+        console.log(`${type}: ${count} aircraft`);
+      });
+      
+      // Add detailed debugging for all aircraft in Gulf of Mexico
+      console.log(`%c===== DETAILED AIRCRAFT INSPECTION IN GULF OF MEXICO =====`, 'background: #f00; color: #fff;');
+      
+      // Get specific registrations to check
+      const registrationsToCheck = [
+        'N145JW', 'N290BG', 'N293BG', 'N524PB', 'N592BG',
+        'N692BG', 'N806AP', 'N920VH', 'N92EH'
+      ];
+      
+      // Find all these registrations in the aircraft list
+      console.log('CHECKING SPECIFIC REGISTRATIONS:');
+      registrationsToCheck.forEach(reg => {
+        const matches = this.aircraftList.filter(aircraft => 
+          aircraft.registration.includes(reg)
+        );
+        
+        console.log(`${reg}: Found ${matches.length} matches`);
+        
+        matches.forEach(aircraft => {
+          console.log(`  - Registration: ${aircraft.registration}`);
+          console.log(`    Type: ${aircraft.modelType}`);
+          console.log(`    Model Name: ${aircraft.modelName}`);
+          console.log(`    Region: ${aircraft.region}`);
+          console.log(`    Status: ${aircraft.status}`);
+        });
+      });
+      
+      // Get all S92 aircraft in Gulf of Mexico
+      const s92AircraftInGOM = this.aircraftList.filter(aircraft => 
+        aircraft.modelType === 'S92' && 
+        this.regionsMatch(aircraft.region, 'GULF OF MEXICO')
+      );
+      
+      console.log(`Found ${s92AircraftInGOM.length} S92 aircraft in Gulf of Mexico`);
+      
+      // Print the details of each S92 aircraft
+      s92AircraftInGOM.forEach(aircraft => {
+        console.log(`Registration: ${aircraft.registration}`);
+        console.log(`Type: ${aircraft.modelType}`);
+        console.log(`Model Name: ${aircraft.modelName}`);
+        console.log(`Region: ${aircraft.region}`);
+        console.log(`Status: ${aircraft.status}`);
+        console.log('---------');
+      });
+      
+      // Count each unique type in Gulf of Mexico
+      const actualTypeCounts = {};
+      this.aircraftList.filter(a => this.regionsMatch(a.region, 'GULF OF MEXICO'))
+                       .forEach(a => {
+                         actualTypeCounts[a.modelType] = (actualTypeCounts[a.modelType] || 0) + 1;
+                       });
+      
+      console.log('Actual type counts in Gulf of Mexico:', actualTypeCounts);
+    }
+    
+    // Also check flexible region matches for alternate region names
+    const regionAliases = {
+      'GULF OF MEXICO': ['US', 'GOM', 'MEXICO', 'UNITED STATES'],
+      'NIGERIA': ['WEST AFRICA', 'AFRICAN'],
+      'UNITED KINGDOM': ['UK', 'BRITAIN', 'SCOTLAND'],
+      'TRINIDAD AND TOBAGO': ['TRINIDAD', 'TOBAGO'],
+      'BRAZIL': ['BRAZIL EAST', 'BRAZILIAN', 'SOUTH AMERICA'],
+      'NORWAY': ['NORWEGIAN', 'SCANDINAVIAN'],
+      'NETHERLANDS': ['DUTCH', 'HOLLAND'],
+      'IRELAND': ['IRISH']
+    };
+    
+    // For each region with aliases, ensure aircraft can be found with either name
+    Object.entries(regionAliases).forEach(([primaryRegion, aliases]) => {
+      if (this.aircraftByRegion[primaryRegion]) {
+        // For each alias, create a reference to the primary region's data
+        aliases.forEach(alias => {
+          if (!this.aircraftByRegion[alias] && alias !== primaryRegion) {
+            // Reference the primary region's data
+            this.aircraftByRegion[alias] = this.aircraftByRegion[primaryRegion];
+            this.typesByRegion[alias] = [...this.typesByRegion[primaryRegion]];
+            console.log(`Created alias mapping: ${alias} -> ${primaryRegion} with ${this.aircraftByRegion[primaryRegion].all.length} aircraft`);
+          }
+        });
+      }
+    });
+    
+    // For each known region, ensure we have complete byType collections
+    Object.keys(this.aircraftByRegion).forEach(region => {
+      allKnownTypes.forEach(type => {
+        if (!this.aircraftByRegion[region].byType[type]) {
+          this.aircraftByRegion[region].byType[type] = [];
+        }
+      });
+    });
+    
+    // Log a summary of aircraft by region
+    console.log('Aircraft counts by region:', regionCount);
+    console.log(`Total regions with aircraft: ${Object.keys(this.aircraftByRegion).length}`);
+    console.log(`Total known aircraft types: ${allKnownTypes.size}`);
+    
+    // Log detailed breakdown of aircraft by type for each region
+    Object.keys(this.aircraftByRegion).forEach(region => {
+      console.log(`Region: ${region} - ${this.aircraftByRegion[region].all.length} total aircraft`);
+      const typeCount = {};
+      Object.keys(this.aircraftByRegion[region].byType).forEach(type => {
+        const count = this.aircraftByRegion[region].byType[type].length;
+        if (count > 0) {
+          typeCount[type] = count;
+        }
+      });
+      console.log(`Types available in ${region}:`, typeCount);
+    });
   }
 
   /**
@@ -347,40 +537,59 @@ class AircraftManager {
   formatRegionForOSDK(region) {
     if (!region) return '';
     
+    console.log(`Formatting region: "${region}"`);
+    
     // Map of region IDs to OSDK region names
     const regionMap = {
       'gulf-of-mexico': 'GULF OF MEXICO',
+      'gom': 'GULF OF MEXICO',
+      'gulf of mexico': 'GULF OF MEXICO',
+      'gulf-mexico': 'GULF OF MEXICO',
       'norway': 'NORWAY',
       'united-kingdom': 'UNITED KINGDOM',
+      'uk': 'UNITED KINGDOM',
       'west-africa': 'NIGERIA', // Updated to match actual data
       'nigeria': 'NIGERIA',
       'brazil': 'BRAZIL',
       'brazil-east': 'BRAZIL EAST',
       'australia': 'AUSTRALIA',
       'us': 'GULF OF MEXICO', // Alias
+      'usa': 'GULF OF MEXICO', // Alias
+      'united-states': 'GULF OF MEXICO', // Alias
+      'united states': 'GULF OF MEXICO', // Alias
       'netherlands': 'NETHERLANDS',
       'trinidad': 'TRINIDAD AND TOBAGO',
       'trinidad-and-tobago': 'TRINIDAD AND TOBAGO',
       'ireland': 'IRELAND'
     };
     
+    // First check if we are passing a region that's already in the correct format
+    const upperRegion = region.toUpperCase();
+    
+    // If the uppercase version is already a known region name, use it
+    if (Object.values(regionMap).includes(upperRegion)) {
+      console.log(`Region already in correct format: "${upperRegion}"`);
+      return upperRegion;
+    }
+    
     // Check if direct mapping exists
-    if (regionMap[region.toLowerCase()]) {
-      return regionMap[region.toLowerCase()];
+    const lowerRegion = region.toLowerCase();
+    if (regionMap[lowerRegion]) {
+      console.log(`Direct mapping found for "${region}": "${regionMap[lowerRegion]}"`);
+      return regionMap[lowerRegion];
     }
     
     // If no direct mapping, try to find a close match
-    const searchRegion = region.toLowerCase();
     for (const [key, value] of Object.entries(regionMap)) {
-      if (searchRegion.includes(key) || key.includes(searchRegion)) {
+      if (lowerRegion.includes(key) || key.includes(lowerRegion)) {
         console.log(`No exact region match for "${region}", using "${value}" as closest match`);
         return value;
       }
     }
     
     // Default: convert to uppercase
-    console.log(`No region mapping found for "${region}", defaulting to uppercase`);
-    return region.toUpperCase();
+    console.log(`No region mapping found for "${region}", defaulting to uppercase: "${upperRegion}"`);
+    return upperRegion;
   }
 
   /**
@@ -389,7 +598,11 @@ class AircraftManager {
    * @returns {string} - The aircraft type
    */
   determineAircraftType(modelName) {
-    if (!modelName) return 'S92'; // Default to S92 if no model name
+    // If no model name provided, return UNKNOWN instead of defaulting to S92
+    if (!modelName) {
+      console.log('No model name provided, using UNKNOWN type');
+      return 'UNKNOWN';
+    }
     
     // Convert to uppercase for consistent matching
     const model = modelName.toUpperCase();
@@ -433,6 +646,20 @@ class AircraftManager {
       'AIRBUS': 'H175' // Default Airbus to H175
     };
     
+    // Check for ASXXX format in the model name, where XXX is a number
+    if (model.includes('AS3') || model.includes('AS5')) {
+      console.log(`Detected Airbus AS series in model name: ${modelName}`);
+      // For AS350, AS355, etc.
+      if (model.includes('AS350') || model.includes('AS-350')) {
+        return 'AS350';
+      }
+    }
+    
+    // Check for specific model numbers that indicate type
+    if (model.includes('AW119')) {
+      return 'A119';
+    }
+    
     // Parse the display format we're seeing in the dropdown
     // e.g. extract S92 from "N228BJ (GULF OF MEXICO) | S92"
     const regExMatch = model.match(/\| (\w+\d+\w*)$/);
@@ -464,15 +691,17 @@ class AircraftManager {
         }
       }
       
-      // If we extracted something but don't recognize it, use it anyway
+      // If we extracted something but don't recognize it, use it as the type
       console.log(`Using extracted but unrecognized type: ${extractedType}`);
       return extractedType;
     }
     
-    // Log unrecognized model types with less verbosity
-    console.log(`Unrecognized aircraft model: "${modelName}" - defaulting to S92`);
+    // Use the actual model name instead of defaulting to S92
+    console.log(`Unrecognized aircraft model: "${modelName}" - using as type`);
     
-    return 'S92'; // Default to S92 if no match
+    // Extract the first part of the model name if it's too long
+    const simplifiedModel = modelName.split(' ')[0];
+    return simplifiedModel;
   }
 
   /**
@@ -494,191 +723,366 @@ class AircraftManager {
   }
 
   /**
-   * Filter aircraft by various criteria
-   * @param {string} region - Filter by region
-   * @param {string} type - Filter by aircraft type
-   * @param {string} status - Filter by status
+   * Get aircraft for a specific region from memory
+   * @param {string} region - Region ID to filter by
+   * @returns {Array} - Array of aircraft in that region
    */
-  filterAircraft(region = null, type = null, status = 'ACTIVE') {
-    // Create a prominent debug message to track when this is called
-    console.log(`%c===== FILTERING AIRCRAFT =====`, 'background: #ff0; color: #000; font-size: 16px; font-weight: bold;');
-    console.log(`Region: "${region}", Type: "${type}", Status: "${status}"`);
+  getAircraftByRegion(region) {
+    if (!region) return this.aircraftList;
     
-    // Display the current state of aircraftList
-    console.log(`Total aircraft before filtering: ${this.aircraftList.length}`);
+    // Format region for consistency
+    const formattedRegion = this.formatRegionForOSDK(region);
+    console.log(`Getting aircraft for region: ${formattedRegion}`);
     
-    // Show sample of aircraft to debug data structure
-    if (this.aircraftList.length > 0) {
-      console.log('Sample aircraft before filtering:');
-      for (let i = 0; i < Math.min(5, this.aircraftList.length); i++) {
-        const ac = this.aircraftList[i];
-        console.log(`- ${ac.registration}`);
-        console.log(`  Region: "${ac.region}"`);
-        console.log(`  Type: "${ac.modelType}"`);
-        console.log(`  Model: "${ac.modelName}"`);
+    // Special handling for Gulf of Mexico - log all aircraft in this region
+    if (formattedRegion === 'GULF OF MEXICO') {
+      console.log(`%c===== ALL AIRCRAFT IN GULF OF MEXICO =====`, 'background: #00a; color: #fff;');
+      
+      // Find all aircraft that match this region
+      const gulfAircraft = this.aircraftList.filter(aircraft => 
+        this.regionsMatch(aircraft.region, formattedRegion)
+      );
+      
+      console.log(`Total aircraft in Gulf of Mexico: ${gulfAircraft.length}`);
+      
+      // Print basic info for each aircraft
+      gulfAircraft.forEach(aircraft => {
+        console.log(`- ${aircraft.registration} (${aircraft.modelType}): Status=${aircraft.status || 'Unknown'}`);
+      });
+    }
+    
+    // Check if we have pre-organized data for this region
+    if (this.aircraftByRegion[formattedRegion]) {
+      const result = this.aircraftByRegion[formattedRegion].all;
+      console.log(`Found ${result.length} aircraft in ${formattedRegion} from organized data`);
+      return result;
+    }
+    
+    // If not found in organized data, use flexible matching
+    console.log(`Region ${formattedRegion} not found in pre-organized data, using flexible matching`);
+    
+    const matchedAircraft = this.aircraftList.filter(aircraft => {
+      // Check region property with flexible matching
+      if (aircraft.region && this.regionsMatch(aircraft.region, formattedRegion)) {
+        return true;
+      }
+      
+      // Check orgUnit property with flexible matching
+      if (aircraft.orgUnit && this.regionsMatch(aircraft.orgUnit, formattedRegion)) {
+        return true;
+      }
+      
+      // Check registration which might contain region
+      const matchRegex = /\(([^)]+)\)/;
+      const match = aircraft.registration.match(matchRegex);
+      const displayedRegion = match ? match[1] : '';
+      
+      return this.regionsMatch(displayedRegion, formattedRegion);
+    });
+    
+    console.log(`Found ${matchedAircraft.length} aircraft in ${formattedRegion} using flexible matching`);
+    
+    // Store the results for future use
+    if (matchedAircraft.length > 0 && !this.aircraftByRegion[formattedRegion]) {
+      this.aircraftByRegion[formattedRegion] = {
+        all: matchedAircraft,
+        byType: {}
+      };
+      
+      // Organize by type
+      const types = {};
+      matchedAircraft.forEach(aircraft => {
+        const type = aircraft.modelType;
+        if (!types[type]) {
+          types[type] = [];
+        }
+        types[type].push(aircraft);
+      });
+      
+      this.aircraftByRegion[formattedRegion].byType = types;
+      
+      // Update types for this region
+      this.typesByRegion[formattedRegion] = Object.keys(types);
+      
+      console.log(`Added ${formattedRegion} to organized data with ${matchedAircraft.length} aircraft`);
+      console.log(`Types in ${formattedRegion}:`, this.typesByRegion[formattedRegion]);
+    }
+    
+    return matchedAircraft;
+  }
+  
+  /**
+   * Get available aircraft types for a specific region
+   * @param {string} region - Region ID
+   * @returns {Array} - Array of available aircraft types in that region
+   */
+  getAvailableTypesInRegion(region) {
+    if (!region) return this.getAvailableTypes();
+    
+    // Format region for consistency
+    const formattedRegion = this.formatRegionForOSDK(region);
+    console.log(`Getting available types for region: ${formattedRegion}`);
+    
+    // Get from pre-calculated data if available
+    if (this.typesByRegion[formattedRegion]) {
+      // Filter to only include types that actually have aircraft
+      const typesWithAircraft = this.typesByRegion[formattedRegion].filter(type => {
+        const hasAircraft = this.aircraftByRegion[formattedRegion] && 
+                           this.aircraftByRegion[formattedRegion].byType[type] && 
+                           this.aircraftByRegion[formattedRegion].byType[type].length > 0;
+        return hasAircraft;
+      });
+      
+      console.log(`Found ${typesWithAircraft.length} types with aircraft in ${formattedRegion}:`, typesWithAircraft);
+      return typesWithAircraft;
+    }
+    
+    // Try flexible region matching to find region
+    console.log(`Region ${formattedRegion} not found in pre-calculated data, trying flexible matching`);
+    
+    // Try each known region and check if it matches
+    for (const knownRegion of Object.keys(this.typesByRegion)) {
+      if (this.regionsMatch(knownRegion, formattedRegion)) {
+        console.log(`Found matching region: ${knownRegion} matches ${formattedRegion}`);
+        
+        // Filter to only include types that actually have aircraft
+        const typesWithAircraft = this.typesByRegion[knownRegion].filter(type => {
+          const hasAircraft = this.aircraftByRegion[knownRegion] && 
+                             this.aircraftByRegion[knownRegion].byType[type] && 
+                             this.aircraftByRegion[knownRegion].byType[type].length > 0;
+          return hasAircraft;
+        });
+        
+        console.log(`Found ${typesWithAircraft.length} types with aircraft in ${knownRegion} (match for ${formattedRegion}):`, typesWithAircraft);
+        
+        // Store for future use
+        this.typesByRegion[formattedRegion] = typesWithAircraft;
+        
+        return typesWithAircraft;
       }
     }
     
-    // Start filtering with a fresh copy of the list
-    let filtered = [...this.aircraftList];
+    // If no matching region found in pre-calculated data, compute it now
+    console.log(`No matching region found, computing types for ${formattedRegion}`);
+    const aircraftInRegion = this.getAircraftByRegion(region);
+    const types = [...new Set(aircraftInRegion.map(aircraft => aircraft.modelType))].filter(Boolean);
     
-    // Filter by region if specified
+    // Store for future use
+    this.typesByRegion[formattedRegion] = types;
+    
+    console.log(`Computed ${types.length} types for ${formattedRegion}:`, types);
+    return types;
+  }
+  
+  /**
+   * Filter aircraft by region and type - enhanced memory-based implementation
+   * @param {string} region - Region to filter by
+   * @param {string} type - Aircraft type to filter by (optional)
+   * @returns {Array} - Filtered aircraft array
+   */
+  filterAircraft(region = null, type = null) {
+    console.log(`%c===== FILTERING AIRCRAFT =====`, 'background: #ff0; color: #000; font-size: 16px; font-weight: bold;');
+    console.log(`Region: "${region}", Type: "${type}"`);
+    
+    // Log filtering operation
+    console.log(`Filtering aircraft for ${region || 'all regions'}${type ? `, type: ${type}` : ''}`);
+
+    
+    // STEP 1: First filter by region
+    let filtered = [];
+    let formattedRegion = null;
+    
     if (region) {
-      console.log(`Filtering by region: "${region}"`);
+      formattedRegion = this.formatRegionForOSDK(region);
+      console.log(`Formatted region name: "${formattedRegion}"`);
       
-      // Format region for matching (e.g. "gulf-of-mexico" -> "GULF OF MEXICO")
-      const formattedRegion = this.formatRegionForOSDK(region);
-      console.log(`Formatted region for filtering: "${formattedRegion}"`);
-      
-      // Before filtering, check if any aircraft match this region
-      const matchingRegionCount = this.aircraftList.filter(ac => 
-        (ac.region && ac.region.includes(formattedRegion)) || 
-        (ac.registration && ac.registration.includes(formattedRegion))
-      ).length;
-      
-      console.log(`Aircraft matching region "${formattedRegion}" before filtering: ${matchingRegionCount}`);
-      
-      filtered = filtered.filter(aircraft => {
-        // First try to match by region property directly
-        if (aircraft.region) {
-          const regionMatches = this.regionsMatch(aircraft.region, formattedRegion);
-          if (regionMatches) {
-            console.log(`Region match by direct property: ${aircraft.registration} (${aircraft.region} matches ${formattedRegion})`);
-            return true;
+      // Check if we have pre-organized data for this exact region
+      if (this.aircraftByRegion[formattedRegion] && this.aircraftByRegion[formattedRegion].all) {
+        filtered = [...this.aircraftByRegion[formattedRegion].all];
+        console.log(`Using pre-organized data: ${filtered.length} aircraft in ${formattedRegion}`);
+      } else {
+        // Try to find a matching region using flexible matching
+        console.log(`Region "${formattedRegion}" not found in pre-organized data, trying flexible matching`);
+        
+        // Try each known region and check if it matches
+        let matchFound = false;
+        for (const knownRegion of Object.keys(this.aircraftByRegion)) {
+          if (this.regionsMatch(knownRegion, formattedRegion)) {
+            console.log(`Found matching region: "${knownRegion}" matches "${formattedRegion}"`);
+            filtered = [...this.aircraftByRegion[knownRegion].all];
+            console.log(`Using data from matched region: ${filtered.length} aircraft in ${knownRegion}`);
+            
+            // Create an alias for faster future access
+            this.aircraftByRegion[formattedRegion] = this.aircraftByRegion[knownRegion];
+            this.typesByRegion[formattedRegion] = this.typesByRegion[knownRegion] || [];
+            
+            matchFound = true;
+            break;
           }
         }
         
-        // Then try to extract from registration format
-        // Format is like: "N503JW (GULF OF MEXICO) | S92"
-        const matchRegex = /\(([^)]+)\)/;
-        const match = aircraft.registration.match(matchRegex);
-        const displayedRegion = match ? match[1] : '';
-        
-        // Check if the regions match using our flexible matching function
-        const matches = this.regionsMatch(displayedRegion, formattedRegion);
-        
-        // Log each match for debugging
-        if (matches) {
-          console.log(`Region match found in registration: ${aircraft.registration} (${displayedRegion} matches ${formattedRegion})`);
+        // If no pre-organized match, fall back to manual filtering
+        if (!matchFound) {
+          console.log(`No matching pre-organized region found, using manual filtering`);
+          filtered = this.aircraftList.filter(aircraft => this.regionsMatch(aircraft.region, formattedRegion));
+          console.log(`Manually filtered to ${filtered.length} aircraft for region "${formattedRegion}"`);
         }
-        
-        return matches;
-      });
-      
-      console.log(`After region filter: ${filtered.length} aircraft`);
-    }
-    
-    // Filter by type if specified
-    if (type) {
-      console.log(`Filtering by type: "${type}"`);
-      
-      // Before filtering, check if any aircraft match this type
-      const matchingTypeCount = filtered.filter(ac => 
-        ac.modelType === type || 
-        (ac.registration && ac.registration.includes(type))
-      ).length;
-      
-      console.log(`Aircraft matching type "${type}" before filtering: ${matchingTypeCount}`);
-      
-      filtered = filtered.filter(aircraft => {
-        // First check the modelType property directly
-        if (aircraft.modelType === type) {
-          console.log(`Type match by modelType: ${aircraft.registration} (${aircraft.modelType})`);
-          return true;
-        }
-        
-        // Then try to extract from registration format
-        // Format is like: "N503JW (GULF OF MEXICO) | S92"
-        const typeRegex = /\|\s*(\S+)$/;
-        const match = aircraft.registration.match(typeRegex);
-        const displayedType = match ? match[1] : '';
-        
-        // Check if types match with flexible matching
-        const typesMatch = this.typesMatch(displayedType, type) || 
-                          (aircraft.modelName && this.typesMatch(aircraft.modelName, type));
-        
-        // Log matches for debugging
-        if (typesMatch) {
-          console.log(`Type match found: ${aircraft.registration} (${displayedType || aircraft.modelName} matches ${type})`);
-        }
-        
-        return typesMatch;
-      });
-      
-      console.log(`After type filter: ${filtered.length} aircraft`);
-    }
-    
-    // Set the filtered aircraft list
-    this.filteredAircraft = filtered;
-    
-    // Enhanced debug logging
-    if (this.filteredAircraft.length > 0) {
-      console.log("%cFiltered Aircraft Results:", "color: green; font-weight: bold;");
-      this.filteredAircraft.forEach(aircraft => {
-        console.log(`- ${aircraft.registration} (Type: ${aircraft.modelType}, Region: ${aircraft.region})`);
-      });
+      }
     } else {
-      console.warn("%c⚠️ WARNING: No aircraft found after filtering!", "color: red; font-weight: bold; font-size: 14px;");
-      console.log("Filter criteria - Region:", region, "Type:", type);
-      console.log("Please check if the OSDK data contains aircraft for this region and type.");
+      // No region specified, use all aircraft
+      filtered = [...this.aircraftList];
+      console.log(`No region specified, using all ${filtered.length} aircraft`);
     }
+    
+    // STEP 2: Filter by type if specified and not empty
+    if (type && type !== 'all' && type !== '') {
+      // Try to use pre-organized type data if available
+      if (formattedRegion && 
+          this.aircraftByRegion[formattedRegion] && 
+          this.aircraftByRegion[formattedRegion].byType && 
+          this.aircraftByRegion[formattedRegion].byType[type]) {
+        
+        filtered = [...this.aircraftByRegion[formattedRegion].byType[type]];
+        console.log(`Using pre-organized type data: ${filtered.length} ${type} aircraft in ${formattedRegion}`);
+      } else {
+        // Filter manually using flexible type matching
+        console.log(`Filtering by type "${type}" using flexible matching`);
+        
+        // First try direct type match
+        const directMatches = filtered.filter(aircraft => aircraft.modelType === type);
+        
+        if (directMatches.length > 0) {
+          console.log(`Found ${directMatches.length} direct type matches for ${type}`);
+          filtered = directMatches;
+        } else {
+          // Fall back to flexible type matching
+          console.log(`No direct matches for type ${type}, using flexible matching`);
+          filtered = filtered.filter(aircraft => {
+            // Check modelType with flexible matching
+            if (this.typesMatch(aircraft.modelType, type)) {
+              return true;
+            }
+            
+            // Check for type in registration
+            const typeRegex = /\|\s*(\S+)$/;
+            const match = aircraft.registration.match(typeRegex);
+            const displayedType = match ? match[1] : '';
+            
+            // Use flexible matching on displayed type or model name
+            return this.typesMatch(displayedType, type) || 
+                  (aircraft.modelName && this.typesMatch(aircraft.modelName, type));
+          });
+          
+          console.log(`Found ${filtered.length} aircraft using flexible type matching`);
+        }
+      }
+    }
+    
+    // Additional detailed logging for S92 after filtering for Gulf of Mexico
+    if (formattedRegion === 'GULF OF MEXICO' && (type === 'S92' || !type)) {
+      const s92Aircraft = filtered.filter(aircraft => aircraft.modelType === 'S92');
+      console.log(`%c===== S92 AIRCRAFT AFTER FILTERING (count: ${s92Aircraft.length}) =====`, 'background: #f00; color: #fff;');
+      
+      // Show each S92 aircraft in detail
+      s92Aircraft.forEach(aircraft => {
+        console.log(`- Registration: ${aircraft.registration}`);
+        console.log(`  Model: ${aircraft.modelName}`);
+        console.log(`  Type: ${aircraft.modelType}`);
+        console.log(`  Region: ${aircraft.region}`);
+        console.log(`  Status: ${aircraft.status || 'Unknown'}`);
+      });
+      
+      // Look for potential duplicates
+      const registrations = s92Aircraft.map(a => a.registration);
+      const uniqueRegs = new Set(registrations);
+      
+      if (registrations.length !== uniqueRegs.size) {
+        console.log(`%c⚠️ WARNING: FOUND DUPLICATE REGISTRATIONS IN S92 AIRCRAFT`, 'background: #f00; color: #ff0; font-weight: bold;');
+        // Find the duplicates
+        const counts = {};
+        registrations.forEach(reg => {
+          counts[reg] = (counts[reg] || 0) + 1;
+        });
+        
+        for (const [reg, count] of Object.entries(counts)) {
+          if (count > 1) {
+            console.log(`Registration ${reg} appears ${count} times!`);
+          }
+        }
+      }
+    }
+    
+    // Temporarily cache the results in this.filteredAircraft for quick access
+    this.filteredAircraft = filtered;
     
     // Create a temporary overlay to display the results
     this.showFilteringResults(filtered.length, region, type);
     
-    // Trigger the callback with the filtered results
+    // STEP 3: Create type buckets for the UI even if filtering by a specific type
+    // This allows the UI to show counts for all types even when a specific type is selected
+    const typeBuckets = {};
+    
+    // If we've filtered by region only (no type filter)
+    if (region && !type && formattedRegion && this.aircraftByRegion[formattedRegion]) {
+      // Use pre-calculated type buckets
+      console.log(`Using pre-calculated type buckets for region ${formattedRegion}`);
+      
+      // Get all type buckets for this region
+      Object.keys(this.aircraftByRegion[formattedRegion].byType).forEach(typeKey => {
+        typeBuckets[typeKey] = this.aircraftByRegion[formattedRegion].byType[typeKey];
+      });
+    } else {
+      // Create type buckets from the filtered aircraft
+      console.log(`Creating type buckets from filtered aircraft`);
+      
+      // Build a map of known types with empty arrays
+      const allTypes = this.getAvailableTypes();
+      allTypes.forEach(typeKey => {
+        typeBuckets[typeKey] = [];
+      });
+      
+      // Group filtered aircraft by type
+      filtered.forEach(aircraft => {
+        const aircraftType = aircraft.modelType || 'S92';
+        if (!typeBuckets[aircraftType]) {
+          typeBuckets[aircraftType] = [];
+        }
+        typeBuckets[aircraftType].push(aircraft);
+      });
+    }
+    
+    // Trigger the callback with additional info for the UI
+    const callbackData = {
+      filtered: this.filteredAircraft,
+      byType: typeBuckets
+    };
+    
     this.triggerCallback('onAircraftFiltered', this.filteredAircraft);
     
     return this.filteredAircraft;
   }
   
   /**
-   * Show filtering results in a temporary overlay for debugging
+   * Show filtering results in the console
    * @param {number} count - Number of aircraft after filtering
    * @param {string} region - Region filter applied
    * @param {string} type - Type filter applied
    */
   showFilteringResults(count, region, type) {
-    // Get or create an overlay element
-    let overlay = document.getElementById('debug-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'debug-overlay';
-      overlay.style.position = 'fixed';
-      overlay.style.top = '10px';
-      overlay.style.right = '10px';
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.8)';
-      overlay.style.color = 'white';
-      overlay.style.padding = '10px';
-      overlay.style.borderRadius = '5px';
-      overlay.style.zIndex = '9999';
-      overlay.style.fontSize = '14px';
-      overlay.style.fontFamily = 'monospace';
-      overlay.style.maxWidth = '400px';
-      overlay.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-      document.body.appendChild(overlay);
-    }
+    // Just log to console to avoid any issues
+    const regionText = region ? this.formatRegionForOSDK(region) : 'All Regions';
+    const typeText = type ? type : 'All Types';
     
-    // Create the message
-    const regionText = region ? `Region: ${this.formatRegionForOSDK(region)}` : 'All Regions';
-    const typeText = type ? `Type: ${type}` : 'All Types';
+    console.log(`Aircraft filtered: ${count} aircraft found for ${regionText}, ${typeText}`);
     
-    overlay.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 5px;">Aircraft Filtering Results:</div>
-      <div>${regionText}</div>
-      <div>${typeText}</div>
-      <div style="margin-top: 5px; font-weight: bold; color: ${count > 0 ? '#4CAF50' : '#F44336'}">
-        Found: ${count} aircraft
-      </div>
-      <div style="font-size: 12px; margin-top: 10px;">This message will disappear in 5 seconds</div>
-    `;
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      if (overlay && overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
+    // Only attempt to update the status indicator if it exists and is working properly
+    try {
+      if (window.LoadingIndicator && typeof window.LoadingIndicator.updateStatusIndicator === 'function') {
+        window.LoadingIndicator.updateStatusIndicator(`Found: ${count} aircraft`);
       }
-    }, 5000);
+    } catch (e) {
+      console.error('Error updating status indicator:', e);
+    }
   }
   
   /**
@@ -695,22 +1099,57 @@ class AircraftManager {
   /**
    * Reset aircraft filtering for region changes
    * Clears the filtered aircraft and prepares for new region data
+   * but doesn't clear our permanent data
    */
   resetAircraftForRegion() {
-    console.log('Resetting aircraft data for region change');
+    console.log('Resetting filtered aircraft for region change');
     this.filteredAircraft = [];
     
-    // We won't clear the main aircraftList since it contains data for all regions
-    // But we'll trigger the callback to reset the UI
+    // We won't clear the main aircraftList or our organized data
+    // but we'll trigger the callback to reset the UI
     this.triggerCallback('onAircraftFiltered', []);
   }
   
   /**
-   * Get all available aircraft types
+   * Get counts of aircraft by type for a specific region
+   * @param {string} region - Region ID to get counts for
+   * @returns {Object} - Object with type keys and count values
+   */
+  getAircraftCountsByType(region) {
+    if (!region) return {};
+    
+    // Format region for consistency
+    const formattedRegion = this.formatRegionForOSDK(region);
+    console.log(`Getting aircraft counts by type for region: ${formattedRegion}`);
+    
+    // Use the pre-organized data if available
+    if (this.aircraftByRegion[formattedRegion]) {
+      const typeCounts = {};
+      Object.keys(this.aircraftByRegion[formattedRegion].byType).forEach(type => {
+        typeCounts[type] = this.aircraftByRegion[formattedRegion].byType[type].length;
+      });
+      return typeCounts;
+    }
+    
+    // If not available, calculate it now
+    const aircraftInRegion = this.getAircraftByRegion(region);
+    
+    // Group by type and count
+    const typeCounts = {};
+    aircraftInRegion.forEach(aircraft => {
+      const type = aircraft.modelType || 'S92';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
+    
+    return typeCounts;
+  }
+  
+  /**
+   * Get all available aircraft types across all regions
    * @returns {Array} - Array of available aircraft types
    */
   getAvailableTypes() {
-    // Get unique aircraft types
+    // Get unique aircraft types from all aircraft
     const types = [...new Set(this.aircraftList.map(aircraft => aircraft.modelType))];
     return types.filter(type => type); // Remove null/undefined
   }

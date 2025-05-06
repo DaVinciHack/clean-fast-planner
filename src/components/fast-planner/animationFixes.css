@@ -1,0 +1,60 @@
+/* Fix for card animation */
+
+/* Guarantee panel position */
+.info-panel {
+  will-change: transform;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Animation definitions with proper transforms */
+@keyframes slideOutToRight {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320px);
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(320px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Add base styles for the sliding panel container */
+.info-panel {
+  position: absolute;
+  top: 15px;
+  right: 45px;
+  z-index: 2;
+  background: linear-gradient(to bottom, 
+    rgba(60, 60, 60, 0.95) 0%, 
+    rgba(45, 45, 45, 0.85) 30%, 
+    rgba(35, 35, 35, 0.75) 60%, 
+    rgba(25, 25, 25, 0.4) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 350px;
+  max-height: calc(100vh - 30px);
+  overflow-y: auto;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  border-left: 1px solid var(--border-color);
+}
+
+/* Fix animation timing function to use dramatic ease-out */
+.info-panel[style*="animation"] {
+  animation-timing-function: cubic-bezier(0.34, 0.95, 0.67, 0.99) !important;
+}

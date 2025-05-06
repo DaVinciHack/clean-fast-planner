@@ -1,14 +1,13 @@
-/**
- * Modules index - exports all Fast Planner modules
- */
-
 import MapManager from './MapManager';
 import WaypointManager from './WaypointManager';
 import PlatformManager from './PlatformManager';
 import RouteCalculator from './RouteCalculator';
 import RegionManager from './RegionManager';
-import AircraftManager from './AircraftManager';
 import FavoriteLocationsManager from './FavoriteLocationsManager';
+import AircraftManager from './AircraftManager';
+import FlightCalculations from './calculations/FlightCalculations';
+import MapInteractionHandler from './MapInteractionHandler';
+import AppSettingsManager from './AppSettingsManager';
 
 export {
   MapManager,
@@ -16,6 +15,9 @@ export {
   PlatformManager,
   RouteCalculator,
   RegionManager,
+  FavoriteLocationsManager,
   AircraftManager,
-  FavoriteLocationsManager
+  FlightCalculations,
+  MapInteractionHandler,
+  AppSettingsManager
 };

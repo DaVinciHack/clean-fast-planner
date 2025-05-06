@@ -16,7 +16,8 @@ const LeftPanel = ({
   onRouteInputChange,
   favoriteLocations, // Receive favorite locations
   onAddFavoriteLocation, // Receive add favorite function
-  onRemoveFavoriteLocation // Receive remove favorite function
+  onRemoveFavoriteLocation, // Receive remove favorite function
+  onReorderWaypoints // Receive reorder waypoints function
 }) => {
   // Keep track of recently added waypoint IDs for highlighting
   const [recentWaypoints, setRecentWaypoints] = useState({});
@@ -25,6 +26,20 @@ const LeftPanel = ({
   // Keep track of recently added favorite locations for highlighting
   const [recentFavorites, setRecentFavorites] = useState({});
   const prevFavoritesRef = useRef([]);
+  
+  // Internal state for favorites to ensure UI updates even if parent state doesn't
+  const [internalFavorites, setInternalFavorites] = useState([]);
+  
+  // Keep internal favorites in sync with props
+  useEffect(() => {
+    console.log("LeftPanel: favoriteLocations prop changed:", favoriteLocations.length);
+    setInternalFavorites(favoriteLocations);
+  }, [favoriteLocations]);
+  
+  // Debug output for favorites changes
+  useEffect(() => {
+    console.log("LeftPanel: Internal favorites updated:", internalFavorites.length);
+  }, [internalFavorites]);
   
   // Check for newly added favorites
   useEffect(() => {
@@ -145,14 +160,39 @@ const LeftPanel = ({
       // Find source index
       const sourceIndex = waypoints.findIndex(wp => wp.id === draggedId);
       
-      // Call parent handler with reordering info
-      const updatedWaypoints = [...waypoints];
-      const [movedWaypoint] = updatedWaypoints.splice(sourceIndex, 1);
-      updatedWaypoints.splice(targetIndex, 0, movedWaypoint);
+      console.log(`LeftPanel: Reordering waypoint from index ${sourceIndex} to ${targetIndex}`);
       
-      // Update parent component with new order
-      if (onWaypointNameChange) {
-        onWaypointNameChange(draggedId, movedWaypoint.name, updatedWaypoints);
+      // In our waypoint manager, we need source and target waypoint IDs, not just indices
+      const sourceId = draggedId;
+      const targetId = waypoints[targetIndex]?.id;
+      
+      // If the parent component provided a reorder function, call it
+      if (onReorderWaypoints && sourceId && targetId) {
+        console.log(`LeftPanel: Calling onReorderWaypoints with sourceId=${sourceId}, targetId=${targetId}`);
+        onReorderWaypoints(sourceId, targetId);
+      } else {
+        console.log(`LeftPanel: Missing onReorderWaypoints function or invalid IDs`);
+        
+        // Fallback: try to simulate reordering by removing and adding at new index
+        if (onRemoveWaypoint && onAddWaypoint && sourceIndex !== -1) {
+          // Get the waypoint's data before removing
+          const movedWaypoint = waypoints[sourceIndex];
+          
+          // Remove from original position
+          onRemoveWaypoint(sourceId, sourceIndex);
+          
+          // If we have the coordinates, add it at the new position
+          // Note: This is a fallback that won't work well with multiple users
+          if (movedWaypoint && movedWaypoint.coords) {
+            setTimeout(() => {
+              // Add at new position - not ideal as it creates a new waypoint
+              onAddWaypoint({
+                coordinates: movedWaypoint.coords,
+                name: movedWaypoint.name
+              });
+            }, 10);
+          }
+        }
       }
     }
   };
@@ -160,19 +200,26 @@ const LeftPanel = ({
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && routeInput.trim() !== "") {
       if (onAddWaypoint) {
+        console.log('LeftPanel: Enter key pressed with input:', routeInput.trim());
         onAddWaypoint(routeInput.trim());
+        
+        // Clear the input field after search attempt
+        if (onRouteInputChange) {
+          onRouteInputChange('');
+        }
       }
     }
   };
   
   return (
     <>
-      {/* Left panel toggle tab */}
+      {/* Left panel toggle tab - with horizontal > and < markers */}
       <div 
-        className="panel-tab left-panel-tab" 
+        className="panel-tab left-panel-tab main-toggle tab-selector" 
+        style={{ position: 'fixed', top: '50px', left: '0', zIndex: '20', height: '24px', width: '24px', writingMode: 'horizontal-tb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={onToggleVisibility}
       >
-        {visible ? '← Hide' : 'Stops →'}
+        {visible ? '<' : '>'}
       </div>
       
       {/* Route Editor Panel */}
@@ -215,19 +262,48 @@ const LeftPanel = ({
                   onClick={() => {
                     if (onAddFavoriteLocation) {
                       const locationName = waypoint.name || `Stop ${index + 1}`;
-                      onAddFavoriteLocation({ 
+                      const newLocation = { 
                         name: locationName, 
                         coords: waypoint.coords 
-                      });
-                      // Show success message
-                      const loadingOverlay = document.getElementById('loading-overlay');
-                      if (loadingOverlay) {
-                        loadingOverlay.textContent = `Added ${locationName} to favorites`;
-                        loadingOverlay.style.display = 'block';
-                        setTimeout(() => {
-                          loadingOverlay.style.display = 'none';
-                        }, 1500);
+                      };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${locationName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
+                      if (onAddFavoriteLocation) {
+                        onAddFavoriteLocation(newLocation);
                       }
+                      
+                      // Show success message
+                      const message = `Added ${locationName} to favorites`;
+                      // Create a toast-style notification instead of using the loading overlay
+                      const toast = document.createElement('div');
+                      toast.style.position = 'fixed';
+                      toast.style.bottom = '20px';
+                      toast.style.left = '50%';
+                      toast.style.transform = 'translateX(-50%)';
+                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                      toast.style.color = 'white';
+                      toast.style.padding = '10px 20px';
+                      toast.style.borderRadius = '5px';
+                      toast.style.zIndex = '1000';
+                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                      toast.textContent = message;
+                      document.body.appendChild(toast);
+                      
+                      // Remove after 1.5 seconds
+                      setTimeout(() => {
+                        document.body.removeChild(toast);
+                      }, 1500);
                     }
                   }}
                   style={{ 
@@ -251,6 +327,7 @@ const LeftPanel = ({
                   className="remove-stop" 
                   onClick={() => {
                     if (onRemoveWaypoint) {
+                      console.log(`LeftPanel: Removing waypoint at index ${index} with ID ${waypoint.id}`);
                       onRemoveWaypoint(waypoint.id, index);
                     }
                   }}
@@ -292,8 +369,13 @@ const LeftPanel = ({
                 justifyContent: "center"
               }}
               onClick={() => {
-                if (onAddWaypoint) {
-                  onAddWaypoint(routeInput.trim() || "New Stop");
+                if (onAddWaypoint && routeInput.trim()) {
+                  console.log('LeftPanel: Add button clicked with input:', routeInput.trim());
+                  onAddWaypoint(routeInput.trim());
+                  // Clear the input field after adding
+                  if (onRouteInputChange) {
+                    onRouteInputChange('');
+                  }
                 }
               }}
             >
@@ -325,7 +407,7 @@ const LeftPanel = ({
               justifyContent: 'space-between'
             }}>
               <span>
-                <strong>{favoriteLocations.length}</strong> favorites in this region
+                <strong>{internalFavorites.length}</strong> favorites in this region
               </span>
               <button 
                 style={{
@@ -413,20 +495,44 @@ const LeftPanel = ({
                     if (parts.length === 3 && !isNaN(parts[1]) && !isNaN(parts[2])) {
                       const name = parts[0];
                       const coords = [parseFloat(parts[2]), parseFloat(parts[1])]; // Lon, Lat
+                      const newLocation = { name, coords };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
                       if (onAddFavoriteLocation) {
-                        onAddFavoriteLocation({ name, coords });
-                        e.target.value = ''; // Clear input
-                        
-                        // Show success message
-                        const loadingOverlay = document.getElementById('loading-overlay');
-                        if (loadingOverlay) {
-                          loadingOverlay.textContent = `Added ${name} to favorites`;
-                          loadingOverlay.style.display = 'block';
-                          setTimeout(() => {
-                            loadingOverlay.style.display = 'none';
-                          }, 1500);
-                        }
+                        onAddFavoriteLocation(newLocation);
                       }
+                      
+                      // Show success message with toast notification
+                      const message = `Added ${name} to favorites`;
+                      const toast = document.createElement('div');
+                      toast.style.position = 'fixed';
+                      toast.style.bottom = '20px';
+                      toast.style.left = '50%';
+                      toast.style.transform = 'translateX(-50%)';
+                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                      toast.style.color = 'white';
+                      toast.style.padding = '10px 20px';
+                      toast.style.borderRadius = '5px';
+                      toast.style.zIndex = '1000';
+                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                      toast.textContent = message;
+                      document.body.appendChild(toast);
+                      
+                      // Remove after 1.5 seconds
+                      setTimeout(() => {
+                        document.body.removeChild(toast);
+                      }, 1500);
                     } else {
                       alert("Invalid format. Please use 'Name, Lat, Lon'.");
                     }
@@ -451,20 +557,44 @@ const LeftPanel = ({
                     if (parts.length === 3 && !isNaN(parts[1]) && !isNaN(parts[2])) {
                       const name = parts[0];
                       const coords = [parseFloat(parts[2]), parseFloat(parts[1])]; // Lon, Lat
+                      const newLocation = { name, coords };
+                      
+                      // Add directly to internal state for immediate UI update
+                      // Generate a temporary ID for display purposes
+                      const tempId = `${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                      const tempLocation = {
+                        ...newLocation,
+                        id: tempId
+                      };
+                      
+                      // Update internal state immediately
+                      setInternalFavorites(prev => [...prev, tempLocation]);
+                      
+                      // Also call the parent handler
                       if (onAddFavoriteLocation) {
-                        onAddFavoriteLocation({ name, coords });
-                        inputElement.value = ''; // Clear input
-                        
-                        // Show success message
-                        const loadingOverlay = document.getElementById('loading-overlay');
-                        if (loadingOverlay) {
-                          loadingOverlay.textContent = `Added ${name} to favorites`;
-                          loadingOverlay.style.display = 'block';
-                          setTimeout(() => {
-                            loadingOverlay.style.display = 'none';
-                          }, 1500);
-                        }
+                        onAddFavoriteLocation(newLocation);
                       }
+                      
+                      // Show success message with toast notification
+                      const message = `Added ${name} to favorites`;
+                      const toast = document.createElement('div');
+                      toast.style.position = 'fixed';
+                      toast.style.bottom = '20px';
+                      toast.style.left = '50%';
+                      toast.style.transform = 'translateX(-50%)';
+                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                      toast.style.color = 'white';
+                      toast.style.padding = '10px 20px';
+                      toast.style.borderRadius = '5px';
+                      toast.style.zIndex = '1000';
+                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                      toast.textContent = message;
+                      document.body.appendChild(toast);
+                      
+                      // Remove after 1.5 seconds
+                      setTimeout(() => {
+                        document.body.removeChild(toast);
+                      }, 1500);
                     } else {
                       alert("Invalid format. Please use 'Name, Lat, Lon'.");
                     }
@@ -484,21 +614,47 @@ const LeftPanel = ({
                 <div
                   key={locationId}
                   className={`favorite-item ${recentFavorites[locationId] ? 'highlight-new' : ''}`}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    padding: "5px 3px",
+                    marginBottom: "4px",
+                    borderRadius: "4px",
+                    backgroundColor: "rgba(0,0,0,0.1)",
+                    transition: "background-color 0.2s"
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.2)"}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.1)"}
                 >
                   <span
                     onClick={() => {
                       if (onAddWaypoint && location.coords && location.coords.length === 2) {
-                        onAddWaypoint(location.name, location.coords);
+                        // Pass location object format compatible with addWaypoint
+                        onAddWaypoint({
+                          coordinates: location.coords,
+                          name: location.name
+                        });
                         
-                        // Show a success message
-                        const loadingOverlay = document.getElementById('loading-overlay');
-                        if (loadingOverlay) {
-                          loadingOverlay.textContent = `Added ${location.name} to route`;
-                          loadingOverlay.style.display = 'block';
-                          setTimeout(() => {
-                            loadingOverlay.style.display = 'none';
-                          }, 1500);
-                        }
+                        // Show a success message with a toast instead of overlay
+                        const message = `Added ${location.name} to route`;
+                        const toast = document.createElement('div');
+                        toast.style.position = 'fixed';
+                        toast.style.bottom = '20px';
+                        toast.style.left = '50%';
+                        toast.style.transform = 'translateX(-50%)';
+                        toast.style.backgroundColor = 'rgba(0, 123, 255, 0.9)';
+                        toast.style.color = 'white';
+                        toast.style.padding = '10px 20px';
+                        toast.style.borderRadius = '5px';
+                        toast.style.zIndex = '1000';
+                        toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        
+                        // Remove after 1.5 seconds
+                        setTimeout(() => {
+                          document.body.removeChild(toast);
+                        }, 1500);
                       }
                     }}
                     style={{ 
@@ -506,20 +662,38 @@ const LeftPanel = ({
                       flexGrow: 1, 
                       marginRight: "10px", 
                       display: "flex", 
-                      alignItems: "center" 
+                      alignItems: "center",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis"
                     }}
                   >
                     <span style={{ marginRight: "8px", fontSize: "14px", color: "#ff5e85" }}>❤️</span>
-                    <span>
-                      <strong>{location.name}</strong>
-                      <br />
+                    <span style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}>
+                      <strong style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{location.name}</strong>
                       {location.coords && location.coords.length === 2 ? (
-                        <span style={{ fontSize: "11px", color: "var(--label-color)" }}>
-                          {location.coords[1].toFixed(3)}, {location.coords[0].toFixed(3)}
+                        <span style={{ 
+                          fontSize: "11px", 
+                          color: "var(--label-color)", 
+                          marginLeft: "5px",
+                          whiteSpace: "nowrap" 
+                        }}>
+                          ({location.coords[1].toFixed(3)}, {location.coords[0].toFixed(3)})
                         </span>
                       ) : (
-                        <span style={{ fontSize: "11px", color: "var(--danger-color)" }}>
-                          Invalid coordinates
+                        <span style={{ 
+                          fontSize: "11px", 
+                          color: "var(--danger-color)", 
+                          marginLeft: "5px",
+                          whiteSpace: "nowrap" 
+                        }}>
+                          (Invalid coordinates)
                         </span>
                       )}
                     </span>
