@@ -17,6 +17,13 @@ This is a verified working version of the Fast Planner application with all key 
 2. Made WindCalculations module globally available:
    - Added code to import the WindCalculations module and assign it to window.WindCalculations
    - This ensures the module is accessible for route and stop card calculations
+   
+3. Fixed Wind Input Synchronization (May 06, 2025):
+   - Updated MainCard.jsx and WeatherCard.jsx to properly call onWeatherUpdate
+   - Added parameter normalization for wind direction (0-359 range)
+   - Enhanced updateWeatherSettings in FastPlannerApp.jsx with better state handling
+   - Ensured RightPanel.jsx passes weather props to MainCard
+   - Added clear documentation about wind input parameter order
 
 ## How to Return to This Working State
 
@@ -51,6 +58,7 @@ If you ever need to return to this known working state:
 - Do not modify the WindCalculations.js file without thorough testing
 - Always verify that wind calculations are working after any changes
 - Always create a new branch before making changes to preserve this working state
+- The wind input system is particularly sensitive - check both cards when making UI changes
 
 ## Verification Steps
 
@@ -60,6 +68,19 @@ To verify the application is working correctly:
 2. Select an aircraft
 3. Enter wind values in either the MainCard or WeatherCard
 4. Verify that:
+   - Wind values update in both cards
    - Time values appear on the route line
    - Stop cards show adjusted times
    - The console doesn't show "WindCalculations not available" errors
+   
+## Common Issues and Fixes
+
+### Wind Inputs Not Syncing
+- Check if RightPanel.jsx is passing weather and onWeatherUpdate props to MainCard
+- Verify parameter order: updateWeatherSettings(speed, direction)
+- Look for console errors about undefined values
+
+### Route Times Not Updating with Wind
+- Verify WindCalculations module is globally available
+- Check for any component not properly passing weather to RouteCalculator
+- Try forcing a recalculation with setForceUpdate

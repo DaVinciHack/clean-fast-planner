@@ -42,9 +42,10 @@ const WeatherCard = ({
               onChange={(e) => {
                 const newDirection = parseInt(e.target.value) || 0;
                 console.log('WeatherCard: Wind direction changed to:', newDirection);
-                console.log('WeatherCard: Current weather object:', weather);
-                console.log('WeatherCard: onWeatherUpdate function:', onWeatherUpdate);
-                onWeatherUpdate(weather.windSpeed, newDirection);
+                // Ensure valid range 0-359
+                const normalizedDirection = ((newDirection % 360) + 360) % 360;
+                // Important: Pass parameters in correct order (speed, direction)
+                onWeatherUpdate(weather.windSpeed, normalizedDirection);
               }}
             />
           </div>
@@ -59,6 +60,8 @@ const WeatherCard = ({
               max="100"
               onChange={(e) => {
                 const newSpeed = parseInt(e.target.value) || 0;
+                console.log('WeatherCard: Wind speed changed to:', newSpeed);
+                // Important: Pass parameters in correct order (speed, direction)
                 onWeatherUpdate(newSpeed, weather.windDirection);
               }}
             />

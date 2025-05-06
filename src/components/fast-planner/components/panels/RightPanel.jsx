@@ -106,6 +106,8 @@ const RightPanel = ({
         passengerWeight={passengerWeight}
         deckTimePerStop={deckTimePerStop}
         deckFuelFlow={deckFuelFlow}
+        weather={weather}
+        onWeatherUpdate={onWeatherUpdate}
       />
       
       {/* Settings Card */}
