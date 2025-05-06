@@ -26,7 +26,74 @@ const SaveFlightButton = ({
   const closeModal = () => {
     setShowModal(false);
   };
-  
+
+  /**
+   * Run a diagnostic test on the API connection
+   * This helps identify what's causing the 400 Bad Request error
+   */
+  const runDiagnosticMode = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Set a global flag to use minimal parameters
+      window.OSDK_DIAGNOSTIC_MODE = true;
+      
+      // Alert the user
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Running API diagnostics...');
+      }
+      
+      // Try with absolute minimal parameters to see if the API is accessible
+      const minimalParams = {
+        flightName: "Diagnostic Test Flight",
+        aircraftRegion: currentRegion ? currentRegion.name : "NORWAY",
+        aircraftId: "TEST123"
+      };
+      
+      console.log('Diagnostic Mode: Using minimal parameters', minimalParams);
+      
+      // Try just to get a list of available SDK functions first
+      try {
+        const sdk = await import('@flight-app/sdk');
+        console.log('Available SDK functions for flight creation:', 
+          Object.keys(sdk).filter(key => 
+            typeof key === 'string' && 
+            key.toLowerCase().includes('flight') && 
+            (key.toLowerCase().includes('create') || key.toLowerCase().includes('new'))
+          )
+        );
+      } catch (sdkError) {
+        console.error('Cannot load SDK in diagnostic mode:', sdkError);
+      }
+      
+      // Now try the actual API call
+      const result = await PalantirFlightService.createFlight(minimalParams);
+      console.log('Diagnostic API result:', result);
+      
+      // Clear the diagnostic mode flag
+      window.OSDK_DIAGNOSTIC_MODE = false;
+      
+      return true;
+    } catch (error) {
+      console.error('Diagnostic mode error:', error);
+      
+      // Format the error for display
+      const errorMessage = `API Diagnostic Error: ${error.message || 'Unknown error'}`;
+      
+      // Clear the diagnostic mode flag
+      window.OSDK_DIAGNOSTIC_MODE = false;
+      
+      // Show the user what happened
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(errorMessage, 'error');
+      }
+      
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   /**
    * Handles the flight data submitted from the modal
    * @param {Object} flightData - The flight data from the modal form
@@ -177,7 +244,7 @@ const SaveFlightButton = ({
       setIsSaving(false);
     }
   };
-  
+
   // Check if we can save a flight (have aircraft and 2+ waypoints)
   const canSaveFlight = selectedAircraft && waypoints && waypoints.length >= 2;
   
@@ -217,6 +284,7 @@ const SaveFlightButton = ({
         onSave={handleFlightFormSubmit}
         isSaving={isSaving}
         waypoints={waypoints}
+        onRunDiagnostic={runDiagnosticMode}
       />
     </>
   );

@@ -11,7 +11,8 @@ const SaveFlightModal = ({
   onSave, 
   isSaving, 
   initialFlightName = '',
-  waypoints
+  waypoints,
+  onRunDiagnostic = null
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -279,6 +280,28 @@ const SaveFlightModal = ({
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+          {/* Diagnostic button only shown if onRunDiagnostic is provided */}
+          {onRunDiagnostic && (
+            <button
+              onClick={() => {
+                onRunDiagnostic();
+              }}
+              style={{
+                backgroundColor: '#444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '8px 16px',
+                marginRight: 'auto',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '12px'
+              }}
+            >
+              Diagnose API
+            </button>
+          )}
+          
           <button
             onClick={onClose}
             style={{
