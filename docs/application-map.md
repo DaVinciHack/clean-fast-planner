@@ -129,10 +129,24 @@ Located in `/src/components/fast-planner/context/`:
 
 ### 3. Foundry Integration
 
-#### Route Export to Flight Planner
-- Implement route export to Palantir Flight Planner
-- Create serialization format for routes
-- Add validation before export
+### Integration with Palantir
+
+#### Save Flight Functionality ✅
+- Successfully implemented flight saving to Palantir Foundry
+- Fixed API parameter formats to use simple string IDs (not $primaryKey objects)
+- Added comprehensive error handling and validation
+- Integrated with createNewFlightFp2 OSDK action
+
+The Save Flight functionality creates new flights in Palantir Foundry using the following components:
+- **SaveFlightButton.jsx** - UI component that triggers the save operation
+- **SaveFlightModal.jsx** - Collects additional flight information (ETD, crew)
+- **PalantirFlightService.js** - Handles API interactions and parameter formatting
+
+Key implementation details:
+1. Aircraft ID must be provided as a simple string (numeric ID like "190")
+2. All API calls include the $returnEdits: true option
+3. Crew member IDs are sent as simple strings, not objects with $primaryKey
+4. Parameter format matches the server-side implementation requirements
 
 #### Weather Integration
 - Connect to weather data sources via OSDK

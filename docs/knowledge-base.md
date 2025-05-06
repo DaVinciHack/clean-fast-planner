@@ -100,13 +100,33 @@ The AircraftManager follows this sequence:
 3. Groups aircraft by type
 4. Further filters when an aircraft type is selected
 
-### Route Calculation Process
-Route calculations are performed in these steps:
-1. WaypointManager provides waypoint coordinates
-2. Distance between waypoints is calculated
-3. Aircraft performance data is applied
-4. Fuel requirements are calculated based on flight settings
-5. Passenger capacity is determined based on fuel load and aircraft capacity
+### OSDK Flight Creation
+The application integrates with Palantir OSDK to save flight plans back to Foundry. The flight creation process follows these steps:
+
+1. **Data Collection**:
+   - Flight data is gathered from the UI (waypoints, aircraft, ETD, crew)
+   - The SaveFlightModal.jsx component collects remaining information
+   - Data is formatted to match the Palantir API requirements
+
+2. **API Integration**:
+   - The PalantirFlightService.js handles all API interactions
+   - It uses the createNewFlightFp2 action from the OSDK
+   - Parameters must be formatted as simple strings, not objects with $primaryKey
+
+3. **Critical Requirements**:
+   - `aircraftId` must be a numeric ID string (e.g., "190") not a tail number
+   - Crew member IDs must be simple strings, not objects with $primaryKey
+   - All locations must be properly formatted as uppercase strings
+   - Both CreateNewFlightFp2 and SaveFlightButton use the same format
+
+4. **Implementation Details**:
+   - The SaveFlightButton.jsx component retrieves aircraft ID from selectedAircraft.assetId
+   - PalantirFlightService.js formats all parameters as simple strings
+   - All API calls include the $returnEdits: true option for proper responses
+   - Error handling is implemented for specific validation errors
+
+When implementing flight saving functionality, always use simple string values for all IDs, not objects with $primaryKey properties, as the Palantir API implementation expects string values directly.
+
 
 ### Wind Effect Handling
 The application accurately calculates and displays wind effects on flight time and fuel consumption:
@@ -166,6 +186,9 @@ The system consists of:
 
 **Issue**: Wind correction times inconsistent across UI components
 **Solution**: This was also fixed in commit e983c7d. The fix ensures all UI components access the same calculation results by using global state management and passing the complete `routeStats` object to all components that need it.
+
+**Issue**: Flight creation API returning 400 Bad Request errors
+**Solution**: The key is to use simple string values for all IDs, not objects with $primaryKey. When using the createNewFlightFp2 action, the aircraftId must be the numeric ID (e.g., "190") as a simple string. This was fixed in May 2025 by updating the PalantirFlightService.js and SaveFlightButton.jsx components to format parameters correctly.
 
 ## References & Resources
 
