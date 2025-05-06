@@ -1,27 +1,21 @@
-# Fast Planner Application Map & Refactoring Strategy
+# Fast Planner Application Map - Updated May 6, 2025
 
 ## Project Overview
 
-The Fast Planner is a React application connecting to Palantir's OSDK (Ontology Software Development Kit) that provides flight planning functionality for managing routes between oil rigs, airports, and platforms. The project is currently in a refactoring phase, transitioning from a large monolithic component to a more modular architecture.
+The Fast Planner is a React application connecting to Palantir's OSDK (Ontology Software Development Kit) that provides flight planning functionality for managing routes between oil rigs, airports, and platforms. The project has undergone significant refactoring from a monolithic structure to a more modular architecture.
 
 ## Current Project Structure
 
-### Entry Points
+### Entry Point
 
-There are two main entry points to the application:
+After the latest cleanup, the application now has a single consolidated entry point:
 
-1. **Original Implementation (ModularFastPlannerComponent.jsx)**
-   - Accessed via: `http://localhost:8080/`
-   - Over 2,500 lines of code in a single file
-   - Contains all functionality in one monolithic component
-   - Should be preserved as a working reference
+**Refactored Implementation (FastPlannerApp.jsx)**
+- Accessed via: `http://localhost:8080/` (or any domain)
+- Uses modular architecture with functionality split among multiple files
+- Implements dynamic redirect URL generation for flexible deployment
 
-2. **Refactored Implementation (FastPlannerApp.jsx)**
-   - Accessed via: `http://localhost:8080/?context=new`
-   - Around 1,000 lines of code with functionality split among multiple files
-   - Uses the same underlying modules but with better separation of concerns
-
-The switching between implementations happens in `FastPlannerPage.jsx`, which detects URL parameters and renders the appropriate component.
+The legacy implementations have been moved to `src/_old_components/` for reference but are no longer used in the application.
 
 ### Core Architecture
 
@@ -46,8 +40,18 @@ Located in `/src/components/fast-planner/components/`:
 
 - **MapComponent** - Renders the map
 - **LeftPanel** - Route editor panel
-- **RightPanel** - Controls and statistics panel
+- **RightPanel** - Controls and statistics panel (now using card-based architecture)
 - **RouteStatsCard** - Displays route statistics
+
+#### RightPanel Cards
+Located in `/src/components/fast-planner/components/panels/cards/`:
+
+- **MainCard** - Main controls, region selection, aircraft selection, weather inputs
+- **SettingsCard** - Flight settings and calculation parameters
+- **PerformanceCard** - Performance calculations including S92 dropdown
+- **WeatherCard** - Weather settings with wind inputs
+- **FinanceCard** - Finance calculations
+- **EvacuationCard** - Evacuation planning
 
 #### Context Providers
 Located in `/src/components/fast-planner/context/`:
@@ -64,157 +68,110 @@ Located in `/src/components/fast-planner/context/`:
 3. Aircraft data is loaded and filtered by region and type
 4. Users create routes by clicking on the map or selecting locations
 5. Route statistics are calculated based on selected aircraft and waypoints
+6. Wind data entered in either MainCard or WeatherCard affects route calculations
 
-## Refactoring Strategy
+## Current Status
 
-### Clear Separation - For Better Development Workflow
+### Completed Work
 
-To ensure we avoid confusion between the original and refactored versions:
+#### Modular Architecture ✅
+- Successfully migrated from monolithic to modular component structure
+- Implemented manager modules for different functionalities
+- Created focused UI components with clear responsibilities
 
-1. **Visual Indicators**:
-   - Add a prominent banner in both versions indicating which version is being used
-   - Use different color schemes or subtle UI differences between versions
+#### Wind Input System ✅
+- Fixed synchronization between MainCard and WeatherCard
+- Added wind direction normalization to 0-359 range
+- Enhanced updateWeatherSettings function for proper state management
+- Thoroughly documented wind input system
 
-2. **Code Organization**:
-   - Keep all original files in the root directory
-   - Move all refactored files to a clear subfolder structure
+#### Project Cleanup ✅
+- Removed unused/duplicate files
+- Fixed hardcoded localhost references
+- Added comprehensive documentation
+- Created verification scripts and git tags
 
-3. **Version Control Strategy**:
-   - Create separate branches for each feature refactoring
-   - Only merge completed and tested features to main
+#### RightPanel Architecture ✅
+- Implemented card-based panel with tabs
+- Created individual card components for different functionalities
+- Added smooth animations for card transitions
 
-### Refactoring Guidelines
+#### S92 Performance Calculator ✅
+- Integrated S92 dropdown calculations with PerformanceCard
+- Added interactive inputs for weight, temperature, and wind conditions
+- Implemented visualization with charts
 
-To maintain manageable file sizes (under 500 lines) and improve code organization:
+## Next Steps in Development
 
-1. **Component Decomposition**:
-   - Break large components into smaller, focused components
-   - Each component should have a single responsibility
-   - Follow these separation criteria:
-     - UI sections (panels, cards, forms)
-     - Logical functionality groups (aircraft selection, route editing)
-     - Data management (loading, filtering, calculations)
-   - When refactoring, ensure state management flows properly between components
-   - Avoid direct DOM manipulation in React components - use state and props instead
-   - For interactive elements like dropdowns with complex behavior, make sure state flows through parent components
+### 1. Enhanced Calculations - CURRENT PRIORITY
 
-2. **Context Usage**:
-   - Move shared state to context providers
-   - Components should access only the context they need
-   - Avoid prop drilling by using context
+#### Fuel Calculations
+- Improve accuracy of fuel burn calculations
+- Implement contingency fuel calculations
+- Add visualization for fuel requirements
 
-3. **Hooks Extraction**:
-   - Move complex state logic to custom hooks
-   - Create hooks for specific functionality (e.g., useAircraft, useRouteCalculation)
-   - Keep hook files under 200 lines
+#### Passenger (Pax) Calculations
+- Create passenger weight and capacity calculations
+- Implement dynamic capacity based on fuel load
+- Add visualization for passenger distribution
 
-### Step-by-Step Refactoring Plan
+### 2. Component Refactoring
 
-To avoid breaking functionality during refactoring:
+#### Aircraft Selection Component
+- Extract from MainCard.jsx to components/aircraft/AircraftSelection.jsx
+- Create dedicated AircraftContext for state management
+- Improve filtering and selection UI
 
-1. **Identification Phase**:
-   - Identify sections of code that can be isolated
-   - Document dependencies between functions and state
+#### WaypointEditor Component
+- Extract from LeftPanel.jsx to components/waypoints/WaypointEditor.jsx
+- Connect to RouteContext for state management
+- Enhance waypoint editing interface
 
-2. **Extraction Phase**:
-   - Extract one component/feature at a time
-   - Test thoroughly after each extraction
-   - Maintain state management consistency
+### 3. Foundry Integration
 
-3. **Integration Phase**:
-   - Connect extracted components through context or props
-   - Verify all interactions work correctly
-   - Update documentation
+#### Route Export to Flight Planner
+- Implement route export to Palantir Flight Planner
+- Create serialization format for routes
+- Add validation before export
 
-## Next Steps in Refactoring
+#### Weather Integration
+- Connect to weather data sources via OSDK
+- Implement weather visualization on map
+- Add weather-based route optimization
 
-Based on the current state, here are the next components to refactor:
+## Development Guidelines
 
-1. ~~**Modular RightPanel Architecture**:~~ ✅ COMPLETED
-   - ~~Create a card-based structure for RightPanel to replace the current large component~~
-   - ~~Implement a container component (RightPanelContainer.jsx) to manage layout and coordinate visible cards~~
-   - ~~Create individual card components:~~
-     - ~~MainCard.jsx - For main controls and region selection~~
-     - ~~SettingsCard.jsx - For flight settings~~
-     - ~~PerformanceCard.jsx - For performance calculations~~
-     - ~~WeatherCard.jsx - For weather settings~~
-     - ~~FinanceCard.jsx - For finance calculations~~
-     - ~~EvacuationCard.jsx - For evacuation planning~~
-   - ~~Implement tab/accordion system with sliding animations~~
-   - ~~Each card maintains its own local state~~
-   - ~~CSS transitions for smooth sliding animations~~
+### Code Organization
+- Keep components focused and single-responsibility
+- Use React contexts for state management
+- Implement proper error handling
+- Document all public functions and interfaces
+- Maintain consistent naming conventions
 
-2. ~~**S92 Performance Calculator Implementation**:~~ ✅ COMPLETED
-   - ~~Implement the S92DropdownCalculator component from the provided code~~
-   - ~~Integrate it with the PerformanceCard component~~
-   - ~~Add necessary context connections for aircraft data~~
+### Testing Strategy
+- Verify wind inputs work correctly after any changes
+- Test route calculations with different aircraft and conditions
+- Ensure authentication works with dynamic redirect URL
 
-3. **Route StopCards Enhancement**:
-   - ✅ Implemented compact, elegant card styling
-   - ✅ Added smooth FLIP animations for reordering
-   - ✅ Created custom blue-themed SVG icons
-   - ✅ Eliminated scrolling by dynamically expanding card container
-   - ⏳ Optimize calculations to match aircraft data and flight settings
+### Version Control
+- Use the created git tags to reference important milestones:
+  - `wind-input-fix-v3` - Contains all wind input fixes
+  - `cleanup-phase1-complete` - After fixing hardcoded values
+  - `cleanup-phase2-complete` - After removing unused files
+  - `cleanup-complete` - Final state after all cleanup
+  - `documentation-updated` - After organizing documentation
 
-4. **Aircraft Integration**:
-   - Extract AircraftSelection from MainCard.jsx
-   - Add to a new file in components/aircraft/AircraftSelection.jsx
-   - Create an AircraftContext to manage aircraft state
-   - Properly connect aircraft performance data to route calculations
+## Reference Documentation
 
-5. **LeftPanel Component Extraction**:
-   - Extract WaypointEditor from LeftPanel.jsx
-   - Add to components/waypoints/WaypointEditor.jsx
-   - Connect to RouteContext
+### Implementation Documents
+- `/docs/WIND_INPUT_SYSTEM.md` - Detailed documentation of the wind input system
+- `/docs/PROJECT_STATUS_AND_ROADMAP.md` - Current status and future plans
+- `/docs/MEMORY_SUMMARY.md` - Quick reference for project context
 
-## Documentation Strategy
-
-To maintain clear knowledge of project structure:
-
-1. **Living Documentation**:
-   - Create and maintain this application map document
-   - Update with each significant change
-   - Include diagrams of component relationships
-
-2. **Component Documentation**:
-   - Add JSDoc comments to each component and function
-   - Document props, state, and effects
-   - Include examples of usage
-
-3. **Knowledge Base Management**:
-   - Use a dedicated tool for project documentation (see recommended tools below)
-   - Link documentation to code for easier navigation
-   - Regularly review and update documentation
-
-## Recommended Knowledge Base Tools
-
-Based on research, here are recommended tools for maintaining project knowledge:
-
-1. **Documentation-Specific Tools**:
-   - **Notion** - Flexible workspace combining docs, wikis, and project management
-   - **Confluence** - Robust documentation platform with Jira integration
-   - **GitBook** - Developer-focused documentation platform
-
-2. **Code Documentation Tools**:
-   - **JSDoc** - Documentation generator for JavaScript
-   - **Storybook** - Component library and documentation
-
-3. **Code Organization Tools**:
-   - **GitHub Projects** - Track tasks and organize work
-   - **Code Maps** - Visual representations of code structure
-
-## Reference vs. Refactored Components
-
-### Reference (Do Not Modify)
-- `/src/components/fast-planner/ModularFastPlannerComponent.jsx` - Original implementation
-- Any file with `.bak` extension - Original backup files
-
-### Refactored (Active Development)
-- `/src/components/fast-planner/FastPlannerApp.jsx` - New implementation entry point
-- `/src/components/fast-planner/components/` - UI components
-- `/src/components/fast-planner/context/` - Context providers
-- `/src/components/fast-planner/hooks/` - Custom hooks
-- `/src/components/fast-planner/modules/` - Manager modules
+### Cleanup Documentation
+- `/docs/CLEANUP_PLAN.md` - Overall cleanup strategy
+- `/docs/CLEANUP_FILES_PLAN.md` - File cleanup details
+- `/docs/CLEANUP_SUMMARY.md` - Summary of completed cleanup
 
 ## Using This Map
 
@@ -227,9 +184,9 @@ Reference this document when:
 Update this document when:
 1. Adding new components or modules
 2. Changing data flow or architecture
-3. Completing a refactoring milestone
+3. Completing a development milestone
 4. Finding improvements to the documentation itself
 
 ## Conclusion
 
-This refactoring approach emphasizes incremental progress with clear separation between the original and refactored code. By focusing on one component at a time and maintaining comprehensive documentation, we can successfully transition to a more maintainable codebase while preserving functionality.
+The Fast Planner has successfully been refactored from a monolithic structure to a modular architecture. The application now has better separation of concerns, improved maintainability, and the flexibility to be deployed to any environment. The focus now shifts to enhancing the calculations for fuel and passengers, followed by deeper integration with Palantir Foundry services.

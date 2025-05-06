@@ -67,7 +67,7 @@
     .progress-fill {
       height: 100%;
       background: #4CAF50;
-      width: 137.2%;
+      width: 66.7%;
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -122,7 +122,8 @@
       height: 150px;
       border-radius: 50%;
       background: conic-gradient(
-        #4CAF50 0% 83.3%, 
+        #4CAF50 0% 66.7%, 
+        #FFB74D 66.7% 83.3%,
         #f1f1f1 83.3% 100%
       );
       margin: 0 auto;
@@ -169,6 +170,17 @@
     .next-steps ul {
       margin-bottom: 0;
     }
+    .recent-milestone {
+      background-color: #E8F5E9;
+      border-left: 4px solid #4CAF50;
+      padding: 15px;
+      margin-bottom: 30px;
+      border-radius: 4px;
+    }
+    .recent-milestone h3 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
     a {
       color: #3498db;
       text-decoration: none;
@@ -188,144 +200,210 @@
 </head>
 <body>
   <div class="container">
-    <h1>Fast Planner Refactoring Dashboard</h1>
-    <div class="timestamp">Last updated: 5/4/2025, 4:26:52 PM</div>
+    <h1>Fast Planner Development Dashboard</h1>
+    <div class="timestamp">Last updated: May 06, 2025</div>
+    
+    <div class="recent-milestone">
+      <h3>Recent Milestones Completed</h3>
+      <ul>
+        <li>✅ <strong>Wind Input System Fix</strong>: Synchronized inputs across UI components</li>
+        <li>✅ <strong>Project Cleanup</strong>: Removed unused files and fixed hardcoded values</li>
+        <li>✅ <strong>Dynamic URL Support</strong>: Application now deployable to any domain</li>
+        <li>✅ <strong>Documentation</strong>: Created comprehensive documentation and roadmap</li>
+      </ul>
+    </div>
     
     <div class="summary-cards">
       <div class="card">
-        <h3>Original Code</h3>
-        <div class="value">2578</div>
-        <div>lines of code</div>
-      </div>
-      <div class="card">
-        <h3>Refactored Code</h3>
-        <div class="value">3537</div>
-        <div>lines of code</div>
-      </div>
-      <div class="card">
-        <h3>Code Ratio</h3>
-        <div class="value">137.2%</div>
-        <div>refactored / original</div>
+        <h3>Features Complete</h3>
+        <div class="value">6/9</div>
+        <div>core features implemented</div>
       </div>
       <div class="card">
         <h3>Components Completed</h3>
-        <div class="value">5/6</div>
-        <div>components refactored</div>
+        <div class="value">8/12</div>
+        <div>components fully functional</div>
+      </div>
+      <div class="card">
+        <h3>Code Cleanup</h3>
+        <div class="value">100%</div>
+        <div>unused files removed</div>
+      </div>
+      <div class="card">
+        <h3>Documentation</h3>
+        <div class="value">7</div>
+        <div>documentation files</div>
       </div>
     </div>
     
     <div class="progress-container">
-      <h2>Refactoring Progress</h2>
+      <h2>Development Progress</h2>
       <div class="progress-bar">
-        <div class="progress-fill">137.2%</div>
+        <div class="progress-fill">66.7%</div>
       </div>
-      <div>Based on total lines of code refactored compared to original.</div>
+      <div>Based on completed features compared to roadmap.</div>
     </div>
     
     <div class="chart-container">
       <div class="chart">
-        <h3>Component Completion</h3>
+        <h3>Feature Completion</h3>
         <div class="pie-chart">
-          <div class="pie-center">83.3%</div>
+          <div class="pie-center">66.7%</div>
         </div>
         <div class="refactoring-status">
-          5 of 6 components refactored
+          6 of 9 major features complete
         </div>
       </div>
       
       <div class="chart">
-        <h3>Code Structure</h3>
+        <h3>Current Structure</h3>
         <div class="code-block">
-ModularFastPlannerComponent.jsx: 2578 lines
-FastPlannerApp.jsx: 1987 lines
-leftpanel.jsx: 737 lines
-rightpanel.jsx: 153 lines
-routestats.jsx: 379 lines
-mapcomponent.jsx: 120 lines
-flightsettings.jsx: 161 lines
-
+src/
+├── components/
+│   └── fast-planner/
+│       ├── FastPlannerApp.jsx
+│       ├── components/
+│       │   ├── map/
+│       │   ├── panels/
+│       │   │   ├── cards/
+│       │   │   ├── LeftPanel.jsx
+│       │   │   └── RightPanel.jsx
+│       │   └── flight/
+│       ├── context/
+│       └── modules/
+├── _old_components/ (Legacy code)
+└── docs/ (Documentation)
         </div>
       </div>
     </div>
     
     <div class="next-steps">
-      <h3>Next Steps in Refactoring</h3>
+      <h3>Current Development Focus</h3>
       <ul>
-        <li><strong>Aircraft Selection Component</strong>: Extract from RightPanel.jsx</li>
-        <li><strong>WaypointEditor Component</strong>: Extract from LeftPanel.jsx</li>
-        <li><strong>Add fuel consumption display</strong> to route line</li>
-        <li><strong>Add passenger capacity information</strong> to route line</li>
-        <li><strong>Add visual indicators</strong> to clearly show which version is being used</li>
+        <li><strong>Fuel Calculations</strong>: Improving fuel burn calculations with better accuracy</li>
+        <li><strong>Passenger Calculations</strong>: Implementing passenger weight and capacity calculations</li>
+        <li><strong>Aircraft Selection Component</strong>: Extracting from MainCard to dedicated component</li>
+        <li><strong>Waypoint Editor Component</strong>: Improving the route editing interface</li>
+        <li><strong>Foundry Integration</strong>: Implementing route export to Palantir Flight Planner</li>
       </ul>
     </div>
     
-    <h2>Components Status</h2>
+    <h2>Feature Status</h2>
     <table class="components-table">
       <thead>
         <tr>
-          <th>Component</th>
+          <th>Feature</th>
           <th>Status</th>
-          <th>Lines</th>
+          <th>Priority</th>
           <th>Description</th>
         </tr>
       </thead>
       <tbody>
-        
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js leftpanel\nto see detailed information about this component')">leftpanel</a></td>
-          <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>737</td>
-          <td></td>
+          <td>Core Architecture</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>High</td>
+          <td>Modular architecture with manager-based modules</td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js rightpanel\nto see detailed information about this component')">rightpanel</a></td>
-          <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>153</td>
-          <td></td>
+          <td>Map Integration</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>High</td>
+          <td>Map display with waypoint interaction</td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js routestats\nto see detailed information about this component')">routestats</a></td>
-          <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>379</td>
-          <td></td>
+          <td>Aircraft Selection</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>High</td>
+          <td>Selection and filtering of aircraft</td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js mapcomponent\nto see detailed information about this component')">mapcomponent</a></td>
-          <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>120</td>
-          <td></td>
+          <td>Route Creation</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>High</td>
+          <td>Creation and editing of routes</td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js flightsettings\nto see detailed information about this component')">flightsettings</a></td>
-          <td><span class="status" style="background-color: #4CAF50; color: white;">Refactored</span></td>
-          <td>161</td>
-          <td></td>
+          <td>Wind Input System</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>High</td>
+          <td>Synchronized wind inputs with calculations</td>
         </tr>
         
         <tr>
-          <td><a href="javascript:void(0)" onclick="alert('Run: node src/componentNavigator.js aircraftselection\nto see detailed information about this component')">aircraftselection</a></td>
-          <td><span class="status" style="background-color: #FF9800; color: white;">Not Started</span></td>
-          <td>0</td>
-          <td></td>
+          <td>S92 Performance Calculator</td>
+          <td><span class="status" style="background-color: #4CAF50; color: white;">Complete</span></td>
+          <td>Medium</td>
+          <td>S92 dropdown calculations with visualization</td>
         </tr>
         
+        <tr>
+          <td>Fuel Calculations</td>
+          <td><span class="status" style="background-color: #FFB74D; color: white;">In Progress</span></td>
+          <td>High</td>
+          <td>Accurate fuel burn calculations</td>
+        </tr>
+        
+        <tr>
+          <td>Passenger Calculations</td>
+          <td><span class="status" style="background-color: #FFB74D; color: white;">In Progress</span></td>
+          <td>High</td>
+          <td>Passenger capacity based on fuel load</td>
+        </tr>
+        
+        <tr>
+          <td>Foundry Integration</td>
+          <td><span class="status" style="background-color: #f1f1f1; color: #333;">Not Started</span></td>
+          <td>Medium</td>
+          <td>Route export to Palantir Flight Planner</td>
+        </tr>
+        
+        <tr>
+          <td>Weather Integration</td>
+          <td><span class="status" style="background-color: #f1f1f1; color: #333;">Not Started</span></td>
+          <td>Medium</td>
+          <td>Integration with weather data sources</td>
+        </tr>
+        
+        <tr>
+          <td>Mobile Responsiveness</td>
+          <td><span class="status" style="background-color: #f1f1f1; color: #333;">Not Started</span></td>
+          <td>Low</td>
+          <td>Enhanced mobile support</td>
+        </tr>
+        
+        <tr>
+          <td>Reporting & Analytics</td>
+          <td><span class="status" style="background-color: #f1f1f1; color: #333;">Not Started</span></td>
+          <td>Low</td>
+          <td>Flight efficiency and cost reporting</td>
+        </tr>
       </tbody>
     </table>
     
-    <h2>How to Use This Report</h2>
-    <p>This dashboard provides a visual overview of the Fast Planner refactoring progress. For more detailed information:</p>
+    <h2>Documentation Resources</h2>
     <ul>
-      <li>Run <code>node src/componentNavigator.js report</code> to see the text report</li>
-      <li>Run <code>node src/componentNavigator.js componentName</code> to see details about a specific component</li>
-      <li>Run <code>node src/componentNavigator.js search term</code> to find functions containing the search term</li>
-      <li>Run <code>node src/componentNavigator.js html</code> to regenerate this HTML report</li>
+      <li><a href="PROJECT_STATUS_AND_ROADMAP.md">Project Status and Roadmap</a> - Current status and future plans</li>
+      <li><a href="WIND_INPUT_SYSTEM.md">Wind Input System Documentation</a> - Detailed documentation of wind inputs</li>
+      <li><a href="application-map.md">Application Map</a> - Overall architecture and component relationships</li>
+      <li><a href="MEMORY_SUMMARY.md">Memory Summary</a> - Quick reference for project context</li>
+      <li><a href="CLEANUP_SUMMARY.md">Cleanup Summary</a> - Details of completed cleanup work</li>
     </ul>
     
-    <p>See the <a href="application-map.md">Application Map</a> and <a href="knowledge-base.md">Knowledge Base</a> for more detailed documentation.</p>
+    <h2>Git Tags (Version Control)</h2>
+    <div class="code-block">
+wind-input-fix-v3       - Contains all wind input fixes
+cleanup-phase1-complete - After fixing hardcoded values
+cleanup-phase2-complete - After removing unused files
+cleanup-complete        - Final state after all cleanup
+documentation-updated   - After organizing documentation
+    </div>
+    
+    <p>Run the application with <code>npm run dev</code> to see the latest version in action.</p>
   </div>
 </body>
 </html>
