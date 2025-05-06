@@ -14,7 +14,17 @@ const scopes = [
 // Initialize with environment variables
 const url = "https://bristow.palantirfoundry.com";
 const clientId = "7db2ec0841ba7cd5697f25eebde0a64e";
-const redirectUrl = "http://localhost:8080/auth/callback";
+
+// Dynamically determine the redirect URL based on current hostname
+const getRedirectUrl = () => {
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const port = window.location.port ? `:${window.location.port}` : '';
+  return `${protocol}//${hostname}${port}/auth/callback`;
+};
+
+const redirectUrl = getRedirectUrl();
+console.log(`Using OAuth redirect URL: ${redirectUrl}`);
 
 // Create auth and client instances
 export const auth = createPublicOauthClient(
