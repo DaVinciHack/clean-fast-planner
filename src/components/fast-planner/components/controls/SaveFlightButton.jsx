@@ -58,6 +58,15 @@ const SaveFlightButton = ({
         aircraftRegistration = aircraftRegistration.split('(')[0].trim();
       }
       
+      // Debug output of IDs to help find issues
+      console.log('OSDK Flight Creation - Debug Data:', {
+        aircraftReg: aircraftRegistration,
+        aircraftAssetId: selectedAircraft.assetId || '(none)',
+        aircraftId: selectedAircraft.id || '(none)',
+        captainId: flightData.captainId,
+        copilotId: flightData.copilotId
+      });
+      
       // Create parameters for the API call using our service
       const flightParams = PalantirFlightService.formatFlightParams({
         aircraftRegion: currentRegion ? currentRegion.name : 'Unknown',
@@ -103,6 +112,52 @@ const SaveFlightButton = ({
       // Format the error message using the service
       const errorMessage = PalantirFlightService.formatErrorMessage(error);
       
+      // Display a more visible error message in the UI
+      const errorContainer = document.createElement('div');
+      errorContainer.className = 'api-error-notification';
+      errorContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #ff4c4c;
+        color: white;
+        padding: 15px 25px;
+        border-radius: 5px;
+        z-index: 10000;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        max-width: 80%;
+        text-align: center;
+        font-weight: bold;
+      `;
+      errorContainer.textContent = errorMessage;
+      
+      // Add a close button to the error message
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      closeButton.style.cssText = `
+        position: absolute;
+        top: 5px;
+        right: 10px;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+      `;
+      closeButton.onclick = () => document.body.removeChild(errorContainer);
+      errorContainer.appendChild(closeButton);
+      
+      // Add to body
+      document.body.appendChild(errorContainer);
+      
+      // Auto-remove after 8 seconds
+      setTimeout(() => {
+        if (document.body.contains(errorContainer)) {
+          document.body.removeChild(errorContainer);
+        }
+      }, 8000);
+      
       // Update loading indicator with error
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator(errorMessage, 'error');
@@ -110,6 +165,13 @@ const SaveFlightButton = ({
       
       if (onError) {
         onError(errorMessage);
+      }
+      
+      // Show a special message for 400 errors (likely due to API data format issues)
+      if (error.message && error.message.includes('400')) {
+        console.log('Detailed API error info to help debug the 400 Bad Request:');
+        console.log('This might be due to incorrect field formatting or missing required fields.');
+        console.log('Check the API documentation for exact field requirements.');
       }
     } finally {
       setIsSaving(false);
