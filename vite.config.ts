@@ -16,6 +16,28 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['@osdk/client', '@osdk/oauth', '@flight-app/sdk']
+    include: ['@osdk/client', '@osdk/oauth', '@flight-app/sdk', '@osdk/foundry.admin']
+  },
+  build: {
+    sourcemap: true, // Enable source maps for easier debugging
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Explicitly include OSDK packages in a dedicated chunk
+          'osdk-vendors': [
+            '@osdk/client',
+            '@osdk/oauth',
+            '@flight-app/sdk',
+            '@osdk/foundry.admin'
+          ],
+          // React in a separate chunk
+          'react-vendors': [
+            'react',
+            'react-dom',
+            'react/jsx-runtime'
+          ]
+        }
+      }
+    }
   }
 });

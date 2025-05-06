@@ -182,6 +182,54 @@ const FastPlannerApp = () => {
   useEffect(() => {
     console.log("FastPlannerApp: Initializing managers...");
     
+    // Check if OSDK client is available
+    if (!client) {
+      console.error("OSDK Client Error: client is null or undefined");
+      
+      // Create error dialog
+      const errorDialog = document.createElement('div');
+      errorDialog.style.position = 'fixed';
+      errorDialog.style.top = '0';
+      errorDialog.style.left = '0';
+      errorDialog.style.right = '0';
+      errorDialog.style.bottom = '0';
+      errorDialog.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+      errorDialog.style.display = 'flex';
+      errorDialog.style.alignItems = 'center';
+      errorDialog.style.justifyContent = 'center';
+      errorDialog.style.zIndex = '9999';
+      
+      const dialogContent = document.createElement('div');
+      dialogContent.style.backgroundColor = 'white';
+      dialogContent.style.padding = '20px';
+      dialogContent.style.borderRadius = '8px';
+      dialogContent.style.maxWidth = '500px';
+      dialogContent.style.textAlign = 'center';
+      
+      dialogContent.innerHTML = `
+        <h3 style="color: #dc3545; margin-top: 0;">OSDK Client Error</h3>
+        <p>The Palantir OSDK client failed to initialize properly. This will prevent loading aircraft and platform data.</p>
+        <p>Error: Client is null or undefined</p>
+        <p>Please reload the page and try again. If the problem persists, check the console for more details.</p>
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+          <button id="dismiss-btn" style="padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; background-color: #f8f9fa; color: #212529;">Dismiss</button>
+          <button id="reload-btn" style="padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; background-color: #007bff; color: white;">Reload Page</button>
+        </div>
+      `;
+      
+      errorDialog.appendChild(dialogContent);
+      document.body.appendChild(errorDialog);
+      
+      // Add event listeners to buttons
+      document.getElementById('dismiss-btn').addEventListener('click', () => {
+        document.body.removeChild(errorDialog);
+      });
+      
+      document.getElementById('reload-btn').addEventListener('click', () => {
+        window.location.reload();
+      });
+    }
+    
     // Create managers if they don't exist - order matters!
     // 1. First create the map manager
     if (!mapManagerRef.current) {

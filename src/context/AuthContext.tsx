@@ -44,23 +44,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // This function runs synchronously during component initialization
   const checkForToken = (): boolean => {
     try {
-      // The most reliable way to check - does auth have a token right now?
-      const hasToken = typeof auth.getAccessToken === 'function' && !!auth.getAccessToken();
-      
-      if (hasToken) {
-        console.log('%c✓ TOKEN FOUND - Setting authenticated state to TRUE', 
-          'background: green; color: white; font-weight: bold; padding: 3px 5px;');
+      // Check if auth exists and has the necessary methods
+      if (auth && typeof auth.getAccessToken === 'function') {
+        const token = auth.getAccessToken();
         
-        // Set a global flag so other components can see auth state immediately
-        (window as any).isFoundryAuthenticated = true;
-        
-        // Add CSS class to body to indicate authenticated state
-        if (document && document.body) {
-          document.body.classList.add('foundry-authenticated');
-          document.body.classList.remove('foundry-unauthenticated');
+        if (token) {
+          console.log('%c✓ TOKEN FOUND - Setting authenticated state to TRUE', 
+            'background: green; color: white; font-weight: bold; padding: 3px 5px;');
+          
+          // Set a global flag so other components can see auth state immediately
+          (window as any).isFoundryAuthenticated = true;
+          
+          // Add CSS class to body to indicate authenticated state
+          if (document && document.body) {
+            document.body.classList.add('foundry-authenticated');
+            document.body.classList.remove('foundry-unauthenticated');
+          }
+          
+          return true;
         }
-        
-        return true;
+      } else {
+        console.log('Auth object not fully initialized, skipping token check');
       }
       
       // Also check localStorage as a backup
@@ -78,8 +82,34 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
   
+  // Check for token without immediately calling methods
+  const safeCheckForToken = (): boolean => {
+    try {
+      // Check if auth exists and has a getAccessToken method
+      if (auth && typeof auth.getAccessToken === 'function') {
+        const token = auth.getAccessToken();
+        if (token) {
+          console.log('Token found, setting initial state to authenticated');
+          return true;
+        }
+      }
+      
+      // If no token found via auth methods, check localStorage as backup
+      const storedAuthState = localStorage.getItem('fastPlanner_isAuthenticated');
+      if (storedAuthState === 'true') {
+        console.log('Auth state found in localStorage, using as fallback');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error in initial token check:', error);
+      return false;
+    }
+  };
+  
   // Check for token and set initial auth state
-  const initialAuthState = checkForToken();
+  const initialAuthState = safeCheckForToken();
   
   // Initialize state with proper values
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuthState);
@@ -193,10 +223,23 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const debugAdminUser = async () => {
     try {
       console.log("🔍 DEBUG: Attempting to get user with direct admin API call...");
+      
+      // Simple existence check without accessing methods
+      if (!client) {
+        console.log("🔍 DEBUG: OSDK client is not available");
+        return null;
+      }
+      
+      // Check if Users module is available
+      if (!Users || typeof Users.getCurrent !== 'function') {
+        console.log("🔍 DEBUG: Users module or getCurrent method not available");
+        return null;
+      }
+      
       // This replicates the example from @osdk/foundry.admin documentation
+      console.log("🔍 DEBUG: Calling Users.getCurrent with client...");
       const currentUser = await Users.getCurrent(client, { preview: true });
-      console.log("🔍 DEBUG: Direct admin API result:", JSON.stringify(currentUser, null, 2));
-      console.log("🔍 DEBUG: Available fields:", Object.keys(currentUser || {}));
+      console.log("🔍 DEBUG: Direct admin API call succeeded");
       
       // If we successfully get user data from the admin API, we are authenticated
       if (currentUser) {
