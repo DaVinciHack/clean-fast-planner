@@ -29,14 +29,21 @@ for file in "${KEY_FILES[@]}"; do
   fi
 done
 
-# Check if old files are properly moved
-echo -e "\n${YELLOW}Checking that old files are moved:${NC}"
+# Verify removed files
+echo -e "\n${YELLOW}Checking that old files were removed:${NC}"
 
-OLD_FILES=(
-  "src/_old_components/_old_ModularFastPlannerComponent.jsx"
-  "src/_old_components/FastPlannerWithContexts.jsx"
-  "src/_old_components/FastPlannerWithRegionContext.jsx"
+REMOVED_FILES=(
+  "public/fast-planner/index.html"
+  "public/test.html"
 )
+
+for file in "${REMOVED_FILES[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo -e "${GREEN}✓${NC} $file successfully removed"
+  else
+    echo -e "${RED}✗${NC} $file still exists!"
+  fi
+done
 
 for file in "${OLD_FILES[@]}"; do
   if [ -f "$file" ]; then
