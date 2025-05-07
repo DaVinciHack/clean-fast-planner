@@ -161,11 +161,20 @@ const RouteStatsCard = ({
   // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
   const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;
   
-  // Calculate total deck time (in minutes) - prefer value from stats if available
-  const totalDeckTime = routeStats?.deckTimeMinutes || (landingsCount * deckTimePerStop);
+  // Calculate the number of intermediate stops (waypoints - 2 or 0 if less than 3 waypoints)
+  // This matches the StopCardCalculator logic
+  const intermediateStops = waypoints && waypoints.length > 2 ? waypoints.length - 2 : 0;
   
-  // Calculate total deck fuel - prefer value from stats if available
-  const totalDeckFuel = routeStats?.deckFuel || (landingsCount * deckFuelPerStop);
+  // Calculate total deck time (in minutes) - prefer value from stats if available
+  const totalDeckTime = routeStats?.deckTimeMinutes || (intermediateStops * deckTimePerStop);
+  
+  // Calculate total deck fuel using the same formula as StopCardCalculator
+  // Convert deck time from minutes to hours and multiply by fuel flow rate
+  const deckTimeHours = totalDeckTime / 60;
+  const calculatedDeckFuel = Math.round(deckTimeHours * deckFuelFlow);
+  
+  // Use the calculated value or the one from routeStats if available
+  const totalDeckFuel = routeStats?.deckFuel || calculatedDeckFuel;
   
   // Always show the card, even without route stats
   // Use default values if routeStats is not available
@@ -207,12 +216,12 @@ const RouteStatsCard = ({
   // Get the departure stop card to get the TOTAL fuel required (which includes all components)
   let totalFuel = 0;
   
-  // Examine stopCards prop first, as it should contain the most up-to-date stop cards
+  // First, try to get total fuel from departure card in stop cards
   if (stopCards && stopCards.length > 0) {
     const departureCard = stopCards.find(card => card.isDeparture);
     if (departureCard && departureCard.totalFuel) {
       totalFuel = departureCard.totalFuel;
-      console.log('RouteStatsCard: Using provided stopCards departure fuel:', totalFuel);
+      console.log('RouteStatsCard: Using stopCards departure fuel:', totalFuel);
     }
   } 
   // Then try localStopCards
@@ -223,22 +232,26 @@ const RouteStatsCard = ({
       console.log('RouteStatsCard: Using local stopCards departure fuel:', totalFuel);
     }
   }
-  // Fallback to routeStats totalFuel if available
-  else if (stats.totalFuel) {
-    totalFuel = stats.totalFuel;
-    console.log('RouteStatsCard: Using routeStats totalFuel:', totalFuel);
-  }
-  // Fallback to components if available
-  else if (stats.tripFuel && stats.deckFuel && stats.contingencyFuel && stats.taxiFuel && stats.reserveFuel) {
-    totalFuel = parseInt(stats.tripFuel) + parseInt(stats.deckFuel) + 
-                parseInt(stats.contingencyFuel) + parseInt(stats.taxiFuel) + 
-                parseInt(stats.reserveFuel);
-    console.log('RouteStatsCard: Calculated totalFuel from components:', totalFuel);
-  }
-  // Last resort fallback
+  // If no stop cards are available, calculate using the same formula as StopCardCalculator
   else {
-    totalFuel = parseInt(stats.fuelRequired || 0) + totalDeckFuel;
-    console.log('RouteStatsCard: Using fallback totalFuel calculation:', totalFuel);
+    // Get trip fuel from routeStats
+    const tripFuel = stats.tripFuel || stats.fuelRequired || 0;
+    
+    // Calculate contingency fuel - using the same formula as StopCardCalculator
+    const contingencyFuel = Math.round((parseFloat(tripFuel) * contingencyFuelPercent) / 100);
+    
+    // Calculate the complete fuel value
+    totalFuel = parseInt(tripFuel) + parseInt(calculatedDeckFuel) + 
+                contingencyFuel + parseInt(taxiFuel) + parseInt(reserveFuel);
+    
+    console.log('RouteStatsCard: Calculated totalFuel using StopCardCalculator formula:', {
+      tripFuel,
+      deckFuel: calculatedDeckFuel,
+      contingencyFuel,
+      taxiFuel,
+      reserveFuel,
+      total: totalFuel
+    });
   }
   
   // Calculate maximum passengers based on usable load and passenger weight
@@ -438,7 +451,7 @@ const RouteStatsCard = ({
             {/* Column 2: Deck Fuel (below Deck Time) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Deck Fuel:</div>
-              <div className="route-stat-value">{stats.deckFuel || totalDeckFuel} lbs</div>
+              <div className="route-stat-value">{stats.deckFuel || calculatedDeckFuel} lbs</div>
             </div>
             
             {/* Column 3: Total Time (below Flight Time) */}
