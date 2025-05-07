@@ -1,13 +1,13 @@
 /**
  * Fuel Components Index
  * 
- * Central export point for all fuel-related UI components
+ * Export all fuel-related UI components for use in the Fast Planner
  */
 
-import FuelDisplayComponent from './FuelDisplayComponent';
-import LegFuelCard from './LegFuelCard';
+import EnhancedFuelDisplay from './EnhancedFuelDisplay';
 
 export {
-  FuelDisplayComponent,
-  LegFuelCard
+  EnhancedFuelDisplay
 };
+
+export default EnhancedFuelDisplay;

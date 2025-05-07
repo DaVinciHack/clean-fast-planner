@@ -1,7 +1,7 @@
 /**
  * FuelStyles.css
  * 
- * Styles for the fuel calculation components
+ * Styles for the Enhanced Fuel Display components
  */
 
 /* Fuel Display Component */
@@ -232,24 +232,5 @@
   
   .leg-stats {
     margin-top: 8px;
-  }
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .fuel-display {
-    background-color: #1a1a1a;
-  }
-  
-  .action-button {
-    background-color: #282828;
-  }
-  
-  .fuel-table th {
-    background-color: #252525;
-  }
-  
-  .leg-fuel-card {
-    background-color: #252525;
   }
 }
