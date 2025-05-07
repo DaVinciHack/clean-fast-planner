@@ -6,6 +6,7 @@ import RegionContext, { RegionProvider, useRegion } from './RegionContext';
 import AircraftContext, { AircraftProvider, useAircraft } from './AircraftContext';
 import RouteContext, { RouteProvider, useRoute } from './RouteContext';
 import MapContext, { MapProvider, useMap } from './MapContext';
+import FuelContext, { FuelProvider, useFuel } from './FuelContext';
 
 export {
   RegionContext,
@@ -19,5 +20,8 @@ export {
   useRoute,
   MapContext,
   MapProvider,
-  useMap
+  useMap,
+  FuelContext,
+  FuelProvider,
+  useFuel
 };
