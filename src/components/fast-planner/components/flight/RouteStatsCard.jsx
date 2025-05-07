@@ -204,11 +204,42 @@ const RouteStatsCard = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
   
-  // Calculate total fuel from components in routeStats
-  const totalFuel = stats.totalFuel || 
-                    (stats.tripFuel && stats.deckFuel && stats.contingencyFuel && stats.taxiFuel && stats.reserveFuel) ? 
-                      (parseInt(stats.tripFuel) + parseInt(stats.deckFuel) + parseInt(stats.contingencyFuel) + parseInt(stats.taxiFuel) + parseInt(stats.reserveFuel)) : 
-                      (parseInt(stats.fuelRequired || 0) + totalDeckFuel);
+  // Get the departure stop card to get the TOTAL fuel required (which includes all components)
+  let totalFuel = 0;
+  
+  // Examine stopCards prop first, as it should contain the most up-to-date stop cards
+  if (stopCards && stopCards.length > 0) {
+    const departureCard = stopCards.find(card => card.isDeparture);
+    if (departureCard && departureCard.totalFuel) {
+      totalFuel = departureCard.totalFuel;
+      console.log('RouteStatsCard: Using provided stopCards departure fuel:', totalFuel);
+    }
+  } 
+  // Then try localStopCards
+  else if (localStopCards && localStopCards.length > 0) {
+    const departureCard = localStopCards.find(card => card.isDeparture);
+    if (departureCard && departureCard.totalFuel) {
+      totalFuel = departureCard.totalFuel;
+      console.log('RouteStatsCard: Using local stopCards departure fuel:', totalFuel);
+    }
+  }
+  // Fallback to routeStats totalFuel if available
+  else if (stats.totalFuel) {
+    totalFuel = stats.totalFuel;
+    console.log('RouteStatsCard: Using routeStats totalFuel:', totalFuel);
+  }
+  // Fallback to components if available
+  else if (stats.tripFuel && stats.deckFuel && stats.contingencyFuel && stats.taxiFuel && stats.reserveFuel) {
+    totalFuel = parseInt(stats.tripFuel) + parseInt(stats.deckFuel) + 
+                parseInt(stats.contingencyFuel) + parseInt(stats.taxiFuel) + 
+                parseInt(stats.reserveFuel);
+    console.log('RouteStatsCard: Calculated totalFuel from components:', totalFuel);
+  }
+  // Last resort fallback
+  else {
+    totalFuel = parseInt(stats.fuelRequired || 0) + totalDeckFuel;
+    console.log('RouteStatsCard: Using fallback totalFuel calculation:', totalFuel);
+  }
   
   // Calculate maximum passengers based on usable load and passenger weight
   const calculateMaxPassengers = () => {
@@ -389,7 +420,11 @@ const RouteStatsCard = ({
             {/* Column 4: Total Fuel and Passengers */}
             <div className="route-stat-item">
               <div className="route-stat-label">Total Fuel:</div>
-              <div className="route-stat-value">{totalFuel} lbs</div>
+              <div className="route-stat-value">
+                {stopCards && stopCards.length > 0 
+                 ? stopCards.find(card => card.isDeparture)?.totalFuel || totalFuel 
+                 : totalFuel} lbs
+              </div>
             </div>
           </div>
           
