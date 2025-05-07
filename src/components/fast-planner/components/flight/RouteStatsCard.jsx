@@ -43,14 +43,25 @@ const RouteStatsCard = ({
     }
   }, [stopCards, waypoints, selectedAircraft, routeStats, weather]);
   
-  // Debug log for stop cards
+  // Debug log for stop cards and force update when they change
   useEffect(() => {
-    console.log('🔴 Stop Cards status:', {
-      passed: stopCards ? stopCards.length : 0,
-      local: localStopCards ? localStopCards.length : 0,
-      waypoints: waypoints ? waypoints.length : 0
+    console.log('🚨 STOP CARDS CHANGED:', {
+      count: stopCards?.length || 0,
+      firstCard: stopCards && stopCards.length > 0 ? {
+        isDeparture: stopCards[0].isDeparture || false,
+        totalFuel: stopCards[0].totalFuel || 0,
+        deckFuel: stopCards[0].deckFuel || 0
+      } : null,
+      departureCard: stopCards?.find(card => card.isDeparture) ? {
+        totalFuel: stopCards.find(card => card.isDeparture).totalFuel || 0,
+        deckFuel: stopCards.find(card => card.isDeparture).deckFuel || 0,
+        components: stopCards.find(card => card.isDeparture).fuelComponents || ''
+      } : 'No departure card found'
     });
-  }, [stopCards, localStopCards, waypoints]);
+    
+    // Force a rerender when stopCards change
+    setForceRerender(prev => prev + 1);
+  }, [stopCards]);
   
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
@@ -287,6 +298,38 @@ const RouteStatsCard = ({
     };
   }, []);
   
+  // Force update DOM elements with departure card values
+  useEffect(() => {
+    if (stopCards && stopCards.length > 0) {
+      const departureCard = stopCards.find(card => card.isDeparture);
+      if (departureCard) {
+        console.log('⚠️ FORCING DOM UPDATE with departure card values:', {
+          totalFuel: departureCard.totalFuel,
+          deckFuel: departureCard.deckFuel,
+          tripFuel: departureCard.fuelComponentsObject?.tripFuel
+        });
+        
+        // Force update total fuel DOM element
+        const totalFuelElement = document.getElementById('route-stats-total-fuel');
+        if (totalFuelElement && departureCard.totalFuel) {
+          totalFuelElement.innerText = `${departureCard.totalFuel} lbs`;
+        }
+        
+        // Force update deck fuel DOM element
+        const deckFuelElement = document.getElementById('route-stats-deck-fuel');
+        if (deckFuelElement && departureCard.deckFuel) {
+          deckFuelElement.innerText = `${departureCard.deckFuel} lbs`;
+        }
+        
+        // Force update trip fuel DOM element
+        const tripFuelElement = document.getElementById('route-stats-trip-fuel');
+        if (tripFuelElement && departureCard.fuelComponentsObject?.tripFuel) {
+          tripFuelElement.innerText = `${departureCard.fuelComponentsObject.tripFuel} lbs`;
+        }
+      }
+    }
+  }, [stopCards, forceRerender]);
+
   // Add loading indicator effect for waypoints changes
   useEffect(() => {
     // Show loading message when waypoints change
@@ -405,7 +448,7 @@ const RouteStatsCard = ({
             {/* Column 4: Total Fuel and Passengers */}
             <div className="route-stat-item">
               <div className="route-stat-label">Total Fuel:</div>
-              <div className="route-stat-value">
+              <div className="route-stat-value" id="route-stats-total-fuel">
                 {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.totalFuel ? 
                   stopCards.find(card => card.isDeparture).totalFuel : 0} lbs
               </div>
@@ -416,7 +459,7 @@ const RouteStatsCard = ({
             {/* Column 1: Trip Fuel (below Total Distance) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Trip Fuel:</div>
-              <div className="route-stat-value">
+              <div className="route-stat-value" id="route-stats-trip-fuel">
                 {/* Get trip fuel directly from departure card */}
                 {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.fuelComponentsObject?.tripFuel ? 
                   stopCards.find(card => card.isDeparture).fuelComponentsObject.tripFuel : 0} lbs
@@ -426,8 +469,7 @@ const RouteStatsCard = ({
             {/* Column 2: Deck Fuel (below Deck Time) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Deck Fuel:</div>
-              <div className="route-stat-value">
-                {/* Get deck fuel directly from departure card to ensure consistency */}
+              <div className="route-stat-value" id="route-stats-deck-fuel">
                 {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.deckFuel ? 
                   stopCards.find(card => card.isDeparture).deckFuel : 0} lbs
               </div>
