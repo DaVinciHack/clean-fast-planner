@@ -29,8 +29,8 @@
 
 /* Base card styling */
 .stop-card {
-  background-color: rgba(45, 45, 45, 0.85);
-  border-left: 3px solid #3498db;
+  background-color: rgba(40, 45, 50, 0.95);
+  border-left: 3px solid #34495e;
   border-radius: 3px;
   padding: 8px 10px;
   margin-bottom: 5px;
@@ -42,6 +42,49 @@
   z-index: 1;
   position: relative;
   cursor: pointer;
+}
+
+/* Special styles for departure card */
+.stop-card.departure-card {
+  border-left-color: #3498db;
+  background-color: rgba(45, 55, 65, 0.85);
+}
+
+.stop-card.departure-card .stop-number {
+  background-color: #3498db;
+}
+
+.stop-card.departure-card:hover {
+  background-color: rgba(55, 65, 75, 0.85);
+}
+
+/* Special styles for destination card */
+.stop-card.destination-card {
+  border-left-color: #2ecc71;
+  background-color: rgba(45, 65, 55, 0.85);
+}
+
+.stop-card.destination-card .stop-number {
+  background-color: #2ecc71;
+}
+
+.stop-card.destination-card:hover {
+  background-color: rgba(55, 75, 65, 0.85);
+}
+
+/* Fuel components section */
+.fuel-components {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fuel-components-text {
+  font-size: 0.7em;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Animation states */
@@ -62,6 +105,8 @@
   display: flex;
   align-items: center;
   margin-bottom: 6px;
+  position: relative;
+  width: 100%;
 }
 
 .stop-number {
@@ -86,8 +131,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 120px;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  margin-right: 8px;
+}
+
+.stop-wind {
+  font-size: 0.7em;
+  margin-left: auto;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.wind-value {
+  color: #f5f5f5;
+}
+
+.wind-value[data-positive="true"] {
+  color: #e74c3c;
+}
+
+.wind-value[data-negative="true"] {
+  color: #2ecc71;
 }
 
 .stop-details {
@@ -112,6 +180,16 @@
   color: #3498db;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
   flex-shrink: 0;
+}
+
+/* Special icon colors for departure */
+.departure-card .stop-metric .icon {
+  color: #2ecc71;
+}
+
+/* Special icon colors for destination */
+.destination-card .stop-metric .icon {
+  color: #e74c3c;
 }
 
 .metric-value {
@@ -175,7 +253,7 @@
 }
 
 .stop-card:hover {
-  background-color: rgba(55, 55, 55, 0.85);
+  background-color: rgba(50, 55, 60, 0.95);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -183,6 +261,18 @@
   background-color: rgba(50, 60, 75, 0.85);
   border-left-color: #5dade2;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Special active styles for departure */
+.departure-card.stop-card-active {
+  border-left-color: #2980b9; /* Darker blue */
+  background-color: rgba(40, 55, 70, 0.95);
+}
+
+/* Special active styles for destination */
+.destination-card.stop-card-active {
+  border-left-color: #27ae60; /* Darker green */
+  background-color: rgba(40, 70, 55, 0.95);
 }
 
 /* Animation for new cards */

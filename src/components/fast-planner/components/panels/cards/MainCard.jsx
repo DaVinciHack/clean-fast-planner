@@ -39,6 +39,8 @@ const MainCard = ({
   passengerWeight = 220,
   deckTimePerStop = 5,
   deckFuelFlow = 400,
+  // Stop cards prop
+  stopCards = [],
   // Weather props
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {},
@@ -448,6 +450,7 @@ const MainCard = ({
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}
             weather={weather}
+            stopCards={stopCards}
           />
         )}
       </div>

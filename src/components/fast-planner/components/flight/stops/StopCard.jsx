@@ -4,8 +4,8 @@ import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon, WindIcon } from './Sto
 /**
  * StopCard Component
  * 
- * Displays cumulative information about a stop in the route
- * Only shows the total values at this point in the journey
+ * Displays information about a stop in the route
+ * Now includes fuel component display and departure/destination highlighting
  */
 const StopCard = React.forwardRef(({
   id,
@@ -15,9 +15,13 @@ const StopCard = React.forwardRef(({
   totalTime,
   totalFuel,
   maxPassengers,
+  maxPassengersDisplay,
   groundSpeed,
   headwind,
   deckTime,
+  isDeparture,
+  isDestination,
+  fuelComponents,
   isActive,
   onClick,
   className = ''
@@ -30,8 +34,36 @@ const StopCard = React.forwardRef(({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
+  // Determine card and border style based on stop type
+  // Light blue for departure, green for destination, dark blue for waypoints
+  const borderColor = isDeparture ? '#3498db' : isDestination ? '#2ecc71' : '#34495e';
+  const cardStyle = {
+    borderLeft: `3px solid ${borderColor}`,
+    backgroundColor: isDeparture ? 'rgba(45, 55, 65, 0.85)' : 
+                   isDestination ? 'rgba(45, 65, 55, 0.85)' : 
+                   'rgba(40, 45, 50, 0.95)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+    marginBottom: '8px'
+  };
+  
   // Combine all class names
-  const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${className}`;
+  const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${isDeparture ? 'departure-card' : ''} ${isDestination ? 'destination-card' : ''} ${className}`;
+  
+  // Determine the display text for the stop number
+  let stopNumberDisplay = index;
+  if (isDeparture) {
+    stopNumberDisplay = 'D';
+  } else if (isDestination) {
+    stopNumberDisplay = 'F';
+  }
+  
+  // Determine the style for the stop number circle
+  const stopNumberStyle = {
+    backgroundColor: borderColor
+  };
+  
+  // Format passenger display 
+  const passengersDisplay = maxPassengersDisplay || maxPassengers || (isDestination ? 'Final' : '0');
   
   return (
     <div 
@@ -40,10 +72,18 @@ const StopCard = React.forwardRef(({
       className={cardClasses}
       onClick={onClick}
       data-index={index}
+      style={cardStyle}
     >
       <div className="stop-header">
-        <div className="stop-number">{index + 1}</div>
-        <div className="stop-name">{stopName || `Stop ${index + 1}`}</div>
+        <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
+        <div className="stop-name">{stopName || `Stop ${index}`}</div>
+        {headwind !== undefined && !isDeparture && (
+          <div className="stop-wind" title={`Groundspeed: ${groundSpeed || 0} kts`}>
+            <span className="wind-value" data-positive={headwind > 0} data-negative={headwind < 0}>
+              {headwind > 0 ? `+${headwind}` : headwind} kts
+            </span>
+          </div>
+        )}
       </div>
       
       <div className="stop-details">
@@ -68,23 +108,18 @@ const StopCard = React.forwardRef(({
         {/* Passenger information */}
         <div className="stop-metric">
           <span className="icon"><PassengerIcon /></span>
-          <div className="metric-value">{maxPassengers || '0'}</div>
+          <div className="metric-value">{passengersDisplay}</div>
         </div>
         
-        {/* Wind information if available */}
-        {headwind !== undefined && (
-          <div className="stop-metric wind-info" title={`Groundspeed: ${groundSpeed || 0} kts`}>
-            <span className="icon"><WindIcon /></span>
-            <div 
-              className="metric-value"
-              data-positive={headwind > 0}
-              data-negative={headwind < 0}
-            >
-              {headwind > 0 ? `+${headwind}` : headwind} kts
-            </div>
-          </div>
-        )}
+        {/* Wind information moved to header */}
       </div>
+      
+      {/* Fuel Components - shown for all stops */}
+      {fuelComponents && (
+        <div className="fuel-components">
+          <div className="fuel-components-text">{fuelComponents}</div>
+        </div>
+      )}
     </div>
   );
 });

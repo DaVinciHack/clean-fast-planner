@@ -1,25 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import StopCard from './StopCard';
-// Import statement removed; we'll access WindCalculations from the window
+import StopCardCalculator from '../../../modules/calculations/flight/StopCardCalculator';
 
 /**
  * StopCardsContainer Component
  * 
  * Manages and displays a collection of StopCard components
  * based on the current route waypoints with smooth reordering animations
- * Includes wind calculations for more accurate timing and fuel estimates
+ * Fuel requirements and passenger capacity are calculated internally
+ * 
+ * Note: stopCards prop is accepted but ignored for backward compatibility
  */
 const StopCardsContainer = ({
   waypoints = [],
   routeStats = null,
   selectedAircraft = null,
   passengerWeight = 220,
-  reserveFuel = 600,
+  reserveFuel = 500,
+  contingencyPercent = 10,
   deckTimePerStop = 5,
   deckFuelFlow = 400,
-  weather = { windSpeed: 0, windDirection: 0 } // Default to no wind
+  taxiFuel = 100,
+  weather = { windSpeed: 0, windDirection: 0 }, // Default to no wind
+  stopCards = [] // Kept for backward compatibility but not used
 }) => {
-  const [stopCards, setStopCards] = useState([]);
+  const [calculatedStopCards, setCalculatedStopCards] = useState([]);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   const [cardPositions, setCardPositions] = useState({});
   const [animatingCards, setAnimatingCards] = useState({});
@@ -30,7 +35,7 @@ const StopCardsContainer = ({
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
     if (waypoints.length < 2) {
-      setStopCards([]);
+      setCalculatedStopCards([]);
       prevWaypointsRef.current = [];
       return;
     }
@@ -40,7 +45,7 @@ const StopCardsContainer = ({
     
     // Store current card positions before update
     const currentPositions = {};
-    stopCards.forEach(card => {
+    calculatedStopCards.forEach(card => {
       const cardId = `stop-${card.id || card.index}`;
       const cardElement = document.getElementById(cardId);
       if (cardElement) {
@@ -53,165 +58,53 @@ const StopCardsContainer = ({
       setCardPositions(currentPositions);
     }
     
-    // Create data for each stop
-    const cards = [];
-    let cumulativeDistance = 0;
-    let cumulativeTime = 0;
-    let cumulativeFuel = 0;
-    
     // Get aircraft data for calculations
     // If no aircraft is selected, we'll show zeros
     if (!selectedAircraft) {
       console.log('StopCardsContainer: No aircraft selected, setting empty stop cards');
-      setStopCards([]);
+      setCalculatedStopCards([]);
       return;
     }
     
     // Check if aircraft has all required properties
     if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
       console.log('StopCardsContainer: Aircraft missing required properties, setting empty stop cards');
-      setStopCards([]);
+      setCalculatedStopCards([]);
       return;
     }
     
-    const aircraft = selectedAircraft;
+    // Use the StopCardCalculator to calculate the stop cards
+    const newCards = StopCardCalculator.calculateStopCards(
+      waypoints, 
+      routeStats, 
+      selectedAircraft, 
+      weather, 
+      {
+        passengerWeight,
+        reserveFuel,
+        contingencyFuelPercent: contingencyPercent,
+        deckTimePerStop,
+        deckFuelFlow,
+        taxiFuel
+      }
+    );
     
-    // Add taxi fuel to the total
-    const taxiFuel = 50; // Default value
-    cumulativeFuel += taxiFuel;
-    
-    // Add reserve fuel to the total
-    cumulativeFuel += reserveFuel;
-    
-    // For each leg (between waypoints)
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const fromWaypoint = waypoints[i];
-      const toWaypoint = waypoints[i + 1];
-      
-      // Create a unique ID for this stop
-      const stopId = toWaypoint.id || `waypoint-${i}`;
-      
-      // Get leg distance from routeStats if available
-      let legDistance = 0;
-      if (routeStats && routeStats.legs && routeStats.legs[i]) {
-        legDistance = parseFloat(routeStats.legs[i].distance);
-      }
-      
-      // Calculate leg timing and fuel with wind adjustments
-      let legTimeHours = 0;
-      let legFuel = 0;
-      let legGroundSpeed = aircraft.cruiseSpeed;
-      let headwindComponent = 0;
-      
-      // Check if we have coordinates - either as separate lat/lon or as coords array
-      const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) || 
-                           (fromWaypoint.coords && fromWaypoint.coords.length === 2);
-      const toHasCoords = (toWaypoint.lat && toWaypoint.lon) || 
-                         (toWaypoint.coords && toWaypoint.coords.length === 2);
-      
-      if (fromHasCoords && toHasCoords) {
-        // Create lat/lon objects from either format
-        const fromCoords = {
-          lat: fromWaypoint.lat || fromWaypoint.coords[1],
-          lon: fromWaypoint.lon || fromWaypoint.coords[0]
-        };
-        
-        const toCoords = {
-          lat: toWaypoint.lat || toWaypoint.coords[1],
-          lon: toWaypoint.lon || toWaypoint.coords[0]
-        };
-        
-        // Use wind calculations if we have full coordinates
-        let legDetails;
-        if (window.WindCalculations) {
-          legDetails = window.WindCalculations.calculateLegWithWind(
-            fromCoords,
-            toCoords,
-            legDistance,
-            aircraft,
-            weather
-          );
-        } else {
-          // Fallback calculation if WindCalculations isn't available
-          const time = legDistance / aircraft.cruiseSpeed;
-          const fuel = time * aircraft.fuelBurn;
-          legDetails = {
-            time,
-            fuel,
-            groundSpeed: aircraft.cruiseSpeed,
-            headwindComponent: 0,
-            course: 0
-          };
-          console.warn('WindCalculations not available, using basic calculations');
-        }
-        
-        legTimeHours = legDetails.time;
-        legFuel = Math.round(legDetails.fuel);
-        legGroundSpeed = Math.round(legDetails.groundSpeed);
-        headwindComponent = Math.round(legDetails.headwindComponent);
-      } else {
-        // Fall back to simple calculation without wind
-        legTimeHours = legDistance / aircraft.cruiseSpeed;
-        legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
-      }
-      
-      // Update cumulative values
-      cumulativeDistance += legDistance;
-      cumulativeTime += legTimeHours;
-      cumulativeFuel += legFuel;
-      
-      // Add deck time and fuel for all stops except the final destination
-      if (i < waypoints.length - 2) {
-        const deckTimeHours = deckTimePerStop / 60; // Convert minutes to hours
-        const deckFuel = Math.round(deckTimeHours * deckFuelFlow);
-        
-        cumulativeTime += deckTimeHours;
-        cumulativeFuel += deckFuel;
-      }
-      
-      // Calculate max passengers based on remaining load
-      let maxPassengers = 0;
-      if (selectedAircraft) {
-        const usableLoad = Math.max(
-          0, 
-          selectedAircraft.maxTakeoffWeight - 
-          selectedAircraft.emptyWeight - 
-          cumulativeFuel
-        );
-        maxPassengers = Math.floor(usableLoad / passengerWeight);
-        
-        // Ensure we don't exceed aircraft capacity
-        maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
-      }
-      
-      // Create the card data
-      cards.push({
-        index: i,
-        id: stopId,
-        stopName: toWaypoint.name,
-        legDistance: legDistance.toFixed(1),
-        totalDistance: cumulativeDistance.toFixed(1),
-        legTime: legTimeHours,
-        totalTime: cumulativeTime,
-        legFuel: legFuel,
-        totalFuel: cumulativeFuel,
-        maxPassengers: maxPassengers,
-        isNew: prevWaypointsRef.current.findIndex(wp => wp.id === toWaypoint.id) === -1,
-        groundSpeed: legGroundSpeed,
-        headwind: headwindComponent
-      });
-    }
+    // Mark new cards
+    const updatedCards = newCards.map(card => ({
+      ...card,
+      isNew: prevWaypointsRef.current.findIndex(wp => wp.id === card.id) === -1
+    }));
     
     // Update cards state
-    setStopCards(cards);
+    setCalculatedStopCards(updatedCards);
     
     // Update previous waypoints
     prevWaypointsRef.current = [...waypoints];
-  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, deckTimePerStop, deckFuelFlow, weather]);
+  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather]);
   
   // Apply FLIP animation after cards update
   useEffect(() => {
-    if (Object.keys(cardPositions).length === 0 || stopCards.length === 0) {
+    if (Object.keys(cardPositions).length === 0 || calculatedStopCards.length === 0) {
       return;
     }
     
@@ -219,7 +112,7 @@ const StopCardsContainer = ({
     requestAnimationFrame(() => {
       const newAnimating = {};
       
-      stopCards.forEach(card => {
+      calculatedStopCards.forEach(card => {
         const cardId = `stop-${card.id}`;
         const cardElement = document.getElementById(cardId);
         
@@ -270,7 +163,7 @@ const StopCardsContainer = ({
       // Clear stored positions
       setCardPositions({});
     });
-  }, [stopCards, cardPositions]);
+  }, [calculatedStopCards, cardPositions]);
   
   // Handle card click
   const handleCardClick = (index) => {
@@ -285,7 +178,7 @@ const StopCardsContainer = ({
   };
   
   // If there are no cards, don't render anything
-  if (stopCards.length === 0) {
+  if (calculatedStopCards.length === 0) {
     return null;
   }
   
@@ -295,7 +188,7 @@ const StopCardsContainer = ({
       
       <div className="stop-cards-container" style={{ marginTop: '0', paddingTop: '0' }}>
         <div className="stop-cards-stack" ref={containerRef}>
-          {stopCards.map((card, index) => {
+          {calculatedStopCards.map((card, index) => {
             const cardId = `stop-${card.id}`;
             let className = '';
             
@@ -315,9 +208,13 @@ const StopCardsContainer = ({
                 totalTime={card.totalTime}
                 totalFuel={card.totalFuel}
                 maxPassengers={card.maxPassengers}
+                maxPassengersDisplay={card.maxPassengersDisplay}
                 groundSpeed={card.groundSpeed}
                 headwind={card.headwind}
                 deckTime={card.deckTime}
+                isDeparture={card.isDeparture}
+                isDestination={card.isDestination}
+                fuelComponents={card.fuelComponents}
                 isActive={index === activeCardIndex}
                 onClick={() => handleCardClick(index)}
                 className={className}

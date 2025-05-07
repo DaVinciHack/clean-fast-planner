@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import LoadingIndicator from '../../modules/LoadingIndicator';
+import { EnhancedFuelDisplay } from '../fuel';
+// Import the backup stop cards component
+import generateBackupStopCards from '../../backup-stop-cards';
 
 /**
  * Route Statistics Card Component
@@ -25,6 +28,30 @@ const RouteStatsCard = ({
   // Add optional stopCards prop to get data from StopCardsContainer
   stopCards = []
 }) => {
+  // Add effect to generate backup stop cards if needed
+  const [localStopCards, setLocalStopCards] = useState([]);
+  
+  useEffect(() => {
+    // Only generate backup cards if we have waypoints, aircraft and route stats
+    if (stopCards && stopCards.length > 0) {
+      console.log('Using existing stop cards:', stopCards.length);
+      setLocalStopCards(stopCards);
+    } else if (waypoints && waypoints.length >= 2 && selectedAircraft && routeStats) {
+      console.log('Generating backup stop cards');
+      const backupCards = generateBackupStopCards(waypoints, routeStats, selectedAircraft, weather);
+      setLocalStopCards(backupCards);
+    }
+  }, [stopCards, waypoints, selectedAircraft, routeStats, weather]);
+  
+  // Debug log for stop cards
+  useEffect(() => {
+    console.log('🔴 Stop Cards status:', {
+      passed: stopCards ? stopCards.length : 0,
+      local: localStopCards ? localStopCards.length : 0,
+      waypoints: waypoints ? waypoints.length : 0
+    });
+  }, [stopCards, localStopCards, waypoints]);
+  
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
   
@@ -255,6 +282,14 @@ const RouteStatsCard = ({
     }
   }, [waypoints]);
   
+  // Format time as HH:MM
+  const formatTime = (timeHours) => {
+    if (!timeHours && timeHours !== 0) return '00:00';
+    const hours = Math.floor(timeHours);
+    const minutes = Math.floor((timeHours - hours) * 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+  
   return (
     <div className="route-stats-card" ref={cardRef}>
       <div className="route-stats-header">
@@ -299,79 +334,240 @@ const RouteStatsCard = ({
           ></span>
         </div>
       </div>
-      <div className="route-stats-content">
-        <div className="stats-row">
-          {/* Column 1: Total Distance and Trip Fuel */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Total Distance:</div>
-            <div className="route-stat-value">
-              {stats.totalDistance || '0'} NM
+      
+      {/* Conditional rendering based on whether we have enhanced fuel calculations */}
+      {routeStats && routeStats.enhancedResults ? (
+        // Display the enhanced fuel display component when we have enhanced calculations
+        <EnhancedFuelDisplay 
+          fuelData={routeStats}
+          selectedAircraft={selectedAircraft}
+          onAdjustFuel={() => console.log('Adjust fuel clicked')}
+          onChangeAlternate={() => console.log('Change alternate clicked')}
+        />
+      ) : (
+        // Display the standard fuel display when we don't have enhanced calculations
+        <div className="route-stats-content">
+          <div className="stats-row">
+            {/* Column 1: Total Distance and Trip Fuel */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Total Distance:</div>
+              <div className="route-stat-value">
+                {stats.totalDistance || '0'} NM
+              </div>
+            </div>
+            
+            {/* Column 2: Deck Time and Deck Fuel */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Deck Time:</div>
+              <div className="route-stat-value">{stats.deckTimeMinutes || totalDeckTime} mins</div>
+            </div>
+            
+            {/* Column 3: Flight Time and Total Time */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">
+                Flight Time:
+                {isWindAdjusted && routeStats.windData.avgHeadwind !== 0 && (
+                  <span style={{ 
+                    fontSize: '0.8em', 
+                    marginLeft: '4px', 
+                    color: routeStats.windData.avgHeadwind > 0 ? '#e74c3c' : '#2ecc71',
+                    fontWeight: 'bold'
+                  }}
+                  title={`${Math.abs(routeStats.windData.avgHeadwind)} kt ${routeStats.windData.avgHeadwind > 0 ? 'headwind' : 'tailwind'}`}>
+                    {routeStats.windData.avgHeadwind > 0 ? 
+                      ` (+${routeStats.windData.avgHeadwind}kt)` : 
+                      ` (${routeStats.windData.avgHeadwind}kt)`}
+                  </span>
+                )}
+              </div>
+              <div className="route-stat-value">
+                {/* Display estimatedTime from routeStats */}
+                {stats.estimatedTime || "00:00"}
+              </div>
+            </div>
+            
+            {/* Column 4: Total Fuel and Passengers */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Total Fuel:</div>
+              <div className="route-stat-value">{totalFuel} lbs</div>
             </div>
           </div>
           
-          {/* Column 2: Deck Time and Deck Fuel */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Deck Time:</div>
-            <div className="route-stat-value">{stats.deckTimeMinutes || totalDeckTime} mins</div>
-          </div>
-          
-          {/* Column 3: Flight Time and Total Time */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">
-              Flight Time:
-              {isWindAdjusted && routeStats.windData.avgHeadwind !== 0 && (
-                <span style={{ 
-                  fontSize: '0.8em', 
-                  marginLeft: '4px', 
-                  color: routeStats.windData.avgHeadwind > 0 ? '#e74c3c' : '#2ecc71',
-                  fontWeight: 'bold'
-                }}
-                title={`${Math.abs(routeStats.windData.avgHeadwind)} kt ${routeStats.windData.avgHeadwind > 0 ? 'headwind' : 'tailwind'}`}>
-                  {routeStats.windData.avgHeadwind > 0 ? 
-                    ` (+${routeStats.windData.avgHeadwind}kt)` : 
-                    ` (${routeStats.windData.avgHeadwind}kt)`}
-                </span>
-              )}
+          <div className="stats-row">
+            {/* Column 1: Trip Fuel (below Total Distance) */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Trip Fuel:</div>
+              <div className="route-stat-value">{stats.tripFuel || stats.fuelRequired || '0'} lbs</div>
             </div>
-            <div className="route-stat-value">
-              {/* Display estimatedTime from routeStats */}
-              {stats.estimatedTime || "00:00"}
+            
+            {/* Column 2: Deck Fuel (below Deck Time) */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Deck Fuel:</div>
+              <div className="route-stat-value">{stats.deckFuel || totalDeckFuel} lbs</div>
             </div>
-          </div>
-          
-          {/* Column 4: Total Fuel and Passengers */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Total Fuel:</div>
-            <div className="route-stat-value">{totalFuel} lbs</div>
+            
+            {/* Column 3: Total Time (below Flight Time) */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Total Time:</div>
+              <div className="route-stat-value">{calculateTotalTime()}</div>
+            </div>
+            
+            {/* Column 4: Passengers (below Total Fuel) */}
+            <div className="route-stat-item">
+              <div className="route-stat-label">Passengers:</div>
+              <div className="route-stat-value">{calculateMaxPassengers()}</div>
+            </div>
           </div>
         </div>
-        
-        <div className="stats-row">
-          {/* Column 1: Trip Fuel (below Total Distance) */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Trip Fuel:</div>
-            <div className="route-stat-value">{stats.tripFuel || stats.fuelRequired || '0'} lbs</div>
-          </div>
+      )}
+      
+      {/* Enhanced info message if we're using enhanced calculations */}
+      {routeStats && routeStats.enhancedResults && (
+        <div className="enhanced-calculations-indicator" style={{
+          textAlign: 'center',
+          fontSize: '0.8em',
+          color: '#3498db',
+          padding: '4px',
+          backgroundColor: 'rgba(52, 152, 219, 0.1)',
+          borderRadius: '4px',
+          margin: '2px 0'
+        }}>
+          Using enhanced fuel calculations
+        </div>
+      )}
+      
+      {/* Local stop cards display */}
+      {localStopCards && localStopCards.length > 0 && (
+        <div className="route-stops" style={{ margin: '5px 0', padding: '8px 10px' }}>
+          <h4 className="route-stops-title" style={{ 
+            margin: '0 0 8px 0', 
+            color: '#3498db', 
+            fontSize: '0.85em', 
+            fontWeight: '600', 
+            textTransform: 'uppercase' 
+          }}>ROUTE STOPS</h4>
           
-          {/* Column 2: Deck Fuel (below Deck Time) */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Deck Fuel:</div>
-            <div className="route-stat-value">{stats.deckFuel || totalDeckFuel} lbs</div>
-          </div>
-          
-          {/* Column 3: Total Time (below Flight Time) */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Total Time:</div>
-            <div className="route-stat-value">{calculateTotalTime()}</div>
-          </div>
-          
-          {/* Column 4: Passengers (below Total Fuel) */}
-          <div className="route-stat-item">
-            <div className="route-stat-label">Passengers:</div>
-            <div className="route-stat-value">{calculateMaxPassengers()}</div>
+          <div className="stop-cards-stack" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {localStopCards.map((card, index) => {
+              // Determine styling based on stop type
+              const borderColor = card.isDeparture ? '#2ecc71' : 
+                                card.isDestination ? '#e74c3c' : 
+                                '#3498db';
+              const bgColor = card.isDeparture ? 'rgba(45, 55, 45, 0.95)' : 
+                             card.isDestination ? 'rgba(55, 45, 45, 0.95)' : 
+                             'rgba(45, 45, 55, 0.95)';
+              
+              // Format time as HH:MM
+              const formatTime = (timeHours) => {
+                if (!timeHours && timeHours !== 0) return '00:00';
+                const hours = Math.floor(timeHours);
+                const minutes = Math.floor((timeHours - hours) * 60);
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+              };
+              
+              // Determine stop number display
+              const stopNumberDisplay = card.isDeparture ? 'D' : 
+                                       card.isDestination ? 'F' : 
+                                       card.index;
+                                       
+              return (
+                <div key={`stop-${index}`} className={`stop-card ${card.isDeparture ? 'departure-card' : ''} ${card.isDestination ? 'destination-card' : ''}`} style={{
+                  backgroundColor: bgColor,
+                  borderLeft: `3px solid ${borderColor}`,
+                  borderRadius: '3px',
+                  padding: '8px 10px',
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
+                  cursor: 'pointer',
+                  marginBottom: '5px'
+                }}>
+                  {/* Stop header with number and name */}
+                  <div className="stop-header" style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+                    <div className="stop-number" style={{ 
+                      backgroundColor: borderColor,
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: '18px',
+                      height: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75em',
+                      fontWeight: 'bold',
+                      marginRight: '8px',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)'
+                    }}>
+                      {stopNumberDisplay}
+                    </div>
+                    <div className="stop-name" style={{
+                      fontWeight: '600',
+                      fontSize: '0.85em',
+                      color: 'white',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '180px',
+                      textShadow: '0 1px 1px rgba(0, 0, 0, 0.3)'
+                    }}>
+                      {card.stopName || `Stop ${index + 1}`}
+                    </div>
+                  </div>
+                  
+                  {/* Stop details */}
+                  <div className="stop-details" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    {/* Distance */}
+                    <div className="stop-metric">
+                      <span className="icon" style={{ color: borderColor }}>📍</span>
+                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
+                        {card.totalDistance || '0'} nm
+                      </div>
+                    </div>
+                    
+                    {/* Time */}
+                    <div className="stop-metric">
+                      <span className="icon" style={{ color: borderColor }}>⏱️</span>
+                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
+                        {formatTime(card.totalTime)}
+                      </div>
+                    </div>
+                    
+                    {/* Fuel */}
+                    <div className="stop-metric">
+                      <span className="icon" style={{ color: borderColor }}>⛽</span>
+                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
+                        {card.totalFuel || '0'} lbs
+                      </div>
+                    </div>
+                    
+                    {/* Passengers */}
+                    <div className="stop-metric">
+                      <span className="icon" style={{ color: borderColor }}>👥</span>
+                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
+                        {card.maxPassengersDisplay || card.maxPassengers || '0'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Fuel Components */}
+                  {card.fuelComponents && (
+                    <div className="fuel-components" style={{ 
+                      marginTop: '6px', 
+                      paddingTop: '4px', 
+                      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                      fontSize: '0.7em',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      <div className="fuel-components-text">{card.fuelComponents}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

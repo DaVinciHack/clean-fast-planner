@@ -20,6 +20,11 @@ import {
   RouteStatsCard
 } from './components';
 
+// Import enhanced fuel calculator modules
+import enhancedFuelCalculator from './modules/calculations/fuel';
+import FuelIntegration from './modules/calculations/fuel/FuelIntegration';
+import { EnhancedFuelDisplay } from './components/fuel';
+
 // Import all manager modules
 import { 
   MapManager, 
@@ -156,6 +161,17 @@ const FastPlannerApp = () => {
       flightCalculationsRef.current.updateConfig(updatedSettings);
     }
     
+    // Update Enhanced Fuel Calculator
+    FuelIntegration.initializeFuelCalculator({
+      passengerWeight,
+      taxiFuel,
+      contingencyFuelPercent,
+      reserveFuel: updatedSettings.reserveFuel || reserveFuel,
+      deckTimePerStop,
+      deckFuelFlow,
+      cargoWeight: cargoWeight || 0
+    });
+    
     // Save to AppSettingsManager
     if (appSettingsManagerRef.current) {
       appSettingsManagerRef.current.updateFlightSettings({
@@ -177,6 +193,22 @@ const FastPlannerApp = () => {
       });
     }
   };
+
+  // Initialize enhanced fuel calculator with current flight settings
+  useEffect(() => {
+    if (flightSettings) {
+      console.log("FastPlannerApp: Initializing enhanced fuel calculator...");
+      FuelIntegration.initializeFuelCalculator({
+        passengerWeight,
+        taxiFuel,
+        contingencyFuelPercent,
+        reserveFuel,
+        deckTimePerStop,
+        deckFuelFlow,
+        cargoWeight: cargoWeight || 0
+      });
+    }
+  }, [passengerWeight, taxiFuel, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, cargoWeight, flightSettings]);
 
   // Initialize managers
   useEffect(() => {
@@ -350,13 +382,65 @@ const FastPlannerApp = () => {
         });
         
         // Check if stats are valid before updating
+        // Replace or modify this check
         if (!stats || !stats.timeHours || stats.timeHours === 0) {
           console.error('🔄 Received invalid route stats with zero time:', stats);
-          return; // Don't update with invalid stats
+          
+          // Add this as a temporary fix
+          console.log('🔄 ATTEMPTING FIX: Manually calculating timeHours');
+          if (stats && stats.totalDistance && selectedAircraft) {
+            const totalDistance = parseFloat(stats.totalDistance);
+            if (totalDistance > 0 && selectedAircraft.cruiseSpeed > 0) {
+              stats.timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+              const hours = Math.floor(stats.timeHours);
+              const minutes = Math.floor((stats.timeHours - hours) * 60);
+              stats.estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+              console.log('🔄 Manual calculation results:', stats);
+              
+              // Force update stats and generate stop cards
+              setRouteStats(stats);
+              const newStopCards = generateStopCardsData(waypoints, stats, selectedAircraft, weather);
+              setStopCards(newStopCards);
+              console.log('🔄 Generated stop cards after fix:', newStopCards.length);
+            }
+          }
+          return; // Remove this line to continue processing even with zero time
         }
         
         // Store previous route stats
         const prevStats = {...routeStats};
+        
+        // Add enhanced fuel calculations if we have an aircraft and waypoints
+        if (stats && waypoints.length >= 2 && selectedAircraft) {
+          // Calculate enhanced fuel requirements using the new calculator
+          console.log('🔥 Calculating enhanced fuel requirements from onCalculationComplete callback...');
+          
+          try {
+            const enhancedResults = FuelIntegration.calculateFuelRequirements(
+              waypoints,
+              selectedAircraft,
+              weather,
+              {
+                passengerWeight,
+                taxiFuel,
+                contingencyFuelPercent,
+                reserveFuel,
+                deckTimePerStop,
+                deckFuelFlow,
+                cargoWeight: cargoWeight || 0
+              }
+            );
+            
+            // If we got enhanced results, merge them with the stats
+            if (enhancedResults) {
+              console.log('🔥 Using enhanced fuel calculation results');
+              stats = enhancedResults;
+            }
+          } catch (error) {
+            // Log the error but continue with basic stats
+            console.error('🔥 Error calculating enhanced fuel:', error);
+          }
+        }
         
         // Update the route stats state with the new data
         setRouteStats(stats);
@@ -389,16 +473,25 @@ const FastPlannerApp = () => {
           console.log('🔄 Generating stop cards with stats:', {
             totalDistance: stats.totalDistance,
             estimatedTime: stats.estimatedTime,
-            timeHours: stats.timeHours
+            timeHours: stats.timeHours,
+            hasEnhancedResults: stats.enhancedResults ? true : false
           });
           
-          // Generate stop cards with the new stats
+          // Generate stop cards using the new stats
           const newStopCards = generateStopCardsData(waypoints, stats, selectedAircraft, weather);
-          console.log('🔄 Generated stop cards:', newStopCards.map(card => ({
-            leg: card.index + 1,
-            legTime: card.legTime,
-            totalTime: card.totalTime
-          })));
+          console.log('🔄 Generated stop cards data:', {
+            count: newStopCards.length,
+            first: newStopCards.length > 0 ? {
+              id: newStopCards[0].id,
+              name: newStopCards[0].stopName,
+              isDeparture: newStopCards[0].isDeparture
+            } : 'none',
+            last: newStopCards.length > 1 ? {
+              id: newStopCards[newStopCards.length-1].id,
+              name: newStopCards[newStopCards.length-1].stopName,
+              isDestination: newStopCards[newStopCards.length-1].isDestination
+            } : 'none'
+          });
           
           // Update the stop cards state
           setStopCards(newStopCards);
@@ -868,13 +961,40 @@ const FastPlannerApp = () => {
             // Extract coordinates from waypoints
             const coordinates = routeData.waypoints.map(wp => wp.coords);
             
-            // Calculate route statistics using the correct method
-            routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            // First calculate with the original calculator to get basic stats
+            const basicResults = routeCalculatorRef.current.calculateRouteStats(coordinates, {
               aircraftType: selectedAircraft.modelType || 's92',
               payloadWeight: cargoWeight || 0,
               reserveFuel: reserveFuel,
               weather: weather // Include weather data in calculations
             });
+            
+            // Then calculate enhanced fuel data with the new calculator
+            console.log('🔥 Calculating enhanced fuel requirements...');
+            
+            const enhancedResults = FuelIntegration.calculateFuelRequirements(
+              routeData.waypoints,
+              selectedAircraft,
+              weather,
+              {
+                passengerWeight,
+                taxiFuel,
+                contingencyFuelPercent,
+                reserveFuel,
+                deckTimePerStop,
+                deckFuelFlow,
+                cargoWeight: cargoWeight || 0
+              }
+            );
+            
+            // Use enhanced results if available, otherwise fall back to basic results
+            if (enhancedResults) {
+              console.log('🔥 Using enhanced fuel calculation results');
+              setRouteStats(enhancedResults);
+            } else {
+              console.log('⚠️ Enhanced fuel calculation failed, using basic results');
+              setRouteStats(basicResults);
+            }
           }
         });
       }
@@ -943,211 +1063,274 @@ const FastPlannerApp = () => {
   };
   
   // Generate stop cards data
-  const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather) => {
-    if (waypoints.length < 2 || !selectedAircraft) {
-      return [];
+  // Generate stop cards data
+const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather = { windSpeed: 0, windDirection: 0 }) => {
+  if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
+    console.log('generateStopCardsData: Missing required data', {
+      hasWaypoints: waypoints ? waypoints.length : 0,
+      hasAircraft: !!selectedAircraft
+    });
+    return [];
+  }
+
+  console.log('Generating stop cards with', waypoints.length, 'waypoints');
+  
+  // Create data for each stop
+  const cards = [];
+  
+  // Get aircraft data for calculations
+  const aircraft = selectedAircraft;
+  
+  // Calculate total trip values
+  let totalDistance = 0;
+  let totalTripFuel = 0;
+  const legDetails = [];
+  
+  // First, pre-calculate all leg details and total values
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const fromWaypoint = waypoints[i];
+    const toWaypoint = waypoints[i + 1];
+    
+    // Calculate leg distance
+    let legDistance = 0;
+    if (routeStats && routeStats.legs && routeStats.legs[i]) {
+      legDistance = parseFloat(routeStats.legs[i].distance);
+    } else if (window.turf) {
+      // Calculate using turf
+      const from = window.turf.point(fromWaypoint.coords);
+      const to = window.turf.point(toWaypoint.coords);
+      legDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
     }
     
-    // Check if aircraft has all required properties
-    if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
-      console.log('generateStopCardsData: Aircraft missing required properties');
-      return [];
-    }
+    // Calculate leg time and fuel with wind adjustments
+    let legTimeHours = 0;
+    let legFuel = 0;
+    let legGroundSpeed = aircraft.cruiseSpeed;
+    let headwindComponent = 0;
     
-    console.log('Generating stop cards with weather data:', weather);
+    // Check for coordinates
+    const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) || 
+                        (fromWaypoint.coords && fromWaypoint.coords.length === 2);
+    const toHasCoords = (toWaypoint.lat && toWaypoint.lon) || 
+                        (toWaypoint.coords && toWaypoint.coords.length === 2);
     
-    // Create data for each stop
-    const cards = [];
-    let cumulativeDistance = 0;
-    let cumulativeTime = 0;
-    let cumulativeFuel = 0;
-    let cumulativeDeckTime = 0;
-    let cumulativeDeckFuel = 0;
-    
-    // Get aircraft data for calculations
-    const aircraft = selectedAircraft;
-    
-    // Add taxi fuel to the total immediately
-    const taxiFuelValue = taxiFuel || 50; // Default value
-    cumulativeFuel += taxiFuelValue;
-    
-    // Add reserve fuel to the total
-    cumulativeFuel += reserveFuel;
-    
-    // Check if window.turf is available
-    if (!window.turf && routeCalculatorRef.current) {
-      console.warn('Turf.js not loaded, using routeStats legs for distances');
-    }
-    
-    // For each leg (between waypoints)
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const fromWaypoint = waypoints[i];
-      const toWaypoint = waypoints[i + 1];
+    if (fromHasCoords && toHasCoords) {
+      // Create lat/lon objects
+      const fromCoords = {
+        lat: fromWaypoint.lat || fromWaypoint.coords[1],
+        lon: fromWaypoint.lon || fromWaypoint.coords[0]
+      };
       
-      // Create a unique ID for this stop
-      const stopId = toWaypoint.id || `waypoint-${i}`;
+      const toCoords = {
+        lat: toWaypoint.lat || toWaypoint.coords[1],
+        lon: toWaypoint.lon || toWaypoint.coords[0]
+      };
       
-      // Get leg distance from routeStats if available
-      let legDistance = 0;
-      if (routeStats && routeStats.legs && routeStats.legs[i]) {
-        legDistance = parseFloat(routeStats.legs[i].distance);
-      } else if (window.turf) {
-        // Calculate distance using turf if available
-        const from = window.turf.point(fromWaypoint.coords);
-        const to = window.turf.point(toWaypoint.coords);
-        const options = { units: 'nauticalmiles' };
-        
-        legDistance = window.turf.distance(from, to, options);
-      }
-      
-      // Calculate leg timing and fuel with wind adjustments
-      let legTimeHours = 0;
-      let legFuel = 0;
-      let legGroundSpeed = aircraft.cruiseSpeed;
-      let headwindComponent = 0;
-      
-      // Check if we have coordinates - either as separate lat/lon or as coords array
-      const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) || 
-                           (fromWaypoint.coords && fromWaypoint.coords.length === 2);
-      const toHasCoords = (toWaypoint.lat && toWaypoint.lon) || 
-                         (toWaypoint.coords && toWaypoint.coords.length === 2);
-      
-      // Import the wind calculation functions if needed
-      // Use window.WindCalculations which we've made globally available
-      
-      if (fromHasCoords && toHasCoords) {
-        // Create lat/lon objects from either format
-        const fromCoords = {
-          lat: fromWaypoint.lat || fromWaypoint.coords[1],
-          lon: fromWaypoint.lon || fromWaypoint.coords[0]
-        };
-        
-        const toCoords = {
-          lat: toWaypoint.lat || toWaypoint.coords[1],
-          lon: toWaypoint.lon || toWaypoint.coords[0]
-        };
-        
-        // Use wind calculations if available
-        if (window.WindCalculations) {
-          try {
-            console.log(`Calculating leg ${i} with wind: ${fromCoords.lat},${fromCoords.lon} to ${toCoords.lat},${toCoords.lon}`);
-            const legDetails = window.WindCalculations.calculateLegWithWind(
-              fromCoords,
-              toCoords,
-              legDistance,
-              aircraft,
-              weather
-            );
-            
-            console.log(`Leg ${i} calculation results:`, {
-              time: legDetails.time,
-              fuel: legDetails.fuel,
-              groundSpeed: legDetails.groundSpeed,
-              headwind: legDetails.headwindComponent
-            });
-            
-            legTimeHours = legDetails.time;
-            legFuel = Math.round(legDetails.fuel);
-            legGroundSpeed = Math.round(legDetails.groundSpeed);
-            headwindComponent = Math.round(legDetails.headwindComponent);
-          } catch (error) {
-            console.warn('Error calculating leg with wind:', error);
-            // Basic calculation without wind as fallback
-            legTimeHours = legDistance / aircraft.cruiseSpeed;
-            legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
-            legGroundSpeed = aircraft.cruiseSpeed;
-            headwindComponent = 0;
-          }
-        } else {
-          // Basic calculation without wind as fallback
+      // Calculate with wind if available
+      if (window.WindCalculations) {
+        try {
+          const legDetails = window.WindCalculations.calculateLegWithWind(
+            fromCoords,
+            toCoords,
+            legDistance,
+            aircraft,
+            weather
+          );
+          
+          legTimeHours = legDetails.time;
+          legFuel = Math.round(legDetails.fuel);
+          legGroundSpeed = Math.round(legDetails.groundSpeed);
+          headwindComponent = Math.round(legDetails.headwindComponent);
+        } catch (error) {
+          // Fallback to basic calculation
           legTimeHours = legDistance / aircraft.cruiseSpeed;
           legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
           legGroundSpeed = aircraft.cruiseSpeed;
           headwindComponent = 0;
-          console.warn('WindCalculations not available, using basic time calculation');
         }
       } else {
-        // Fall back to simple calculation without wind
+        // Basic calculation
         legTimeHours = legDistance / aircraft.cruiseSpeed;
         legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+        legGroundSpeed = aircraft.cruiseSpeed;
+        headwindComponent = 0;
       }
-      
-      // Update cumulative values
-      cumulativeDistance += legDistance;
-      cumulativeTime += legTimeHours;
-      cumulativeFuel += legFuel;
-      
-      // Add deck time and fuel for this stop if it's not the final destination
-      // IMPORTANT: Only add deck time to future stops, since the current stop
-      // hasn't had its deck time yet - it will be added to the NEXT leg
-      let deckTimeHours = 0;
-      let deckFuel = 0;
-
-      // Add deck time only if this is not the final leg
-      // This adds deck time for the PREVIOUS stop, not the current one
-      if (i > 0) {
-        deckTimeHours = deckTimePerStop / 60; // Convert minutes to hours
-        deckFuel = Math.round(deckTimeHours * deckFuelFlow);
-        
-        cumulativeDeckTime += deckTimeHours;
-        cumulativeDeckFuel += deckFuel;
-      }
-      
-      // Calculate max passengers based on remaining load
-      let maxPassengers = 0;
-      if (selectedAircraft) {
-        const usableLoad = Math.max(
-          0, 
-          selectedAircraft.maxTakeoffWeight - 
-          selectedAircraft.emptyWeight - 
-          cumulativeFuel - cumulativeDeckFuel
-        );
-        maxPassengers = Math.floor(usableLoad / passengerWeight);
-        
-        // Ensure we don't exceed aircraft capacity
-        maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
-      }
-      
-      // Create the card data
-      // Make a deep copy of all values to prevent reference issues
-      const cardData = {
-        index: i,
-        id: stopId,
-        stopName: toWaypoint.name,
-        legDistance: legDistance.toFixed(1),
-        totalDistance: cumulativeDistance.toFixed(1),
-        legTime: Number(legTimeHours),
-        // Include cumulative deck time in the total time calculation
-        totalTime: Number(cumulativeTime + cumulativeDeckTime),
-        legFuel: Number(legFuel),
-        // Include cumulative deck fuel in the total fuel calculation
-        totalFuel: Number(cumulativeFuel + cumulativeDeckFuel),
-        maxPassengers: Number(maxPassengers),
-        groundSpeed: Number(legGroundSpeed),
-        headwind: Number(headwindComponent),
-        // Add explicit deck time values for display
-        deckTime: Number(cumulativeDeckTime * 60), // Convert back to minutes for display
-        deckFuel: Number(cumulativeDeckFuel)
-      };
-      
-      console.log(`Stop card ${i} data:`, {
-        stopName: cardData.stopName,
-        legTime: cardData.legTime,
-        cumulativeTime: cumulativeTime,
-        deckTime: cumulativeDeckTime * 60,
-        totalTime: cardData.totalTime,
-        legFuel: cardData.legFuel,
-        cumulativeFuel: cumulativeFuel,
-        deckFuel: cumulativeDeckFuel,
-        totalFuel: cardData.totalFuel
-      });
-      
-      cards.push(cardData);
+    } else {
+      // Simple calculation
+      legTimeHours = legDistance / aircraft.cruiseSpeed;
+      legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
     }
     
-    console.log('All stop cards generated, cards count:', cards.length);
-    return cards;
-  };
+    // Update totals
+    totalDistance += legDistance;
+    totalTripFuel += legFuel;
+    
+    // Store leg details for later use
+    legDetails.push({
+      fromWaypoint,
+      toWaypoint,
+      distance: legDistance,
+      timeHours: legTimeHours,
+      fuel: legFuel,
+      groundSpeed: legGroundSpeed,
+      headwind: headwindComponent
+    });
+  }
+  
+  // Calculate auxiliary fuel values
+  const taxiFuelValue = 50;
+  const reserveFuelValue = 600;
+  
+  // Calculate intermediate stops (for deck fuel)
+  const intermediateStops = Math.max(0, waypoints.length - 2);
+  const deckTimeHours = (intermediateStops * 5) / 60; // Convert from minutes to hours
+  const deckFuelValue = Math.round(deckTimeHours * 400);
+  
+  // Calculate contingency fuel
+  const contingencyFuelValue = Math.round((totalTripFuel * 10) / 100);
+  
+  // Calculate total fuel required for the entire trip
+  const totalFuelRequired = taxiFuelValue + totalTripFuel + contingencyFuelValue + reserveFuelValue + deckFuelValue;
+  
+  // CHANGE: Only create stop cards for actual waypoints, not adding a departure card
+  // This matches the original behavior before the changes
+  
+  // Now create cards for each stop - these show the fuel needed to continue the journey
+  let cumulativeDistance = 0;
+  let cumulativeTime = 0;
+  
+  for (let i = 0; i < legDetails.length; i++) {
+    const legDetail = legDetails[i];
+    const toWaypoint = legDetail.toWaypoint;
+    
+    // Create a unique ID for this stop
+    const stopId = toWaypoint.id || `waypoint-${i+1}`;
+    
+    // Update cumulative values for distance and time (for display only)
+    cumulativeDistance += legDetail.distance;
+    cumulativeTime += legDetail.timeHours;
+    
+    // Calculate remaining trip fuel - sum of all legs after this one
+    let remainingTripFuel = 0;
+    for (let j = i + 1; j < legDetails.length; j++) {
+      remainingTripFuel += legDetails[j].fuel;
+    }
+    
+    // Calculate remaining number of deck stops
+    const remainingIntermediateStops = Math.max(0, legDetails.length - i - 1);
+    
+    // Calculate remaining deck fuel
+    const remainingDeckTimeHours = (remainingIntermediateStops * 5) / 60;
+    const remainingDeckFuel = Math.round(remainingDeckTimeHours * 400);
+    
+    // Calculate remaining contingency fuel (proportional to remaining trip fuel)
+    let remainingContingencyFuel = 0;
+    if (totalTripFuel > 0) {
+      remainingContingencyFuel = Math.round((remainingTripFuel / totalTripFuel) * contingencyFuelValue);
+    }
+    
+    // At the final destination, we only have reserve and unused contingency
+    const isFinalDestination = i === legDetails.length - 1;
+    
+    // Calculate the fuel needed at this stop to continue the journey
+    let fuelNeeded;
+    let fuelComponents;
+    let fuelComponentsText;
+    
+    if (isFinalDestination) {
+      // At the final destination, you have reserve fuel and unused contingency
+      fuelNeeded = reserveFuelValue + remainingContingencyFuel;
+      fuelComponents = {
+        reserveFuel: reserveFuelValue,
+        contingencyFuel: remainingContingencyFuel,
+        extraFuel: 0 // Can be used for alternate or holding fuel
+      };
+      
+      if (routeStats?.enhancedResults?.auxiliaryFuel?.contingencyFuel) {
+        // If we have enhanced results, use the exact contingency fuel
+        fuelComponents.contingencyFuel = routeStats.enhancedResults.auxiliaryFuel.contingencyFuel;
+      }
+      
+      fuelComponentsText = `Reserve:${reserveFuelValue} Extra:0 FullCont:${remainingContingencyFuel}`;
+    } else {
+      // At intermediate stops, you need fuel for remaining legs, plus reserve
+      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue;
+      fuelComponents = {
+        remainingTripFuel: remainingTripFuel,
+        contingencyFuel: remainingContingencyFuel,
+        deckFuel: remainingDeckFuel,
+        reserveFuel: reserveFuelValue
+      };
+      fuelComponentsText = `Trip:${remainingTripFuel} Cont:${remainingContingencyFuel} Res:${reserveFuelValue}`;
+      
+      // Add deck fuel text only if there are remaining intermediate stops
+      if (remainingDeckFuel > 0) {
+        fuelComponentsText += ` Deck:${remainingDeckFuel}`;
+      }
+    }
+    
+    // Calculate max passengers based on remaining fuel needed
+    let maxPassengers = 0;
+    if (selectedAircraft) {
+      const usableLoad = Math.max(
+        0, 
+        selectedAircraft.maxTakeoffWeight - 
+        selectedAircraft.emptyWeight - 
+        fuelNeeded
+      );
+      maxPassengers = Math.floor(usableLoad / 220);
+      
+      // Ensure we don't exceed aircraft capacity
+      maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
+    }
+    
+    // For final destination, show "Final Stop" instead of passenger count
+    const displayMaxPassengers = isFinalDestination ? "Final Stop" : maxPassengers;
+    const maxPassengersValue = isFinalDestination ? null : maxPassengers;
+    const maxPassengersWeight = isFinalDestination ? null : (maxPassengers * 220);
+    
+    // First waypoint is departure, last is destination
+    const isDeparture = i === 0;
+    const isDestination = isFinalDestination;
+    
+    // Create the card data
+    const cardData = {
+      index: i + 1, // +1 because the original index started at 1
+      id: stopId,
+      stopName: toWaypoint.name,
+      legDistance: legDetail.distance.toFixed(1),
+      totalDistance: cumulativeDistance.toFixed(1),
+      legTime: Number(legDetail.timeHours),
+      totalTime: Number(cumulativeTime),
+      legFuel: Number(legDetail.fuel),
+      // The fuel shown is what's needed to continue from this point
+      totalFuel: Number(fuelNeeded),
+      maxPassengers: maxPassengersValue,
+      maxPassengersDisplay: displayMaxPassengers,
+      maxPassengersWeight: maxPassengersWeight,
+      groundSpeed: Number(legDetail.groundSpeed),
+      headwind: Number(legDetail.headwind),
+      deckTime: Number(remainingDeckTimeHours * 60), // Convert back to minutes for display
+      deckFuel: Number(remainingDeckFuel),
+      fuelComponents: fuelComponentsText,
+      fuelComponentsObject: fuelComponents,
+      isDeparture: isDeparture,
+      isDestination: isDestination
+    };
+    
+    console.log(`Stop card ${i+1} data:`, {
+      stopName: cardData.stopName,
+      isDeparture: cardData.isDeparture,
+      isDestination: cardData.isDestination
+    });
+    
+    cards.push(cardData);
+  }
+  
+  console.log(`Generated ${cards.length} stop cards`);
+  return cards;
+}
+
 
   /**
    * Updates weather settings for the application
@@ -1203,6 +1386,23 @@ const FastPlannerApp = () => {
         forceTimeCalculation: true // Force recalculation of time with new wind
       });
       
+      // Also calculate enhanced fuel data
+      console.log('🌬️ Calculating enhanced fuel with updated weather');
+      FuelIntegration.calculateFuelRequirements(
+        waypoints,
+        selectedAircraft,
+        newWeather,
+        {
+          passengerWeight,
+          taxiFuel,
+          contingencyFuelPercent,
+          reserveFuel,
+          deckTimePerStop,
+          deckFuelFlow,
+          cargoWeight: cargoWeight || 0
+        }
+      );
+      
       // CRITICAL FIX: Force route display update with a delay to ensure the route calculator has time to finish
       setTimeout(() => {
         if (waypointManagerRef.current) {
@@ -1222,7 +1422,32 @@ const FastPlannerApp = () => {
       // Generate stop cards data with the new weather settings immediately
       if (waypoints.length >= 2 && selectedAircraft) {
         console.log(`🌬️ Generating new stop cards with updated weather: ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
-        const newStopCards = generateStopCardsData(waypoints, routeStats, selectedAircraft, newWeather);
+        
+        // Get latest route stats with enhanced calculations if available
+        const currentStats = window.currentRouteStats || routeStats;
+        let enhancedResults = null;
+        
+        // Try to get enhanced fuel calculations with the new weather
+        if (selectedAircraft) {
+          enhancedResults = FuelIntegration.calculateFuelRequirements(
+            waypoints,
+            selectedAircraft,
+            newWeather,
+            {
+              passengerWeight,
+              taxiFuel,
+              contingencyFuelPercent,
+              reserveFuel,
+              deckTimePerStop,
+              deckFuelFlow,
+              cargoWeight: cargoWeight || 0
+            }
+          );
+        }
+        
+        // Use the stats with enhanced results if available, otherwise use the current stats
+        const statsForStopCards = enhancedResults || currentStats;
+        const newStopCards = generateStopCardsData(waypoints, statsForStopCards, selectedAircraft, newWeather);
         setStopCards(newStopCards);
       }
     }
@@ -1416,7 +1641,28 @@ const FastPlannerApp = () => {
               calcOptions.forceTimeCalculation = true;
             }
             
-            const calcResults = routeCalculatorRef.current.calculateRouteStats(coordinates, calcOptions);
+            // First calculate with original calculator to get basic results
+            const basicResults = routeCalculatorRef.current.calculateRouteStats(coordinates, calcOptions);
+            
+            // Then try to get enhanced fuel calculations
+            console.log('🌐 Calculating enhanced fuel requirements for addWaypoint...');
+            const enhancedResults = FuelIntegration.calculateFuelRequirements(
+              updatedWaypoints,
+              selectedAircraft,
+              weather,
+              {
+                passengerWeight,
+                taxiFuel,
+                contingencyFuelPercent,
+                reserveFuel,
+                deckTimePerStop,
+                deckFuelFlow,
+                cargoWeight: cargoWeight || 0
+              }
+            );
+            
+            // Use enhanced results if available, otherwise fall back to basic results
+            const calcResults = enhancedResults || basicResults;
             
             // Log raw results for debugging
             console.log('🌐 Raw calculation results:', calcResults ? {
@@ -1914,12 +2160,31 @@ const FastPlannerApp = () => {
             console.log(`⚡ Forcing route calculation after aircraft selection`);
             
             // Make sure to use the current aircraft we just selected
-            const calcResults = routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            const basicResults = routeCalculatorRef.current.calculateRouteStats(coordinates, {
               selectedAircraft: aircraft, // Use the aircraft we just found
               payloadWeight: cargoWeight || 0,
               reserveFuel: reserveFuel,
               weather: weather // Include weather data
             });
+            
+            // Also calculate enhanced fuel data
+            const enhancedResults = FuelIntegration.calculateFuelRequirements(
+              existingWaypoints,
+              aircraft,
+              weather,
+              {
+                passengerWeight,
+                taxiFuel,
+                contingencyFuelPercent,
+                reserveFuel,
+                deckTimePerStop,
+                deckFuelFlow,
+                cargoWeight: cargoWeight || 0
+              }
+            );
+            
+            // Use enhanced results if available
+            const calcResults = enhancedResults || basicResults;
             
             console.log(`⚡ Direct calculation results:`, {
               estimatedTime: calcResults?.estimatedTime,
@@ -2018,6 +2283,31 @@ const FastPlannerApp = () => {
 
   return (
     <div className="fast-planner-container">
+      {/* Debug overlay for stop cards */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        color: 'white',
+        padding: '10px',
+        borderRadius: '5px',
+        zIndex: 1000,
+        fontSize: '12px',
+        maxWidth: '300px',
+        maxHeight: '200px',
+        overflow: 'auto'
+      }}>
+        <div style={{ fontWeight: 'bold', color: '#ff6b6b' }}>STOP CARDS DEBUG</div>
+        <div>Count: {stopCards ? stopCards.length : 'null'}</div>
+        {stopCards && stopCards.length > 0 && (
+          <div>
+            <div>First: {stopCards[0].stopName} ({stopCards[0].isDeparture ? 'Departure' : 'Stop'})</div>
+            <div>Last: {stopCards[stopCards.length-1].stopName} ({stopCards[stopCards.length-1].isDestination ? 'Destination' : 'Stop'})</div>
+          </div>
+        )}
+      </div>
+      
       {/* Loading Overlay - Only used for critical operations, not for aircraft loading */}
       <div id="loading-overlay" className="loading-overlay" style={{ display: 'none' }}>
         <div className="loading-spinner"></div>
