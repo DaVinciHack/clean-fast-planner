@@ -214,44 +214,16 @@ const RouteStatsCard = ({
   };
   
   // Get the departure stop card to get the TOTAL fuel required (which includes all components)
+  // Using ONLY the official stop cards, no fallbacks, no mock data
   let totalFuel = 0;
   
-  // First, try to get total fuel from departure card in stop cards
+  // ONLY use the departure card from the official stop cards
   if (stopCards && stopCards.length > 0) {
     const departureCard = stopCards.find(card => card.isDeparture);
     if (departureCard && departureCard.totalFuel) {
       totalFuel = departureCard.totalFuel;
-      console.log('RouteStatsCard: Using stopCards departure fuel:', totalFuel);
+      console.log('RouteStatsCard: Using departure card total fuel:', totalFuel);
     }
-  } 
-  // Then try localStopCards
-  else if (localStopCards && localStopCards.length > 0) {
-    const departureCard = localStopCards.find(card => card.isDeparture);
-    if (departureCard && departureCard.totalFuel) {
-      totalFuel = departureCard.totalFuel;
-      console.log('RouteStatsCard: Using local stopCards departure fuel:', totalFuel);
-    }
-  }
-  // If no stop cards are available, calculate using the same formula as StopCardCalculator
-  else {
-    // Get trip fuel from routeStats
-    const tripFuel = stats.tripFuel || stats.fuelRequired || 0;
-    
-    // Calculate contingency fuel - using the same formula as StopCardCalculator
-    const contingencyFuel = Math.round((parseFloat(tripFuel) * contingencyFuelPercent) / 100);
-    
-    // Calculate the complete fuel value
-    totalFuel = parseInt(tripFuel) + parseInt(calculatedDeckFuel) + 
-                contingencyFuel + parseInt(taxiFuel) + parseInt(reserveFuel);
-    
-    console.log('RouteStatsCard: Calculated totalFuel using StopCardCalculator formula:', {
-      tripFuel,
-      deckFuel: calculatedDeckFuel,
-      contingencyFuel,
-      taxiFuel,
-      reserveFuel,
-      total: totalFuel
-    });
   }
   
   // Calculate maximum passengers based on usable load and passenger weight
@@ -434,9 +406,8 @@ const RouteStatsCard = ({
             <div className="route-stat-item">
               <div className="route-stat-label">Total Fuel:</div>
               <div className="route-stat-value">
-                {stopCards && stopCards.length > 0 
-                 ? stopCards.find(card => card.isDeparture)?.totalFuel || totalFuel 
-                 : totalFuel} lbs
+                {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.totalFuel ? 
+                  stopCards.find(card => card.isDeparture).totalFuel : 0} lbs
               </div>
             </div>
           </div>
@@ -445,13 +416,21 @@ const RouteStatsCard = ({
             {/* Column 1: Trip Fuel (below Total Distance) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Trip Fuel:</div>
-              <div className="route-stat-value">{stats.tripFuel || stats.fuelRequired || '0'} lbs</div>
+              <div className="route-stat-value">
+                {/* Get trip fuel directly from departure card */}
+                {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.fuelComponentsObject?.tripFuel ? 
+                  stopCards.find(card => card.isDeparture).fuelComponentsObject.tripFuel : 0} lbs
+              </div>
             </div>
             
             {/* Column 2: Deck Fuel (below Deck Time) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Deck Fuel:</div>
-              <div className="route-stat-value">{stats.deckFuel || calculatedDeckFuel} lbs</div>
+              <div className="route-stat-value">
+                {/* Get deck fuel directly from departure card to ensure consistency */}
+                {stopCards && stopCards.length > 0 && stopCards.find(card => card.isDeparture)?.deckFuel ? 
+                  stopCards.find(card => card.isDeparture).deckFuel : 0} lbs
+              </div>
             </div>
             
             {/* Column 3: Total Time (below Flight Time) */}
