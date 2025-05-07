@@ -12,7 +12,8 @@ const SaveFlightModal = ({
   isSaving, 
   initialFlightName = '',
   waypoints,
-  onRunDiagnostic = null
+  onRunDiagnostic = null,
+  runAutomation = true // Default to true to match current behavior
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -22,6 +23,7 @@ const SaveFlightModal = ({
   const [medicId, setMedicId] = useState('');
   const [soId, setSoId] = useState('');
   const [rswId, setRswId] = useState('');
+  const [enableAutomation, setEnableAutomation] = useState(runAutomation);
   
   // Set up initial values when modal opens
   useEffect(() => {
@@ -39,7 +41,10 @@ const SaveFlightModal = ({
     const now = new Date();
     const formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
     setEtd(formattedDate);
-  }, [isOpen, initialFlightName, waypoints]);
+    
+    // Set initial automation state from props
+    setEnableAutomation(runAutomation);
+  }, [isOpen, initialFlightName, waypoints, runAutomation]);
   
   // Handle form submission
   const handleSubmit = () => {
@@ -54,7 +59,8 @@ const SaveFlightModal = ({
       copilotId: copilotId || null,
       medicId: medicId || null,
       soId: soId || null,
-      rswId: rswId || null
+      rswId: rswId || null,
+      runAutomation: enableAutomation // Add the automation flag
     };
     
     onSave(flightData);
@@ -279,6 +285,49 @@ const SaveFlightModal = ({
           />
         </div>
         
+        {/* Add automation toggle checkbox */}
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            backgroundColor: '#2a2a2a',
+            padding: '10px',
+            borderRadius: '4px',
+            border: '1px solid #444'
+          }}>
+            <input
+              type="checkbox"
+              id="enable-automation"
+              checked={enableAutomation}
+              onChange={() => setEnableAutomation(!enableAutomation)}
+              style={{
+                width: '18px',
+                height: '18px',
+                marginRight: '10px'
+              }}
+            />
+            <label 
+              htmlFor="enable-automation"
+              style={{
+                cursor: 'pointer',
+                fontWeight: 'normal',
+                fontSize: '14px',
+                color: enableAutomation ? '#4caf50' : '#ccc'
+              }}
+            >
+              Run automation after saving 
+              <span style={{ 
+                fontSize: '12px', 
+                marginLeft: '5px', 
+                opacity: 0.7, 
+                display: 'block'
+              }}>
+                Will find best runway, calculate wind effects, find alternates, optimize fuel and passenger count
+              </span>
+            </label>
+          </div>
+        </div>
+        
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
           {/* Diagnostic button only shown if onRunDiagnostic is provided */}
           {onRunDiagnostic && (
@@ -292,7 +341,7 @@ const SaveFlightModal = ({
                 border: 'none',
                 borderRadius: '4px',
                 padding: '8px 16px',
-                marginRight: 'auto',
+                marginRight: '8px',
                 cursor: 'pointer',
                 fontWeight: 'bold',
                 fontSize: '12px'
@@ -301,6 +350,78 @@ const SaveFlightModal = ({
               Diagnose API
             </button>
           )}
+          
+          {/* Add Test API Connection button */}
+          <button
+            onClick={async () => {
+              try {
+                // Show that we're working
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator('Testing API connection...');
+                }
+                
+                // Import the SDK directly
+                const sdk = await import('@flight-app/sdk');
+                
+                // Check if the actions exist
+                const hasFlightAction = !!sdk.createNewFlightFp2;
+                const hasAutomationAction = !!sdk.singleFlightAutomation;
+                
+                // Log what we found
+                console.log('SDK Loaded:', !!sdk);
+                console.log('createNewFlightFp2 action available:', hasFlightAction);
+                console.log('singleFlightAutomation action available:', hasAutomationAction);
+                console.log('All available SDK objects:', Object.keys(sdk));
+                
+                // Show in the UI
+                if (window.LoadingIndicator) {
+                  if (hasFlightAction && hasAutomationAction) {
+                    window.LoadingIndicator.updateStatusIndicator(
+                      'API connection successful: Both actions found', 
+                      'success'
+                    );
+                  } else if (hasFlightAction) {
+                    window.LoadingIndicator.updateStatusIndicator(
+                      'API connection partial: createNewFlightFp2 found, automation missing', 
+                      'warning'
+                    );
+                  } else if (hasAutomationAction) {
+                    window.LoadingIndicator.updateStatusIndicator(
+                      'API connection partial: singleFlightAutomation found, flight creation missing', 
+                      'warning'
+                    );
+                  } else {
+                    window.LoadingIndicator.updateStatusIndicator(
+                      'API connection issue: Both actions missing', 
+                      'error'
+                    );
+                  }
+                }
+              } catch (error) {
+                console.error('API connection test error:', error);
+                
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(
+                    `API connection failed: ${error.message}`, 
+                    'error'
+                  );
+                }
+              }
+            }}
+            style={{
+              backgroundColor: '#444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '8px 16px',
+              marginRight: 'auto',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '12px'
+            }}
+          >
+            Test API
+          </button>
           
           <button
             onClick={onClose}

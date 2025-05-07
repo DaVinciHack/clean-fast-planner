@@ -16,6 +16,63 @@ class PalantirFlightService {
   }
   
   /**
+   * Run a diagnostic test with minimal parameters to identify API issues
+   * @returns {Promise<boolean>} - True if the diagnostic succeeded
+   */
+  static async runDiagnostic() {
+    try {
+      console.log("Running API diagnostic with minimal parameters...");
+      
+      // Import the SDK
+      const sdk = await this.getSDK();
+      
+      // Log available Actions
+      console.log("Available SDK Actions:", Object.keys(sdk).filter(key => 
+        typeof key === 'string' && key.toLowerCase().includes('flight')
+      ));
+      
+      // Try with absolute minimal parameters
+      const minimalParams = {
+        "flightName": "Diagnostic Test Flight",
+        "aircraftRegion": "NORWAY",
+        "new_parameter": "Norway",
+        "aircraftId": { "$primaryKey": "LN-OIA" },
+        "region": "NORWAY",
+        "etd": new Date().toISOString(),
+        "locations": ["ENZV", "ENLE"]
+      };
+      
+      console.log("Diagnostic params:", minimalParams);
+      
+      // Test the API call with returnEdits option
+      const result = await client(sdk.createNewFlightFp2).applyAction(
+        minimalParams,
+        { $returnEdits: true }
+      );
+      
+      console.log("Diagnostic successful with result:", result);
+      return true;
+    } catch (error) {
+      console.error("Diagnostic failed:", error);
+      
+      // Check if we have validation errors and log them clearly
+      if (error.message && error.message.includes('evaluatedConstraints')) {
+        try {
+          const errorJson = error.message.match(/\{.*\}/s);
+          if (errorJson) {
+            const validationData = JSON.parse(errorJson[0]);
+            console.log('Parameter validation errors:', validationData);
+          }
+        } catch (parseError) {
+          console.log('Could not parse validation errors:', parseError);
+        }
+      }
+      
+      return false;
+    }
+  }
+  
+  /**
    * Import the SDK dynamically
    * @returns {Object} - The SDK object
    */
@@ -38,211 +95,174 @@ class PalantirFlightService {
       throw new Error('OSDK client not available. Try logging in again.');
     }
     
-    // Enhanced debugging - log the structure of the flight data
-    console.log('Flight data structure being sent to API:', JSON.stringify(flightData, null, 2));
+    // Clean up the locations to ensure no leading/trailing spaces
+    let cleanLocations = [];
+    if (flightData.locations && Array.isArray(flightData.locations)) {
+      cleanLocations = flightData.locations.map(loc => typeof loc === 'string' ? loc.trim() : loc);
+    } else {
+      cleanLocations = ["ENZV", "ENLE"]; // Default locations
+    }
+    
+    // Use a greatly simplified approach that matches the working ApiTester
+    const cleanData = {
+      flightName: flightData.flightName || "Test Flight",
+      aircraftRegion: "NORWAY",
+      new_parameter: "Norway",
+      aircraftId: flightData.aircraftId,
+      region: "NORWAY",
+      etd: flightData.etd || new Date().toISOString(),
+      locations: cleanLocations,
+      alternateLocation: flightData.alternateLocation || "",
+      // Only include crew if provided
+      ...(flightData.captainId ? { captainId: flightData.captainId } : {}),
+      ...(flightData.copilotId ? { copilotId: flightData.copilotId } : {})
+    };
+    
+    // Log the clean data 
+    console.log('Flight data structure being sent to API:', JSON.stringify(cleanData, null, 2));
     
     // Import the SDK
     const sdk = await this.getSDK();
     
-    // Log all available functions in the SDK for debugging
-    console.log('All available SDK keys:', Object.keys(sdk));
-    
-    // Check if we're in diagnostic mode
-    if (window.OSDK_DIAGNOSTIC_MODE) {
-      console.log('Running in diagnostic mode with minimal parameters');
-      
-      // Try with a simplest possible set of params
-      try {
-        const simpleParams = {
-          flightName: flightData.flightName || "Test Flight",
-          aircraftRegion: flightData.aircraftRegion || "NORWAY"
-        };
-        
-        // Check if createNewFlightFp2 exists
-        if (sdk.createNewFlightFp2) {
-          console.log('Attempting diagnostic call with createNewFlightFp2');
-          const result = await client(sdk.createNewFlightFp2).applyAction(simpleParams);
-          return result;
-        }
-        
-        // Try all possible flight-related functions
-        const flightFunctions = Object.keys(sdk).filter(key => 
-          key.toLowerCase().includes('flight')
-        );
-        
-        if (flightFunctions.length > 0) {
-          console.log('Found flight-related functions:', flightFunctions);
-          
-          for (const funcName of flightFunctions) {
-            try {
-              console.log(`Trying diagnostic call with ${funcName}`);
-              const result = await client(sdk[funcName]).applyAction(simpleParams);
-              return result;
-            } catch (error) {
-              console.error(`Error with ${funcName}:`, error);
-            }
-          }
-        }
-        
-        throw new Error('No working flight-related functions found in diagnostic mode');
-      } catch (error) {
-        console.error('All diagnostic attempts failed:', error);
-        throw error;
-      }
-    }
-    
-    // For normal operation - try multiple options in sequence
-    
-    // Attempt #1: Try with the explicit format from the example code
     try {
-      console.log('Attempt #1: Using format from example code');
-      
-      // Match the example format from the documentation
-      const exampleFormatParams = {
-        aircraftRegion: flightData.aircraftRegion || "NORWAY",
-        new_parameter: flightData.country || "Norway",
-        flightName: flightData.flightName || "Test Flight",
-        locations: flightData.locations || ["ENZV", "ENLE"],
-        alternateLocation: flightData.alternateLocation || "",
-        aircraftId: { 
-          $primaryKey: flightData.aircraftId || "" 
-        },
-        region: flightData.region || "NORWAY",
-        etd: flightData.etd || new Date().toISOString(),
-        captainId: flightData.captainId ? { $primaryKey: flightData.captainId } : null,
-        copilotId: flightData.copilotId ? { $primaryKey: flightData.copilotId } : null,
-        medicId: flightData.medicId ? { $primaryKey: flightData.medicId } : null,
-        soId: flightData.soId ? { $primaryKey: flightData.soId } : null,
-        rswId: flightData.rswId ? { $primaryKey: flightData.rswId } : null,
-        useDirectRoutes: flightData.useDirectRoutes || false,
-        displayWaypoints: flightData.locations || ["ENZV", "ENLE"]
-      };
-      
-      // Identify which action to use based on what's available
-      let actionToUse = null;
-      
-      // Try these in order of likelihood
-      const actionNames = [
-        'createNewFlightFp2',
-        'create-new-flight-fp2',
-        'CreateNewFlightFp2',
-        'createFlightFp2',
-        'createFlight'
-      ];
-      
-      // Find the first available action
-      for (const name of actionNames) {
-        if (sdk[name]) {
-          actionToUse = sdk[name];
-          console.log(`Found action: ${name}`);
-          break;
-        }
+      // Check if the createNewFlightFp2 action exists
+      if (!sdk.createNewFlightFp2) {
+        console.error('createNewFlightFp2 action not found in SDK');
+        console.log('Available SDK actions:', Object.keys(sdk));
+        throw new Error('createNewFlightFp2 action not found in SDK');
       }
       
-      // If no exact match, find any flight creation function
-      if (!actionToUse) {
-        const matchingActions = Object.keys(sdk).filter(key => 
-          key.toLowerCase().includes('flight') && 
-          (key.toLowerCase().includes('create') || key.toLowerCase().includes('new'))
-        );
-        
-        if (matchingActions.length > 0) {
-          actionToUse = sdk[matchingActions[0]];
-          console.log(`Using alternative action: ${matchingActions[0]}`);
-        }
-      }
+      // Get parameters in the proper format (this will use $primaryKey format for IDs)
+      const params = this.formatFlightParams(cleanData);
       
-      if (!actionToUse) {
-        throw new Error('No suitable flight creation action found in SDK');
-      }
+      console.log('Calling createNewFlightFp2 with params:', params);
       
-      // Call the API with the chosen action
-      const result = await client(actionToUse).applyAction({
-        ...exampleFormatParams,
-        $returnEdits: true
-      });
+      // Use a try-catch with retry logic for network issues
+      let attempts = 0;
+      const maxAttempts = 3;
       
-      console.log('Flight creation successful!', result);
-      return result;
-    } catch (firstError) {
-      console.error('Attempt #1 failed:', firstError);
-      
-      // Attempt #2: Try with a simplified format
-      try {
-        console.log('Attempt #2: Using simplified format');
-        
-        // Use a simpler format with only essential fields
-        const simplifiedParams = {
-          flightName: flightData.flightName || "Test Flight",
-          aircraftRegion: flightData.aircraftRegion || "NORWAY",
-          region: flightData.region || "NORWAY",
-          locations: flightData.locations || ["ENZV", "ENLE"]
-        };
-        
-        // Look for any flight-related action
-        const flightActions = Object.keys(sdk).filter(key => 
-          key.toLowerCase().includes('flight')
-        );
-        
-        if (flightActions.length === 0) {
-          throw new Error('No flight-related actions found in SDK');
-        }
-        
-        // Try each flight action in turn
-        for (const actionName of flightActions) {
-          try {
-            console.log(`Trying ${actionName} with simplified parameters`);
-            const result = await client(sdk[actionName]).applyAction({
-              ...simplifiedParams,
-              $returnEdits: true
-            });
-            
-            console.log(`Success with ${actionName}!`, result);
-            return result;
-          } catch (actionError) {
-            console.error(`Error with ${actionName}:`, actionError);
-            // Continue to the next action
-          }
-        }
-        
-        throw new Error('All simplified action attempts failed');
-      } catch (secondError) {
-        console.error('Attempt #2 failed:', secondError);
-        
-        // Attempt #3: Last resort - try to read API documentation from SDK
+      while (attempts < maxAttempts) {
+        attempts++;
         try {
-          console.log('Attempt #3: Analyzing SDK for documentation');
+          // Make the API call with the exact format from the documentation
+          // Add a delay before the API call to ensure any previous requests have completed
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Look for any function that might tell us about the API
-          const helpFunctions = Object.keys(sdk).filter(key => 
-            key.toLowerCase().includes('help') || 
-            key.toLowerCase().includes('doc') || 
-            key.toLowerCase().includes('info')
+          console.log(`Attempt ${attempts} of ${maxAttempts} to create flight...`);
+          
+          // CRITICAL FIX: Based on working example, use either the direct export or $Actions
+          let createFlightAction = sdk.createNewFlightFp2;
+          
+          // If direct export doesn't exist, try $Actions
+          if (!createFlightAction && sdk.$Actions) {
+            console.log('Using $Actions.createNewFlightFp2 instead of direct export');
+            createFlightAction = sdk.$Actions.createNewFlightFp2;
+          }
+          
+          if (!createFlightAction) {
+            throw new Error('Could not find createNewFlightFp2 action in SDK');
+          }
+          
+          // Use the exact format from the working example including $returnEdits option
+          const result = await client(createFlightAction).applyAction(
+            params,
+            { $returnEdits: true }
           );
+          console.log('Flight creation successful!', result);
+          return result;
+        } catch (apiError) {
+          console.error(`Attempt ${attempts} failed:`, apiError);
           
-          if (helpFunctions.length > 0) {
-            console.log('Found potential help functions:', helpFunctions);
+          // If this is the last attempt, or if it's not a network error, don't retry
+          if (attempts >= maxAttempts || 
+             (apiError.message && !apiError.message.includes('Failed to fetch'))) {
+            throw apiError;
+          }
+          
+          // Add exponential backoff for retries
+          const backoffTime = Math.pow(2, attempts) * 500; // 1s, 2s, 4s
+          console.log(`Retrying in ${backoffTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
+        }
+      }
+    } catch (error) {
+      console.error('All attempts to create flight failed:', error);
+      
+      // Log the full error for debugging
+      console.error('Error details:', error);
+      
+      // Check if it's a network issue
+      if (error.message && error.message.includes('Failed to fetch')) {
+        console.error('This appears to be a network issue or CORS problem.');
+        throw new Error('Network error: Failed to connect to the Palantir API. This might be due to connection issues or CORS restrictions.');
+      }
+      
+      // Check for 400 Bad Request errors specifically
+      if (error.message && error.message.includes('400')) {
+        console.error('This is a 400 Bad Request error - parameter format issue');
+        
+        // Try to extract any validation details
+        try {
+          const errorJson = error.message.match(/\{.*\}/s);
+          if (errorJson) {
+            const validationData = JSON.parse(errorJson[0]);
+            console.log('Parameter validation data:', validationData);
             
-            // Try to get info from each function
-            for (const helpFunc of helpFunctions) {
-              try {
-                const info = sdk[helpFunc];
-                console.log(`Help from ${helpFunc}:`, info);
-              } catch (e) {
-                console.error(`Error getting help from ${helpFunc}:`, e);
+            // Build a more helpful error message
+            let errorDetails = 'API 400 Error: The server rejected the request. ';
+            
+            if (validationData && validationData.parameters) {
+              errorDetails += 'Invalid parameters: ';
+              for (const [param, details] of Object.entries(validationData.parameters)) {
+                if (details.result === 'INVALID') {
+                  errorDetails += `${param}, `;
+                }
               }
             }
+            
+            throw new Error(errorDetails);
           }
-          
-          // At this point, we've tried everything and failed
-          throw new Error('Unable to create flight - API integration failed after multiple attempts');
-        } catch (thirdError) {
-          console.error('All attempts failed:', thirdError);
-          
-          // Re-throw the original error for better debugging
-          throw firstError;
+        } catch (parseError) {
+          console.error('Could not parse validation errors:', parseError);
+        }
+        
+        // If we couldn't extract details, return a general 400 error
+        throw new Error('API 400 Error: The server rejected the flight data. Please check all parameters are correctly formatted.');
+      }
+      
+      // Check for authentication issues
+      if (error.message && error.message.includes('401')) {
+        console.error('This appears to be an authentication issue.');
+        throw new Error('Authentication error: Your session may have expired. Please log in again.');
+      }
+      
+      // If there's a detailed error message with validation info, extract and log it
+      if (error.message && error.message.includes('INVALID')) {
+        try {
+          const validationMatch = error.message.match(/Validation Error: (.*)/);
+          if (validationMatch && validationMatch[1]) {
+            const validationData = JSON.parse(validationMatch[1]);
+            console.log('Parameter validation errors:', validationData);
+            
+            // Check for specific issues and build a detailed error message
+            let errorDetails = 'Validation errors: ';
+            
+            if (validationData && validationData.parameters) {
+              for (const [param, details] of Object.entries(validationData.parameters)) {
+                if (details.result === 'INVALID') {
+                  errorDetails += `${param} (${details.evaluatedConstraints?.[0]?.type || 'unknown reason'}), `;
+                }
+              }
+            }
+            
+            throw new Error(errorDetails);
+          }
+        } catch (parseError) {
+          console.log('Could not parse validation errors:', parseError);
         }
       }
+      
+      throw error;
     }
   }
   
@@ -252,9 +272,46 @@ class PalantirFlightService {
    * @returns {string} - The extracted ID or 'Unknown ID'
    */
   static extractFlightId(result) {
-    if (result && result.editedObjectTypes && result.editedObjectTypes[0]) {
-      return result.editedObjectTypes[0].id || 'Unknown ID';
+    // Log the entire result structure for debugging
+    console.log('Extracting flight ID from result:', result);
+    
+    // Based on the working example in ApiTester, check for addedObjects first
+    if (result && result.addedObjects && Array.isArray(result.addedObjects)) {
+      for (const obj of result.addedObjects) {
+        if (obj.objectType === 'MainFlightObjectFp2' && obj.primaryKey) {
+          console.log('Found flight ID in addedObjects:', obj.primaryKey);
+          return obj.primaryKey;
+        }
+      }
     }
+    
+    // Fall back to other methods if addedObjects doesn't contain the ID
+    if (result) {
+      // If the result has an editedObjectTypes property
+      if (result.editedObjectTypes && result.editedObjectTypes.length > 0) {
+        const firstObject = result.editedObjectTypes[0];
+        // Return the ID if it exists
+        if (firstObject && firstObject.id) {
+          console.log('Found flight ID in editedObjectTypes:', firstObject.id);
+          return firstObject.id;
+        }
+      }
+      
+      // If the result has a type of 'edits' and an updatedObject property
+      if (result.type === 'edits' && result.updatedObject) {
+        const id = result.updatedObject.id || 'Unknown ID';
+        console.log('Found flight ID in updatedObject:', id);
+        return id;
+      }
+      
+      // If the result has an id property directly
+      if (result.id) {
+        console.log('Found flight ID directly in result:', result.id);
+        return result.id;
+      }
+    }
+    
+    console.warn('Could not find flight ID in result. Using "Unknown ID"');
     return 'Unknown ID';
   }
   
@@ -264,67 +321,65 @@ class PalantirFlightService {
    * @returns {boolean} - True if the result is successful
    */
   static isSuccessfulResult(result) {
-    return result && (result.type === 'edits' || result.editedObjectTypes);
+    if (!result) return false;
+    
+    // Based on the API documentation, the result should have one of these structures
+    return (
+      // Check for the format shown in the API documentation screenshot
+      (result.type === 'edits') || 
+      
+      // Check for editedObjectTypes property
+      (result.editedObjectTypes && result.editedObjectTypes.length > 0) ||
+      
+      // Check for updatedObject property
+      (result.updatedObject) ||
+      
+      // Check for id property directly
+      (result.id)
+    );
   }
   
   /**
    * Format flight parameters for the API
    * @param {Object} params - Flight parameters
-   * @returns {Object} - Formatted parameters for the API
+   * @returns {Object} - Formatted parameters for the API exactly as specified in the documentation
    */
   static formatFlightParams(params) {
-    const {
-      flightName,
-      aircraftRegion,
-      country,
-      locations,
-      alternateLocation,
-      aircraftId,
-      region,
-      etd,
-      captainId,
-      copilotId,
-      medicId,
-      soId,
-      rswId,
-      useDirectRoutes
-    } = params;
-    
-    // Create a minimal payload to identify what's causing the 400 error
-    // Start with just the absolutely required fields
-    const minimalParams = {
-      flightName: flightName || "Test Flight",
-      aircraftRegion: aircraftRegion || "NORWAY",
-      aircraftId: { $primaryKey: aircraftId || "" }
+    // Based on actual implementation, use simple string for aircraftId
+    const formattedParams = {
+      "flightName": params.flightName || "Test Flight",
+      "aircraftRegion": "NORWAY",
+      "new_parameter": "Norway",
+      "aircraftId": params.aircraftId || "190", // Use the numeric ID as fallback
+      "region": "NORWAY",
+      "etd": params.etd || new Date().toISOString(),
+      "locations": Array.isArray(params.locations) ? params.locations : ["ENZV", "ENLE"],
+      "alternateLocation": params.alternateLocation || ""
     };
     
-    // Log the minimal parameters
-    console.log('Using minimal parameters to test API:', minimalParams);
-    
-    // Check if we're in diagnostic mode
-    if (window.OSDK_DIAGNOSTIC_MODE) {
-      return minimalParams;
+    // Add crew members only if provided
+    if (params.captainId) {
+      formattedParams.captainId = params.captainId; // Simple string, no $primaryKey
     }
     
-    // Standard parameters with careful formatting
-    // Note: All fields exactly match the example API payload
-    return {
-      aircraftRegion: aircraftRegion || 'Unknown',
-      new_parameter: country || 'Norway', // Default country
-      flightName: flightName,
-      locations: locations || ["ENZV", "ENLE"],
-      alternateLocation: alternateLocation || '', 
-      aircraftId: { $primaryKey: aircraftId || "" },
-      region: region || 'Unknown',
-      etd: etd,
-      captainId: captainId ? { $primaryKey: captainId } : null,
-      copilotId: copilotId ? { $primaryKey: copilotId } : null,
-      medicId: medicId ? { $primaryKey: medicId } : null,
-      soId: soId ? { $primaryKey: soId } : null,
-      rswId: rswId ? { $primaryKey: rswId } : null,
-      useDirectRoutes: useDirectRoutes !== undefined ? useDirectRoutes : false,
-      displayWaypoints: locations || ["ENZV", "ENLE"] // Same as locations for now
-    };
+    if (params.copilotId) {
+      formattedParams.copilotId = params.copilotId; // Simple string, no $primaryKey
+    }
+    
+    if (params.medicId) {
+      formattedParams.medicId = params.medicId; // Simple string, no $primaryKey
+    }
+    
+    if (params.soId) {
+      formattedParams.soId = params.soId; // Simple string, no $primaryKey
+    }
+    
+    if (params.rswId) {
+      formattedParams.rswId = params.rswId; // Simple string, no $primaryKey
+    }
+    
+    console.log('Formatted flight parameters:', formattedParams);
+    return formattedParams;
   }
   
   /**
@@ -335,10 +390,13 @@ class PalantirFlightService {
   static formatErrorMessage(error) {
     if (!error) return 'Unknown error occurred';
     
+    // Log the full error for debugging
+    console.error('Full error details:', error);
+    
     // Extract useful information from the error
     const message = error.message || '';
     
-    // Check for specific error patterns
+    // Check for specific error patterns based on the Palantir API
     if (message.includes('401') || message.includes('unauthorized')) {
       return 'Authentication error: You need to log in again to save flights';
     }
@@ -348,7 +406,18 @@ class PalantirFlightService {
     }
     
     if (message.includes('400') || message.includes('Bad Request')) {
-      return 'API request error (400): The server rejected the flight data. Check that all required fields are correctly formatted.';
+      // For 400 errors, try to extract more details to help diagnose parameter formatting issues
+      let detailedMessage = 'API request error (400): The server rejected the flight data.';
+      
+      // Try to extract parameter-specific errors if they exist
+      if (error.response && error.response.data) {
+        detailedMessage += ' Details: ' + JSON.stringify(error.response.data);
+      }
+      
+      // Provide guidance for common issues
+      detailedMessage += ' Please check that all required fields are correctly formatted, especially IDs and dates.';
+      
+      return detailedMessage;
     }
     
     if (message.includes('timeout') || message.includes('aborted')) {
@@ -359,12 +428,21 @@ class PalantirFlightService {
       return 'Network error: Check your internet connection';
     }
     
-    if (message.includes('bristol')) {
-      return 'API connection error: Unable to connect to the flight creation service';
+    if (message.includes('TypeError') && message.includes('is not a function')) {
+      return 'API function error: The createNewFlightFp2 action may not be available or has changed. Check the Palantir API documentation.';
     }
     
-    // Default error message
-    return `Error creating flight: ${message}`;
+    if (message.includes('bristol') || message.includes('foundry')) {
+      return 'API connection error: Unable to connect to the Palantir Foundry service. Please verify your authentication.';
+    }
+    
+    // Special message for missing SDK
+    if (message.includes('import') || message.includes('module')) {
+      return 'SDK import error: Unable to load the @flight-app/sdk module. Please check that it is correctly installed.';
+    }
+    
+    // Default error message with more detail
+    return `Error creating flight: ${message} (Check browser console for more details)`;
   }
 }
 

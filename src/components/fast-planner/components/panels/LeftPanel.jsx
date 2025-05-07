@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 /**
  * Left Panel Component
  * 
- * Displays and manages the route's waypoints/stops list
+ * Displays and manages the route's waypoints/stops list and route controls
  */
 const LeftPanel = ({ 
   visible, 
@@ -17,7 +17,10 @@ const LeftPanel = ({
   favoriteLocations, // Receive favorite locations
   onAddFavoriteLocation, // Receive add favorite function
   onRemoveFavoriteLocation, // Receive remove favorite function
-  onReorderWaypoints // Receive reorder waypoints function
+  onReorderWaypoints, // Receive reorder waypoints function
+  onClearRoute, // Added for clear route button
+  onToggleChart, // Added for toggle rigs button
+  chartsVisible // Added for toggle rigs button state
 }) => {
   // Keep track of recently added waypoint IDs for highlighting
   const [recentWaypoints, setRecentWaypoints] = useState({});
@@ -382,9 +385,45 @@ const LeftPanel = ({
               Add
             </button>
           </div>
-          <p style={{ fontSize: '0.75em', color: 'var(--label-color)', margin: '3px 0 0 0' }}>
-            Type a rig name (e.g. "Mars", "Thunder Horse") to find it automatically
-          </p>
+        </div>
+        
+        {/* Route Control Buttons - Full Width Side by Side */}
+        <div style={{ 
+          display: "flex", 
+          width: "100%", 
+          gap: "5px",
+          marginTop: "10px"
+        }}>
+          <button 
+            id="clear-route" 
+            className="control-button" 
+            onClick={onClearRoute}
+            style={{
+              flex: 1,
+              padding: "8px 0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "14px"
+            }}
+          >
+            Clear Route
+          </button>
+          <button 
+            id="toggle-chart" 
+            className="control-button" 
+            onClick={onToggleChart}
+            style={{
+              flex: 1,
+              padding: "8px 0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "14px"
+            }}
+          >
+            {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}
+          </button>
         </div>
         
         {/* Favorite Locations Section */}

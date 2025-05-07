@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import RegionSelector from '../../controls/RegionSelector';
-import { SaveFlightButton } from '../../controls';
+import { SaveFlightButton, ApiTester } from '../../controls';
 import { StopCardsContainer } from '../../flight/stops';
 import '../../flight/stops/StopCards.css';
 
@@ -74,22 +74,7 @@ const MainCard = ({
       </div>
       
       <div className="control-section">
-        <button 
-          id="clear-route" 
-          className="control-button" 
-          onClick={onClearRoute}
-        >
-          Clear Route
-        </button>
-        <button 
-          id="toggle-chart" 
-          className="control-button" 
-          style={{ display: chartsVisible !== null ? "inline-block" : "none" }}
-          onClick={onToggleChart}
-        >
-          {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}
-        </button>
-        {/* Add Save Flight button */}
+        {/* Save Flight button */}
         <SaveFlightButton
           selectedAircraft={selectedAircraft}
           waypoints={waypoints}
@@ -97,6 +82,7 @@ const MainCard = ({
           currentRegion={currentRegion}
           onSuccess={handleSaveSuccess}
           onError={handleSaveError}
+          style={{ marginRight: 'auto' }}
         />
         {/* Manual reload button - hidden by default but useful for development */}
         <button 
@@ -465,6 +451,14 @@ const MainCard = ({
           />
         )}
       </div>
+      
+      {/* Add API Tester for OSDK testing */}
+      {isAuthenticated && (
+        <div className="control-section" style={{ marginTop: '20px' }}>
+          <h4>API Testing Tools</h4>
+          <ApiTester />
+        </div>
+      )}
     </div>
   );
 };

@@ -1781,6 +1781,9 @@ const FastPlannerApp = () => {
       aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
       setSelectedAircraft(aircraft);
       
+      // CRITICAL: Make the selected aircraft globally available for API testing
+      window.currentSelectedAircraft = aircraft;
+      
       console.log(`⚡ Selected aircraft:`, {
         registration: aircraft?.registration,
         type: aircraft?.modelType,
@@ -2059,6 +2062,9 @@ const FastPlannerApp = () => {
         favoriteLocations={favoriteLocations}
         onAddFavoriteLocation={handleAddFavoriteLocation}
         onRemoveFavoriteLocation={handleRemoveFavoriteLocation}
+        onClearRoute={clearRoute}
+        onToggleChart={togglePlatformsVisibility}
+        chartsVisible={platformsVisible}
       />
       
       {/* Right Panel (Controls & Stats) */}
