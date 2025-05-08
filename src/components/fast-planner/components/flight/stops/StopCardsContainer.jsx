@@ -15,12 +15,12 @@ const StopCardsContainer = ({
   waypoints = [],
   routeStats = null,
   selectedAircraft = null,
-  passengerWeight = 220,
-  reserveFuel = 500,
-  contingencyPercent = 10,
-  deckTimePerStop = 5,
-  deckFuelFlow = 400,
-  taxiFuel = 100,
+  passengerWeight,  // No default - must be provided
+  reserveFuel,      // No default - must be provided
+  contingencyFuelPercent, // Fixed parameter name to match StopCardCalculator
+  deckTimePerStop,  // No default - must be provided
+  deckFuelFlow,     // No default - must be provided 
+  taxiFuel,         // No default - must be provided
   weather = { windSpeed: 0, windDirection: 0 }, // Default to no wind
   stopCards = [] // Kept for backward compatibility but not used
 }) => {
@@ -34,6 +34,17 @@ const StopCardsContainer = ({
   
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
+    console.log('🔍 StopCardsContainer useEffect triggered with:', {
+      waypointsLength: waypoints?.length || 0,
+      taxiFuel: taxiFuel, // Using direct taxiFuel value with no transformation
+      deckTimePerStop,
+      deckFuelFlow,
+      reserveFuel,
+      contingencyFuelPercent, // Fixed parameter name to match StopCardCalculator
+      hasAircraft: !!selectedAircraft,
+      hasRouteStats: !!routeStats
+    });
+    
     if (waypoints.length < 2) {
       setCalculatedStopCards([]);
       prevWaypointsRef.current = [];
@@ -74,6 +85,9 @@ const StopCardsContainer = ({
     }
     
     // Use the StopCardCalculator to calculate the stop cards
+    // Log input values to debug
+    console.log('🧮 StopCardsContainer calculating with taxiFuel directly from props:', taxiFuel);
+    
     const newCards = StopCardCalculator.calculateStopCards(
       waypoints, 
       routeStats, 
@@ -82,10 +96,10 @@ const StopCardsContainer = ({
       {
         passengerWeight,
         reserveFuel,
-        contingencyFuelPercent: contingencyPercent,
+        contingencyFuelPercent, // Fixed: use the correct parameter name
         deckTimePerStop,
         deckFuelFlow,
-        taxiFuel
+        taxiFuel // Pass the original value directly
       }
     );
     
@@ -100,7 +114,7 @@ const StopCardsContainer = ({
     
     // Update previous waypoints
     prevWaypointsRef.current = [...waypoints];
-  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather]);
+  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather]);
   
   // Apply FLIP animation after cards update
   useEffect(() => {

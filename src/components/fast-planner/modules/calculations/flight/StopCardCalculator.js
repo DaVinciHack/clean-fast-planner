@@ -20,15 +20,43 @@
  * @returns {Array} Array of stop card objects
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-  // Extract options with defaults
+  // Extract options with defaults for safety, but these should always be provided
   const {
-    passengerWeight = 220,
-    taxiFuel = 50,
-    contingencyFuelPercent = 10,
-    reserveFuel = 600,
-    deckTimePerStop = 5,
-    deckFuelFlow = 400
+    passengerWeight = 0,  // Default to 0 to make missing settings obvious
+    taxiFuel = 0,         // Default to 0 to make missing settings obvious
+    contingencyFuelPercent = 0, // Default to 0 to make missing settings obvious
+    reserveFuel = 0,      // Default to 0 to make missing settings obvious
+    deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
+    deckFuelFlow = 0      // Default to 0 to make missing settings obvious
   } = options;
+  
+  // Log all received values for debugging
+  console.log('🧰 StopCardCalculator received raw values:', {
+    taxiFuel,
+    passengerWeight,
+    contingencyFuelPercent,
+    reserveFuel,
+    deckTimePerStop,
+    deckFuelFlow
+  });
+  
+  // Convert all calculation parameters to proper numeric values
+  const taxiFuelValue = Number(taxiFuel);
+  const passengerWeightValue = Number(passengerWeight);
+  const contingencyFuelPercentValue = Number(contingencyFuelPercent);
+  const reserveFuelValue = Number(reserveFuel);
+  const deckTimePerStopValue = Number(deckTimePerStop);
+  const deckFuelFlowValue = Number(deckFuelFlow);
+  
+  // Log converted values for debugging
+  console.log('🧰 StopCardCalculator using numeric values:', {
+    taxiFuelValue,
+    passengerWeightValue,
+    contingencyFuelPercentValue,
+    reserveFuelValue,
+    deckTimePerStopValue,
+    deckFuelFlowValue
+  });
 
   // Validate input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
@@ -37,6 +65,31 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       hasAircraft: !!selectedAircraft
     });
     return [];
+  }
+  
+  // Validate calculation parameters - Log warnings but don't fail
+  if (isNaN(passengerWeightValue) || passengerWeightValue <= 0) {
+    console.warn('StopCardCalculator: Invalid passengerWeight:', passengerWeight);
+  }
+  
+  if (isNaN(taxiFuelValue)) {
+    console.warn('StopCardCalculator: Invalid taxiFuel:', taxiFuel);
+  }
+  
+  if (isNaN(contingencyFuelPercentValue) || contingencyFuelPercentValue < 0) {
+    console.warn('StopCardCalculator: Invalid contingencyFuelPercent:', contingencyFuelPercent);
+  }
+  
+  if (isNaN(reserveFuelValue)) {
+    console.warn('StopCardCalculator: Invalid reserveFuel:', reserveFuel);
+  }
+  
+  if (isNaN(deckTimePerStopValue) || deckTimePerStopValue < 0) {
+    console.warn('StopCardCalculator: Invalid deckTimePerStop:', deckTimePerStop);
+  }
+  
+  if (isNaN(deckFuelFlowValue) || deckFuelFlowValue < 0) {
+    console.warn('StopCardCalculator: Invalid deckFuelFlow:', deckFuelFlow);
   }
 
   console.log('StopCardCalculator: Generating stop cards with', waypoints.length, 'waypoints');
@@ -144,16 +197,53 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   }
 
   // Calculate auxiliary fuel values
-  const taxiFuelValue = taxiFuel;
-  const reserveFuelValue = reserveFuel;
+  // Using our converted numeric values
+  
+  // Log the numeric values being used
+  console.log('⛽ Using numeric fuel values:', {
+    taxiFuelValue, 
+    reserveFuelValue,
+    contingencyFuelPercentValue,
+    deckTimePerStopValue,
+    deckFuelFlowValue
+  });
 
   // Calculate intermediate stops (for deck fuel)
   const intermediateStops = Math.max(0, waypoints.length - 2);
-  const deckTimeHours = (intermediateStops * deckTimePerStop) / 60; // Convert from minutes to hours
-  const deckFuelValue = Math.round(deckTimeHours * deckFuelFlow);
+  
+  // Calculate deck time and fuel
+  const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours
+  const deckFuelValue = Math.round(deckTimeHours * deckFuelFlowValue);
 
   // Calculate contingency fuel
-  const contingencyFuelValue = Math.round((totalTripFuel * contingencyFuelPercent) / 100);
+  const contingencyFuelValue = Math.round((totalTripFuel * contingencyFuelPercentValue) / 100);
+  
+  // Log the calculated values with more detail
+  console.log('🧮 Calculated auxiliary values with detailed breakdown:', {
+    taxiFuel_passedValue: taxiFuel,
+    taxiFuel_convertedValue: taxiFuelValue,
+    taxiFuel_afterConversion: taxiFuelValue,
+    
+    reserveFuel_passedValue: reserveFuel,
+    reserveFuel_convertedValue: reserveFuelValue,
+    
+    contingencyFuelPercent_passedValue: contingencyFuelPercent,
+    contingencyFuelPercent_convertedValue: contingencyFuelPercentValue,
+    contingencyFuelPercent_calculation: `${totalTripFuel} * ${contingencyFuelPercentValue} / 100 = ${contingencyFuelValue}`,
+    contingencyFuelValue,
+    
+    deckTimePerStop_passedValue: deckTimePerStop,
+    deckTimePerStop_convertedValue: deckTimePerStopValue,
+    
+    deckFuelFlow_passedValue: deckFuelFlow,
+    deckFuelFlow_convertedValue: deckFuelFlowValue,
+    
+    deckFuel_calculation: `${intermediateStops} stops * (${deckTimePerStopValue} mins / 60) hrs * ${deckFuelFlowValue} lbs/hr = ${deckFuelValue}`,
+    deckFuelValue,
+    
+    intermediateStops,
+    totalTripFuel
+  });
 
   // Calculate total fuel required for the entire trip
   const totalFuelRequired = taxiFuelValue + totalTripFuel + contingencyFuelValue + reserveFuelValue + deckFuelValue;
@@ -165,6 +255,21 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     // Total fuel needed for entire journey at departure
     const departureFuelNeeded = totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue;
     
+    // Create fuel components text for departure
+    const departureFuelComponentsText = `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue}`;
+    
+    // DEBUG: Log the fuel components for departure
+    console.log('🔥 DEPARTURE CARD FUEL COMPONENTS (DETAILED):', {
+      totalTripFuel,
+      contingencyFuelValue,
+      taxiFuelValue,
+      deckFuelValue,
+      reserveFuelValue,
+      departureFuelNeeded,
+      actualSum: totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue,
+      componentText: departureFuelComponentsText
+    });
+    
     // Calculate max passengers for departure
     let departureMaxPassengers = 0;
     if (selectedAircraft) {
@@ -174,16 +279,24 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         selectedAircraft.emptyWeight -
         departureFuelNeeded
       );
-      departureMaxPassengers = Math.floor(departureUsableLoad / passengerWeight);
+      departureMaxPassengers = Math.floor(departureUsableLoad / passengerWeightValue);
       
       // Ensure we don't exceed aircraft capacity
       departureMaxPassengers = Math.min(departureMaxPassengers, selectedAircraft.maxPassengers || 19);
     }
     
-    // Create fuel components text for departure
-    const departureFuelComponentsText = `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue}`;
+    // Create departure card with detailed console logging
+    console.log('🔎 Creating departure card with components:', {
+      tripFuel: totalTripFuel,
+      contingencyFuel: contingencyFuelValue,
+      contingencyRate: `${contingencyFuelPercentValue}%`,
+      taxiFuel: taxiFuelValue,
+      deckFuel: deckFuelValue,
+      reserveFuel: reserveFuelValue,
+      totalFuel: departureFuelNeeded,
+      componentText: departureFuelComponentsText
+    });
     
-    // Create departure card
     const departureCard = {
       index: 'D',
       id: departureWaypoint.id || 'departure',
@@ -196,7 +309,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       totalFuel: departureFuelNeeded,
       maxPassengers: departureMaxPassengers,
       maxPassengersDisplay: departureMaxPassengers,
-      maxPassengersWeight: departureMaxPassengers * passengerWeight,
+      maxPassengersWeight: departureMaxPassengers * passengerWeightValue,
       groundSpeed: 0,
       headwind: 0,
       deckTime: deckTimeHours * 60, // Convert back to minutes for display
@@ -247,8 +360,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const remainingIntermediateStops = Math.max(0, legDetails.length - i - 1 - 1); // -1 for current leg, -1 for final leg
 
     // Calculate remaining deck fuel - only for intermediate stops
-    const remainingDeckTimeHours = (remainingIntermediateStops * deckTimePerStop) / 60;
-    const remainingDeckFuel = Math.round(remainingDeckTimeHours * deckFuelFlow);
+    const remainingDeckTimeHours = (remainingIntermediateStops * deckTimePerStopValue) / 60;
+    const remainingDeckFuel = Math.round(remainingDeckTimeHours * deckFuelFlowValue);
 
     // Calculate remaining contingency fuel (proportional to remaining trip fuel)
     let remainingContingencyFuel = 0;
@@ -286,6 +399,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // Calculate potential landing fuel (reserve + full unused contingency)
       const potentialLandingFuel = reserveFuelValue + fullContingencyFuel;
       fuelComponentsText = `Reserve:${reserveFuelValue} Extra:0 FullCont:${remainingContingencyFuel} (${reserveFuelValue}+${fullContingencyFuel}=${potentialLandingFuel})`;
+      
+      // Log the destination fuel components
+      console.log('🔚 DESTINATION CARD FUEL COMPONENTS:', {
+        reserveFuel: reserveFuelValue,
+        fullContingencyFuel,
+        remainingContingencyFuel,
+        potentialLandingFuel,
+        componentText: fuelComponentsText
+      });
     } else {
       // At intermediate stops, you need fuel for remaining legs, plus reserve
       fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue;
@@ -301,6 +423,16 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       if (remainingDeckFuel > 0) {
         fuelComponentsText += ` Deck:${remainingDeckFuel}`;
       }
+      
+      // Log the intermediate stop fuel components
+      console.log('🛑 INTERMEDIATE STOP FUEL COMPONENTS:', {
+        remainingTripFuel,
+        remainingContingencyFuel,
+        remainingDeckFuel,
+        reserveFuel: reserveFuelValue,
+        fuelNeeded,
+        componentText: fuelComponentsText
+      });
     }
 
     // Calculate max passengers based on remaining fuel needed
@@ -312,7 +444,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         selectedAircraft.emptyWeight -
         fuelNeeded
       );
-      maxPassengers = Math.floor(usableLoad / passengerWeight);
+      maxPassengers = Math.floor(usableLoad / passengerWeightValue);
 
       // Ensure we don't exceed aircraft capacity
       maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
@@ -321,7 +453,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     // For final destination, show "Final Stop" instead of passenger count
     const displayMaxPassengers = isFinalDestination ? "Final Stop" : maxPassengers;
     const maxPassengersValue = isFinalDestination ? null : maxPassengers;
-    const maxPassengersWeight = isFinalDestination ? null : (maxPassengers * passengerWeight);
+    const maxPassengersWeight = isFinalDestination ? null : (maxPassengers * passengerWeightValue);
 
     // Only the final waypoint is a destination
     const isDeparture = false; // We already added the departure card

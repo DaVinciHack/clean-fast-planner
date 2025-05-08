@@ -33,12 +33,14 @@ const MainCard = ({
   onRegionChange = () => {},
   regionLoading = false,
   // Read-only values from settings
-  reserveFuel = 600,
+  reserveFuel = 0, // Changed default to 0 for safety
   // Waypoints for stop cards
   waypoints = [],
-  passengerWeight = 220,
-  deckTimePerStop = 5,
-  deckFuelFlow = 400,
+  passengerWeight = 0, // Changed default to 0 for safety
+  deckTimePerStop = 0, // Changed default to 0 for safety
+  deckFuelFlow = 0, // Changed default to 0 for safety
+  contingencyFuelPercent = 0, // Added with 0 default for safety
+  taxiFuel = 0, // Added with 0 default for safety
   // Stop cards prop
   stopCards = [],
   // Weather props
@@ -447,8 +449,10 @@ const MainCard = ({
             selectedAircraft={selectedAircraft}
             passengerWeight={passengerWeight}
             reserveFuel={reserveFuel}
+            contingencyFuelPercent={contingencyFuelPercent} // Use the value passed from props
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}
+            taxiFuel={taxiFuel} // Use the value passed from props
             weather={weather}
             stopCards={stopCards}
           />

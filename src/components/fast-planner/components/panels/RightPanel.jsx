@@ -106,6 +106,8 @@ const RightPanel = ({
         passengerWeight={passengerWeight}
         deckTimePerStop={deckTimePerStop}
         deckFuelFlow={deckFuelFlow}
+        contingencyFuelPercent={contingencyFuelPercent} // Pass contingencyFuelPercent to MainCard
+        taxiFuel={taxiFuel} // Pass taxiFuel to MainCard
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
         // Added cargoWeight for the Save Flight button to calculate payload
