@@ -13,6 +13,10 @@ const FinanceCard = ({ id }) => {
   const [includeLandingFees, setIncludeLandingFees] = useState(true);
   const [additionalCost, setAdditionalCost] = useState(0);
   const [useFlightTime, setUseFlightTime] = useState(true); // Toggle between flight time and total time
+  const [customLandings, setCustomLandings] = useState(0); // Custom number of landings
+  const [useCustomLandings, setUseCustomLandings] = useState(false); // Toggle between waypoint count and custom landings
+  const [taxRate, setTaxRate] = useState(25); // Tax rate percentage
+  const [includeTax, setIncludeTax] = useState(false); // Toggle tax calculation
   
   // Route data extracted from the DOM
   const [routeData, setRouteData] = useState({
@@ -122,6 +126,17 @@ const FinanceCard = ({ id }) => {
       // Calculate main cost based on billing method
       let mainCost = 0;
       
+      // Determine the number of landings based on settings
+      const landingsCount = useCustomLandings ? customLandings : routeData.landings;
+      
+      // Calculate landing fees if included
+      const landingCost = includeLandingFees && landingsCount > 0
+        ? landingsCount * landingFee
+        : 0;
+      
+      // Additional cost
+      const extra = parseFloat(additionalCost) || 0;
+      
       if (billingMethod === 'hourly') {
         // Use either flight time or total time based on toggle
         const timeHours = useFlightTime ? routeData.flightTimeHours : routeData.totalTimeHours;
@@ -129,35 +144,50 @@ const FinanceCard = ({ id }) => {
         
         mainCost = timeHours * hourlyRate;
         
+        // Subtotal before tax
+        const subtotal = mainCost + landingCost + extra;
+        
+        // Calculate tax if included
+        const taxAmount = includeTax ? (subtotal * taxRate / 100) : 0;
+        
+        // Total cost including tax if applicable
+        const totalCost = subtotal + taxAmount;
+        
         return {
           mainCost,
           timeHours,
           timeDisplay,
           isFlightTime: useFlightTime,
-          landingCost: includeLandingFees && routeData.landings > 0 ? routeData.landings * landingFee : 0,
-          extra: parseFloat(additionalCost) || 0,
-          totalCost: mainCost + 
-                     (includeLandingFees && routeData.landings > 0 ? routeData.landings * landingFee : 0) + 
-                     (parseFloat(additionalCost) || 0)
+          landingCost,
+          landingsCount,
+          extra,
+          subtotal,
+          taxAmount,
+          taxRate: includeTax ? taxRate : 0,
+          includeTax,
+          totalCost
         };
       } else { // mileage
         mainCost = routeData.distance * mileageRate;
         
-        // Calculate landing fees if included
-        const landingCost = includeLandingFees && routeData.landings > 0
-          ? routeData.landings * landingFee
-          : 0;
+        // Subtotal before tax
+        const subtotal = mainCost + landingCost + extra;
         
-        // Additional cost
-        const extra = parseFloat(additionalCost) || 0;
+        // Calculate tax if included
+        const taxAmount = includeTax ? (subtotal * taxRate / 100) : 0;
         
-        // Total cost
-        const totalCost = mainCost + landingCost + extra;
+        // Total cost including tax if applicable
+        const totalCost = subtotal + taxAmount;
         
         return {
           mainCost,
           landingCost,
+          landingsCount,
           extra,
+          subtotal,
+          taxAmount,
+          taxRate: includeTax ? taxRate : 0,
+          includeTax,
           totalCost
         };
       }
@@ -257,22 +287,125 @@ const FinanceCard = ({ id }) => {
           />
         </div>
         
+        {/* Time Type Toggle Switch */}
+        {billingMethod === 'hourly' && (
+          <div className="mb-4">
+            <label className="block mb-2">Time Type:</label>
+            <div className="flex items-center">
+              <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                <input 
+                  type="checkbox" 
+                  id="time-toggle" 
+                  checked={!useFlightTime}
+                  onChange={() => setUseFlightTime(!useFlightTime)}
+                  className="absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                  style={{
+                    top: '0',
+                    left: useFlightTime ? '0' : '16px',
+                    transition: 'left 0.2s',
+                    borderColor: useFlightTime ? '#007bff' : '#40c057'
+                  }}
+                />
+                <label 
+                  htmlFor="time-toggle" 
+                  className="block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #007bff 50%, #40c057 50%)`,
+                    opacity: 0.3
+                  }}
+                ></label>
+              </div>
+              <span className={`ml-2 ${useFlightTime ? 'font-bold' : ''}`} style={{ color: useFlightTime ? '#007bff' : '#e0e0e0' }}>
+                Flight Time
+              </span>
+              <span className="mx-2">|</span>
+              <span className={`${!useFlightTime ? 'font-bold' : ''}`} style={{ color: !useFlightTime ? '#40c057' : '#e0e0e0' }}>
+                Total Time
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {/* Custom Landings Toggle */}
+        {includeLandingFees && (
+          <div className="mb-4">
+            <div className="flex items-center mb-2">
+              <input 
+                type="checkbox" 
+                id="use-custom-landings" 
+                checked={useCustomLandings}
+                onChange={(e) => setUseCustomLandings(e.target.checked)}
+                className="mr-2"
+              />
+              <label htmlFor="use-custom-landings">Specify Landing Count</label>
+            </div>
+            
+            {useCustomLandings && (
+              <div className="mb-2">
+                <label htmlFor="custom-landings">Number of Landings:</label>
+                <input 
+                  type="number" 
+                  id="custom-landings" 
+                  value={customLandings}
+                  min="0"
+                  step="1"
+                  onChange={(e) => setCustomLandings(Number(e.target.value))}
+                  className="w-full p-2 border rounded"
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  Only count landings at airports, not rigs
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Tax Calculator */}
+        <div className="mb-4">
+          <div className="flex items-center mb-2">
+            <input 
+              type="checkbox" 
+              id="include-tax" 
+              checked={includeTax}
+              onChange={(e) => setIncludeTax(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="include-tax">Include Tax</label>
+          </div>
+          
+          {includeTax && (
+            <div className="mb-2">
+              <label htmlFor="tax-rate">Tax Rate (%):</label>
+              <input 
+                type="number" 
+                id="tax-rate" 
+                value={taxRate}
+                min="0"
+                max="100"
+                step="0.1"
+                onChange={(e) => setTaxRate(Number(e.target.value))}
+                className="w-full p-2 border rounded"
+              />
+            </div>
+          )}
+        </div>
+        
         <h4>Cost Breakdown</h4>
         {routeData.hasRoute && costs ? (
           <div className="finance-results">
             <div className="finance-item">
               <div className="finance-label">
                 {billingMethod === 'hourly' 
-                  ? `Flight Time Cost (${routeData.flightTime}):`
+                  ? `${costs.isFlightTime ? 'Flight' : 'Total'} Time Cost (${costs.timeDisplay}):`
                   : `Distance Cost (${routeData.distance} nm):`
                 }
               </div>
               <div className="finance-value">{formatCurrency(costs.mainCost)}</div>
             </div>
             
-            {includeLandingFees && routeData.landings > 0 && (
+            {includeLandingFees && costs.landingsCount > 0 && (
               <div className="finance-item">
-                <div className="finance-label">Landing Fees ({routeData.landings} landings):</div>
+                <div className="finance-label">Landing Fees ({costs.landingsCount} landings):</div>
                 <div className="finance-value">{formatCurrency(costs.landingCost)}</div>
               </div>
             )}
@@ -281,6 +414,22 @@ const FinanceCard = ({ id }) => {
               <div className="finance-item">
                 <div className="finance-label">Additional Cost:</div>
                 <div className="finance-value">{formatCurrency(costs.extra)}</div>
+              </div>
+            )}
+            
+            {/* Display subtotal if tax is included */}
+            {includeTax && (
+              <div className="finance-item">
+                <div className="finance-label">Subtotal:</div>
+                <div className="finance-value">{formatCurrency(costs.subtotal)}</div>
+              </div>
+            )}
+            
+            {/* Display tax amount if included */}
+            {includeTax && (
+              <div className="finance-item">
+                <div className="finance-label">Tax ({taxRate}%):</div>
+                <div className="finance-value">{formatCurrency(costs.taxAmount)}</div>
               </div>
             )}
             
