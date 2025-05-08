@@ -940,25 +940,81 @@ const FastPlannerApp = () => {
     console.log('🌬️ Old weather state:', weather);
 
     // Immediately set the new weather state
-    setWeather(newWeather); // Updating weather state will trigger the centralized useEffect
-    console.log('🌬️ Weather state updated to:', newWeather);
-
-    // Force an immediate UI update to ensure changes are reflected
+    setWeather(newWeather);
+    
+    // Force an immediate UI update
     setForceUpdate(prev => prev + 1);
     
-    // Force a clear and recalculation when wind changes
-    // This two-step process ensures the route display updates correctly
-    if (waypointManagerRef.current && waypoints && waypoints.length >= 2 && selectedAircraft) {
-      console.log('🌬️ Forcing route display update for wind change...');
+    // CRITICAL: Manually recalculate the route with the new wind settings
+    if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+      console.log('🌬️ Manually recalculating route with new wind settings...');
       
-      // Step 1: Clear the route display to ensure a fresh redraw
-      // This is important for wind changes to be properly reflected
-      waypointManagerRef.current.updateRoute(null);
-      
-      // Step 2: Wait a moment then force recalculation with current route stats
-      setTimeout(() => {
+      try {
+        // Step 1: Clear the route display
+        if (waypointManagerRef.current) {
+          waypointManagerRef.current.updateRoute(null);
+        }
+        
+        // Step 2: Manually calculate with numeric settings
+        const numericSettings = {
+          passengerWeight: Number(flightSettings.passengerWeight),
+          taxiFuel: Number(flightSettings.taxiFuel),
+          contingencyFuelPercent: Number(flightSettings.contingencyFuelPercent),
+          reserveFuel: Number(flightSettings.reserveFuel),
+          deckTimePerStop: Number(flightSettings.deckTimePerStop),
+          deckFuelFlow: Number(flightSettings.deckFuelFlow),
+          cargoWeight: Number(flightSettings.cargoWeight || 0)
+        };
+        
+        console.log('🌬️ Using numeric settings for manual recalculation:', numericSettings);
+        
+        // Import ComprehensiveFuelCalculator directly
+        const ComprehensiveFuelCalculator = require('./modules/calculations/fuel/ComprehensiveFuelCalculator').default;
+        
+        // Calculate with the new wind settings
+        const { enhancedResults, stopCards: newStopCards } = ComprehensiveFuelCalculator.calculateAllFuelData(
+          waypoints,
+          selectedAircraft,
+          numericSettings,
+          newWeather
+        );
+        
+        if (enhancedResults) {
+          console.log('🌬️ Manual calculation complete with wind settings:', newWeather);
+          
+          // Always ensure the wind data is properly set
+          enhancedResults.windAdjusted = true;
+          enhancedResults.windData = {
+            windSpeed: newWeather.windSpeed,
+            windDirection: newWeather.windDirection,
+            avgHeadwind: enhancedResults.windData?.avgHeadwind || 0
+          };
+          
+          console.log('🌬️ Recalculated time with wind effects:', {
+            timeHours: enhancedResults.timeHours,
+            estimatedTime: enhancedResults.estimatedTime,
+            windAdjusted: enhancedResults.windAdjusted
+          });
+          
+          // Update state with new calculations
+          setRouteStats(enhancedResults);
+          setStopCards(newStopCards);
+          
+          // Update global reference immediately
+          window.currentRouteStats = enhancedResults;
+          
+          // Step 3: Update the route display with the recalculated stats
+          setTimeout(() => {
+            if (waypointManagerRef.current) {
+              waypointManagerRef.current.updateRoute(enhancedResults);
+            }
+          }, 100);
+        }
+      } catch (error) {
+        console.error('🌬️ Error in manual recalculation:', error);
+        
+        // Fallback: Update with current stats but with updated wind data
         if (window.currentRouteStats) {
-          // Make sure wind data is correctly marked in the stats
           window.currentRouteStats.windAdjusted = true;
           window.currentRouteStats.windData = {
             windSpeed: newWeather.windSpeed,
@@ -966,17 +1022,11 @@ const FastPlannerApp = () => {
             avgHeadwind: window.currentRouteStats.windData?.avgHeadwind || 0
           };
           
-          console.log('🌬️ Updating route with wind-adjusted data:', {
-            windSpeed: newWeather.windSpeed,
-            windDirection: newWeather.windDirection,
-            timeHours: window.currentRouteStats.timeHours,
-            estimatedTime: window.currentRouteStats.estimatedTime
-          });
-          
-          // Update the route with the wind-adjusted stats
-          waypointManagerRef.current.updateRoute(window.currentRouteStats);
+          if (waypointManagerRef.current) {
+            waypointManagerRef.current.updateRoute(window.currentRouteStats);
+          }
         }
-      }, 100);
+      }
     }
   };
 
