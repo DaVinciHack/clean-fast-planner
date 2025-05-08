@@ -34,9 +34,12 @@ function App() {
         nav.style.justifyContent = 'space-between';
         nav.style.zIndex = '1000';
         
+        // Get the base path from the current URL
+        const basePath = '/planner';
+        
         // Create links
         const homeLink = document.createElement('a');
-        homeLink.href = '/';
+        homeLink.href = `${basePath}/`;
         homeLink.textContent = 'Flight Planner';
         homeLink.style.color = 'white';
         homeLink.style.textDecoration = 'none';
@@ -44,30 +47,30 @@ function App() {
         homeLink.style.marginRight = '10px';
         
         const debugLink = document.createElement('a');
-        debugLink.href = '/debug';
+        debugLink.href = `${basePath}/debug`;
         debugLink.textContent = 'OSDK Debugger';
         debugLink.style.color = 'white';
         debugLink.style.textDecoration = 'none';
         debugLink.style.padding = '5px 10px';
         
         // Highlight the active link
-        if (window.location.pathname === '/') {
+        if (window.location.pathname === `${basePath}/` || window.location.pathname === basePath) {
           homeLink.style.backgroundColor = '#555';
-        } else if (window.location.pathname === '/debug') {
+        } else if (window.location.pathname === `${basePath}/debug`) {
           debugLink.style.backgroundColor = '#555';
         }
         
         // Add click handlers for SPA navigation
         homeLink.addEventListener('click', (e) => {
           e.preventDefault();
-          window.history.pushState(null, '', '/');
-          setCurrentPath('/');
+          window.history.pushState(null, '', `${basePath}/`);
+          setCurrentPath(`${basePath}/`);
         });
         
         debugLink.addEventListener('click', (e) => {
           e.preventDefault();
-          window.history.pushState(null, '', '/debug');
-          setCurrentPath('/debug');
+          window.history.pushState(null, '', `${basePath}/debug`);
+          setCurrentPath(`${basePath}/debug`);
         });
         
         // Add links to nav
@@ -99,9 +102,14 @@ function App() {
   
   // Determine which component to render based on path
   const renderComponent = () => {
-    switch (currentPath) {
+    // Handle paths with or without the /planner prefix
+    const path = currentPath.replace(/^\/planner/, '');
+    
+    switch (path) {
       case '/debug':
         return <OSDKDebugger />;
+      case '':
+      case '/':
       default:
         return <FastPlannerPage />;
     }
