@@ -1,36 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BaseCard from './BaseCard';
 
-// Custom styles for Finance Calculator
-const financeStyles = `
-  .checkbox-icon {
-    transition: all 0.2s ease-in-out;
-  }
-  
-  .checkbox-icon svg {
-    transition: all 0.15s ease-in-out;
-    transform-origin: center;
-  }
-  
-  .custom-checkbox label:hover .checkbox-icon {
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-  }
-  
-  .custom-checkbox input:checked + label .checkbox-icon svg {
-    animation: check-pop 0.2s ease-in-out;
-  }
-  
-  @keyframes check-pop {
-    0% { transform: scale(0); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-  }
-  
-  .custom-checkbox input:focus + label .checkbox-icon {
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
-  }
-`;
-
 /**
  * Finance Calculator Component with browser persistence
  */
@@ -308,8 +278,6 @@ const FinanceCard = ({ id }) => {
   
   return (
     <BaseCard title="Finance Calculator" id={id}>
-      {/* Add dynamic styles */}
-      <style dangerouslySetInnerHTML={{ __html: financeStyles }} />
       <div className="control-section">
         <h4>Flight Cost Parameters</h4>
         
@@ -355,28 +323,15 @@ const FinanceCard = ({ id }) => {
         )}
         
         <div className="mb-2">
-          <div className="custom-checkbox">
+          <div className="flex items-center">
             <input 
               type="checkbox" 
               id="include-landing-fees" 
               checked={includeLandingFees}
               onChange={(e) => updateIncludeLandingFees(e.target.checked)}
-              className="hidden"
+              className="mr-2"
             />
-            <label htmlFor="include-landing-fees" className="flex items-center cursor-pointer">
-              <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
-                style={{ 
-                  backgroundColor: includeLandingFees ? '#007bff' : 'transparent',
-                  borderColor: includeLandingFees ? '#007bff' : '#484848'
-                }}>
-                {includeLandingFees && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
-                  </svg>
-                )}
-              </span>
-              <span>Include Landing Fees</span>
-            </label>
+            <label htmlFor="include-landing-fees">Include Landing Fees</label>
           </div>
         </div>
         
@@ -408,74 +363,43 @@ const FinanceCard = ({ id }) => {
           />
         </div>
         
-        {/* Time Type Toggle Switch - Enhanced UI */}
+        {/* Time Type Toggle Switch - Simplified UI */}
         {billingMethod === 'hourly' && (
           <div className="mb-4">
             <label className="block mb-2">Time Type:</label>
             <div className="flex items-center">
-              <div className="relative inline-block w-10 mr-2 align-middle select-none">
-                <input 
-                  type="checkbox" 
-                  id="time-toggle" 
-                  checked={!useFlightTime}
-                  onChange={() => updateUseFlightTime(!useFlightTime)}
-                  className="hidden"
-                />
-                <label 
-                  htmlFor="time-toggle" 
-                  className="block overflow-hidden h-6 rounded-full cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #007bff 50%, #40c057 50%)`,
-                    opacity: useFlightTime ? 0.2 : 0.2
-                  }}
-                >
-                  <span className="block w-6 h-6 rounded-full bg-white shadow"
-                    style={{
-                      transform: useFlightTime ? 'translateX(0)' : 'translateX(16px)',
-                      transition: 'transform 0.2s ease-in-out',
-                      borderWidth: '2px',
-                      borderStyle: 'solid',
-                      borderColor: useFlightTime ? '#007bff' : '#40c057'
-                    }}
-                  ></span>
-                </label>
+              <input 
+                type="checkbox" 
+                id="time-toggle" 
+                checked={!useFlightTime}
+                onChange={() => updateUseFlightTime(!useFlightTime)}
+                className="mr-2"
+              />
+              <div className="flex-1">
+                <span className={`${useFlightTime ? 'font-bold text-blue-500' : ''}`}>
+                  Flight Time
+                </span>
+                <span className="mx-2">|</span>
+                <span className={`${!useFlightTime ? 'font-bold text-green-500' : ''}`}>
+                  Total Time
+                </span>
               </div>
-              <span className={`ml-2 ${useFlightTime ? 'font-bold' : ''}`} style={{ color: useFlightTime ? '#007bff' : '#e0e0e0' }}>
-                Flight Time
-              </span>
-              <span className="mx-2">|</span>
-              <span className={`${!useFlightTime ? 'font-bold' : ''}`} style={{ color: !useFlightTime ? '#40c057' : '#e0e0e0' }}>
-                Total Time
-              </span>
             </div>
           </div>
         )}
         
-        {/* Custom Landings Toggle - Enhanced UI */}
+        {/* Custom Landings Toggle - Standard UI */}
         {includeLandingFees && (
           <div className="mb-4">
-            <div className="custom-checkbox mb-2">
+            <div className="flex items-center mb-2">
               <input 
                 type="checkbox" 
                 id="use-custom-landings" 
                 checked={useCustomLandings}
                 onChange={(e) => updateUseCustomLandings(e.target.checked)}
-                className="hidden"
+                className="mr-2"
               />
-              <label htmlFor="use-custom-landings" className="flex items-center cursor-pointer">
-                <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
-                  style={{ 
-                    backgroundColor: useCustomLandings ? '#007bff' : 'transparent',
-                    borderColor: useCustomLandings ? '#007bff' : '#484848'
-                  }}>
-                  {useCustomLandings && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
-                    </svg>
-                  )}
-                </span>
-                <span>Specify Landing Count</span>
-              </label>
+              <label htmlFor="use-custom-landings">Specify Landing Count</label>
             </div>
             
             {useCustomLandings && (
@@ -498,30 +422,17 @@ const FinanceCard = ({ id }) => {
           </div>
         )}
         
-        {/* Tax Calculator - Enhanced UI */}
+        {/* Tax Calculator - Standard UI */}
         <div className="mb-4">
-          <div className="custom-checkbox mb-2">
+          <div className="flex items-center mb-2">
             <input 
               type="checkbox" 
               id="include-tax" 
               checked={includeTax}
               onChange={(e) => updateIncludeTax(e.target.checked)}
-              className="hidden"
+              className="mr-2"
             />
-            <label htmlFor="include-tax" className="flex items-center cursor-pointer">
-              <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
-                style={{ 
-                  backgroundColor: includeTax ? '#007bff' : 'transparent',
-                  borderColor: includeTax ? '#007bff' : '#484848'
-                }}>
-                {includeTax && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
-                  </svg>
-                )}
-              </span>
-              <span>Include Tax</span>
-            </label>
+            <label htmlFor="include-tax">Include Tax</label>
           </div>
           
           {includeTax && (
