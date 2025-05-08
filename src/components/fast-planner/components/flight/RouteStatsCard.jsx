@@ -650,21 +650,30 @@ const RouteStatsCard = ({
       return stats.calculatedPassengers;
     }
     
+    // If routeStats has usableLoad and maxPassengers, use those directly
+    if (stats.usableLoad !== undefined && stats.maxPassengers !== undefined) {
+      console.log('Using maxPassengers directly from route stats:', stats.maxPassengers);
+      return stats.maxPassengers;
+    }
+    
     // Check if we have stop cards with passenger info
     if (stopCards && stopCards.length > 0) {
       const departureCard = stopCards.find(card => card.isDeparture);
       if (departureCard && departureCard.maxPassengers !== undefined) {
+        console.log('Using maxPassengers from departure card:', departureCard.maxPassengers);
         return departureCard.maxPassengers;
       }
     }
     
     // If we have fuelData and selectedAircraft, use PassengerCalculator
     if (selectedAircraft && fuelData && fuelData.totalFuel) {
-      return PassengerCalculator.calculateMaxPassengers(
+      const maxPax = PassengerCalculator.calculateMaxPassengers(
         selectedAircraft,
         fuelData.totalFuel,
         passengerWeight
       );
+      console.log('Calculated maxPassengers using PassengerCalculator:', maxPax);
+      return maxPax;
     }
     
     // Last resort fallback - return 0 instead of using partial data

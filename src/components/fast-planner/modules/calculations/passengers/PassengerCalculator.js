@@ -17,7 +17,7 @@ class PassengerCalculator {
    */
   static calculateMaxPassengers(aircraft, fuelWeight, passengerWeight) {
     // Validate inputs
-    if (!aircraft || !aircraft.emptyWeight || !aircraft.maxTakeoffWeight) {
+    if (!aircraft) {
       console.error('PassengerCalculator: Invalid aircraft data provided');
       return 0;
     }
@@ -32,14 +32,28 @@ class PassengerCalculator {
       return 0;
     }
     
-    // Calculate usable load (max takeoff weight minus empty weight minus fuel)
-    const usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum;
+    // Calculate available load for passengers
+    let usableLoadWithoutFuel = 0;
     
-    // If usable load is negative, return 0 (can't carry passengers)
-    if (usableLoadWithoutFuel <= 0) {
-      console.log('PassengerCalculator: No usable load available for passengers');
+    // First, try to use aircraft.usableLoad property if it exists
+    // This would be the most direct and accurate way
+    if (aircraft.usableLoad !== undefined) {
+      usableLoadWithoutFuel = Number(aircraft.usableLoad);
+      console.log('PassengerCalculator: Using aircraft.usableLoad directly:', usableLoadWithoutFuel);
+    }
+    // If not available, calculate it from maxTakeoffWeight and emptyWeight
+    else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
+      usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum;
+      console.log('PassengerCalculator: Calculated usableLoad from weight data:', usableLoadWithoutFuel);
+    } 
+    // If neither option is available, return 0
+    else {
+      console.error('PassengerCalculator: Cannot calculate usableLoad - missing aircraft weight data');
       return 0;
     }
+    
+    // Ensure usable load is not negative
+    usableLoadWithoutFuel = Math.max(0, usableLoadWithoutFuel);
     
     // Calculate max passengers based on usable load and passenger weight
     const maxByWeight = Math.floor(usableLoadWithoutFuel / passengerWeightNum);
