@@ -361,140 +361,35 @@ const RouteStatsCard = ({
   
   // Calculate total time (flight time + deck time)
   const calculateTotalTime = () => {
-    // CRITICAL FIX: Log current state to debug total time calculation
-    console.log('⚠️ Calculating total time with data:', {
-      flightTimeHours: stats.timeHours,
-      estimatedTime: stats.estimatedTime,
-      totalDeckTime, 
-      intermediateStops,
-      deckTimePerStopNum,
-      windAdjusted: stats.windAdjusted || false,
-      windSpeed: stats.windData?.windSpeed,
-      windDirection: stats.windData?.windDirection
+    // CRITICAL FIX: Get the exact same flight time that's displayed in the UI
+    const displayedFlightTime = calculateFlightTime(stats, waypoints, selectedAircraft);
+    
+    // Convert displayed time (HH:MM) to hours
+    let flightTimeHours = 0;
+    if (displayedFlightTime && displayedFlightTime !== '00:00') {
+      const [hours, minutes] = displayedFlightTime.split(':').map(Number);
+      flightTimeHours = hours + (minutes / 60);
+    }
+    
+    console.log('⚠️ Total time calculation using UI-displayed flight time:', {
+      displayedFlightTime,
+      flightTimeHours: flightTimeHours.toFixed(2),
+      totalDeckTime,
+      deckTimeHours: (totalDeckTime / 60).toFixed(2)
     });
-    
-    // Use totalTimeFormatted from stats if available
-    if (stats.totalTimeFormatted) {
-      console.log('⚠️ Using pre-calculated totalTimeFormatted:', stats.totalTimeFormatted);
-      return stats.totalTimeFormatted;
-    }
-    
-    // CRITICAL FIX: Check if we have stop cards with valid total time
-    if (stopCards && stopCards.length > 0) {
-      const destinationCard = stopCards.find(card => card.isDestination);
-      if (destinationCard && destinationCard.totalTime) {
-        const hours = Math.floor(destinationCard.totalTime);
-        const minutes = Math.floor((destinationCard.totalTime - hours) * 60);
-        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        console.log(`⚠️ Using destination card total time: ${formattedTime} (${destinationCard.totalTime} hours)`);
-        return formattedTime;
-      }
-    }
-    
-    // Get flight time from stats or try window.currentRouteStats
-    let flightTimeHours = stats.timeHours || 0;
-    
-    // CRITICAL FIX: If stats is not wind-adjusted but window.currentRouteStats is, use that instead
-    if (window.currentRouteStats && window.currentRouteStats.windAdjusted && 
-        (!stats.windAdjusted || !stats.windData) && 
-        window.currentRouteStats.timeHours > 0) {
-      console.log('⚠️ Using wind-adjusted time from window.currentRouteStats:', window.currentRouteStats.timeHours);
-      flightTimeHours = window.currentRouteStats.timeHours;
-    }
-    
-    // EMERGENCY FIX: If flight time is missing but we have waypoints and aircraft, calculate it
-    if (flightTimeHours === 0 && waypoints && waypoints.length >= 2 && selectedAircraft && selectedAircraft.cruiseSpeed) {
-      console.log('⚠️ Emergency calculation of flight time in calculateTotalTime');
-      
-      try {
-        // Calculate total distance if not in stats
-        let totalDistance;
-        if (stats.totalDistance && parseFloat(stats.totalDistance) > 0) {
-          totalDistance = parseFloat(stats.totalDistance);
-        } else {
-          totalDistance = parseFloat(calculateTotalDistance(waypoints));
-        }
-        
-        // Try to use wind calculations if we have the data
-        if (window.WindCalculations && (stats.windData || weather) && 
-            ((stats.windData && stats.windData.windSpeed > 0) || 
-             (weather && weather.windSpeed > 0))) {
-          console.log('⚠️ Attempting wind-adjusted emergency flight time calculation');
-          
-          // Get wind data from stats or weather prop
-          const windData = stats.windData || weather;
-          
-          // Try to use the first leg's course if available
-          let course;
-          if (stats.legs && stats.legs.length > 0 && stats.legs[0].course !== undefined) {
-            course = stats.legs[0].course;
-          } else if (waypoints.length >= 2) {
-            // Calculate course from the first two waypoints
-            const fromPoint = {
-              lat: waypoints[0].coords[1],
-              lon: waypoints[0].coords[0]
-            };
-            
-            const toPoint = {
-              lat: waypoints[1].coords[1],
-              lon: waypoints[1].coords[0]
-            };
-            
-            // Calculate course between points
-            course = window.WindCalculations.calculateCourse(fromPoint, toPoint);
-          }
-          
-          if (course !== undefined) {
-            // Calculate with wind adjustment
-            flightTimeHours = window.WindCalculations.calculateWindAdjustedTime(
-              totalDistance,
-              selectedAircraft.cruiseSpeed,
-              course,
-              windData.windSpeed,
-              windData.windDirection
-            );
-            
-            console.log(`⚠️ Wind-adjusted flight time: ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
-          } else {
-            // Fallback to basic calculation if we couldn't determine course
-            flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
-            console.log(`⚠️ Basic flight time (no course): ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
-          }
-        } else {
-          // Basic calculation without wind effects
-          flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
-          console.log(`⚠️ Basic flight time: ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
-        }
-      } catch (error) {
-        console.error('Error calculating flight time:', error);
-        // Last resort fallback
-        try {
-          const totalDistance = parseFloat(stats.totalDistance || calculateTotalDistance(waypoints));
-          flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
-        } catch (innerError) {
-          console.error('Critical error in fallback calculation:', innerError);
-          flightTimeHours = 0;
-        }
-      }
-    }
-    
-    // CRITICAL FIX: Log flight time hours before adding deck time
-    console.log(`⚠️ Flight time before adding deck time: ${flightTimeHours.toFixed(2)} hours`);
     
     // Convert deck time from minutes to hours
     const deckTimeHours = totalDeckTime / 60;
-    console.log(`⚠️ Deck time: ${deckTimeHours.toFixed(2)} hours (${totalDeckTime} minutes)`);
     
     // Add flight time and deck time
     const totalTimeHours = flightTimeHours + deckTimeHours;
-    console.log(`⚠️ Total time (flight + deck): ${totalTimeHours.toFixed(2)} hours`);
     
     // Format as HH:MM
     const hours = Math.floor(totalTimeHours);
     const minutes = Math.floor((totalTimeHours - hours) * 60);
     const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
-    console.log(`⚠️ Total formatted time: ${formattedTime}`);
+    console.log(`⚠️ Total time (displayed flight time + deck): ${formattedTime}`);
     return formattedTime;
   };
   
