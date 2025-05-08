@@ -991,13 +991,33 @@ const FastPlannerApp = () => {
         if (enhancedResults) {
           console.log('🌬️ Manual calculation complete with wind settings:', newWeather);
           
-          // Always ensure the wind data is properly set
+          // CRITICAL: Ensure wind data is properly set in all necessary places
           enhancedResults.windAdjusted = true;
+          
+          // Set wind data in the main object
           enhancedResults.windData = {
             windSpeed: newWeather.windSpeed,
             windDirection: newWeather.windDirection,
             avgHeadwind: enhancedResults.windData?.avgHeadwind || 0
           };
+          
+          // Also ensure each leg has proper wind data
+          if (enhancedResults.legs && enhancedResults.legs.length > 0) {
+            enhancedResults.legs.forEach((leg, index) => {
+              // Calculate headwind for each leg if missing
+              if (leg.headwind === undefined) {
+                // If WindCalculations is available, try to calculate headwind
+                if (window.WindCalculations && leg.heading !== undefined) {
+                  leg.headwind = window.WindCalculations.calculateHeadwindComponent(
+                    newWeather.windSpeed, 
+                    leg.heading, 
+                    newWeather.windDirection
+                  );
+                  console.log(`🌬️ Added headwind data to leg ${index+1}: ${leg.headwind.toFixed(2)} knots`);
+                }
+              }
+            });
+          }
           
           console.log('🌬️ Recalculated time with wind effects:', {
             timeHours: enhancedResults.timeHours,

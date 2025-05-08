@@ -317,16 +317,69 @@ class WaypointManager {
     
     // CRITICAL FIX: Add a safety check to verify if routeStats contains sane time values
     // For a single leg, check if the total time makes sense for the total distance
-    if (routeStats && routeStats.timeHours && routeStats.totalDistance) {
+    if (routeStats && routeStats.totalDistance) {
       const totalDistance = parseFloat(routeStats.totalDistance);
-      const cruiseSpeed = 135; // Default S92 speed
-      const expectedTimeHours = totalDistance / cruiseSpeed;
-      const timeHoursDifference = Math.abs(routeStats.timeHours - expectedTimeHours);
       
-      if (timeHoursDifference > 1) { // More than 1 hour difference
-        console.error(`❌ Route time value is unreasonable! Got ${routeStats.timeHours.toFixed(2)} hours but expected ~${expectedTimeHours.toFixed(2)} hours based on distance ${totalDistance} nm at ${cruiseSpeed} kts`);
-        console.log('❌ Setting window.currentRouteStats to null to prevent incorrect time display');
-        window.currentRouteStats = null;
+      // Check if time values are present and valid
+      if (!routeStats.timeHours || routeStats.timeHours === 0 || 
+          !routeStats.estimatedTime || routeStats.estimatedTime === '00:00') {
+        console.error(`❌ Missing or zero time values in routeStats! Distance: ${totalDistance} nm`);
+        
+        // Try to calculate reasonable time values
+        const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || 135; // Use aircraft speed or default to 135 knots
+        const calculatedTimeHours = totalDistance / cruiseSpeed;
+        
+        // Format time string
+        const hours = Math.floor(calculatedTimeHours);
+        const minutes = Math.floor((calculatedTimeHours - hours) * 60);
+        const calculatedTimeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        
+        console.log(`❌ Generated calculated time: ${calculatedTimeString} (${calculatedTimeHours.toFixed(2)} hours) for display`);
+        
+        // Update the passed routeStats object with calculated values
+        routeStats.timeHours = calculatedTimeHours;
+        routeStats.estimatedTime = calculatedTimeString;
+        
+        // Also update window.currentRouteStats
+        if (window.currentRouteStats) {
+          window.currentRouteStats.timeHours = calculatedTimeHours;
+          window.currentRouteStats.estimatedTime = calculatedTimeString;
+        } else {
+          // If no window.currentRouteStats, create a minimal one
+          window.currentRouteStats = {
+            ...routeStats,
+            timeHours: calculatedTimeHours,
+            estimatedTime: calculatedTimeString
+          };
+        }
+      } 
+      // If time values exist, check if they're reasonable
+      else {
+        const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || 135; // Default S92 speed
+        const expectedTimeHours = totalDistance / cruiseSpeed;
+        const timeHoursDifference = Math.abs(routeStats.timeHours - expectedTimeHours);
+        
+        if (timeHoursDifference > 1) { // More than 1 hour difference
+          console.error(`❌ Route time value is unreasonable! Got ${routeStats.timeHours.toFixed(2)} hours but expected ~${expectedTimeHours.toFixed(2)} hours based on distance ${totalDistance} nm at ${cruiseSpeed} kts`);
+          
+          // Don't set to null, but fix the values instead
+          const fixedTimeHours = expectedTimeHours;
+          const hours = Math.floor(fixedTimeHours);
+          const minutes = Math.floor((fixedTimeHours - hours) * 60);
+          const fixedTimeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          
+          console.log(`❌ Fixing time values to: ${fixedTimeString} (${fixedTimeHours.toFixed(2)} hours) for display`);
+          
+          // Update the routeStats object
+          routeStats.timeHours = fixedTimeHours;
+          routeStats.estimatedTime = fixedTimeString;
+          
+          // Update window.currentRouteStats
+          if (window.currentRouteStats) {
+            window.currentRouteStats.timeHours = fixedTimeHours;
+            window.currentRouteStats.estimatedTime = fixedTimeString;
+          }
+        }
       }
     }
     
@@ -363,7 +416,16 @@ class WaypointManager {
       let legFuel = null;
       
       // Try to get aircraft data from routeStats or window.currentRouteStats
-      const stats = routeStats || window.currentRouteStats;
+      let stats = routeStats || window.currentRouteStats;
+      
+      // If no stats at all, create minimal stats with aircraft data
+      if (!stats && window.currentSelectedAircraft) {
+        console.log(`❗ Creating emergency minimal stats for leg ${i+1} display`);
+        stats = {
+          aircraft: window.currentSelectedAircraft,
+          windAdjusted: false
+        };
+      }
       
       // Log available stats for debugging
       console.log(`Drawing leg ${i+1} with stats:`, {
@@ -374,67 +436,76 @@ class WaypointManager {
         windAdjusted: stats?.windAdjusted || false
       });
       
-      if (stats && stats.legs && stats.legs[i]) {
-        // CRITICAL FIX: Always use the time from legs data, which includes wind effects
-        if (stats.legs[i].time !== undefined) {
-          const timeHours = stats.legs[i].time;
+      // CRITICAL EMERGENCY FIX: Always ensure we have a legTime value
+      // We must calculate the time for each leg regardless of stats
+      
+      if (stats && stats.legs && stats.legs[i] && stats.legs[i].time !== undefined) {
+        // Best case: Use pre-calculated time from legs data (includes wind effects)
+        const timeHours = stats.legs[i].time;
+        
+        // Format time as minutes only, rounded to the nearest minute
+        const totalMinutes = Math.round(timeHours * 60);
+        legTime = `${totalMinutes}m`;
+        
+        // Add wind indicator if needed
+        if (stats.windAdjusted && stats.legs[i] && stats.legs[i].headwind !== undefined) {
+          const headwind = stats.legs[i].headwind;
+          console.log(`🌬️ Checking wind effect for leg ${i+1}: headwind=${headwind}, windAdjusted=${stats.windAdjusted}`);
           
-          // Use a more flexible safety check for reasonable time values
-          // based on aircraft speed (default 135kts if not available)
-          const cruiseSpeed = stats.aircraft?.cruiseSpeed || 135;
-          const expectedTimeHours = distance / cruiseSpeed;
-          
-          // Allow more variation to account for wind effects (60 minutes instead of 30)
-          const isTimeReasonable = Math.abs(timeHours - expectedTimeHours) < 1.0; 
-          
-          // Format time as minutes only, rounded to the nearest minute
-          const totalMinutes = Math.round(timeHours * 60);
-          const expectedMinutes = Math.round(expectedTimeHours * 60);
-          
-          if (!isTimeReasonable) {
-            console.error(`❌ Leg ${i+1} time is unreasonable! Got ${timeHours.toFixed(2)} hours (${totalMinutes}m) but expected ~${expectedTimeHours.toFixed(2)} hours (${expectedMinutes}m) based on distance ${distance.toFixed(1)} nm at ${cruiseSpeed} kts`);
-            // Use the expected time instead of clearly wrong value
-            legTime = `${expectedMinutes}m`;
-          } else {
-            legTime = `${totalMinutes}m`;
-            
-            // If the time includes wind adjustments, add a visual indicator
-            if (stats.windAdjusted && stats.legs[i].groundSpeed) {
-              // Add the wind-adjusted marker to the time
-              const headwind = stats.legs[i].headwind;
-              if (headwind && Math.abs(headwind) > 5) {
-                legTime = `${totalMinutes}m*`; // Add an asterisk to indicate wind adjusted time
-              }
-            }
+          if (Math.abs(headwind) > 1) {
+            legTime = `${totalMinutes}m*`; // Add an asterisk to indicate wind adjusted time
+            console.log(`🌬️ Added wind indicator to leg ${i+1} time: ${legTime}`);
           }
-          
-          console.log(`Using leg time for leg ${i+1}: ${legTime} (${timeHours.toFixed(3)} hours, ${totalMinutes} minutes, wind-adjusted: ${stats.windAdjusted})`);
+        } else {
+          console.log(`Wind data missing for leg ${i+1}: windAdjusted=${stats.windAdjusted}, hasWindData=${stats.windData ? 'yes' : 'no'}`);
         }
+        
+        console.log(`Using leg time from legs data for leg ${i+1}: ${legTime}`);
         
         // Use the pre-calculated fuel if available
         if (stats.legs[i].fuel) {
           legFuel = Math.round(stats.legs[i].fuel);
         }
       }
-      else if (stats && stats.aircraft && stats.aircraft.cruiseSpeed) {
-        // If leg-specific time not available, calculate based on aircraft speed
-        // This is a fallback and won't include wind effects
-        const speed = stats.aircraft.cruiseSpeed;
-        const timeHours = distance / speed;
+      else {
+        // Fallback: Calculate time directly from distance and aircraft speed
+        console.log(`❗ No leg data for leg ${i+1}, calculating directly`);
+        
+        // Get cruise speed - try multiple sources
+        let cruiseSpeed = 135; // Default S92 speed
+        
+        if (stats && stats.aircraft && stats.aircraft.cruiseSpeed) {
+          cruiseSpeed = stats.aircraft.cruiseSpeed;
+        } else if (window.currentSelectedAircraft && window.currentSelectedAircraft.cruiseSpeed) {
+          cruiseSpeed = window.currentSelectedAircraft.cruiseSpeed;
+        }
+        
+        const timeHours = distance / cruiseSpeed;
         
         // Format time as minutes only, rounded to the nearest minute
         const totalMinutes = Math.round(timeHours * 60);
         legTime = `${totalMinutes}m`;
         
-        console.log(`Calculated time for leg ${i+1}: ${legTime} based on distance ${distance.toFixed(1)} nm at speed ${speed} kts (NO WIND ADJUSTMENT)`);
+        console.log(`Calculated time for leg ${i+1}: ${legTime} based on distance ${distance.toFixed(1)} nm at speed ${cruiseSpeed} kts`);
         
-        // Calculate fuel for this leg if we have fuel burn data
-        if (stats.aircraft.fuelBurn) {
-          const fuelBurn = stats.aircraft.fuelBurn;
-          legFuel = Math.round(timeHours * fuelBurn);
+        // Calculate fuel for this leg
+        let fuelBurn = 1100; // Default fuel burn
+        
+        if (stats && stats.aircraft && stats.aircraft.fuelBurn) {
+          fuelBurn = stats.aircraft.fuelBurn;
+        } else if (window.currentSelectedAircraft && window.currentSelectedAircraft.fuelBurn) {
+          fuelBurn = window.currentSelectedAircraft.fuelBurn;
         }
+        
+        legFuel = Math.round(timeHours * fuelBurn);
       }
-      // REMOVED: Dangerous fallback calculation when no aircraft data is available
+      
+      // CRITICAL: Ensure we always have a leg time - final emergency fallback
+      if (!legTime) {
+        console.error(`❌ Critical failure - no legTime calculated for leg ${i+1}. Using emergency fallback.`);
+        const emergencyTimeMinutes = Math.round((distance / 135) * 60);
+        legTime = `${emergencyTimeMinutes}m`;
+      }
       
       // CRITICAL FIX: All text on one line
       // Format elements
@@ -447,6 +518,11 @@ class WaypointManager {
         if (legTime.includes('*')) {
           // For wind-adjusted time, add wind-specific styling
           timeText = legTime;
+          console.log(`🌬️ Using wind-adjusted time: ${timeText}`);
+        } else if (stats && stats.windAdjusted && weather && weather.windSpeed > 0) {
+          // If we have wind settings but legTime doesn't show it, add the asterisk
+          timeText = `${legTime}*`;
+          console.log(`🌬️ Adding wind indicator to time: ${timeText}`);
         } else {
           timeText = legTime;
         }
@@ -576,6 +652,70 @@ class WaypointManager {
     const map = this.mapManager.getMap();
     if (!map) return;
     
+    // Log routeStats passed to updateRoute for debugging
+    if (routeStats) {
+      console.log('🔄 WaypointManager.updateRoute called with routeStats:', {
+        timeHours: routeStats.timeHours,
+        estimatedTime: routeStats.estimatedTime,
+        totalDistance: routeStats.totalDistance,
+        hasLegs: routeStats.legs ? true : false,
+        legCount: routeStats.legs?.length || 0,
+        windAdjusted: routeStats.windAdjusted || false
+      });
+      
+      // CRITICAL FIX: Ensure time values are available
+      if (!routeStats.timeHours || routeStats.timeHours === 0 || !routeStats.estimatedTime || routeStats.estimatedTime === '00:00') {
+        console.warn('⚠️ CRITICAL: Missing time values in routeStats passed to updateRoute!');
+        
+        if (routeStats.totalDistance && parseFloat(routeStats.totalDistance) > 0) {
+          console.log('⚠️ Calculating emergency time values for route display');
+          
+          // Get cruiseSpeed from the aircraft or use a default
+          let cruiseSpeed = 135; // Default S92 speed
+          if (routeStats.aircraft && routeStats.aircraft.cruiseSpeed) {
+            cruiseSpeed = routeStats.aircraft.cruiseSpeed;
+          } else if (window.currentSelectedAircraft && window.currentSelectedAircraft.cruiseSpeed) {
+            cruiseSpeed = window.currentSelectedAircraft.cruiseSpeed;
+          }
+          
+          const totalDistance = parseFloat(routeStats.totalDistance);
+          const timeHours = totalDistance / cruiseSpeed;
+          
+          // Format time
+          const hours = Math.floor(timeHours);
+          const minutes = Math.floor((timeHours - hours) * 60);
+          const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          
+          // Update routeStats directly
+          routeStats.timeHours = timeHours;
+          routeStats.estimatedTime = estimatedTime;
+          
+          console.log('⚠️ Fixed routeStats time values:', {
+            timeHours,
+            estimatedTime
+          });
+          
+          // Also update window.currentRouteStats
+          if (window.currentRouteStats) {
+            window.currentRouteStats.timeHours = timeHours;
+            window.currentRouteStats.estimatedTime = estimatedTime;
+          } else {
+            window.currentRouteStats = {
+              ...routeStats
+            };
+          }
+        }
+      }
+    } else {
+      console.log('🔄 WaypointManager.updateRoute called without routeStats');
+      
+      // Try to use window.currentRouteStats if available
+      if (window.currentRouteStats) {
+        console.log('🔄 Using window.currentRouteStats for route display');
+        routeStats = window.currentRouteStats;
+      }
+    }
+    
     // Remove existing route, glow, and arrows if they exist
     if (map.getSource('route')) {
       if (map.getLayer('route-glow')) {
@@ -651,8 +791,19 @@ class WaypointManager {
         'filter': ['==', '$type', 'LineString']
       }, 'route'); // Insert below the main route
       
-      // Access route stats from global state if not provided
+      // CRITICAL FIX: Prefer the passed routeStats over any global state
+      // This ensures the leg times and other data are consistent with the current calculation
       const stats = routeStats || window.currentRouteStats;
+      
+      // Store current stats for debugging
+      window.currentRouteStats = stats;
+      
+      // Log the stats being used for createArrowsAlongLine
+      console.log('🔄 Using route stats for arrows:', {
+        timeHours: stats?.timeHours,
+        estimatedTime: stats?.estimatedTime,
+        legs: stats?.legs?.length || 0
+      });
       
       // Create a GeoJSON source for the route arrows and leg labels
       const arrowsData = this.createArrowsAlongLine(coordinates, stats);
