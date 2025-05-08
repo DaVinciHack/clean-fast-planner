@@ -26,6 +26,8 @@ import FuelIntegration from './modules/calculations/fuel/FuelIntegration'; // Ke
 import { EnhancedFuelDisplay } from './components/fuel';
 // Import StopCardCalculator for stop card calculations
 import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
+// Import WindCalculations for global access
+import * as WindCalc from './modules/calculations/WindCalculations';
 // Import ComprehensiveFuelCalculator for centralized fuel calculations
 import ComprehensiveFuelCalculator from './modules/calculations/fuel/ComprehensiveFuelCalculator';
 
@@ -67,6 +69,10 @@ const FastPlannerApp = () => {
   // Initialize loading indicator on first render
   useEffect(() => {
     initializeLoadingIndicator();
+    
+    // Make WindCalculations available globally for other components and calculations
+    window.WindCalculations = WindCalc;
+    console.log('🌬️ Initialized WindCalculations globally:', window.WindCalculations);
   }, []);
 
   // UI state
@@ -955,6 +961,12 @@ const FastPlannerApp = () => {
           waypointManagerRef.current.updateRoute(null);
         }
         
+        // Verify WindCalculations is available globally
+        if (!window.WindCalculations) {
+          console.log('🌬️ Making WindCalculations available globally');
+          window.WindCalculations = WindCalc;
+        }
+        
         // Step 2: Manually calculate with numeric settings
         const numericSettings = {
           passengerWeight: Number(flightSettings.passengerWeight),
@@ -968,10 +980,7 @@ const FastPlannerApp = () => {
         
         console.log('🌬️ Using numeric settings for manual recalculation:', numericSettings);
         
-        // Import ComprehensiveFuelCalculator directly
-        const ComprehensiveFuelCalculator = require('./modules/calculations/fuel/ComprehensiveFuelCalculator').default;
-        
-        // Calculate with the new wind settings
+        // Calculate with the new wind settings - use imported module directly
         const { enhancedResults, stopCards: newStopCards } = ComprehensiveFuelCalculator.calculateAllFuelData(
           waypoints,
           selectedAircraft,
