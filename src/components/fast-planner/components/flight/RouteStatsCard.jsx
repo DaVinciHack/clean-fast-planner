@@ -1218,7 +1218,7 @@ const RouteStatsCard = ({
                       .map((card, idx) => {
                         // Define colors matching the menu highlight colors
                         // Starting with second color for the first intermediate stop
-                        const colors = ['#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c'];
+                        const colors = ['#614dd6', '#8c5ed6', '#c05edb', '#e27add', '#1abc9c'];
                         const color = colors[idx % colors.length];
                         
                         return (
