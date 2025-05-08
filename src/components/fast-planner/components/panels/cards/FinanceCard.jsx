@@ -25,7 +25,6 @@ const FinanceCard = ({ id }) => {
   const [additionalCost, setAdditionalCost] = useState(() => loadSetting('additionalCost', 0));
   const [useFlightTime, setUseFlightTime] = useState(() => loadSetting('useFlightTime', true)); // Toggle between flight time and total time
   const [customLandings, setCustomLandings] = useState(() => loadSetting('customLandings', 0)); // Custom number of landings
-  const [useCustomLandings, setUseCustomLandings] = useState(() => loadSetting('useCustomLandings', false)); // Toggle between waypoint count and custom landings
   const [taxRate, setTaxRate] = useState(() => loadSetting('taxRate', 25)); // Tax rate percentage
   const [includeTax, setIncludeTax] = useState(() => loadSetting('includeTax', false)); // Toggle tax calculation
   
@@ -77,11 +76,6 @@ const FinanceCard = ({ id }) => {
   const updateCustomLandings = (value) => {
     setCustomLandings(value);
     saveSetting('customLandings', value);
-  };
-  
-  const updateUseCustomLandings = (value) => {
-    setUseCustomLandings(value);
-    saveSetting('useCustomLandings', value);
   };
   
   const updateTaxRate = (value) => {
@@ -202,8 +196,8 @@ const FinanceCard = ({ id }) => {
       // Calculate main cost based on billing method
       let mainCost = 0;
       
-      // Determine the number of landings based on settings
-      const landingsCount = useCustomLandings ? customLandings : routeData.landings;
+      // Always use the custom landing count when specified, otherwise use route data
+      const landingsCount = customLandings > 0 ? customLandings : routeData.landings;
       
       // Calculate landing fees if included
       const landingCost = includeLandingFees && landingsCount > 0
@@ -322,8 +316,8 @@ const FinanceCard = ({ id }) => {
           </div>
         )}
         
-        <div className="mb-2">
-          <div className="flex items-center">
+        <div className="mb-4">
+          <div className="flex items-center mb-2">
             <input 
               type="checkbox" 
               id="include-landing-fees" 
@@ -333,22 +327,40 @@ const FinanceCard = ({ id }) => {
             />
             <label htmlFor="include-landing-fees">Include Landing Fees</label>
           </div>
+          
+          {includeLandingFees && (
+            <div>
+              <div className="mb-2">
+                <label htmlFor="landing-fee">Landing Fee (USD):</label>
+                <input 
+                  type="number" 
+                  id="landing-fee" 
+                  value={landingFee}
+                  min="0"
+                  step="50"
+                  onChange={(e) => updateLandingFee(Number(e.target.value))}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              
+              <div className="mb-2">
+                <label htmlFor="custom-landings">Number of Landings:</label>
+                <input 
+                  type="number" 
+                  id="custom-landings" 
+                  value={customLandings}
+                  min="0"
+                  step="1"
+                  onChange={(e) => updateCustomLandings(Number(e.target.value))}
+                  className="w-full p-2 border rounded"
+                />
+                <div className="text-xs text-gray-400 mt-1">
+                  Only count landings at airports, not rigs
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        
-        {includeLandingFees && (
-          <div className="mb-4">
-            <label htmlFor="landing-fee">Landing Fee (USD):</label>
-            <input 
-              type="number" 
-              id="landing-fee" 
-              value={landingFee}
-              min="0"
-              step="50"
-              onChange={(e) => updateLandingFee(Number(e.target.value))}
-              className="w-full p-2 border rounded"
-            />
-          </div>
-        )}
         
         <div className="mb-4">
           <label htmlFor="additional-cost">Additional Cost (USD):</label>
@@ -388,39 +400,7 @@ const FinanceCard = ({ id }) => {
           </div>
         )}
         
-        {/* Custom Landings Toggle - Standard UI */}
-        {includeLandingFees && (
-          <div className="mb-4">
-            <div className="flex items-center mb-2">
-              <input 
-                type="checkbox" 
-                id="use-custom-landings" 
-                checked={useCustomLandings}
-                onChange={(e) => updateUseCustomLandings(e.target.checked)}
-                className="mr-2"
-              />
-              <label htmlFor="use-custom-landings">Specify Landing Count</label>
-            </div>
-            
-            {useCustomLandings && (
-              <div className="mb-2">
-                <label htmlFor="custom-landings">Number of Landings:</label>
-                <input 
-                  type="number" 
-                  id="custom-landings" 
-                  value={customLandings}
-                  min="0"
-                  step="1"
-                  onChange={(e) => updateCustomLandings(Number(e.target.value))}
-                  className="w-full p-2 border rounded"
-                />
-                <div className="text-xs text-gray-400 mt-1">
-                  Only count landings at airports, not rigs
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+
         
         {/* Tax Calculator - Standard UI */}
         <div className="mb-4">
