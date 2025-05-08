@@ -441,6 +441,20 @@ const RouteStatsCard = ({
             taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
           };
           
+          // Check if total fuel exceeds max fuel capacity
+          if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
+            const fuelNeeded = result.totalFuel;
+            const maxFuel = selectedAircraft.maxFuel;
+            const refuelAmount = fuelNeeded - maxFuel;
+            
+            console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
+            
+            // Set the total fuel to max capacity
+            result.totalFuel = maxFuel;
+            // Add refuel indicator
+            result.refuelNeeded = refuelAmount;
+          }
+          
           console.log('🚨 RETURNING FUEL DATA:', result);
           return result;
         }
@@ -457,7 +471,7 @@ const RouteStatsCard = ({
             deckFuel: departureCard.deckFuel
           });
           
-          return {
+          const result = {
             totalFuel: departureCard.totalFuel || 0,
             tripFuel: departureCard.fuelComponentsObject?.tripFuel || 0,
             deckFuel: departureCard.deckFuel || 0,
@@ -465,6 +479,22 @@ const RouteStatsCard = ({
             reserveFuel: departureCard.fuelComponentsObject?.reserveFuel || 0,
             taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
           };
+          
+          // Check if total fuel exceeds max fuel capacity
+          if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
+            const fuelNeeded = result.totalFuel;
+            const maxFuel = selectedAircraft.maxFuel;
+            const refuelAmount = fuelNeeded - maxFuel;
+            
+            console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
+            
+            // Set the total fuel to max capacity
+            result.totalFuel = maxFuel;
+            // Add refuel indicator
+            result.refuelNeeded = refuelAmount;
+          }
+          
+          return result;
         }
       }
       
@@ -513,7 +543,8 @@ const RouteStatsCard = ({
               departure_card_components: departureCard.fuelComponentsObject,
               departure_card_text: departureCard.fuelComponents
             });
-            return {
+            
+            const result = {
               totalFuel: departureCard.totalFuel || 0,
               tripFuel: departureCard.fuelComponentsObject?.tripFuel || 0,
               deckFuel: departureCard.deckFuel || 0,
@@ -521,6 +552,22 @@ const RouteStatsCard = ({
               reserveFuel: departureCard.fuelComponentsObject?.reserveFuel || 0,
               taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
             };
+            
+            // Check if total fuel exceeds max fuel capacity
+            if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
+              const fuelNeeded = result.totalFuel;
+              const maxFuel = selectedAircraft.maxFuel;
+              const refuelAmount = fuelNeeded - maxFuel;
+              
+              console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
+              
+              // Set the total fuel to max capacity
+              result.totalFuel = maxFuel;
+              // Add refuel indicator
+              result.refuelNeeded = refuelAmount;
+            }
+            
+            return result;
           }
         } catch (error) {
           console.error('Error calculating from StopCardCalculator:', error);
@@ -555,11 +602,25 @@ const RouteStatsCard = ({
         });
         
         // Calculate total as sum of all components
-        const calculatedTotalFuel = calculatedTripFuel + 
+        let calculatedTotalFuel = calculatedTripFuel + 
                                 calculatedContingencyFuel + 
                                 calculatedTaxiFuel + 
                                 calculatedDeckFuel + 
                                 calculatedReserveFuel;
+        
+        let refuelNeeded = 0;
+        
+        // Check if total fuel exceeds max fuel capacity
+        if (selectedAircraft && selectedAircraft.maxFuel && calculatedTotalFuel > selectedAircraft.maxFuel) {
+          const fuelNeeded = calculatedTotalFuel;
+          const maxFuel = selectedAircraft.maxFuel;
+          refuelNeeded = fuelNeeded - maxFuel;
+          
+          console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelNeeded} lbs)`);
+          
+          // Set the total fuel to max capacity
+          calculatedTotalFuel = maxFuel;
+        }
         
         console.log('🚨 STRICT NUMBER CONVERSION FALLBACK FUEL CALCULATIONS:', {
           calculatedTripFuel,
@@ -579,7 +640,7 @@ const RouteStatsCard = ({
           intermediateStops: calculatedIntermediateStops
         });
         
-        return {
+        const result = {
           tripFuel: calculatedTripFuel,
           deckFuel: calculatedDeckFuel,
           totalFuel: calculatedTotalFuel,
@@ -587,6 +648,12 @@ const RouteStatsCard = ({
           reserveFuel: calculatedReserveFuel,
           taxiFuel: calculatedTaxiFuel
         };
+        
+        if (refuelNeeded > 0) {
+          result.refuelNeeded = refuelNeeded;
+        }
+        
+        return result;
       } catch (error) {
         console.error('Error in fuel fallback calculation:', error);
         // Last resort emergency fallback
@@ -1095,6 +1162,16 @@ const RouteStatsCard = ({
               <div className="route-stat-label">Total Fuel:</div>
               <div className="route-stat-value">
                 {(fuelData && fuelData.totalFuel) ? fuelData.totalFuel : '0'} lbs
+                {fuelData && fuelData.refuelNeeded && (
+                  <span style={{ 
+                    fontSize: '0.8em', 
+                    color: '#e74c3c', 
+                    marginLeft: '5px', 
+                    fontStyle: 'italic' 
+                  }}>
+                    (+{fuelData.refuelNeeded} lbs)
+                  </span>
+                )}
               </div>
             </div>
           </div>
