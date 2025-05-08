@@ -8,6 +8,9 @@
  * All calculations rely on actual aircraft performance data from the selected aircraft.
  */
 
+// Import the PassengerCalculator module for passenger calculations
+import PassengerCalculator from '../passengers/PassengerCalculator';
+
 /**
  * Calculate stop cards data for a route
  * Shows the fuel required to continue from each waypoint
@@ -270,19 +273,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       componentText: departureFuelComponentsText
     });
     
-    // Calculate max passengers for departure
+    // Calculate max passengers for departure using PassengerCalculator
     let departureMaxPassengers = 0;
     if (selectedAircraft) {
-      const departureUsableLoad = Math.max(
-        0,
-        selectedAircraft.maxTakeoffWeight -
-        selectedAircraft.emptyWeight -
-        departureFuelNeeded
+      // Use our dedicated PassengerCalculator module
+      departureMaxPassengers = PassengerCalculator.calculateMaxPassengers(
+        selectedAircraft, 
+        departureFuelNeeded, 
+        passengerWeightValue
       );
-      departureMaxPassengers = Math.floor(departureUsableLoad / passengerWeightValue);
-      
-      // Ensure we don't exceed aircraft capacity
-      departureMaxPassengers = Math.min(departureMaxPassengers, selectedAircraft.maxPassengers || 19);
     }
     
     // Create departure card with detailed console logging
@@ -435,19 +434,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       });
     }
 
-    // Calculate max passengers based on remaining fuel needed
+    // Calculate max passengers using our PassengerCalculator module
     let maxPassengers = 0;
     if (selectedAircraft) {
-      const usableLoad = Math.max(
-        0,
-        selectedAircraft.maxTakeoffWeight -
-        selectedAircraft.emptyWeight -
-        fuelNeeded
+      // Use our dedicated PassengerCalculator module
+      maxPassengers = PassengerCalculator.calculateMaxPassengers(
+        selectedAircraft, 
+        fuelNeeded, 
+        passengerWeightValue
       );
-      maxPassengers = Math.floor(usableLoad / passengerWeightValue);
-
-      // Ensure we don't exceed aircraft capacity
-      maxPassengers = Math.min(maxPassengers, selectedAircraft.maxPassengers || 19);
     }
 
     // For final destination, show "Final Stop" instead of passenger count

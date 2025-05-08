@@ -4,6 +4,8 @@ import LoadingIndicator from '../../modules/LoadingIndicator';
 import { EnhancedFuelDisplay } from '../fuel';
 // Import StopCardCalculator for direct fuel calculations
 import StopCardCalculator from '../../modules/calculations/flight/StopCardCalculator';
+// Import PassengerCalculator for consistent passenger calculations
+import PassengerCalculator from '../../modules/calculations/passengers/PassengerCalculator';
 
 /**
  * Route Statistics Card Component
@@ -648,15 +650,25 @@ const RouteStatsCard = ({
       return stats.calculatedPassengers;
     }
     
-    // Otherwise calculate manually as a fallback
-    if (!selectedAircraft || !stats.usableLoad) return 0;
+    // Check if we have stop cards with passenger info
+    if (stopCards && stopCards.length > 0) {
+      const departureCard = stopCards.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers !== undefined) {
+        return departureCard.maxPassengers;
+      }
+    }
     
-    // Get max passengers from the aircraft data or calculate based on usable load
-    const maxByLoad = Math.floor(stats.usableLoad / passengerWeight);
-    const aircraftMaxPax = selectedAircraft.maxPassengers || 19;
+    // If we have fuelData and selectedAircraft, use PassengerCalculator
+    if (selectedAircraft && fuelData && fuelData.totalFuel) {
+      return PassengerCalculator.calculateMaxPassengers(
+        selectedAircraft,
+        fuelData.totalFuel,
+        passengerWeight
+      );
+    }
     
-    // Return the lower value (can't exceed aircraft capacity)
-    return Math.min(maxByLoad, aircraftMaxPax);
+    // Last resort fallback - return 0 instead of using partial data
+    return 0;
   };
   
   // Initialize the route stats loader only once, with a cleanup function to remove any existing loaders first
