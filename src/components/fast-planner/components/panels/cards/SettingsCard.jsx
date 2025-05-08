@@ -74,26 +74,32 @@ const SettingsCard = ({
     
     // Update the state for each setting
     if (newSettings.passengerWeight !== undefined) {
+      console.log(`Calling onPassengerWeightChange with:`, newSettings.passengerWeight);
       onPassengerWeightChange(newSettings.passengerWeight);
     }
     
     if (newSettings.reserveFuel !== undefined) {
+      console.log(`Calling onReserveFuelChange with:`, newSettings.reserveFuel);
       onReserveFuelChange(newSettings.reserveFuel);
     }
     
     if (newSettings.deckTimePerStop !== undefined) {
+      console.log(`Calling onDeckTimeChange with:`, newSettings.deckTimePerStop);
       onDeckTimeChange(newSettings.deckTimePerStop);
     }
     
     if (newSettings.deckFuelFlow !== undefined) {
+      console.log(`Calling onDeckFuelFlowChange with:`, newSettings.deckFuelFlow);
       onDeckFuelFlowChange(newSettings.deckFuelFlow);
     }
     
     if (newSettings.taxiFuel !== undefined) {
+      console.log(`Calling onTaxiFuelChange with:`, newSettings.taxiFuel);
       onTaxiFuelChange(newSettings.taxiFuel);
     }
     
     if (newSettings.contingencyFuelPercent !== undefined) {
+      console.log(`Calling onContingencyFuelPercentChange with:`, newSettings.contingencyFuelPercent);
       onContingencyFuelPercentChange(newSettings.contingencyFuelPercent);
     }
     

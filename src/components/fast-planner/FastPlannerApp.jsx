@@ -1542,6 +1542,7 @@ const FastPlannerApp = () => {
         onTaxiFuelChange={(value) => updateFlightSetting('taxiFuel', value)}
         onContingencyFuelPercentChange={(value) => updateFlightSetting('contingencyFuelPercent', value)}
         onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)} // Keep handler if used for UI only
+        onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)} // Add handler for reserveFuel
         forceUpdate={forceUpdate} // Keep forceUpdate if used for UI refresh
         // Additional props - Remove individual payloadWeight and reserveFuel props
         // payloadWeight={payloadWeight}

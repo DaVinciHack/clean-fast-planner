@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 /**
  * Flight Settings Component
@@ -12,25 +12,64 @@ const FlightSettings = ({
   settings,
   onSettingsChange
 }) => {
-  // Handler for input changes
+  // Add debug logging when settings change
+  useEffect(() => {
+    console.log('⚙️ FlightSettings received settings:', settings);
+  }, [settings]);
+  
+  // Handler for input changes - enhanced with debugging
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Enhanced debug logging for changed values
+    console.log(`⚙️ Input field "${name}" changed to "${value}" (${typeof value})`);
     
     // Allow any input to pass through (empty string or number)
     if (value === '') {
       // Allow empty string during editing
-      console.log(`Setting ${name} to empty string temporarily`);
-      e.target.value = '';
+      console.log(`⚙️ Setting ${name} to empty string temporarily`);
+      
+      // For empty strings, still update the parent but with a default value
+      // This ensures the UI remains responsive
+      const updateObject = {
+        [name]: 0 // Default to 0 when the field is emptied
+      };
+      
+      console.log(`⚙️ Sending update to parent with default value:`, updateObject);
+      onSettingsChange(updateObject);
+      
     } else {
-      const numValue = parseFloat(value);
+      // Always parse as integer to avoid number-to-string conversion issues
+      // For example, "90" should be saved as 90 (number), not "90" (string)
+      const numValue = parseInt(value, 10);
       if (!isNaN(numValue)) {
-        console.log(`Setting ${name} to ${numValue}`);
+        console.log(`⚙️ Setting ${name} to ${numValue} (parsed as integer)`);
+        
         // Send the updated value to the parent
-        onSettingsChange({
+        const updateObject = {
           [name]: numValue
-        });
+        };
+        
+        // Log the update object
+        console.log(`⚙️ Sending update to parent:`, updateObject);
+        
+        // Actually update
+        onSettingsChange(updateObject);
+      } else {
+        console.warn(`⚙️ Warning: Could not parse "${value}" as a number for ${name}`);
+        
+        // Even with invalid input, send a default value to ensure UI updates
+        const updateObject = {
+          [name]: 0 // Default to 0 for invalid input
+        };
+        console.log(`⚙️ Sending default value to parent due to invalid input:`, updateObject);
+        onSettingsChange(updateObject);
       }
     }
+    
+    // Force an immediate update globally
+    const event = new Event('settings-changed');
+    window.dispatchEvent(event);
   };
   
   return (
@@ -46,7 +85,7 @@ const FlightSettings = ({
               type="number"
               id="passengerWeight"
               name="passengerWeight"
-              defaultValue={settings.passengerWeight || 220}
+              value={settings.passengerWeight || 0}
               onChange={handleChange}
               min="100"
               max="300"
@@ -68,7 +107,7 @@ const FlightSettings = ({
               type="number"
               id="taxiFuel"
               name="taxiFuel"
-              defaultValue={settings.taxiFuel || 50}
+              value={settings.taxiFuel || 0}
               onChange={handleChange}
               min="0"
               max="500"
@@ -84,7 +123,7 @@ const FlightSettings = ({
               type="number"
               id="reserveFuel"
               name="reserveFuel"
-              defaultValue={settings.reserveFuel || 600}
+              value={settings.reserveFuel || 0}
               onChange={handleChange}
               min="0"
               max="2000"
@@ -103,7 +142,7 @@ const FlightSettings = ({
               type="number"
               id="contingencyFuelPercent"
               name="contingencyFuelPercent"
-              defaultValue={settings.contingencyFuelPercent || 10}
+              value={settings.contingencyFuelPercent || 0}
               onChange={handleChange}
               min="0"
               max="100"
@@ -124,7 +163,7 @@ const FlightSettings = ({
               type="number"
               id="deckTimePerStop"
               name="deckTimePerStop"
-              defaultValue={settings.deckTimePerStop || 5}
+              value={settings.deckTimePerStop || 0}
               onChange={handleChange}
               min="1"
               max="60"
@@ -140,7 +179,7 @@ const FlightSettings = ({
               type="number"
               id="deckFuelFlow"
               name="deckFuelFlow"
-              defaultValue={settings.deckFuelFlow || 400}
+              value={settings.deckFuelFlow || 0}
               onChange={handleChange}
               min="100"
               max="1000"
