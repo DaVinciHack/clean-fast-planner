@@ -12,15 +12,15 @@ class EnhancedFuelCalculator {
   constructor() {
     // Default configuration values
     this.config = {
-      passengerWeight: 220,       // Default passenger weight (lbs)
-      taxiFuel: 50,               // Default taxi fuel (lbs)
-      contingencyFuelPercent: 10, // Default contingency fuel (%)
-      reserveFuel: 500,           // Default reserve fuel (lbs)
+      passengerWeight: 0,       // Changed to 0 to make missing settings obvious
+      taxiFuel: 0,              // Changed to 0 to make missing settings obvious
+      contingencyFuelPercent: 0, // Changed to 0 to make missing settings obvious
+      reserveFuel: 0,           // Changed to 0 to make missing settings obvious
       reserveMethod: 'fixed',     // Default reserve method ('fixed' or 'percent')
-      reserveFuelPercent: 10,     // Default reserve fuel percent (if using percent method)
-      deckTimePerStop: 5,         // Default deck time per stop (mins)
-      deckFuelFlow: 400,          // Default deck fuel flow (lbs/hr)
-      deckFuelPerStop: 100,       // Default deck fuel per stop (lbs)
+      reserveFuelPercent: 0,     // Changed to 0 to make missing settings obvious
+      deckTimePerStop: 0,         // Changed to 0 to make missing settings obvious
+      deckFuelFlow: 0,          // Changed to 0 to make missing settings obvious
+      deckFuelPerStop: 0,       // Changed to 0 to make missing settings obvious
       callbacks: {}               // Callback functions
     };
   }

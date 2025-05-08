@@ -184,9 +184,23 @@ class AppSettingsManager {
    * @param {Object} flightSettings - New flight settings
    */
   updateFlightSettings(flightSettings) {
+    // Parse any string values to integers to ensure we don't have string-to-number issues
+    const parsedSettings = {};
+    Object.keys(flightSettings).forEach(key => {
+      const value = flightSettings[key];
+      if (typeof value === 'string' && !isNaN(parseInt(value, 10))) {
+        parsedSettings[key] = parseInt(value, 10);
+      } else {
+        parsedSettings[key] = value;
+      }
+    });
+    
+    // Log what we're updating with
+    console.log('AppSettingsManager: Updating flight settings with parsed values:', parsedSettings);
+    
     this.settings.flightSettings = {
       ...this.settings.flightSettings,
-      ...flightSettings
+      ...parsedSettings
     };
     this.saveSettings();
     this.triggerCallback('onFlightSettingsChange', this.settings.flightSettings);
