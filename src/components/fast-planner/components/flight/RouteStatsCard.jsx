@@ -189,11 +189,58 @@ const RouteStatsCard = ({
     // CRITICAL FIX: If zero time was received but we have distance and a valid selected aircraft, 
     // fix the time calculation immediately
     if (selectedAircraft && selectedAircraft.cruiseSpeed) {
-      console.log("⚠️ RouteStatsCard - Fixing time with manual calculation");
+      console.log("⚠️ RouteStatsCard - Fixing time with wind-adjusted calculation if possible");
       
       // Calculate time based on distance and cruise speed
       const totalDistance = parseFloat(routeStats.totalDistance);
-      const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+      let timeHours;
+      
+      // Check if we can use wind calculations
+      if (window.WindCalculations && routeStats.windData && routeStats.legs && routeStats.legs.length > 0) {
+        console.log("⚠️ Using WindCalculations for top card fix");
+        
+        // Calculate average course from all legs
+        let avgCourse = 0;
+        let legCount = 0;
+        
+        routeStats.legs.forEach(leg => {
+          if (leg.course !== undefined) {
+            avgCourse += leg.course;
+            legCount++;
+          }
+        });
+        
+        if (legCount > 0) {
+          avgCourse = avgCourse / legCount;
+          
+          // Calculate wind-adjusted time
+          timeHours = window.WindCalculations.calculateWindAdjustedTime(
+            totalDistance,
+            selectedAircraft.cruiseSpeed,
+            avgCourse,
+            routeStats.windData.windSpeed,
+            routeStats.windData.windDirection
+          );
+          
+          console.log("⚠️ Created wind-adjusted time using avg course:", {
+            avgCourse,
+            windSpeed: routeStats.windData.windSpeed,
+            windDirection: routeStats.windData.windDirection,
+            timeHours
+          });
+          
+          // Make sure wind adjustment flag is set
+          routeStats.windAdjusted = true;
+        } else {
+          // Basic calculation if we couldn't determine course
+          timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+          console.log("⚠️ Using basic time calculation (no valid course data)");
+        }
+      } else {
+        // Basic calculation without wind effects
+        timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+        console.log("⚠️ Using basic time calculation (no wind data)");
+      }
       
       // Format time string
       const hours = Math.floor(timeHours);
@@ -208,11 +255,18 @@ const RouteStatsCard = ({
       if (window.currentRouteStats) {
         window.currentRouteStats.timeHours = timeHours;
         window.currentRouteStats.estimatedTime = estimatedTime;
+        
+        // Ensure wind status is synced
+        if (routeStats.windAdjusted) {
+          window.currentRouteStats.windAdjusted = true;
+          window.currentRouteStats.windData = { ...routeStats.windData };
+        }
       }
       
       console.log("⚠️ RouteStatsCard - Fixed time values:", {
         timeHours,
-        estimatedTime
+        estimatedTime,
+        windAdjusted: routeStats.windAdjusted || false
       });
     }
   }
@@ -328,11 +382,61 @@ const RouteStatsCard = ({
           totalDistance = parseFloat(calculateTotalDistance(waypoints));
         }
         
-        // Calculate time with aircraft speed
-        flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
-        console.log(`⚠️ Calculated flight time: ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
+        // Try to use wind calculations if we have the data
+        if (window.WindCalculations && stats.windData && stats.windData.windSpeed > 0) {
+          console.log('⚠️ Attempting wind-adjusted emergency flight time calculation');
+          
+          // Try to use the first leg's course if available
+          let course;
+          if (stats.legs && stats.legs.length > 0 && stats.legs[0].course !== undefined) {
+            course = stats.legs[0].course;
+          } else if (waypoints.length >= 2) {
+            // Calculate course from the first two waypoints
+            const fromPoint = {
+              lat: waypoints[0].coords[1],
+              lon: waypoints[0].coords[0]
+            };
+            
+            const toPoint = {
+              lat: waypoints[1].coords[1],
+              lon: waypoints[1].coords[0]
+            };
+            
+            // Calculate course between points
+            course = window.WindCalculations.calculateCourse(fromPoint, toPoint);
+          }
+          
+          if (course !== undefined) {
+            // Calculate with wind adjustment
+            flightTimeHours = window.WindCalculations.calculateWindAdjustedTime(
+              totalDistance,
+              selectedAircraft.cruiseSpeed,
+              course,
+              stats.windData.windSpeed,
+              stats.windData.windDirection
+            );
+            
+            console.log(`⚠️ Wind-adjusted flight time: ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
+          } else {
+            // Fallback to basic calculation if we couldn't determine course
+            flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
+            console.log(`⚠️ Basic flight time (no course): ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
+          }
+        } else {
+          // Basic calculation without wind effects
+          flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
+          console.log(`⚠️ Basic flight time: ${flightTimeHours.toFixed(2)} hours from distance ${totalDistance}`);
+        }
       } catch (error) {
         console.error('Error calculating flight time:', error);
+        // Last resort fallback
+        try {
+          const totalDistance = parseFloat(stats.totalDistance || calculateTotalDistance(waypoints));
+          flightTimeHours = totalDistance / selectedAircraft.cruiseSpeed;
+        } catch (innerError) {
+          console.error('Critical error in fallback calculation:', innerError);
+          flightTimeHours = 0;
+        }
       }
     }
     
@@ -738,8 +842,105 @@ const RouteStatsCard = ({
           totalDistance = parseFloat(calculateTotalDistance(waypointArray));
         }
         
-        // Calculate time with aircraft cruiseSpeed
-        const timeHours = totalDistance / aircraft.cruiseSpeed;
+        // Try to use wind calculations if we have weather data
+        let timeHours;
+        const hasWindData = (stats.windData && window.WindCalculations) || (weather && window.WindCalculations);
+        
+        if (hasWindData) {
+          console.log('⚠️ Attempting wind-adjusted flight time calculation');
+          
+          // Get wind data from stats or from weather prop
+          const windData = stats.windData || weather;
+          
+          // Use it only if it actually has non-zero wind
+          if (windData && windData.windSpeed > 0) {
+            // If we have multiple waypoints, calculate average course
+            if (waypointArray.length > 2) {
+              // Calculate total time across all legs
+              let totalTime = 0;
+              
+              for (let i = 0; i < waypointArray.length - 1; i++) {
+                const from = window.turf.point(waypointArray[i].coords);
+                const to = window.turf.point(waypointArray[i + 1].coords);
+                const options = { units: 'nauticalmiles' };
+                
+                const legDistance = window.turf.distance(from, to, options);
+                
+                // Calculate course for this leg
+                const fromPoint = {
+                  lat: waypointArray[i].coords[1],
+                  lon: waypointArray[i].coords[0]
+                };
+                
+                const toPoint = {
+                  lat: waypointArray[i + 1].coords[1],
+                  lon: waypointArray[i + 1].coords[0]
+                };
+                
+                const course = window.WindCalculations.calculateCourse(fromPoint, toPoint);
+                
+                // Calculate time with wind for this leg
+                const legTime = window.WindCalculations.calculateWindAdjustedTime(
+                  legDistance,
+                  aircraft.cruiseSpeed,
+                  course,
+                  windData.windSpeed,
+                  windData.windDirection
+                );
+                
+                totalTime += legTime;
+              }
+              
+              timeHours = totalTime;
+              console.log(`⚠️ Multi-leg wind-adjusted flight time: ${timeHours.toFixed(2)} hours`);
+            } else {
+              // Single leg - calculate course
+              const from = {
+                lat: waypointArray[0].coords[1],
+                lon: waypointArray[0].coords[0]
+              };
+              
+              const to = {
+                lat: waypointArray[1].coords[1],
+                lon: waypointArray[1].coords[0]
+              };
+              
+              const course = window.WindCalculations.calculateCourse(from, to);
+              
+              // Calculate time with wind
+              timeHours = window.WindCalculations.calculateWindAdjustedTime(
+                totalDistance,
+                aircraft.cruiseSpeed,
+                course,
+                windData.windSpeed,
+                windData.windDirection
+              );
+              
+              console.log(`⚠️ Single-leg wind-adjusted flight time: ${timeHours.toFixed(2)} hours`);
+            }
+            
+            // Mark as wind-adjusted
+            if (routeStats) {
+              routeStats.windAdjusted = true;
+              
+              // Set/update wind data
+              if (!routeStats.windData) {
+                routeStats.windData = {
+                  windSpeed: windData.windSpeed,
+                  windDirection: windData.windDirection
+                };
+              }
+            }
+          } else {
+            // No wind or zero speed, fallback to basic calculation
+            timeHours = totalDistance / aircraft.cruiseSpeed;
+            console.log(`⚠️ Basic flight time (no wind): ${timeHours.toFixed(2)} hours`);
+          }
+        } else {
+          // Basic calculation without wind
+          timeHours = totalDistance / aircraft.cruiseSpeed;
+          console.log(`⚠️ Basic flight time: ${timeHours.toFixed(2)} hours`);
+        }
         
         // Format time and update stats for future use
         const formattedTime = formatTime(timeHours);
@@ -748,7 +949,8 @@ const RouteStatsCard = ({
           distance: totalDistance,
           cruiseSpeed: aircraft.cruiseSpeed,
           timeHours,
-          formattedTime
+          formattedTime,
+          windAdjusted: hasWindData
         });
         
         // Update routeStats object if it exists
@@ -761,6 +963,12 @@ const RouteStatsCard = ({
         if (window.currentRouteStats) {
           window.currentRouteStats.timeHours = timeHours;
           window.currentRouteStats.estimatedTime = formattedTime;
+          
+          // Also sync wind data
+          if (routeStats && routeStats.windAdjusted) {
+            window.currentRouteStats.windAdjusted = true;
+            window.currentRouteStats.windData = { ...routeStats.windData };
+          }
         }
         
         return formattedTime;

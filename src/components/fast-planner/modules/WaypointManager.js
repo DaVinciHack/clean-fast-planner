@@ -315,6 +315,40 @@ class WaypointManager {
       };
     }
     
+    // CRITICAL FIX: Check if routeStats has wind adjustments first
+    const hasWindAdjustments = routeStats && routeStats.windAdjusted && routeStats.windData;
+    console.log(`⚓ createArrowsAlongLine - Wind adjustments: ${hasWindAdjustments ? 'YES' : 'NO'}`);
+    
+    // CRITICAL FIX: Always check if currentRouteStats has wind-adjusted values that we should use
+    // This is important because it means the weather settings were just updated
+    let useCurrentStats = false;
+    if (window.currentRouteStats && window.currentRouteStats.windAdjusted && 
+        (!routeStats || !routeStats.windAdjusted)) {
+      console.log(`⚓ Found wind-adjusted data in window.currentRouteStats that's not in routeStats`);
+      console.log(`⚓ currentRouteStats wind data:`, {
+        windSpeed: window.currentRouteStats.windData?.windSpeed,
+        windDirection: window.currentRouteStats.windData?.windDirection,
+        timeHours: window.currentRouteStats.timeHours,
+        estimatedTime: window.currentRouteStats.estimatedTime
+      });
+      useCurrentStats = true;
+    }
+    
+    // If we should use currentRouteStats, update routeStats with its values
+    if (useCurrentStats && window.currentRouteStats) {
+      // Create a copy or use the existing routeStats object
+      routeStats = routeStats || {};
+      
+      // Copy wind-adjusted values from currentRouteStats
+      routeStats.timeHours = window.currentRouteStats.timeHours;
+      routeStats.estimatedTime = window.currentRouteStats.estimatedTime;
+      routeStats.windAdjusted = true;
+      routeStats.windData = window.currentRouteStats.windData;
+      routeStats.legs = window.currentRouteStats.legs;
+      
+      console.log(`⚓ Updated routeStats with wind-adjusted data from window.currentRouteStats`);
+    }
+    
     // CRITICAL FIX: Add a safety check to verify if routeStats contains sane time values
     // For a single leg, check if the total time makes sense for the total distance
     if (routeStats && routeStats.totalDistance) {
@@ -326,15 +360,57 @@ class WaypointManager {
         console.error(`❌ Missing or zero time values in routeStats! Distance: ${totalDistance} nm`);
         
         // Try to calculate reasonable time values
-        const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || 135; // Use aircraft speed or default to 135 knots
-        const calculatedTimeHours = totalDistance / cruiseSpeed;
+        let cruiseSpeed = 135; // Default to 135 knots
+        
+        // Try to get cruise speed from routeStats, selectedAircraft, or currentSelectedAircraft
+        if (routeStats.aircraft && routeStats.aircraft.cruiseSpeed) {
+          cruiseSpeed = routeStats.aircraft.cruiseSpeed;
+        } else if (window.selectedAircraft && window.selectedAircraft.cruiseSpeed) {
+          cruiseSpeed = window.selectedAircraft.cruiseSpeed;
+        } else if (window.currentSelectedAircraft && window.currentSelectedAircraft.cruiseSpeed) {
+          cruiseSpeed = window.currentSelectedAircraft.cruiseSpeed;
+        }
+        
+        // Now check if we can calculate with wind effects
+        let calculatedTimeHours;
+        
+        // If we have wind data and WindCalculations, calculate with wind effects
+        if (window.WindCalculations && routeStats.windData) {
+          console.log(`⚓ Calculating time with wind effects for ${totalDistance} nm`);
+          
+          // Get the first and last waypoint to calculate course
+          const firstWaypoint = coordinates[0];
+          const lastWaypoint = coordinates[coordinates.length - 1];
+          
+          // Create lat/lon objects from coordinates
+          const from = { lat: firstWaypoint[1], lon: firstWaypoint[0] };
+          const to = { lat: lastWaypoint[1], lon: lastWaypoint[0] };
+          
+          // Calculate course between waypoints
+          const course = window.WindCalculations.calculateCourse(from, to);
+          
+          // Calculate time with wind adjustment
+          calculatedTimeHours = window.WindCalculations.calculateWindAdjustedTime(
+            totalDistance,
+            cruiseSpeed,
+            course,
+            routeStats.windData.windSpeed,
+            routeStats.windData.windDirection
+          );
+          
+          console.log(`⚓ Wind-adjusted time calculation: ${calculatedTimeHours.toFixed(2)} hours`);
+        } else {
+          // Calculate without wind effects
+          calculatedTimeHours = totalDistance / cruiseSpeed;
+          console.log(`⚓ Basic time calculation: ${calculatedTimeHours.toFixed(2)} hours`);
+        }
         
         // Format time string
         const hours = Math.floor(calculatedTimeHours);
         const minutes = Math.floor((calculatedTimeHours - hours) * 60);
         const calculatedTimeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         
-        console.log(`❌ Generated calculated time: ${calculatedTimeString} (${calculatedTimeHours.toFixed(2)} hours) for display`);
+        console.log(`⚓ Generated calculated time: ${calculatedTimeString} (${calculatedTimeHours.toFixed(2)} hours) for display`);
         
         // Update the passed routeStats object with calculated values
         routeStats.timeHours = calculatedTimeHours;
@@ -344,6 +420,12 @@ class WaypointManager {
         if (window.currentRouteStats) {
           window.currentRouteStats.timeHours = calculatedTimeHours;
           window.currentRouteStats.estimatedTime = calculatedTimeString;
+          
+          // Make sure wind data is properly set
+          if (routeStats.windData) {
+            window.currentRouteStats.windAdjusted = true;
+            window.currentRouteStats.windData = { ...routeStats.windData };
+          }
         } else {
           // If no window.currentRouteStats, create a minimal one
           window.currentRouteStats = {
@@ -355,30 +437,36 @@ class WaypointManager {
       } 
       // If time values exist, check if they're reasonable
       else {
-        const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || 135; // Default S92 speed
-        const expectedTimeHours = totalDistance / cruiseSpeed;
-        const timeHoursDifference = Math.abs(routeStats.timeHours - expectedTimeHours);
-        
-        if (timeHoursDifference > 1) { // More than 1 hour difference
-          console.error(`❌ Route time value is unreasonable! Got ${routeStats.timeHours.toFixed(2)} hours but expected ~${expectedTimeHours.toFixed(2)} hours based on distance ${totalDistance} nm at ${cruiseSpeed} kts`);
+        // Only do this sanity check if it's not wind-adjusted data
+        // Wind effects can cause significant time differences from basic calculations
+        if (!routeStats.windAdjusted) {
+          const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || 135; // Default S92 speed
+          const expectedTimeHours = totalDistance / cruiseSpeed;
+          const timeHoursDifference = Math.abs(routeStats.timeHours - expectedTimeHours);
           
-          // Don't set to null, but fix the values instead
-          const fixedTimeHours = expectedTimeHours;
-          const hours = Math.floor(fixedTimeHours);
-          const minutes = Math.floor((fixedTimeHours - hours) * 60);
-          const fixedTimeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          
-          console.log(`❌ Fixing time values to: ${fixedTimeString} (${fixedTimeHours.toFixed(2)} hours) for display`);
-          
-          // Update the routeStats object
-          routeStats.timeHours = fixedTimeHours;
-          routeStats.estimatedTime = fixedTimeString;
-          
-          // Update window.currentRouteStats
-          if (window.currentRouteStats) {
-            window.currentRouteStats.timeHours = fixedTimeHours;
-            window.currentRouteStats.estimatedTime = fixedTimeString;
+          if (timeHoursDifference > 1) { // More than 1 hour difference
+            console.error(`❌ Route time value is unreasonable! Got ${routeStats.timeHours.toFixed(2)} hours but expected ~${expectedTimeHours.toFixed(2)} hours based on distance ${totalDistance} nm at ${cruiseSpeed} kts`);
+            
+            // Don't set to null, but fix the values instead
+            const fixedTimeHours = expectedTimeHours;
+            const hours = Math.floor(fixedTimeHours);
+            const minutes = Math.floor((fixedTimeHours - hours) * 60);
+            const fixedTimeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            
+            console.log(`❌ Fixing time values to: ${fixedTimeString} (${fixedTimeHours.toFixed(2)} hours) for display`);
+            
+            // Update the routeStats object
+            routeStats.timeHours = fixedTimeHours;
+            routeStats.estimatedTime = fixedTimeString;
+            
+            // Update window.currentRouteStats
+            if (window.currentRouteStats) {
+              window.currentRouteStats.timeHours = fixedTimeHours;
+              window.currentRouteStats.estimatedTime = fixedTimeString;
+            }
           }
+        } else {
+          console.log(`⚓ Using wind-adjusted time: ${routeStats.timeHours.toFixed(2)} hours for ${totalDistance} nm`);
         }
       }
     }
@@ -437,7 +525,7 @@ class WaypointManager {
       });
       
       // CRITICAL EMERGENCY FIX: Always ensure we have a legTime value
-      // We must calculate the time for each leg regardless of stats
+      // We must calculate the time for each leg with proper wind adjustments
       
       if (stats && stats.legs && stats.legs[i] && stats.legs[i].time !== undefined) {
         // Best case: Use pre-calculated time from legs data (includes wind effects)
@@ -448,13 +536,20 @@ class WaypointManager {
         legTime = `${totalMinutes}m`;
         
         // Add wind indicator if needed
-        if (stats.windAdjusted && stats.legs[i] && stats.legs[i].headwind !== undefined) {
-          const headwind = stats.legs[i].headwind;
-          console.log(`🌬️ Checking wind effect for leg ${i+1}: headwind=${headwind}, windAdjusted=${stats.windAdjusted}`);
-          
-          if (Math.abs(headwind) > 1) {
-            legTime = `${totalMinutes}m*`; // Add an asterisk to indicate wind adjusted time
-            console.log(`🌬️ Added wind indicator to leg ${i+1} time: ${legTime}`);
+        if (stats.windAdjusted && stats.windData && stats.windData.windSpeed > 0) {
+          // Check if leg has headwind data
+          if (stats.legs[i] && stats.legs[i].headwind !== undefined) {
+            const headwind = stats.legs[i].headwind;
+            console.log(`🌬️ Checking wind effect for leg ${i+1}: headwind=${headwind}, windAdjusted=${stats.windAdjusted}`);
+            
+            if (Math.abs(headwind) > 1) {
+              legTime = `${totalMinutes}m*`; // Add an asterisk to indicate wind adjusted time
+              console.log(`🌬️ Added wind indicator to leg ${i+1} time: ${legTime}`);
+            }
+          } else {
+            // If we have wind data but no specific leg headwind, still mark it as wind-adjusted
+            legTime = `${totalMinutes}m*`;
+            console.log(`🌬️ Added wind indicator to leg ${i+1} without headwind data: ${legTime}`);
           }
         } else {
           console.log(`Wind data missing for leg ${i+1}: windAdjusted=${stats.windAdjusted}, hasWindData=${stats.windData ? 'yes' : 'no'}`);
@@ -468,8 +563,8 @@ class WaypointManager {
         }
       }
       else {
-        // Fallback: Calculate time directly from distance and aircraft speed
-        console.log(`❗ No leg data for leg ${i+1}, calculating directly`);
+        // Fallback: Calculate time with wind adjustment if possible
+        console.log(`❗ No leg data for leg ${i+1}, calculating with wind effects if possible`);
         
         // Get cruise speed - try multiple sources
         let cruiseSpeed = 135; // Default S92 speed
@@ -480,11 +575,53 @@ class WaypointManager {
           cruiseSpeed = window.currentSelectedAircraft.cruiseSpeed;
         }
         
-        const timeHours = distance / cruiseSpeed;
+        // Determine if we can use wind calculations
+        let timeHours;
+        let useWindCalculation = false;
+        
+        // Check if we have WindCalculations module and wind data
+        if (window.WindCalculations && stats && stats.windAdjusted && stats.windData) {
+          console.log(`🌬️ Attempting wind calculation for leg ${i+1}`);
+          
+          try {
+            // Create from/to points for course calculation
+            const fromPoint = {
+              lat: coordinates[i][1],
+              lon: coordinates[i][0]
+            };
+            
+            const toPoint = {
+              lat: coordinates[i+1][1],
+              lon: coordinates[i+1][0]
+            };
+            
+            // Calculate course between points
+            const course = window.WindCalculations.calculateCourse(fromPoint, toPoint);
+            
+            // Calculate wind-adjusted time
+            timeHours = window.WindCalculations.calculateWindAdjustedTime(
+              distance,
+              cruiseSpeed,
+              course,
+              stats.windData.windSpeed,
+              stats.windData.windDirection
+            );
+            
+            console.log(`🌬️ Wind-adjusted time for leg ${i+1}: ${timeHours.toFixed(2)} hours`);
+            useWindCalculation = true;
+          } catch (error) {
+            console.error(`🌬️ Error calculating wind-adjusted time for leg ${i+1}:`, error);
+            // Fall back to basic calculation
+            timeHours = distance / cruiseSpeed;
+          }
+        } else {
+          // Basic calculation without wind
+          timeHours = distance / cruiseSpeed;
+        }
         
         // Format time as minutes only, rounded to the nearest minute
         const totalMinutes = Math.round(timeHours * 60);
-        legTime = `${totalMinutes}m`;
+        legTime = useWindCalculation ? `${totalMinutes}m*` : `${totalMinutes}m`;
         
         console.log(`Calculated time for leg ${i+1}: ${legTime} based on distance ${distance.toFixed(1)} nm at speed ${cruiseSpeed} kts`);
         

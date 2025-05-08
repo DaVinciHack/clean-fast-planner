@@ -945,29 +945,69 @@ const FastPlannerApp = () => {
     console.log(`🌬️ Updating weather settings: Wind ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
     console.log('🌬️ Old weather state:', weather);
 
-    // Immediately set the new weather state
+    // IMPORTANT FIX: Two-step update process to ensure correct wind calculations
+    
+    // Step 1: Clear the route display first
+    if (waypointManagerRef.current) {
+      console.log('🌬️ Step 1: Clearing route display to force redraw');
+      waypointManagerRef.current.updateRoute(null);
+    }
+    
+    // Step 2: Immediately set the new weather state
     setWeather(newWeather);
     
-    // Force an immediate UI update
+    // Step 3: Force an immediate UI update
     setForceUpdate(prev => prev + 1);
     
-    // CRITICAL: Manually recalculate the route with the new wind settings
+    // Step 4: Manually recalculate the route with the new wind settings
     if (waypoints && waypoints.length >= 2 && selectedAircraft) {
       console.log('🌬️ Manually recalculating route with new wind settings...');
       
       try {
-        // Step 1: Clear the route display
-        if (waypointManagerRef.current) {
-          waypointManagerRef.current.updateRoute(null);
-        }
-        
         // Verify WindCalculations is available globally
         if (!window.WindCalculations) {
           console.log('🌬️ Making WindCalculations available globally');
           window.WindCalculations = WindCalc;
         }
         
-        // Step 2: Manually calculate with numeric settings
+        // First, use RouteCalculator for quick calculation with wind
+        // This ensures the route lines and top card get proper wind-adjusted times
+        if (routeCalculatorRef.current) {
+          console.log('🌬️ Step 4a: Calculating wind-adjusted route with RouteCalculator');
+          
+          // Extract coordinates from waypoints
+          const coordinates = waypoints.map(wp => wp.coords);
+          
+          // Calculate route stats with wind effects
+          const basicRouteStats = routeCalculatorRef.current.calculateRouteStats(
+            coordinates, 
+            {
+              selectedAircraft: selectedAircraft, 
+              weather: newWeather,
+              forceTimeCalculation: true // Force time calculation flag
+            }
+          );
+          
+          console.log('🌬️ RouteCalculator wind-adjusted results:', {
+            timeHours: basicRouteStats?.timeHours,
+            estimatedTime: basicRouteStats?.estimatedTime,
+            windAdjusted: basicRouteStats?.windAdjusted || false,
+            avgHeadwind: basicRouteStats?.windData?.avgHeadwind
+          });
+          
+          // Ensure this calculated data is available globally
+          window.currentRouteStats = basicRouteStats;
+          
+          // Update route display immediately with the basic wind-adjusted stats
+          if (waypointManagerRef.current) {
+            waypointManagerRef.current.updateRoute(basicRouteStats);
+          }
+        }
+        
+        // Step 5: Run comprehensive calculation for stop cards and full stats
+        console.log('🌬️ Step 5: Running comprehensive calculation with wind effects');
+        
+        // Prepare numeric settings for calculation
         const numericSettings = {
           passengerWeight: Number(flightSettings.passengerWeight),
           taxiFuel: Number(flightSettings.taxiFuel),
@@ -978,7 +1018,7 @@ const FastPlannerApp = () => {
           cargoWeight: Number(flightSettings.cargoWeight || 0)
         };
         
-        console.log('🌬️ Using numeric settings for manual recalculation:', numericSettings);
+        console.log('🌬️ Using numeric settings for comprehensive calculation:', numericSettings);
         
         // Calculate with the new wind settings - use imported module directly
         const { enhancedResults, stopCards: newStopCards } = ComprehensiveFuelCalculator.calculateAllFuelData(
@@ -989,7 +1029,7 @@ const FastPlannerApp = () => {
         );
         
         if (enhancedResults) {
-          console.log('🌬️ Manual calculation complete with wind settings:', newWeather);
+          console.log('🌬️ Comprehensive calculation complete with wind settings:', newWeather);
           
           // CRITICAL: Ensure wind data is properly set in all necessary places
           enhancedResults.windAdjusted = true;
@@ -1007,10 +1047,10 @@ const FastPlannerApp = () => {
               // Calculate headwind for each leg if missing
               if (leg.headwind === undefined) {
                 // If WindCalculations is available, try to calculate headwind
-                if (window.WindCalculations && leg.heading !== undefined) {
+                if (window.WindCalculations && leg.course !== undefined) {
                   leg.headwind = window.WindCalculations.calculateHeadwindComponent(
                     newWeather.windSpeed, 
-                    leg.heading, 
+                    leg.course, 
                     newWeather.windDirection
                   );
                   console.log(`🌬️ Added headwind data to leg ${index+1}: ${leg.headwind.toFixed(2)} knots`);
@@ -1019,28 +1059,37 @@ const FastPlannerApp = () => {
             });
           }
           
-          console.log('🌬️ Recalculated time with wind effects:', {
+          console.log('🌬️ Comprehensive calculation results:', {
             timeHours: enhancedResults.timeHours,
             estimatedTime: enhancedResults.estimatedTime,
             windAdjusted: enhancedResults.windAdjusted
           });
           
+          // CRITICAL FIX: Transfer wind-adjusted time from enhancedResults to window.currentRouteStats
+          // This ensures consistency between route display and stop cards
+          if (window.currentRouteStats) {
+            window.currentRouteStats.timeHours = enhancedResults.timeHours;
+            window.currentRouteStats.estimatedTime = enhancedResults.estimatedTime;
+            window.currentRouteStats.windAdjusted = true;
+            window.currentRouteStats.windData = enhancedResults.windData;
+            
+            console.log('🌬️ Synchronized enhancedResults with window.currentRouteStats');
+          }
+          
           // Update state with new calculations
           setRouteStats(enhancedResults);
           setStopCards(newStopCards);
           
-          // Update global reference immediately
-          window.currentRouteStats = enhancedResults;
-          
-          // Step 3: Update the route display with the recalculated stats
+          // Step 6: Update the route display again with the comprehensive stats
           setTimeout(() => {
             if (waypointManagerRef.current) {
+              console.log('🌬️ Step 6: Final route display update with comprehensive stats');
               waypointManagerRef.current.updateRoute(enhancedResults);
             }
           }, 100);
         }
       } catch (error) {
-        console.error('🌬️ Error in manual recalculation:', error);
+        console.error('🌬️ Error in wind calculation:', error);
         
         // Fallback: Update with current stats but with updated wind data
         if (window.currentRouteStats) {
@@ -1056,6 +1105,9 @@ const FastPlannerApp = () => {
           }
         }
       }
+    } else {
+      // No waypoints or aircraft, just update the weather state
+      console.log('🌬️ No waypoints or aircraft, just updating weather state');
     }
   };
 
