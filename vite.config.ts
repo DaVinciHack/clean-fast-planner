@@ -15,7 +15,7 @@ export default defineConfig({
       '@': resolve(__dirname, './src')
     }
   },
-  base: './', // Use relative paths instead of absolute
+  base: '/planner/', // Path for subdirectory deployment
   optimizeDeps: {
     include: ['@osdk/client', '@osdk/oauth', '@flight-app/sdk', '@osdk/foundry.admin']
   },
