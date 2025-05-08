@@ -75,21 +75,25 @@ These provide state management and data sharing between components.
 - Implemented comprehensive wind effect handling throughout UI
 - Fixed route line display to properly update with wind-adjusted times
 - Created two-step redraw process to ensure display consistency
+- Implemented accurate fuel limit checks to prevent exceeding aircraft capacity
+- Added refuel indicators when fuel requirements exceed aircraft capacity
+- Fixed passenger calculation to correctly account for aircraft useful load
+- Enhanced passenger display in top card using colored icons for each leg
 
 ### In Progress
 - Implementing S92 dropdown calculator
 - Extracting AircraftSelection component from MainCard
-- Refining route calculation logic
-- Improving event handling between components
+- Improving error handling and input validation
+- Implementing export functionality to Palantir Flight Planner
 
 ### Next Steps
 - Extract WaypointEditor component
 - Implement comprehensive testing
 - Add error boundaries around components
 - Improve loading indicators
-- Add fuel consumption display to route line
-- Add passenger capacity information to route line
-- Improve handling of long routes with many waypoints
+- Enhance the refuel notification system with stop recommendations
+- Implement route optimization features for multi-leg routes
+- Add detailed mission analytics and reporting
 
 ## Developer Notes
 
@@ -149,6 +153,27 @@ The application accurately calculates and displays wind effects on flight time a
    - Global state management ensures all components access the same calculation results
 
 All flight time calculations incorporate wind effects automatically, with no need for fallback data or safety corrections.
+
+### Passenger Calculation System
+The application calculates passenger capacity based on aircraft useful load and required fuel:
+
+1. **Calculation Flow**:
+   - The `PassengerCalculator.js` module handles all passenger calculations
+   - Calculations consider aircraft useful load, fuel requirements, and passenger weight
+   - Results are displayed in both top card and individual stop cards
+
+2. **Key Components**:
+   - `PassengerCalculator.calculateMaxPassengers()` calculates capacity per leg
+   - `RouteStatsCard.jsx` displays passenger numbers with colored icons
+   - `StopCard.jsx` shows passenger numbers for each leg with consistent styling
+
+3. **Implementation Details**:
+   - Passenger numbers are calculated by: (usefulLoad - totalFuel) / passengerWeight
+   - The system respects aircraft maximum passenger limits
+   - The top card displays passenger counts for all legs with color-coded icons
+   - Stop cards display passenger counts with per-stop formatting
+
+The passenger calculation system ensures safe and accurate passenger planning that respects both aircraft capacity limits and fuel requirements.
 
 #### Route Stop Cards System
 The StopCards system provides a visual representation of each stop in the route with the following features:

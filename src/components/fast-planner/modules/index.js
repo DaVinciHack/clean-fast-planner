@@ -8,6 +8,7 @@ import AircraftManager from './AircraftManager';
 import FlightCalculations from './calculations/FlightCalculations';
 import MapInteractionHandler from './MapInteractionHandler';
 import AppSettingsManager from './AppSettingsManager';
+import FinanceCalculator from './finance/FinanceCalculator';
 
 export {
   MapManager,
@@ -19,5 +20,6 @@ export {
   AircraftManager,
   FlightCalculations,
   MapInteractionHandler,
-  AppSettingsManager
+  AppSettingsManager,
+  FinanceCalculator
 };
