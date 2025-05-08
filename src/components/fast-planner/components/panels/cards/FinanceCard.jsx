@@ -1,22 +1,128 @@
 import React, { useState, useEffect } from 'react';
 import BaseCard from './BaseCard';
 
+// Custom styles for Finance Calculator
+const financeStyles = `
+  .checkbox-icon {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .checkbox-icon svg {
+    transition: all 0.15s ease-in-out;
+    transform-origin: center;
+  }
+  
+  .custom-checkbox label:hover .checkbox-icon {
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  }
+  
+  .custom-checkbox input:checked + label .checkbox-icon svg {
+    animation: check-pop 0.2s ease-in-out;
+  }
+  
+  @keyframes check-pop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  
+  .custom-checkbox input:focus + label .checkbox-icon {
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+  }
+`;
+
 /**
- * Finance Calculator Component
+ * Finance Calculator Component with browser persistence
  */
 const FinanceCard = ({ id }) => {
-  // Basic settings
-  const [hourlyRate, setHourlyRate] = useState(4500);
-  const [mileageRate, setMileageRate] = useState(100);
-  const [billingMethod, setBillingMethod] = useState('hourly');
-  const [landingFee, setLandingFee] = useState(250);
-  const [includeLandingFees, setIncludeLandingFees] = useState(true);
-  const [additionalCost, setAdditionalCost] = useState(0);
-  const [useFlightTime, setUseFlightTime] = useState(true); // Toggle between flight time and total time
-  const [customLandings, setCustomLandings] = useState(0); // Custom number of landings
-  const [useCustomLandings, setUseCustomLandings] = useState(false); // Toggle between waypoint count and custom landings
-  const [taxRate, setTaxRate] = useState(25); // Tax rate percentage
-  const [includeTax, setIncludeTax] = useState(false); // Toggle tax calculation
+  // Load settings from localStorage with defaults if not found
+  const loadSetting = (key, defaultValue) => {
+    try {
+      const savedValue = localStorage.getItem(`financeCalc_${key}`);
+      return savedValue !== null ? JSON.parse(savedValue) : defaultValue;
+    } catch (error) {
+      console.warn(`Error loading setting ${key}:`, error);
+      return defaultValue;
+    }
+  };
+
+  // Basic settings with localStorage persistence
+  const [hourlyRate, setHourlyRate] = useState(() => loadSetting('hourlyRate', 4500));
+  const [mileageRate, setMileageRate] = useState(() => loadSetting('mileageRate', 100));
+  const [billingMethod, setBillingMethod] = useState(() => loadSetting('billingMethod', 'hourly'));
+  const [landingFee, setLandingFee] = useState(() => loadSetting('landingFee', 250));
+  const [includeLandingFees, setIncludeLandingFees] = useState(() => loadSetting('includeLandingFees', true));
+  const [additionalCost, setAdditionalCost] = useState(() => loadSetting('additionalCost', 0));
+  const [useFlightTime, setUseFlightTime] = useState(() => loadSetting('useFlightTime', true)); // Toggle between flight time and total time
+  const [customLandings, setCustomLandings] = useState(() => loadSetting('customLandings', 0)); // Custom number of landings
+  const [useCustomLandings, setUseCustomLandings] = useState(() => loadSetting('useCustomLandings', false)); // Toggle between waypoint count and custom landings
+  const [taxRate, setTaxRate] = useState(() => loadSetting('taxRate', 25)); // Tax rate percentage
+  const [includeTax, setIncludeTax] = useState(() => loadSetting('includeTax', false)); // Toggle tax calculation
+  
+  // Save settings to localStorage when they change
+  const saveSetting = (key, value) => {
+    try {
+      localStorage.setItem(`financeCalc_${key}`, JSON.stringify(value));
+    } catch (error) {
+      console.warn(`Error saving setting ${key}:`, error);
+    }
+  };
+  
+  // Custom setters that update both state and localStorage
+  const updateHourlyRate = (value) => {
+    setHourlyRate(value);
+    saveSetting('hourlyRate', value);
+  };
+  
+  const updateMileageRate = (value) => {
+    setMileageRate(value);
+    saveSetting('mileageRate', value);
+  };
+  
+  const updateBillingMethod = (value) => {
+    setBillingMethod(value);
+    saveSetting('billingMethod', value);
+  };
+  
+  const updateLandingFee = (value) => {
+    setLandingFee(value);
+    saveSetting('landingFee', value);
+  };
+  
+  const updateIncludeLandingFees = (value) => {
+    setIncludeLandingFees(value);
+    saveSetting('includeLandingFees', value);
+  };
+  
+  const updateAdditionalCost = (value) => {
+    setAdditionalCost(value);
+    saveSetting('additionalCost', value);
+  };
+  
+  const updateUseFlightTime = (value) => {
+    setUseFlightTime(value);
+    saveSetting('useFlightTime', value);
+  };
+  
+  const updateCustomLandings = (value) => {
+    setCustomLandings(value);
+    saveSetting('customLandings', value);
+  };
+  
+  const updateUseCustomLandings = (value) => {
+    setUseCustomLandings(value);
+    saveSetting('useCustomLandings', value);
+  };
+  
+  const updateTaxRate = (value) => {
+    setTaxRate(value);
+    saveSetting('taxRate', value);
+  };
+  
+  const updateIncludeTax = (value) => {
+    setIncludeTax(value);
+    saveSetting('includeTax', value);
+  };
   
   // Route data extracted from the DOM
   const [routeData, setRouteData] = useState({
@@ -202,6 +308,8 @@ const FinanceCard = ({ id }) => {
   
   return (
     <BaseCard title="Finance Calculator" id={id}>
+      {/* Add dynamic styles */}
+      <style dangerouslySetInnerHTML={{ __html: financeStyles }} />
       <div className="control-section">
         <h4>Flight Cost Parameters</h4>
         
@@ -210,7 +318,7 @@ const FinanceCard = ({ id }) => {
           <select 
             id="billing-method"
             value={billingMethod}
-            onChange={(e) => setBillingMethod(e.target.value)}
+            onChange={(e) => updateBillingMethod(e.target.value)}
             className="w-full p-2 border rounded"
           >
             <option value="hourly">Hourly Rate</option>
@@ -227,7 +335,7 @@ const FinanceCard = ({ id }) => {
               value={hourlyRate}
               min="0"
               step="100"
-              onChange={(e) => setHourlyRate(Number(e.target.value))}
+              onChange={(e) => updateHourlyRate(Number(e.target.value))}
               className="w-full p-2 border rounded"
             />
           </div>
@@ -240,22 +348,35 @@ const FinanceCard = ({ id }) => {
               value={mileageRate}
               min="0"
               step="10"
-              onChange={(e) => setMileageRate(Number(e.target.value))}
+              onChange={(e) => updateMileageRate(Number(e.target.value))}
               className="w-full p-2 border rounded"
             />
           </div>
         )}
         
         <div className="mb-2">
-          <div className="flex items-center">
+          <div className="custom-checkbox">
             <input 
               type="checkbox" 
               id="include-landing-fees" 
               checked={includeLandingFees}
-              onChange={(e) => setIncludeLandingFees(e.target.checked)}
-              className="mr-2"
+              onChange={(e) => updateIncludeLandingFees(e.target.checked)}
+              className="hidden"
             />
-            <label htmlFor="include-landing-fees">Include Landing Fees</label>
+            <label htmlFor="include-landing-fees" className="flex items-center cursor-pointer">
+              <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
+                style={{ 
+                  backgroundColor: includeLandingFees ? '#007bff' : 'transparent',
+                  borderColor: includeLandingFees ? '#007bff' : '#484848'
+                }}>
+                {includeLandingFees && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
+                  </svg>
+                )}
+              </span>
+              <span>Include Landing Fees</span>
+            </label>
           </div>
         </div>
         
@@ -268,7 +389,7 @@ const FinanceCard = ({ id }) => {
               value={landingFee}
               min="0"
               step="50"
-              onChange={(e) => setLandingFee(Number(e.target.value))}
+              onChange={(e) => updateLandingFee(Number(e.target.value))}
               className="w-full p-2 border rounded"
             />
           </div>
@@ -282,12 +403,12 @@ const FinanceCard = ({ id }) => {
             value={additionalCost}
             min="0"
             step="100"
-            onChange={(e) => setAdditionalCost(Number(e.target.value))}
+            onChange={(e) => updateAdditionalCost(Number(e.target.value))}
             className="w-full p-2 border rounded"
           />
         </div>
         
-        {/* Time Type Toggle Switch */}
+        {/* Time Type Toggle Switch - Enhanced UI */}
         {billingMethod === 'hourly' && (
           <div className="mb-4">
             <label className="block mb-2">Time Type:</label>
@@ -297,23 +418,27 @@ const FinanceCard = ({ id }) => {
                   type="checkbox" 
                   id="time-toggle" 
                   checked={!useFlightTime}
-                  onChange={() => setUseFlightTime(!useFlightTime)}
-                  className="absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                  style={{
-                    top: '0',
-                    left: useFlightTime ? '0' : '16px',
-                    transition: 'left 0.2s',
-                    borderColor: useFlightTime ? '#007bff' : '#40c057'
-                  }}
+                  onChange={() => updateUseFlightTime(!useFlightTime)}
+                  className="hidden"
                 />
                 <label 
                   htmlFor="time-toggle" 
-                  className="block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
+                  className="block overflow-hidden h-6 rounded-full cursor-pointer"
                   style={{
                     background: `linear-gradient(to right, #007bff 50%, #40c057 50%)`,
-                    opacity: 0.3
+                    opacity: useFlightTime ? 0.2 : 0.2
                   }}
-                ></label>
+                >
+                  <span className="block w-6 h-6 rounded-full bg-white shadow"
+                    style={{
+                      transform: useFlightTime ? 'translateX(0)' : 'translateX(16px)',
+                      transition: 'transform 0.2s ease-in-out',
+                      borderWidth: '2px',
+                      borderStyle: 'solid',
+                      borderColor: useFlightTime ? '#007bff' : '#40c057'
+                    }}
+                  ></span>
+                </label>
               </div>
               <span className={`ml-2 ${useFlightTime ? 'font-bold' : ''}`} style={{ color: useFlightTime ? '#007bff' : '#e0e0e0' }}>
                 Flight Time
@@ -326,18 +451,31 @@ const FinanceCard = ({ id }) => {
           </div>
         )}
         
-        {/* Custom Landings Toggle */}
+        {/* Custom Landings Toggle - Enhanced UI */}
         {includeLandingFees && (
           <div className="mb-4">
-            <div className="flex items-center mb-2">
+            <div className="custom-checkbox mb-2">
               <input 
                 type="checkbox" 
                 id="use-custom-landings" 
                 checked={useCustomLandings}
-                onChange={(e) => setUseCustomLandings(e.target.checked)}
-                className="mr-2"
+                onChange={(e) => updateUseCustomLandings(e.target.checked)}
+                className="hidden"
               />
-              <label htmlFor="use-custom-landings">Specify Landing Count</label>
+              <label htmlFor="use-custom-landings" className="flex items-center cursor-pointer">
+                <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
+                  style={{ 
+                    backgroundColor: useCustomLandings ? '#007bff' : 'transparent',
+                    borderColor: useCustomLandings ? '#007bff' : '#484848'
+                  }}>
+                  {useCustomLandings && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
+                    </svg>
+                  )}
+                </span>
+                <span>Specify Landing Count</span>
+              </label>
             </div>
             
             {useCustomLandings && (
@@ -349,7 +487,7 @@ const FinanceCard = ({ id }) => {
                   value={customLandings}
                   min="0"
                   step="1"
-                  onChange={(e) => setCustomLandings(Number(e.target.value))}
+                  onChange={(e) => updateCustomLandings(Number(e.target.value))}
                   className="w-full p-2 border rounded"
                 />
                 <div className="text-xs text-gray-400 mt-1">
@@ -360,17 +498,30 @@ const FinanceCard = ({ id }) => {
           </div>
         )}
         
-        {/* Tax Calculator */}
+        {/* Tax Calculator - Enhanced UI */}
         <div className="mb-4">
-          <div className="flex items-center mb-2">
+          <div className="custom-checkbox mb-2">
             <input 
               type="checkbox" 
               id="include-tax" 
               checked={includeTax}
-              onChange={(e) => setIncludeTax(e.target.checked)}
-              className="mr-2"
+              onChange={(e) => updateIncludeTax(e.target.checked)}
+              className="hidden"
             />
-            <label htmlFor="include-tax">Include Tax</label>
+            <label htmlFor="include-tax" className="flex items-center cursor-pointer">
+              <span className="checkbox-icon flex items-center justify-center w-5 h-5 mr-2 border rounded" 
+                style={{ 
+                  backgroundColor: includeTax ? '#007bff' : 'transparent',
+                  borderColor: includeTax ? '#007bff' : '#484848'
+                }}>
+                {includeTax && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
+                  </svg>
+                )}
+              </span>
+              <span>Include Tax</span>
+            </label>
           </div>
           
           {includeTax && (
@@ -383,7 +534,7 @@ const FinanceCard = ({ id }) => {
                 min="0"
                 max="100"
                 step="0.1"
-                onChange={(e) => setTaxRate(Number(e.target.value))}
+                onChange={(e) => updateTaxRate(Number(e.target.value))}
                 className="w-full p-2 border rounded"
               />
             </div>
