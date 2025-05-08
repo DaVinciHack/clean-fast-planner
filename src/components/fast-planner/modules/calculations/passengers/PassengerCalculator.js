@@ -38,8 +38,15 @@ class PassengerCalculator {
     // First, try to use aircraft.usableLoad property if it exists
     // This would be the most direct and accurate way
     if (aircraft.usableLoad !== undefined) {
-      usableLoadWithoutFuel = Number(aircraft.usableLoad);
-      console.log('PassengerCalculator: Using aircraft.usableLoad directly:', usableLoadWithoutFuel);
+      // Ensure we're properly subtracting fuel when using usableLoad
+      usableLoadWithoutFuel = Number(aircraft.usableLoad) - fuelWeightNum;
+      console.log('PassengerCalculator: Using aircraft.usableLoad directly:', aircraft.usableLoad, 'minus fuel:', fuelWeightNum, '=', usableLoadWithoutFuel);
+    }
+    // Then, try to use aircraft.usefulLoad property if it exists (from OSDK data)
+    else if (aircraft.usefulLoad !== undefined) {
+      // Ensure we're properly subtracting fuel when using usefulLoad
+      usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum;
+      console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, '=', usableLoadWithoutFuel);
     }
     // If not available, calculate it from maxTakeoffWeight and emptyWeight
     else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {

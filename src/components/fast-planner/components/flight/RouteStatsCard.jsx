@@ -656,11 +656,20 @@ const RouteStatsCard = ({
       return stats.maxPassengers;
     }
     
-    // Check if we have stop cards with passenger info
+    // Check if we have stop cards with passenger info - most reliable source
     if (stopCards && stopCards.length > 0) {
       const departureCard = stopCards.find(card => card.isDeparture);
       if (departureCard && departureCard.maxPassengers !== undefined) {
         console.log('Using maxPassengers from departure card:', departureCard.maxPassengers);
+        return departureCard.maxPassengers;
+      }
+    }
+    
+    // If we have local stop cards but no stopCards from props
+    if (localStopCards && localStopCards.length > 0) {
+      const departureCard = localStopCards.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers !== undefined) {
+        console.log('Using maxPassengers from local departure card:', departureCard.maxPassengers);
         return departureCard.maxPassengers;
       }
     }
@@ -678,6 +687,44 @@ const RouteStatsCard = ({
     
     // Last resort fallback - return 0 instead of using partial data
     return 0;
+  };
+  
+  // Add a direct access to passengers from top card
+  const getDisplayPassengers = () => {
+    // First priority: Use the first stop card passenger count if available
+    if (stopCards && stopCards.length > 0) {
+      // Try departure card first
+      const departureCard = stopCards.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers) {
+        console.log('Using passenger count from departure card:', departureCard.maxPassengers);
+        return departureCard.maxPassengers;
+      }
+      
+      // If no specific departure card, use first card
+      if (stopCards[0] && stopCards[0].maxPassengers) {
+        console.log('Using passenger count from first card:', stopCards[0].maxPassengers);
+        return stopCards[0].maxPassengers;
+      }
+    }
+    
+    // Second priority: Use localStopCards if available
+    if (localStopCards && localStopCards.length > 0) {
+      const departureCard = localStopCards.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers) {
+        console.log('Using passenger count from local departure card:', departureCard.maxPassengers);
+        return departureCard.maxPassengers;
+      }
+      
+      if (localStopCards[0] && localStopCards[0].maxPassengers) {
+        console.log('Using passenger count from first local card:', localStopCards[0].maxPassengers);
+        return localStopCards[0].maxPassengers;
+      }
+    }
+    
+    // Last priority: Use calculated max passengers
+    const calculated = calculateMaxPassengers();
+    console.log('Using calculated max passengers as last resort:', calculated);
+    return calculated;
   };
   
   // Initialize the route stats loader only once, with a cleanup function to remove any existing loaders first
@@ -1078,7 +1125,40 @@ const RouteStatsCard = ({
             {/* Column 4: Passengers (below Total Fuel) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Passengers:</div>
-              <div className="route-stat-value">{calculateMaxPassengers()}</div>
+              <div className="route-stat-value" style={{ display: 'flex', alignItems: 'center' }}>
+                {/* First import passenger icon from stop icons */}
+                <div style={{ marginRight: '4px', display: 'flex', alignItems: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
+                      fill="#3498db" />
+                  </svg>
+                </div>
+                {/* Use our dedicated function to get passenger number */}
+                {getDisplayPassengers()} 
+                {stopCards && stopCards.length > 1 && (
+                  <span style={{ fontSize: '0.85em', color: '#fff', marginLeft: '6px', display: 'flex', alignItems: 'center' }}>
+                    {stopCards.filter(card => !card.isDeparture && !card.isDestination)
+                      .map((card, idx) => {
+                        // Define colors matching the menu highlight colors
+                        // Starting with second color for the first intermediate stop
+                        const colors = ['#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c'];
+                        const color = colors[idx % colors.length];
+                        
+                        return (
+                          <span key={idx} title={`${card.stopName || 'Stop'}: ${card.maxPassengers || 0} passengers`}
+                                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '6px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '2px' }}>
+                              <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
+                                fill={color} />
+                            </svg>
+                            <span style={{ color: '#fff' }}>{card.maxPassengers || 0}</span>
+                          </span>
+                        );
+                      })
+                    }
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
