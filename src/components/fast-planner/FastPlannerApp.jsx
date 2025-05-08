@@ -214,6 +214,34 @@ const FastPlannerApp = () => {
       routeStats // Pass current routeStats as it might be needed by StopCardCalculator
     );
 
+    // Ensure time values in enhancedResults are valid before updating state
+    if (enhancedResults && selectedAircraft && enhancedResults.totalDistance && 
+        (!enhancedResults.timeHours || enhancedResults.timeHours === 0 || 
+         !enhancedResults.estimatedTime || enhancedResults.estimatedTime === '00:00')) {
+      console.warn('⚠️ enhancedResults missing time values - calculating before setting state...');
+      
+      // Calculate time based on distance and cruise speed
+      const totalDistance = parseFloat(enhancedResults.totalDistance);
+      const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+      
+      // Format time string
+      const hours = Math.floor(timeHours);
+      const minutes = Math.floor((timeHours - hours) * 60);
+      const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Update enhancedResults with calculated time values
+      enhancedResults.timeHours = timeHours;
+      enhancedResults.estimatedTime = estimatedTime;
+      
+      console.log('⚠️ Added calculated time values to enhancedResults:', {
+        timeHours,
+        estimatedTime
+      });
+    }
+    
+    // IMPORTANT: Always update window.currentRouteStats first for global access
+    window.currentRouteStats = enhancedResults;
+    
     // Update the state with the new results
     setRouteStats(enhancedResults); // enhancedResults should be in the format expected by routeStats
     setStopCards(stopCards);
@@ -226,13 +254,46 @@ const FastPlannerApp = () => {
     // to react to the centralized fuel calculation update.
     if (waypointManagerRef.current && enhancedResults) {
       console.log('⛽ Forcing route display update with new stats');
-      // First clear the route display to ensure a clean redraw
-      waypointManagerRef.current.updateRoute(null);
-      // Then redraw with the new stats after a small delay
-      setTimeout(() => {
-        waypointManagerRef.current.updateRoute(enhancedResults);
-        console.log('⛽ Route display updated with new stats');
-      }, 50);
+      console.log('⛽ Route stats for waypoint display:', {
+        timeHours: enhancedResults.timeHours,
+        estimatedTime: enhancedResults.estimatedTime,
+        totalDistance: enhancedResults.totalDistance,
+        legCount: enhancedResults.legs?.length || 0,
+        windAdjusted: enhancedResults.windAdjusted || false
+      });
+      
+      // DEBUG - Check time values exist in enhancedResults
+      if (!enhancedResults.timeHours || enhancedResults.timeHours === 0 || !enhancedResults.estimatedTime || enhancedResults.estimatedTime === '00:00') {
+        console.error('⚠️ CRITICAL: Missing time values in enhancedResults! This will cause display issues.');
+        
+        // If we have distance and aircraft, calculate time directly
+        if (enhancedResults.totalDistance && parseFloat(enhancedResults.totalDistance) > 0 && selectedAircraft && selectedAircraft.cruiseSpeed) {
+          console.log('⚠️ Calculating missing time values for display...');
+          const totalDistance = parseFloat(enhancedResults.totalDistance);
+          const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
+          const hours = Math.floor(timeHours);
+          const minutes = Math.floor((timeHours - hours) * 60);
+          const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          
+          // Update the enhancedResults with the calculated time values
+          enhancedResults.timeHours = timeHours;
+          enhancedResults.estimatedTime = estimatedTime;
+          
+          console.log('⚠️ Fixed enhancedResults with calculated times:', {
+            timeHours,
+            estimatedTime
+          });
+        }
+      }
+      
+      // Directly pass the enhancedResults to updateRoute without clearing first
+      // This ensures the stats are used for the leg labels
+      waypointManagerRef.current.updateRoute(enhancedResults);
+      
+      // Also update window.currentRouteStats to ensure it's available for map interactions
+      window.currentRouteStats = enhancedResults;
+      
+      console.log('⛽ Route display updated with new stats');
     }
 
   }, [waypoints, selectedAircraft, flightSettings, weather]); // Dependencies for the effect
@@ -882,12 +943,41 @@ const FastPlannerApp = () => {
     setWeather(newWeather); // Updating weather state will trigger the centralized useEffect
     console.log('🌬️ Weather state updated to:', newWeather);
 
-    // Force an immediate UI update (centralized useEffect should handle this)
-    // setForceUpdate(prev => prev + 1);
-
-    // Remove recalculation logic from here
-    // Recalculate route if we have an aircraft and waypoints
-    // ... (removed)
+    // Force an immediate UI update to ensure changes are reflected
+    setForceUpdate(prev => prev + 1);
+    
+    // Force a clear and recalculation when wind changes
+    // This two-step process ensures the route display updates correctly
+    if (waypointManagerRef.current && waypoints && waypoints.length >= 2 && selectedAircraft) {
+      console.log('🌬️ Forcing route display update for wind change...');
+      
+      // Step 1: Clear the route display to ensure a fresh redraw
+      // This is important for wind changes to be properly reflected
+      waypointManagerRef.current.updateRoute(null);
+      
+      // Step 2: Wait a moment then force recalculation with current route stats
+      setTimeout(() => {
+        if (window.currentRouteStats) {
+          // Make sure wind data is correctly marked in the stats
+          window.currentRouteStats.windAdjusted = true;
+          window.currentRouteStats.windData = {
+            windSpeed: newWeather.windSpeed,
+            windDirection: newWeather.windDirection,
+            avgHeadwind: window.currentRouteStats.windData?.avgHeadwind || 0
+          };
+          
+          console.log('🌬️ Updating route with wind-adjusted data:', {
+            windSpeed: newWeather.windSpeed,
+            windDirection: newWeather.windDirection,
+            timeHours: window.currentRouteStats.timeHours,
+            estimatedTime: window.currentRouteStats.estimatedTime
+          });
+          
+          // Update the route with the wind-adjusted stats
+          waypointManagerRef.current.updateRoute(window.currentRouteStats);
+        }
+      }, 100);
+    }
   };
 
   // Basic handlers
@@ -1422,30 +1512,6 @@ const FastPlannerApp = () => {
 
   return (
     <div className="fast-planner-container">
-      {/* Debug overlay for stop cards */}
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        right: '10px',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        color: 'white',
-        padding: '10px',
-        borderRadius: '5px',
-        zIndex: 1000,
-        fontSize: '12px',
-        maxWidth: '300px',
-        maxHeight: '200px',
-        overflow: 'auto'
-      }}>
-        <div style={{ fontWeight: 'bold', color: '#ff6b6b' }}>STOP CARDS DEBUG</div>
-        <div>Count: {stopCards ? stopCards.length : 'null'}</div>
-        {stopCards && stopCards.length > 0 && (
-          <div>
-            <div>First: {stopCards[0].stopName} ({stopCards[0].isDeparture ? 'Departure' : 'Stop'})</div>
-            <div>Last: {stopCards[stopCards.length-1].stopName} ({stopCards[stopCards.length-1].isDestination ? 'Destination' : 'Stop'})</div>
-          </div>
-        )}
-      </div>
 
       {/* Loading Overlay - Only used for critical operations, not for aircraft loading */}
       <div id="loading-overlay" className="loading-overlay" style={{ display: 'none' }}>
