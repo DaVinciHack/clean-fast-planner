@@ -12,7 +12,9 @@
         window.close();
       } else {
         // Redirect back to the main app
-        window.location.href = '/planner/';
+        // Use window.location.origin to ensure we stay on the same domain
+        var baseUrl = window.location.origin + "/planner/";
+        window.location.href = baseUrl;
       }
     };
   </script>
