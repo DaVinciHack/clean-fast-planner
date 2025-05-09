@@ -64,6 +64,20 @@ const MainCard = ({
     }
   };
   
+  // State to track if registration section is expanded
+  const [isRegistrationExpanded, setIsRegistrationExpanded] = useState(!selectedAircraft);
+  
+  // Automatically expand/collapse based on selection changes
+  React.useEffect(() => {
+    if (selectedAircraft) {
+      // Collapse when aircraft is selected
+      setIsRegistrationExpanded(false);
+    } else if (aircraftType) {
+      // Expand when aircraft type is selected but no aircraft is selected
+      setIsRegistrationExpanded(true);
+    }
+  }, [selectedAircraft, aircraftType]);
+  
   return (
     <div className="tab-content main-tab">
       <div className="panel-header">
@@ -119,6 +133,13 @@ const MainCard = ({
             if (onAircraftRegistrationChange) {
               onAircraftRegistrationChange('');
             }
+            
+            // Always expand the registration dropdown when changing aircraft type
+            setIsRegistrationExpanded(true);
+          }}
+          onClick={() => {
+            // Expand registration on click (not just on change)
+            setIsRegistrationExpanded(true);
           }}
           disabled={aircraftLoading}
           className="aircraft-type-dropdown"
@@ -180,90 +201,69 @@ const MainCard = ({
           )}
         </select>
         
-        <label htmlFor="aircraft-registration">Aircraft Registration:</label>
-        <select 
-          id="aircraft-registration" 
-          value={aircraftRegistration}
-          onChange={(e) => {
-            const newReg = e.target.value;
-            console.log(`Aircraft registration changed to: ${newReg || 'empty'}`);
+        {/* Aircraft Registration Selection - with slide animation */}
+        <div className={`registration-container ${isRegistrationExpanded ? 'expanded' : 'collapsed'}`} 
+             style={{
+               overflow: 'hidden',
+               transition: 'max-height 0.3s ease-in-out, opacity 0.3s ease-in-out, margin 0.3s ease-in-out',
+               maxHeight: isRegistrationExpanded ? '200px' : '0px',
+               opacity: isRegistrationExpanded ? '1' : '0',
+               marginTop: isRegistrationExpanded ? '10px' : '0px',
+               marginBottom: isRegistrationExpanded ? '10px' : '0px'
+             }}>
+          <label htmlFor="aircraft-registration">Aircraft Registration:</label>
+          <select 
+            id="aircraft-registration" 
+            value={aircraftRegistration}
+            onChange={(e) => {
+              const newReg = e.target.value;
+              console.log(`Aircraft registration changed to: ${newReg || 'empty'}`);
+              
+              if (newReg) {
+                console.log('Specific aircraft selected, passing to parent component');
+                
+                // Call the handler to select the aircraft - let React handle the state
+                onAircraftRegistrationChange(newReg);
+                
+                // Auto-collapse the registration section after selection
+                setIsRegistrationExpanded(false);
+                
+                // Don't manipulate DOM directly, just let React state flow update UI
+                console.log('Aircraft selection processed, parent component will handle updates');
+              } else {
+                // Just call the parent handler normally for empty selection
+                onAircraftRegistrationChange(newReg);
+              }
+            }}
+            // Only disable if loading or if there are no aircraft available at all
+            disabled={aircraftLoading || 
+                    (aircraftType && aircraftsByType && 
+                      (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
+          >
+            <option value="">-- Select Aircraft --</option>
             
-            if (newReg) {
-              console.log('Specific aircraft selected, passing to parent component');
-              
-              // Call the handler to select the aircraft - let React handle the state
-              onAircraftRegistrationChange(newReg);
-              
-              // Don't manipulate DOM directly, just let React state flow update UI
-              console.log('Aircraft selection processed, parent component will handle updates');
-            } else {
-              // Just call the parent handler normally for empty selection
-              onAircraftRegistrationChange(newReg);
-            }
-          }}
-          // Only disable if loading or if there are no aircraft available at all
-          disabled={aircraftLoading || 
-                  (aircraftType && aircraftsByType && 
-                    (!aircraftsByType[aircraftType] || aircraftsByType[aircraftType].length === 0))}
-        >
-          <option value="">-- Select Aircraft --</option>
-          
-          {aircraftLoading ? (
-            <option value="" disabled>
-              Loading...
-            </option>
-          ) : (
-            // Start with a check if we have ANY aircraft at all
-            Object.values(aircraftsByType).flat().length > 0 ? (
-              // If we do have aircraft, check if we're filtering by type or showing all
-              !aircraftType || aircraftType === '' ? (
-                // No type filter: show all aircraft from all types
-                // MODIFIED: Always show selected aircraft at the top of the list if one is selected
-                selectedAircraft ? (
-                  // If we have a selected aircraft, show it at the top and then all others
-                  <>
-                    {/* Current selected aircraft at the top */}
-                    <option key={selectedAircraft.registration} value={selectedAircraft.registration}>
-                      {selectedAircraft.registration}
-                    </option>
-                    
-                    {/* Show all other aircraft except the selected one */}
-                    {[...Object.values(aircraftsByType).flat()]
-                      .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration) 
-                      .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
-                      .map(aircraft => (
-                        <option key={aircraft.registration} value={aircraft.registration}>
-                          {aircraft.registration}
-                        </option>
-                      ))}
-                  </>
-                ) : (
-                  // No selected aircraft, show all aircraft normally
-                  [...Object.values(aircraftsByType).flat()]
-                    .filter(aircraft => aircraft) // Ensure we have valid aircraft objects
-                    .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
-                    .map(aircraft => (
-                      <option key={aircraft.registration} value={aircraft.registration}>
-                        {aircraft.registration}
-                      </option>
-                    ))
-                )
-              ) : (
-                // Type filter: check if we have aircraft of this type
-                aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
-                  // Show aircraft for the selected type
-                  // MODIFIED: Always show selected aircraft at the top if it's of this type
-                  selectedAircraft && selectedAircraft.modelType === aircraftType ? (
-                    // If we have a selected aircraft of this type, show it at the top and then all others
+            {aircraftLoading ? (
+              <option value="" disabled>
+                Loading...
+              </option>
+            ) : (
+              // Start with a check if we have ANY aircraft at all
+              Object.values(aircraftsByType).flat().length > 0 ? (
+                // If we do have aircraft, check if we're filtering by type or showing all
+                !aircraftType || aircraftType === '' ? (
+                  // No type filter: show all aircraft from all types
+                  // MODIFIED: Always show selected aircraft at the top of the list if one is selected
+                  selectedAircraft ? (
+                    // If we have a selected aircraft, show it at the top and then all others
                     <>
                       {/* Current selected aircraft at the top */}
                       <option key={selectedAircraft.registration} value={selectedAircraft.registration}>
                         {selectedAircraft.registration}
                       </option>
                       
-                      {/* Show all other aircraft of this type except the selected one */}
-                      {[...aircraftsByType[aircraftType]]
-                        .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration)
+                      {/* Show all other aircraft except the selected one */}
+                      {[...Object.values(aircraftsByType).flat()]
+                        .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration) 
                         .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
                         .map(aircraft => (
                           <option key={aircraft.registration} value={aircraft.registration}>
@@ -272,8 +272,9 @@ const MainCard = ({
                         ))}
                     </>
                   ) : (
-                    // No selected aircraft of this type, show all aircraft of this type normally
-                    [...aircraftsByType[aircraftType]]
+                    // No selected aircraft, show all aircraft normally
+                    [...Object.values(aircraftsByType).flat()]
+                      .filter(aircraft => aircraft) // Ensure we have valid aircraft objects
                       .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
                       .map(aircraft => (
                         <option key={aircraft.registration} value={aircraft.registration}>
@@ -282,30 +283,64 @@ const MainCard = ({
                       ))
                   )
                 ) : (
-                  // No aircraft of this type
-                  <option value="" disabled>
-                    No {aircraftType} aircraft available in this region
-                  </option>
+                  // Type filter: check if we have aircraft of this type
+                  aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
+                    // Show aircraft for the selected type
+                    // MODIFIED: Always show selected aircraft at the top if it's of this type
+                    selectedAircraft && selectedAircraft.modelType === aircraftType ? (
+                      // If we have a selected aircraft of this type, show it at the top and then all others
+                      <>
+                        {/* Current selected aircraft at the top */}
+                        <option key={selectedAircraft.registration} value={selectedAircraft.registration}>
+                          {selectedAircraft.registration}
+                        </option>
+                        
+                        {/* Show all other aircraft of this type except the selected one */}
+                        {[...aircraftsByType[aircraftType]]
+                          .filter(aircraft => aircraft && aircraft.registration !== selectedAircraft.registration)
+                          .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                          .map(aircraft => (
+                            <option key={aircraft.registration} value={aircraft.registration}>
+                              {aircraft.registration}
+                            </option>
+                          ))}
+                      </>
+                    ) : (
+                      // No selected aircraft of this type, show all aircraft of this type normally
+                      [...aircraftsByType[aircraftType]]
+                        .sort((a, b) => (a.registration || '').localeCompare(b.registration || ''))
+                        .map(aircraft => (
+                          <option key={aircraft.registration} value={aircraft.registration}>
+                            {aircraft.registration}
+                          </option>
+                        ))
+                    )
+                  ) : (
+                    // No aircraft of this type
+                    <option value="" disabled>
+                      No {aircraftType} aircraft available in this region
+                    </option>
+                  )
                 )
+              ) : (
+                // No aircraft available at all
+                <option value="" disabled>
+                  No aircraft available in this region
+                </option>
               )
-            ) : (
-              // No aircraft available at all
-              <option value="" disabled>
-                No aircraft available in this region
-              </option>
-            )
-          )}
-        </select>
-        
-        {/* Status indicators */}
-        <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
-          {!aircraftLoading && aircraftsByType && aircraftType && aircraftsByType[aircraftType] ? (
-            <span>
-              {aircraftsByType[aircraftType].length > 0 ? 
-                `${aircraftsByType[aircraftType].length} ${aircraftType} aircraft available` : 
-                `No ${aircraftType} aircraft in this region`}
-            </span>
-          ) : null}
+            )}
+          </select>
+          
+          {/* Status indicators */}
+          <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
+            {!aircraftLoading && aircraftsByType && aircraftType && aircraftsByType[aircraftType] ? (
+              <span>
+                {aircraftsByType[aircraftType].length > 0 ? 
+                  `${aircraftsByType[aircraftType].length} ${aircraftType} aircraft available` : 
+                  `No ${aircraftType} aircraft in this region`}
+              </span>
+            ) : null}
+          </div>
         </div>
         
         {/* Show the selected aircraft registration at the bottom with type */}
