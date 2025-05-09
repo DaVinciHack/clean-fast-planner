@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import RegionSelector from '../../controls/RegionSelector';
-import { SaveFlightButton, ApiTester } from '../../controls';
+import { SaveFlightButton } from '../../controls';
 import { StopCardsContainer } from '../../flight/stops';
 import '../../flight/stops/StopCards.css';
 
@@ -459,13 +459,7 @@ const MainCard = ({
         )}
       </div>
       
-      {/* Add API Tester for OSDK testing */}
-      {isAuthenticated && (
-        <div className="control-section" style={{ marginTop: '20px' }}>
-          <h4>API Testing Tools</h4>
-          <ApiTester />
-        </div>
-      )}
+      {/* API Testing Tools section removed */}
     </div>
   );
 };

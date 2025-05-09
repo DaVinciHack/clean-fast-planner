@@ -34,14 +34,22 @@ const StopCard = React.forwardRef(({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  // Determine card and border style based on stop type
-  // Light blue for departure, green for destination, dark blue for waypoints
-  const borderColor = isDeparture ? '#3498db' : isDestination ? '#2ecc71' : '#34495e';
+  // Define passenger colors array
+  const colors = ['#3498db', '#614dd6', '#8c5ed6', '#c05edb', '#e27add', '#1abc9c'];
+  
+  // Get appropriate color based on index (cycle through colors if needed)
+  const getBorderColor = () => {
+    if (isDeparture) return '#3498db'; // First stop always blue
+    if (isDestination) return '#2ecc71'; // Last stop always green
+    // Use colors array for intermediate stops
+    return colors[Math.min(index, colors.length - 1)];
+  };
+  
+  // Determine card and border style
+  const borderColor = getBorderColor();
   const cardStyle = {
     borderLeft: `3px solid ${borderColor}`,
-    backgroundColor: isDeparture ? 'rgba(45, 55, 65, 0.85)' : 
-                   isDestination ? 'rgba(45, 65, 55, 0.85)' : 
-                   'rgba(40, 45, 50, 0.95)',
+    background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))', // Match exact gradient of top card
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
     marginBottom: '8px'
   };

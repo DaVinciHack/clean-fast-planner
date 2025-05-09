@@ -29,7 +29,7 @@
 
 /* Base card styling */
 .stop-card {
-  background-color: rgba(40, 45, 50, 0.95);
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
   border-left: 3px solid #34495e;
   border-radius: 3px;
   padding: 8px 10px;
@@ -47,7 +47,7 @@
 /* Special styles for departure card */
 .stop-card.departure-card {
   border-left-color: #3498db;
-  background-color: rgba(45, 55, 65, 0.85);
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
 }
 
 .stop-card.departure-card .stop-number {
@@ -55,13 +55,13 @@
 }
 
 .stop-card.departure-card:hover {
-  background-color: rgba(55, 65, 75, 0.85);
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
 }
 
 /* Special styles for destination card */
 .stop-card.destination-card {
   border-left-color: #2ecc71;
-  background-color: rgba(45, 65, 55, 0.85);
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
 }
 
 .stop-card.destination-card .stop-number {
@@ -69,7 +69,7 @@
 }
 
 .stop-card.destination-card:hover {
-  background-color: rgba(55, 75, 65, 0.85);
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
 }
 
 /* Fuel components section */
@@ -253,12 +253,12 @@
 }
 
 .stop-card:hover {
-  background-color: rgba(50, 55, 60, 0.95);
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 
 .stop-card-active {
-  background-color: rgba(50, 60, 75, 0.85);
+  background: linear-gradient(to bottom, rgba(50, 60, 75, 0.9), rgba(35, 45, 60, 0.9)); /* Slightly bluer when active */
   border-left-color: #5dade2;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
 }
