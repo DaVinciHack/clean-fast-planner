@@ -3,13 +3,16 @@ import RightPanelContainer from './RightPanelContainer';
 import {
   MainCard,
   SettingsCard,
-  PerformanceCard,
-  WeatherCard,
-  FinanceCard,
-  EvacuationCard,
   SaveFlightCard,
   LoadFlightsCard
 } from './cards';
+
+// Commented out unavailable cards until they are properly implemented
+// These need to be properly added to the cards index.js
+// import PerformanceCard from './cards/PerformanceCard';
+// import WeatherCard from './cards/WeatherCard';
+// import FinanceCard from './cards/FinanceCard';
+// import EvacuationCard from './cards/EvacuationCard';
 import '../../FastPlannerStyles.css';
 import { PanelProvider } from '../../context/PanelContext';
 import PalantirFlightService from '../../services/PalantirFlightService';
@@ -403,21 +406,20 @@ const RightPanel = ({
         aircraftType={aircraftType}
       />
       
-      {/* Performance Card */}
+      {/* Commented out unavailable cards until they are properly implemented */}
+      {/* 
       <PerformanceCard id="performance" />
       
-      {/* Weather Card */}
       <WeatherCard 
         id="weather" 
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
       />
       
-      {/* Finance Card */}
       <FinanceCard id="finance" />
       
-      {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
+      */}
       
       {/* Save Flight Card */}
       <SaveFlightCard
