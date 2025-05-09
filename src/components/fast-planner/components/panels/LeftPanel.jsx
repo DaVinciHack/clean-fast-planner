@@ -391,7 +391,7 @@ const LeftPanel = ({
         <div style={{ 
           display: "flex", 
           width: "100%", 
-          gap: "5px",
+          gap: "7px",
           marginTop: "10px"
         }}>
           <button 
