@@ -4,38 +4,49 @@ import { usePanelContext } from '../../context/PanelContext';
 /**
  * LoadFlightsButton Component
  * 
- * A button that opens the Load Flights panel to select and load a saved flight
+ * Button that opens the Load Flights panel card
  */
-const LoadFlightsButton = ({
-  onSuccess,
-  onError,
-  ...props // Add rest parameter to capture style and other props
+const LoadFlightsButton = ({ 
+  onLoadStart,
+  onLoadComplete,
+  onLoadError,
+  ...props
 }) => {
+  // State for loading status
   const [isLoading, setIsLoading] = useState(false);
   
   // Access the panel context for card navigation
   const panelContext = usePanelContext();
   
+  // Handle button click
   const handleButtonClick = () => {
     // Use the panel context to change to the loadflights card
     if (panelContext && panelContext.handleCardChange) {
       console.log('LoadFlightsButton: Using panel context to switch to loadflights card');
+      
+      // Notify parent that loading is starting
+      if (onLoadStart) {
+        onLoadStart();
+      }
+      
+      // Set loading state
+      setIsLoading(true);
+      
+      // Switch to the loadflights card
       panelContext.handleCardChange('loadflights');
     } else {
-      console.log('LoadFlightsButton: Panel context not available');
-      // For now, we won't implement a fallback modal for this button
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator(
-          'Load flights feature needs to be used with the panel context', 
-          'warning'
-        );
+      console.error('LoadFlightsButton: Panel context not available');
+      
+      // Notify parent of error
+      if (onLoadError) {
+        onLoadError('Panel context not available');
       }
     }
   };
   
-  // Button style to match the Save Flight button
+  // Button style
   const buttonStyle = {
-    backgroundColor: '#038dde',
+    backgroundColor: isLoading ? '#6c757d' : '#038dde',
     color: 'white',
     border: 'none',
     borderRadius: '4px',
@@ -47,37 +58,36 @@ const LoadFlightsButton = ({
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 'normal',
-    height: '32px'
+    height: '32px',
+    ...props.style
+  };
+  
+  // Loading spinner style
+  const spinnerStyle = {
+    display: 'inline-block',
+    width: '14px',
+    height: '14px',
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderRadius: '50%',
+    borderTopColor: 'white',
+    animation: 'spin 1s ease-in-out infinite',
+    marginRight: '8px'
   };
   
   return (
-    <button 
-      style={{...buttonStyle, ...props.style}}
-      onClick={handleButtonClick}
-      disabled={isLoading}
-      title="Load saved flights from Palantir"
-      className="control-button"
-    >
-      {isLoading ? (
-        <>
-          <span 
-            className="spinner" 
-            style={{
-              display: 'inline-block',
-              width: '14px',
-              height: '14px',
-              border: '2px solid rgba(255,255,255,0.3)',
-              borderRadius: '50%',
-              borderTopColor: 'white',
-              animation: 'spin 1s ease-in-out infinite',
-              marginRight: '8px'
-            }}
-          />
-          Loading...
-        </>
-      ) : (
-        'Load Flights'
-      )}
+    <>
+      <button
+        onClick={handleButtonClick}
+        disabled={isLoading}
+        style={buttonStyle}
+        title="Load a saved flight from Palantir"
+        className="control-button"
+      >
+        {isLoading && (
+          <span className="spinner" style={spinnerStyle} />
+        )}
+        {isLoading ? 'Loading...' : 'Load Saved Flights'}
+      </button>
       
       {/* Add loading animation */}
       <style>
@@ -87,7 +97,7 @@ const LoadFlightsButton = ({
           }
         `}
       </style>
-    </button>
+    </>
   );
 };
 

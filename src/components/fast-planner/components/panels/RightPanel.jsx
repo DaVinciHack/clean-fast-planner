@@ -281,21 +281,26 @@ const RightPanel = ({
   
   // Handle loading a flight from LoadFlightsCard
   const handleLoadFlight = (flight) => {
-    console.log('Load flight data from card:', flight);
-    // Implement your load logic here or pass it to parent component
+    console.log('Selected flight data:', flight);
+    
+    // TODO: Implement flight loading logic
+    // This would include:
+    // 1. Setting waypoints from flight.waypoints
+    // 2. Setting the selected aircraft based on flight.aircraftId
+    // 3. Updating other relevant flight parameters
+    
+    // For now, just show the flight was selected
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator(
+        `Flight "${flight.title}" selected. Loading functionality will be implemented in the next phase.`, 
+        'info'
+      );
+    }
     
     // Return to main card after loading
     setTimeout(() => {
       handleCardChange('main');
-    }, 1000);
-    
-    // Show success message
-    if (window.LoadingIndicator) {
-      window.LoadingIndicator.updateStatusIndicator(
-        `Flight "${flight.name}" loaded successfully`, 
-        'success'
-      );
-    }
+    }, 2000);
   };
   
   // Handle cancel from SaveFlightCard
@@ -428,9 +433,9 @@ const RightPanel = ({
       {/* Load Flights Card */}
       <LoadFlightsCard 
         id="loadflights"
-        onLoad={handleLoadFlight}
-        onCancel={handleLoadFlightsCancel}
-        isLoading={false}
+        onSelect={handleLoadFlight}
+        onClose={handleLoadFlightsCancel}
+        currentRegion={currentRegion}
       />
     </RightPanelContainer>
     </PanelProvider>

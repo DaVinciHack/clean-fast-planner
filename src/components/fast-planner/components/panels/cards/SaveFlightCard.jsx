@@ -49,11 +49,8 @@ const SaveFlightCard = ({
       const day = String(today.getDate()).padStart(2, '0');
       const todayDate = `${year}-${month}-${day}`;
       
-      // Also include aircraft registration if available
-      const aircraftInfo = selectedAircraft ? ` (${selectedAircraft.registration})` : '';
-      
-      // Set the flight name with all details
-      const generatedName = `${origin} to ${destination}${aircraftInfo} - ${todayDate}`;
+      // Set the flight name with minimal details, just origin, destination and date
+      const generatedName = `${origin} to ${destination} - ${todayDate}`;
       
       // Only update if different to avoid cursor jumping
       if (flightName !== generatedName && flightName === initialFlightName) {
