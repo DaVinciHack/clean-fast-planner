@@ -23,7 +23,27 @@ const SaveFlightButton = ({
   const [showModal, setShowModal] = useState(false);
   const [savedFlightId, setSavedFlightId] = useState(null);
   
-  // Open the modal
+  const handleButtonClick = () => {
+    // Use the new sliding card instead of the modal
+    const rightPanelContainer = document.querySelector('div#fast-planner-app div#info-panel');
+    if (rightPanelContainer && rightPanelContainer.__reactFiber$) {
+      // Try to access the React component instance
+      let fiber = rightPanelContainer.__reactFiber$;
+      while (fiber) {
+        if (fiber.stateNode && fiber.stateNode.handleCardChange) {
+          // Found the component with handleCardChange method
+          fiber.stateNode.handleCardChange('saveflight');
+          return;
+        }
+        fiber = fiber.return;
+      }
+    }
+    
+    // Fallback to modal if we can't find the panel
+    openModal();
+  };
+  
+  // Open the modal (fallback)
   const openModal = () => {
     setShowModal(true);
   };
@@ -470,7 +490,7 @@ const SaveFlightButton = ({
     <>
       <button 
         style={{...buttonStyle, ...props.style}}
-        onClick={openModal}
+        onClick={handleButtonClick}
         disabled={!canSaveFlight || isSaving || isAutomating}
         title={canSaveFlight ? 'Save route to Palantir as a flight' : 'Select aircraft and add waypoints to save flight'}
         className="control-button"

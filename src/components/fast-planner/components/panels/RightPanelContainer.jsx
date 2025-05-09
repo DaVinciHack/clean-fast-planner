@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import '../../FastPlannerStyles.css';
 import '../../animationFixes.css';
 
@@ -12,12 +12,12 @@ import '../../animationFixes.css';
  * - Current card slides out to the left
  * - New card slides in from the right
  */
-const RightPanelContainer = ({
+const RightPanelContainer = React.forwardRef(({
   visible,
   onToggleVisibility,
   children, // All card components will be passed as children
   initialActiveCard = 'main' // Default to main card
-}) => {
+}, ref) => {
   // State for active card
   const [activeCard, setActiveCard] = useState(initialActiveCard);
   
@@ -37,7 +37,8 @@ const RightPanelContainer = ({
     { id: 'performance', name: 'Performance' },
     { id: 'weather', name: 'Weather' },
     { id: 'finance', name: 'Finance' },
-    { id: 'evacuation', name: 'Evacuation' }
+    { id: 'evacuation', name: 'Evacuation' },
+    { id: 'saveflight', name: 'Save Flight', hidden: true } // Add a hidden card for Save Flight
   ];
   
   // Filter children to get the current active card
@@ -88,6 +89,11 @@ const RightPanelContainer = ({
     }, 400);
   };
   
+  // Expose the handleCardChange method through the ref
+  React.useImperativeHandle(ref, () => ({
+    handleCardChange
+  }));
+  
   return (
     <>
       {/* Right panel toggle tab */}
@@ -100,7 +106,7 @@ const RightPanelContainer = ({
       </div>
       
       {/* Tab/Card Selectors */}
-      {visible && cards.map((card, index) => (
+      {visible && cards.map((card, index) => !card.hidden && (
         <div 
           key={card.id}
           className={`panel-tab right-panel-tab tab-selector tab-${card.id} ${activeCard === card.id ? 'active' : ''}`}
@@ -124,6 +130,6 @@ const RightPanelContainer = ({
       </div>
     </>
   );
-};
+});
 
 export default RightPanelContainer;

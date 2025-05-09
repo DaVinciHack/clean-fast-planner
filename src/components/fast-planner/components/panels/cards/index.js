@@ -5,6 +5,7 @@ import PerformanceCard from './PerformanceCard';
 import WeatherCard from './WeatherCard';
 import FinanceCard from './FinanceCard';
 import EvacuationCard from './EvacuationCard';
+import SaveFlightCard from './SaveFlightCard';
 
 export {
   MainCard,
@@ -12,5 +13,6 @@ export {
   PerformanceCard,
   WeatherCard,
   FinanceCard,
-  EvacuationCard
+  EvacuationCard,
+  SaveFlightCard
 };

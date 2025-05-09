@@ -6,7 +6,8 @@ import {
   PerformanceCard,
   WeatherCard,
   FinanceCard,
-  EvacuationCard
+  EvacuationCard,
+  SaveFlightCard
 } from './cards';
 import '../../FastPlannerStyles.css';
 
@@ -70,13 +71,29 @@ const RightPanel = ({
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {}
 }) => {
-  // No need for the render*Tab functions since we're using the actual components
+  // Handle saving flight from SaveFlightCard
+  const handleSaveFlightSubmit = (flightData) => {
+    console.log('Save flight data from card:', flightData);
+    // Implement your save logic here or pass it to parent component
+  };
+  
+  // Handle cancel from SaveFlightCard
+  const handleSaveFlightCancel = () => {
+    // Switch back to main card
+    if (rightPanelRef.current) {
+      rightPanelRef.current.handleCardChange('main');
+    }
+  };
+  
+  // Reference to the RightPanelContainer for triggering card changes
+  const rightPanelRef = React.useRef();
   
   return (
     <RightPanelContainer
       visible={visible}
       onToggleVisibility={onToggleVisibility}
       initialActiveCard="main"
+      ref={rightPanelRef}
     >
       {/* Main Card */}
       <MainCard
@@ -154,6 +171,16 @@ const RightPanel = ({
       
       {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
+      
+      {/* Save Flight Card */}
+      <SaveFlightCard
+        id="saveflight"
+        onSave={handleSaveFlightSubmit}
+        onCancel={handleSaveFlightCancel}
+        waypoints={waypoints}
+        selectedAircraft={selectedAircraft}
+        isSaving={false}
+      />
     </RightPanelContainer>
   );
 };
