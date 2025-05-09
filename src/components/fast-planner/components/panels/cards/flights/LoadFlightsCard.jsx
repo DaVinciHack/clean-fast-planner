@@ -30,6 +30,7 @@ const LoadFlightsCard = ({
     setErrorMessage('');
     
     try {
+      // Use try-catch to handle API availability issues
       const loadedFlights = await FlightLoaderService.loadFlights({
         region: currentRegion,
         searchQuery: searchQuery
@@ -38,7 +39,19 @@ const LoadFlightsCard = ({
       setFlights(loadedFlights);
     } catch (error) {
       console.error('Error loading flights:', error);
-      setErrorMessage(FlightLoaderService.formatErrorMessage(error));
+      
+      // Display a user-friendly error message
+      if (error.message && error.message.includes('MainFlightObjectFP2')) {
+        setErrorMessage(
+          'The flight loading API is not available in this environment. ' +
+          'Please check that you have access to the flight data in Palantir.'
+        );
+      } else {
+        setErrorMessage(FlightLoaderService.formatErrorMessage(error));
+      }
+      
+      // Reset flights array when there's an error
+      setFlights([]);
     } finally {
       setIsLoading(false);
     }

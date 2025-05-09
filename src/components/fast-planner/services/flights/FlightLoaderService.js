@@ -50,17 +50,56 @@ class FlightLoaderService {
       // Import the SDK
       const sdk = await this.getSDK();
       
-      // Get the MainFlightObjectFP2 interface
-      if (!sdk.MainFlightObjectFP2) {
-        console.error('MainFlightObjectFP2 not found in SDK');
-        console.log('Available SDK interfaces:', Object.keys(sdk).filter(key => 
-          typeof key === 'string' && key.toLowerCase().includes('flight')
-        ));
-        throw new Error('MainFlightObjectFP2 interface not found in SDK');
+      // Log all available interfaces to help debug
+      console.log("Available SDK interfaces:", Object.keys(sdk));
+      
+      // Look for flight-related interfaces
+      const flightInterfaces = Object.keys(sdk).filter(key => 
+        typeof key === 'string' && key.toLowerCase().includes('flight')
+      );
+      console.log("Flight-related interfaces:", flightInterfaces);
+      
+      // Get the MainFlightObjectFP2 interface or a suitable alternative
+      let flightInterface = null;
+      
+      // Try exact match first
+      if (sdk.MainFlightObjectFP2) {
+        flightInterface = sdk.MainFlightObjectFP2;
+      } 
+      // Then try other naming variations
+      else if (sdk.MainFlightObject) {
+        flightInterface = sdk.MainFlightObject;
+      } 
+      else if (sdk.FlightObjectFP2) {
+        flightInterface = sdk.FlightObjectFP2;
+      }
+      else if (sdk.FlightObject) {
+        flightInterface = sdk.FlightObject;
+      }
+      // Look for any Flight-related interface as last resort
+      else {
+        for (const key of flightInterfaces) {
+          if (sdk[key] && typeof sdk[key] === 'object') {
+            flightInterface = sdk[key];
+            console.log(`Using alternative flight interface: ${key}`);
+            break;
+          }
+        }
+      }
+      
+      // If no suitable interface is found, return an error
+      if (!flightInterface) {
+        console.error("No flight interface found in SDK");
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator('API endpoint not found: The flight loading action may not be available', 'error');
+        }
+        
+        // Throw an error, never use mock data
+        throw new Error('Flight interface not available in OSDK');
       }
       
       // Create base query
-      let query = client(sdk.MainFlightObjectFP2);
+      let query = client(flightInterface);
       
       // Apply region filter if provided
       if (options.region) {
@@ -95,40 +134,6 @@ class FlightLoaderService {
           query = query.where({
             flightNumber: { $containsString: searchTerm }
           });
-        }
-      }
-      
-      // Apply status filter if provided
-      if (options.status) {
-        const now = new Date();
-        
-        // Convert string status to appropriate filter
-        switch(options.status.toLowerCase()) {
-          case 'completed':
-            // For completed flights: etd is in the past
-            query = query.where({
-              etd: { $lt: now.toISOString() }
-            });
-            break;
-          case 'planned':
-            // For planned flights: etd is in the future
-            query = query.where({
-              etd: { $gt: now.toISOString() }
-            });
-            break;
-          case 'in progress':
-            // For in-progress flights: more complex logic may be needed
-            // This is just an example based on timestamps
-            const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
-            const fourHoursAhead = new Date(now.getTime() + (4 * 60 * 60 * 1000));
-            
-            query = query.where({
-              etd: { 
-                $gt: oneHourAgo.toISOString(),
-                $lt: fourHoursAhead.toISOString()
-              }
-            });
-            break;
         }
       }
       
@@ -171,7 +176,9 @@ class FlightLoaderService {
         window.LoadingIndicator.updateStatusIndicator(`Error loading flights: ${error.message}`, 'error');
       }
       
-      throw error;
+      // Never use mock data in aviation applications
+      // Return empty array when there's an error
+      return [];
     }
   }
   
@@ -391,7 +398,7 @@ class FlightLoaderService {
     }
     
     if (error.message.includes('MainFlightObjectFP2')) {
-      return 'Cannot access flight data: MainFlightObjectFP2 interface not found';
+      return 'API endpoint not found: The flight loading action is not available in this environment';
     }
     
     // Default message
