@@ -453,7 +453,8 @@ const SaveFlightButton = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontWeight: 'bold'
+    fontWeight: 'normal',
+    height: '32px'
   };
   
   // Status indicator text - based on the current state

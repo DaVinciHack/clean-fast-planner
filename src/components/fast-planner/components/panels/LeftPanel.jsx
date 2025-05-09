@@ -400,11 +400,12 @@ const LeftPanel = ({
             onClick={onClearRoute}
             style={{
               flex: 1,
-              padding: "8px 0",
+              padding: "6px 0",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "14px"
+              fontSize: "14px",
+              height: "32px"
             }}
           >
             Clear Route
@@ -415,11 +416,12 @@ const LeftPanel = ({
             onClick={onToggleChart}
             style={{
               flex: 1,
-              padding: "8px 0",
+              padding: "6px 0",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "14px"
+              fontSize: "14px",
+              height: "32px"
             }}
           >
             {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}

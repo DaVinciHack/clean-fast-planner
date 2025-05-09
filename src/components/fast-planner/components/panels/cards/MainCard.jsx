@@ -92,16 +92,40 @@ const MainCard = ({
       </div>
       
       <div className="control-section">
-        {/* Save Flight button */}
-        <SaveFlightButton
-          selectedAircraft={selectedAircraft}
-          waypoints={waypoints}
-          routeStats={routeStats}
-          currentRegion={currentRegion}
-          onSuccess={handleSaveSuccess}
-          onError={handleSaveError}
-          style={{ marginRight: 'auto' }}
-        />
+        {/* Save and Load Flight buttons - Side by Side */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <SaveFlightButton
+            selectedAircraft={selectedAircraft}
+            waypoints={waypoints}
+            routeStats={routeStats}
+            currentRegion={currentRegion}
+            onSuccess={handleSaveSuccess}
+            onError={handleSaveError}
+            style={{ flex: 1, margin: 0 }}
+          />
+          <button 
+            className="control-button" 
+            style={{
+              backgroundColor: '#038dde',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '5px 10px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              flex: 1,
+              marginLeft: '5px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 'normal'
+            }}
+            onClick={() => alert('Load Flights functionality will be implemented in the next release')}
+          >
+            Load Flights
+          </button>
+        </div>
         {/* Manual reload button - hidden by default but useful for development */}
         <button 
           id="reload-data" 
@@ -429,7 +453,7 @@ const MainCard = ({
         <div className="weather-control-section" style={{ marginBottom: '0', marginTop: '4px' }}>
           <div className="settings-group" style={{ display: 'flex', gap: '8px', marginBottom: '0' }}>
             <div style={{ flex: '1' }}>
-              <label htmlFor="wind-direction" style={{ fontSize: '0.85em' }}>Wind From:</label>
+              <label htmlFor="wind-direction" style={{ fontSize: '0.75em' }}>Wind From:</label>
               <div className="input-with-unit" style={{ width: '100%' }}>
                 <input
                   id="wind-direction"
@@ -445,13 +469,13 @@ const MainCard = ({
                     // Important: Pass parameters in correct order (speed, direction)
                     onWeatherUpdate(weather.windSpeed, normalizedDirection);
                   }}
-                  style={{ width: '100%', height: '28px', fontSize: '0.9em' }}
+                  style={{ width: '100%', height: '24px', fontSize: '0.8em' }}
                 />
                 <span className="unit">°</span>
               </div>
             </div>
             <div style={{ flex: '1' }}>
-              <label htmlFor="wind-speed" style={{ fontSize: '0.85em' }}>Speed:</label>
+              <label htmlFor="wind-speed" style={{ fontSize: '0.75em' }}>Speed:</label>
               <div className="input-with-unit" style={{ width: '100%' }}>
                 <input
                   id="wind-speed"
@@ -465,7 +489,7 @@ const MainCard = ({
                     // Important: Pass parameters in correct order (speed, direction)
                     onWeatherUpdate(newSpeed, weather.windDirection);
                   }}
-                  style={{ width: '100%', height: '28px', fontSize: '0.9em' }}
+                  style={{ width: '100%', height: '24px', fontSize: '0.8em' }}
                 />
                 <span className="unit">kts</span>
               </div>
