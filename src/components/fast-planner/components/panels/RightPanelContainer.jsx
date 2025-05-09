@@ -38,7 +38,8 @@ const RightPanelContainer = React.forwardRef(({
     { id: 'weather', name: 'Weather' },
     { id: 'finance', name: 'Finance' },
     { id: 'evacuation', name: 'Evacuation' },
-    { id: 'saveflight', name: 'Save Flight', hidden: true } // Add a hidden card for Save Flight
+    { id: 'saveflight', name: 'Save Flight', hidden: true }, // Hidden card for Save Flight
+    { id: 'loadflights', name: 'Load Flights', hidden: true } // Hidden card for Load Flights
   ];
   
   // Filter children to get the current active card
@@ -56,6 +57,9 @@ const RightPanelContainer = React.forwardRef(({
   
   // Handle card change with animation
   const handleCardChange = (cardId) => {
+    // Add debugging to trace card change requests
+    console.log(`RightPanelContainer: handleCardChange called with cardId=${cardId}, currentCard=${currentCard}, activeCard=${activeCard}, isAnimating=${isAnimating}`);
+    
     // Don't do anything if clicking the current active tab or if animation is in progress
     if (activeCard === cardId || isAnimating) return;
     

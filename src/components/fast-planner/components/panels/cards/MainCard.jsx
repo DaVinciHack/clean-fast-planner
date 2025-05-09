@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import RegionSelector from '../../controls/RegionSelector';
-import { SaveFlightButton } from '../../controls';
+import { SaveFlightButton, LoadFlightsButton } from '../../controls';
 import { StopCardsContainer } from '../../flight/stops';
 import '../../flight/stops/StopCards.css';
 
@@ -103,28 +103,19 @@ const MainCard = ({
             onError={handleSaveError}
             style={{ flex: 1, margin: 0 }}
           />
-          <button 
-            className="control-button" 
-            style={{
-              backgroundColor: '#038dde',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '5px 10px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              flex: 1,
-              margin: 0,
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'normal'
+          <LoadFlightsButton 
+            style={{ flex: 1, margin: 0 }}
+            onSuccess={(message) => {
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(message, 'success');
+              }
             }}
-            onClick={() => alert('Load Flights functionality will be implemented in the next release')}
-          >
-            Load Flights
-          </button>
+            onError={(error) => {
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(error, 'error');
+              }
+            }}
+          />
         </div>
         {/* Manual reload button - hidden by default but useful for development */}
         <button 

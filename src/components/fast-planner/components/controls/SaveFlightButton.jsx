@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import SaveFlightModal from './SaveFlightModal';
 import PalantirFlightService from '../../services/PalantirFlightService';
 import AutomationService from '../../services/AutomationService';
+import { usePanelContext } from '../../context/PanelContext';
 
 /**
  * SaveFlightButton Component
@@ -23,24 +24,19 @@ const SaveFlightButton = ({
   const [showModal, setShowModal] = useState(false);
   const [savedFlightId, setSavedFlightId] = useState(null);
   
+  // Access the panel context for card navigation
+  const panelContext = usePanelContext();
+  
   const handleButtonClick = () => {
-    // Use the new sliding card instead of the modal
-    const rightPanelContainer = document.querySelector('div#fast-planner-app div#info-panel');
-    if (rightPanelContainer && rightPanelContainer.__reactFiber$) {
-      // Try to access the React component instance
-      let fiber = rightPanelContainer.__reactFiber$;
-      while (fiber) {
-        if (fiber.stateNode && fiber.stateNode.handleCardChange) {
-          // Found the component with handleCardChange method
-          fiber.stateNode.handleCardChange('saveflight');
-          return;
-        }
-        fiber = fiber.return;
-      }
+    // Use the panel context to change to the saveflight card
+    if (panelContext && panelContext.handleCardChange) {
+      console.log('SaveFlightButton: Using panel context to switch to saveflight card');
+      panelContext.handleCardChange('saveflight');
+    } else {
+      console.log('SaveFlightButton: Panel context not available, falling back to modal');
+      // Fallback to modal if the context is not available
+      openModal();
     }
-    
-    // Fallback to modal if we can't find the panel
-    openModal();
   };
   
   // Open the modal (fallback)
