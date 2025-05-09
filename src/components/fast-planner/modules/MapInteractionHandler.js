@@ -149,7 +149,7 @@ class MapInteractionHandler {
       // Check for nearest rig
       const nearestRig = this.platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
 
-      if (nearestRig && nearestRig.distance < 1) { // Within 1 nautical mile
+      if (nearestRig && nearestRig.distance < 5) { // Within 5 nautical miles
         // Add the rig as a waypoint instead of the clicked location
         console.log(`MapInteractionHandler: Using nearest rig: ${nearestRig.name} (${nearestRig.distance.toFixed(1)} nm away)`);
         this.handlePlatformClick(nearestRig.coordinates, nearestRig.name);
@@ -192,7 +192,7 @@ class MapInteractionHandler {
       this.triggerCallback('onRouteClick', { lngLat, insertIndex, nearestRig });
     } else {
       // Direct add if no callback
-      if (nearestRig && nearestRig.distance < 2) {
+      if (nearestRig && nearestRig.distance < 5) {
         // Add the rig instead of the clicked point
         this.waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex);
       } else {
@@ -207,15 +207,15 @@ class MapInteractionHandler {
    * @param {Object} lngLat - {lng, lat} click coordinates
    */
   handleMapBackgroundClick(lngLat) {
-    // First check for nearest rig within 2 nautical miles
-    const nearestRig = this.platformManager.findNearestPlatform(lngLat.lat, lngLat.lng, 2);
+    // First check for nearest rig within 5 nautical miles
+    const nearestRig = this.platformManager.findNearestPlatform(lngLat.lat, lngLat.lng, 5);
     
     console.log(`MapInteractionHandler: 🌐 Map click at [${lngLat.lng}, ${lngLat.lat}]`);
     
     if (nearestRig) {
       console.log(`MapInteractionHandler: 🌐 Found nearest rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
     } else {
-      console.log(`MapInteractionHandler: 🌐 No rig found within 2 nautical miles`);
+      console.log(`MapInteractionHandler: 🌐 No rig found within 5 nautical miles`);
     }
 
     // Either use callback or direct add
@@ -252,7 +252,7 @@ class MapInteractionHandler {
       this.triggerCallback('onMapClick', callbackData);
     } else {
       // Direct add - use nearest rig if available within distance
-      if (nearestRig && nearestRig.distance <= 2) {
+      if (nearestRig && nearestRig.distance <= 5) {
         console.log(`MapInteractionHandler: 🌐 Snapping to rig ${nearestRig.name}`);
         const coordinates = nearestRig.coords || [nearestRig.lng, nearestRig.lat];
         this.waypointManager.addWaypoint(coordinates, nearestRig.name);
@@ -292,9 +292,9 @@ class MapInteractionHandler {
     
     // Check for nearest rig
     try {
-      const nearestRig = this.platformManager.findNearestPlatform(coords[1], coords[0], 2);
+      const nearestRig = this.platformManager.findNearestPlatform(coords[1], coords[0], 5);
 
-      if (nearestRig && nearestRig.distance < 2) { // Within 2 nautical miles
+      if (nearestRig && nearestRig.distance < 5) { // Within 5 nautical miles
         // Add the rig instead of the dragged point
         console.log(`MapInteractionHandler: Using nearest rig for drag: ${nearestRig.name} (${nearestRig.distance.toFixed(1)} nm away)`);
         this.waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex);
