@@ -91,9 +91,9 @@ const MainCard = ({
         </div>
       </div>
       
-      <div className="control-section">
+      <div className="control-section" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
         {/* Save and Load Flight buttons - Side by Side */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', width: '100%', gap: '5px' }}>
           <SaveFlightButton
             selectedAircraft={selectedAircraft}
             waypoints={waypoints}
@@ -114,7 +114,7 @@ const MainCard = ({
               cursor: 'pointer',
               fontSize: '14px',
               flex: 1,
-              marginLeft: '5px',
+              margin: 0,
               height: '32px',
               display: 'flex',
               alignItems: 'center',

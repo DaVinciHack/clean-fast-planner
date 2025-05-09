@@ -15,7 +15,8 @@ const SaveFlightButton = ({
   currentRegion,
   onSuccess,
   onError,
-  runAutomation = true // New prop to determine if automation should run after save
+  runAutomation = true, // New prop to determine if automation should run after save
+  ...props // Add rest parameter to capture style and other props
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isAutomating, setIsAutomating] = useState(false);
@@ -468,7 +469,7 @@ const SaveFlightButton = ({
   return (
     <>
       <button 
-        style={buttonStyle}
+        style={{...buttonStyle, ...props.style}}
         onClick={openModal}
         disabled={!canSaveFlight || isSaving || isAutomating}
         title={canSaveFlight ? 'Save route to Palantir as a flight' : 'Select aircraft and add waypoints to save flight'}
