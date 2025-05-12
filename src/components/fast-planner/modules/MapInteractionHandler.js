@@ -1,25 +1,36 @@
 /**
  * MapInteractionHandler.js
  * 
- * Handles map click events and route interactions
- * Separates these concerns from the main FastPlannerApp component
+ * Handles interactions between the map and the route manager
  */
 
 class MapInteractionHandler {
-  constructor(mapManager, waypointManager, platformManager) {
+  /**
+   * Initialize the handler
+   * @param {Object} mapManager - Map manager instance
+   * @param {Object} routeManager - Route manager instance
+   * @param {Object} platformManager - Platform manager instance (optional)
+   */
+  constructor(mapManager, routeManager, platformManager = null) {
     this.mapManager = mapManager;
-    this.waypointManager = waypointManager;
+    this.routeManager = routeManager;
     this.platformManager = platformManager;
-    this.isInitialized = false;
+    
+    // Store bound methods for event listeners
+    this.handleMapClick = this.handleMapClick.bind(this);
+    this.handlePlatformClick = this.handlePlatformClick.bind(this);
+    this.handleRouteClick = this.handleRouteClick.bind(this);
+    
+    // Callbacks
     this.callbacks = {
-      onLeftPanelOpen: null,
       onMapClick: null,
-      onRouteClick: null,
       onPlatformClick: null,
+      onRouteClick: null,
+      onLeftPanelOpen: null,
       onError: null
     };
   }
-
+  
   /**
    * Set a callback function
    * @param {string} type - The callback type
@@ -30,7 +41,7 @@ class MapInteractionHandler {
       this.callbacks[type] = callback;
     }
   }
-
+  
   /**
    * Trigger a callback if it exists
    * @param {string} type - The callback type
@@ -41,273 +52,165 @@ class MapInteractionHandler {
       this.callbacks[type](data);
     }
   }
-
+  
   /**
-   * Initialize map click handlers
-   * This is the main function that sets up all map interactions
-   * @returns {boolean} - Success status
+   * Initialize the handler and set up event listeners
+   * @returns {boolean} Whether initialization was successful
    */
   initialize() {
-    console.log('MapInteractionHandler: Initializing map interaction handlers');
-
-    // Make sure we have all the required managers
-    if (!this.mapManager || !this.waypointManager || !this.platformManager) {
-      console.error('MapInteractionHandler: Missing required managers');
-      this.triggerCallback('onError', 'Missing required managers');
+    if (!this.mapManager || !this.routeManager) {
+      console.error('Cannot initialize handler: Missing required managers');
       return false;
     }
-
-    // Get the map instance
+    
     const map = this.mapManager.getMap();
     if (!map) {
-      console.error('MapInteractionHandler: Map is not initialized');
-      this.triggerCallback('onError', 'Map is not initialized');
+      console.error('Cannot initialize handler: Map is not initialized');
       return false;
     }
-
-    // CRITICAL: Remove any existing click handler to prevent duplicates
-    map.off('click');
-
-    // Map click for adding waypoints
-    map.on('click', this.handleMapClick.bind(this));
-
-    // Set up route dragging via the waypoint manager's setupRouteDragging method
-    if (typeof this.waypointManager.setupRouteDragging === 'function') {
-      this.waypointManager.setupRouteDragging(this.handleRouteDragComplete.bind(this));
+    
+    console.log('Initializing map interaction handler');
+    
+    // Set up map click event
+    map.on('click', this.handleMapClick);
+    
+    // Set up platform click event (if platforms layer exists)
+    if (map.getLayer('platforms-layer')) {
+      map.on('click', 'platforms-layer', this.handlePlatformClick);
+    } else {
+      console.warn('Platforms layer not found, platform clicks will not be handled');
     }
-
-    // Mark as initialized
-    this.isInitialized = true;
-    console.log('MapInteractionHandler: Map interactions initialized successfully');
+    
+    // Setup route dragging in the RouteManager
+    if (typeof this.routeManager.setupRouteDragging === 'function') {
+      this.routeManager.setupRouteDragging();
+    }
+    
     return true;
   }
-
+  
   /**
-   * Handle map click events
-   * @param {Object} e - The click event
+   * Clean up event listeners
+   */
+  cleanup() {
+    const map = this.mapManager.getMap();
+    if (map) {
+      map.off('click', this.handleMapClick);
+      
+      if (map.getLayer('platforms-layer')) {
+        map.off('click', 'platforms-layer', this.handlePlatformClick);
+      }
+    }
+  }
+  
+  /**
+   * Handle map click event
+   * @param {Object} e - Map click event
    */
   handleMapClick(e) {
-    console.log('MapInteractionHandler: Map click detected', e.lngLat);
-
-    // Ensure managers are initialized
-    if (!this.mapManager || !this.waypointManager || !this.platformManager) {
-      console.error('MapInteractionHandler: Required managers not initialized');
+    // Skip if mapbox popup is clicked
+    if (e.originalEvent.target.closest('.mapboxgl-popup')) {
       return;
     }
-
-    const map = this.mapManager.getMap();
-    if (!map) return;
-
-    // Notify the app to ensure left panel is shown when clicking on map
-    this.triggerCallback('onLeftPanelOpen');
-
-    try {
-      // Check if clicking on a platform marker (rig, platform, airport)
-      const platformFeatures = map.queryRenderedFeatures(e.point, { 
-        layers: [
-          'platforms-fixed-layer', 
-          'platforms-movable-layer',
-          'airfields-layer'
-        ] 
-      });
-
-      if (platformFeatures && platformFeatures.length > 0) {
-        console.log('MapInteractionHandler: Clicked on platform:', platformFeatures[0].properties.name);
-        const props = platformFeatures[0].properties;
-        const coordinates = platformFeatures[0].geometry.coordinates.slice();
-
-        // Handle platform click - either direct add or callback
-        this.handlePlatformClick(coordinates, props.name);
-        return;
-      }
-    } catch (err) {
-      console.error('MapInteractionHandler: Error handling platform click:', err);
-    }
-
-    try {
-      // Check if clicking on the route line
-      const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
-      if (routeFeatures && routeFeatures.length > 0) {
-        console.log('MapInteractionHandler: Clicked on route line');
-        
-        // Find where to insert on the path
-        const insertIndex = this.waypointManager.findPathInsertIndex(e.lngLat);
-
-        // Check for nearest rig when clicking on route line
-        const nearestRig = this.platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
-
-        // Handle route click - either direct add or callback
-        this.handleRouteClick(e.lngLat, insertIndex, nearestRig);
-        return;
-      }
-    } catch (err) {
-      console.error('MapInteractionHandler: Error handling route click:', err);
-    }
-
-    // If we're here, we clicked on the map background (not a platform or route)
-    try {
-      // Check for nearest rig
-      const nearestRig = this.platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
-
-      if (nearestRig && nearestRig.distance < 1) { // Within 1 nautical mile
-        // Add the rig as a waypoint instead of the clicked location
-        console.log(`MapInteractionHandler: Using nearest rig: ${nearestRig.name} (${nearestRig.distance.toFixed(1)} nm away)`);
-        this.handlePlatformClick(nearestRig.coordinates, nearestRig.name);
-      } else {
-        // Just add the clicked location as a waypoint
-        this.handleMapBackgroundClick(e.lngLat);
-      }
-    } catch (err) {
-      console.error('MapInteractionHandler: Error handling map background click:', err);
-      
-      // Fallback to just adding the clicked point
-      this.handleMapBackgroundClick(e.lngLat);
-    }
-  }
-
-  /**
-   * Handle clicks on platform markers
-   * @param {Array} coordinates - [lng, lat] coordinates
-   * @param {string} name - The platform name
-   */
-  handlePlatformClick(coordinates, name) {
-    // Either add directly or trigger callback
-    if (this.callbacks.onPlatformClick) {
-      this.triggerCallback('onPlatformClick', { coordinates, name });
-    } else {
-      // Direct add if no callback
-      this.waypointManager.addWaypoint(coordinates, name);
-    }
-  }
-
-  /**
-   * Handle clicks on the route line
-   * @param {Object} lngLat - {lng, lat} click coordinates
-   * @param {number} insertIndex - Index to insert the new waypoint
-   * @param {Object} nearestRig - The nearest rig if any
-   */
-  handleRouteClick(lngLat, insertIndex, nearestRig) {
-    // Either add directly or trigger callback
-    if (this.callbacks.onRouteClick) {
-      this.triggerCallback('onRouteClick', { lngLat, insertIndex, nearestRig });
-    } else {
-      // Direct add if no callback
-      if (nearestRig && nearestRig.distance < 2) {
-        // Add the rig instead of the clicked point
-        this.waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex);
-      } else {
-        // Add the clicked point
-        this.waypointManager.addWaypointAtIndex([lngLat.lng, lngLat.lat], null, insertIndex);
-      }
-    }
-  }
-
-  /**
-   * Handle clicks on the map background (not on platforms or route)
-   * @param {Object} lngLat - {lng, lat} click coordinates
-   */
-  handleMapBackgroundClick(lngLat) {
-    // First check for nearest rig within 2 nautical miles
-    const nearestRig = this.platformManager.findNearestPlatform(lngLat.lat, lngLat.lng, 2);
     
-    console.log(`MapInteractionHandler: 🌐 Map click at [${lngLat.lng}, ${lngLat.lat}]`);
-    
-    if (nearestRig) {
-      console.log(`MapInteractionHandler: 🌐 Found nearest rig: ${nearestRig.name} at distance ${nearestRig.distance.toFixed(2)} nm`);
-    } else {
-      console.log(`MapInteractionHandler: 🌐 No rig found within 2 nautical miles`);
+    // Skip if platform was clicked (handled by handlePlatformClick)
+    if (e.features && e.features.length > 0 && 
+        e.features.some(f => f.layer.id === 'platforms-layer')) {
+      return;
     }
-
-    // Either use callback or direct add
-    if (this.callbacks.onMapClick) {
-      // Include the nearest rig info in the callback data
-      const callbackData = { 
-        lngLat: lngLat,
-        coordinates: [lngLat.lng, lngLat.lat], // Ensure we have coordinates in array format
-        mapClickSource: 'directClick' // CRITICAL FIX: Flag to identify this is a map click
-      };
+    
+    console.log(`Map click at [${e.lngLat.lng}, ${e.lngLat.lat}]`);
+    
+    // If left panel is not open, trigger the callback
+    if (this.callbacks.onLeftPanelOpen) {
+      this.callbacks.onLeftPanelOpen();
+    }
+    
+    // Create data object for the click
+    const clickData = {
+      lngLat: e.lngLat,
+      point: e.point,
+      mapClickSource: 'directClick'
+    };
+    
+    // Add nearest platform if available
+    if (this.platformManager) {
+      const nearestPlatform = this.platformManager.findNearestPlatform(
+        e.lngLat.lat, e.lngLat.lng, 2 // 2 nm radius
+      );
       
-      if (nearestRig) {
-        // Make sure coordinates are in the right format - check all possible formats
-        let rigCoordinates;
-        if (Array.isArray(nearestRig.coordinates)) {
-          rigCoordinates = nearestRig.coordinates;
-        } else if (Array.isArray(nearestRig.coords)) {
-          rigCoordinates = nearestRig.coords;
-        } else if (nearestRig.lng !== undefined && nearestRig.lat !== undefined) {
-          rigCoordinates = [nearestRig.lng, nearestRig.lat];
-        } else {
-          console.error('MapInteractionHandler: 🌐 Invalid rig coordinates format:', nearestRig);
-          rigCoordinates = [lngLat.lng, lngLat.lat]; // Fallback to clicked point
-        }
-        
-        callbackData.nearestRig = {
-          ...nearestRig,
-          coordinates: rigCoordinates,
-          name: nearestRig.name || 'Unknown'
+      if (nearestPlatform) {
+        clickData.nearestRig = {
+          name: nearestPlatform.name,
+          coordinates: [nearestPlatform.longitude, nearestPlatform.latitude],
+          distance: nearestPlatform.distance,
+          type: nearestPlatform.type
         };
       }
-      
-      console.log(`MapInteractionHandler: 🌐 Triggering onMapClick with data:`, callbackData);
-      this.triggerCallback('onMapClick', callbackData);
-    } else {
-      // Direct add - use nearest rig if available within distance
-      if (nearestRig && nearestRig.distance <= 2) {
-        console.log(`MapInteractionHandler: 🌐 Snapping to rig ${nearestRig.name}`);
-        const coordinates = nearestRig.coords || [nearestRig.lng, nearestRig.lat];
-        this.waypointManager.addWaypoint(coordinates, nearestRig.name);
-        
-        // CRITICAL FIX: Make sure route is updated immediately after adding waypoint
-        // We need to force a reflow by adding a small delay
-        setTimeout(() => {
-          console.log(`MapInteractionHandler: 🌐 Forcing route update for map click`);
-          if (this.waypointManager && this.waypointManager.updateRoute) {
-            this.waypointManager.updateRoute();
-          }
-        }, 50);
-      } else {
-        // No nearby rig, just add the clicked point
-        console.log(`MapInteractionHandler: 🌐 Adding waypoint at clicked point`);
-        this.waypointManager.addWaypoint([lngLat.lng, lngLat.lat]);
-        
-        // CRITICAL FIX: Make sure route is updated immediately after adding waypoint
-        // We need to force a reflow by adding a small delay
-        setTimeout(() => {
-          console.log(`MapInteractionHandler: 🌐 Forcing route update for map click`);
-          if (this.waypointManager && this.waypointManager.updateRoute) {
-            this.waypointManager.updateRoute();
-          }
-        }, 50);
-      }
     }
-  }
-
-  /**
-   * Handle route drag completion
-   * @param {number} insertIndex - Index to insert the new waypoint
-   * @param {Array} coords - [lng, lat] coordinates
-   */
-  handleRouteDragComplete(insertIndex, coords) {
-    console.log(`MapInteractionHandler: Route dragged at index ${insertIndex}`, coords);
     
-    // Check for nearest rig
-    try {
-      const nearestRig = this.platformManager.findNearestPlatform(coords[1], coords[0], 2);
-
-      if (nearestRig && nearestRig.distance < 2) { // Within 2 nautical miles
-        // Add the rig instead of the dragged point
-        console.log(`MapInteractionHandler: Using nearest rig for drag: ${nearestRig.name} (${nearestRig.distance.toFixed(1)} nm away)`);
-        this.waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex);
-      } else {
-        // Add the dragged point
-        this.waypointManager.addWaypointAtIndex(coords, null, insertIndex);
-      }
-    } catch (err) {
-      console.error('MapInteractionHandler: Error handling route drag:', err);
-      
-      // Fallback to just adding the dragged point
-      this.waypointManager.addWaypointAtIndex(coords, null, insertIndex);
+    // Let the RouteManager handle the click based on the current edit mode
+    if (this.routeManager) {
+      this.routeManager.handleMapClick(clickData);
     }
+    
+    // Trigger callback with the click data
+    this.triggerCallback('onMapClick', clickData);
+  }
+  
+  /**
+   * Handle platform click event
+   * @param {Object} e - Platform click event
+   */
+  handlePlatformClick(e) {
+    // Skip if mapbox popup is clicked
+    if (e.originalEvent.target.closest('.mapboxgl-popup')) {
+      return;
+    }
+    
+    if (!e.features || e.features.length === 0) {
+      return;
+    }
+    
+    // Get the clicked platform
+    const feature = e.features[0];
+    const properties = feature.properties;
+    
+    console.log(`Platform clicked: ${properties.name}`);
+    
+    // If left panel is not open, trigger the callback
+    if (this.callbacks.onLeftPanelOpen) {
+      this.callbacks.onLeftPanelOpen();
+    }
+    
+    // Create data object for the click
+    const clickData = {
+      lngLat: e.lngLat,
+      point: e.point,
+      mapClickSource: 'platformClick',
+      platform: {
+        name: properties.name,
+        coordinates: [properties.longitude, properties.latitude],
+        type: properties.type
+      }
+    };
+    
+    // Let the RouteManager handle the click based on the current edit mode
+    if (this.routeManager) {
+      this.routeManager.handleMapClick(clickData);
+    }
+    
+    // Trigger callback with the click data
+    this.triggerCallback('onPlatformClick', clickData);
+  }
+  
+  /**
+   * Handle route click event
+   * @param {Object} e - Route click event
+   */
+  handleRouteClick(e) {
+    // This is handled by the routeManager's setupRouteDragging method
+    // Left for future use or additional functionality
   }
 }
 

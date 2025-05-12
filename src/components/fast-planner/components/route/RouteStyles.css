@@ -1,0 +1,235 @@
+/* Route Component Styles */
+
+/* Legs Panel */
+.legs-panel {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.panel-header {
+  background-color: #e9ecef;
+  padding: 10px 15px;
+  border-bottom: 1px solid #dee2e6;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.panel-content {
+  padding: 10px 15px;
+}
+
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  color: #6c757d;
+}
+
+/* Leg Container */
+.leg-container {
+  margin-bottom: 16px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.leg-container.active-leg {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.leg-header {
+  padding: 10px 15px;
+  background-color: #f1f3f5;
+  border-bottom: 1px solid #dee2e6;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.leg-header:hover {
+  background-color: #e9ecef;
+}
+
+.active-leg .leg-header {
+  background-color: #e7f1ff;
+}
+
+.leg-title {
+  font-weight: 500;
+  color: #343a40;
+  flex: 1;
+}
+
+.leg-stats {
+  color: #6c757d;
+  font-size: 0.9em;
+  margin-right: 10px;
+}
+
+.leg-points-count {
+  font-size: 0.8em;
+  color: #6c757d;
+  background-color: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.leg-points {
+  padding: 10px 0;
+}
+
+.leg-actions {
+  padding: 10px 15px;
+  border-top: 1px solid #f1f3f5;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Point Items */
+.point-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 8px 15px;
+  border-left: 3px solid transparent;
+  margin-bottom: 5px;
+}
+
+.point-item:hover {
+  background-color: #f8f9fa;
+}
+
+.stop-item {
+  border-left-color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+.waypoint-item {
+  border-left-color: #007bff;
+  background-color: rgba(0, 123, 255, 0.05);
+  margin-left: 20px;
+}
+
+.point-icon {
+  margin-right: 10px;
+  font-size: 1.2em;
+}
+
+.point-details {
+  flex: 1;
+}
+
+.point-name {
+  font-weight: 500;
+}
+
+.point-role {
+  color: #6c757d;
+  font-weight: normal;
+  font-size: 0.9em;
+}
+
+.point-coords {
+  font-size: 0.8em;
+  color: #6c757d;
+  font-family: monospace;
+}
+
+.point-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.action-button {
+  background-color: transparent;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8em;
+  color: #495057;
+  cursor: pointer;
+}
+
+.action-button:hover {
+  background-color: #e9ecef;
+}
+
+.edit-leg-button {
+  background-color: #e9ecef;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 5px 10px;
+  color: #495057;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.edit-leg-button:hover {
+  background-color: #dee2e6;
+}
+
+.edit-leg-button.active {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #fff;
+}
+
+/* Waypoint Mode Toggle */
+.waypoint-mode-toggle {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.mode-indicator {
+  padding: 8px 15px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  text-align: center;
+  font-weight: 600;
+  color: white;
+}
+
+.mode-indicator.stops-mode {
+  background-color: #dc3545;
+}
+
+.mode-indicator.waypoints-mode {
+  background-color: #007bff;
+}
+
+.toggle-button {
+  width: 100%;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #6c757d;
+  margin-bottom: 10px;
+}
+
+.toggle-button:hover {
+  opacity: 0.9;
+}
+
+.mode-description {
+  font-size: 0.9em;
+  color: #6c757d;
+  line-height: 1.4;
+}
