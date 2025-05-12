@@ -1,0 +1,93 @@
+--- FastPlannerApp.jsx.old	2023-05-12 15:54:21.000000000 +0000
++++ FastPlannerApp.jsx	2023-05-12 15:54:22.000000000 +0000
+@@ -1,6 +1,7 @@
+ import React, { useState, useRef, useEffect } from 'react';
+ import { useAuth } from '../../context/AuthContext';
+ import client from '../../client';
++import { createWaypointInsertionManager, setupWaypointCallbacks, patchWaypointManager, toggleWaypointMode } from './modules/waypoints';
+ import './FastPlannerStyles.css';
+ 
+ // Initialize loading indicator effect
+@@ -52,6 +53,7 @@
+   const favoriteLocationsManagerRef = useRef(null);
+   const aircraftManagerRef = useRef(null);
+   const flightCalculationsRef = useRef(null);
++  const waypointInsertionManagerRef = useRef(null);
+   const mapInteractionHandlerRef = useRef(null);
+   const appSettingsManagerRef = useRef(null);
+ 
+@@ -365,6 +367,11 @@
+     window.WindCalculations = WindCalc;
+     console.log('🌬️ Initialized WindCalculations globally:', window.WindCalculations);
+   }, []);
++  
++  // Load waypoint styles
++  useEffect(() => {
++    import('./modules/waypoints/waypoint-styles.css');
++  }, []);
+ 
+   // Initialize managers
+   useEffect(() => {
+@@ -606,6 +613,34 @@
+       // Update with current settings
+       flightCalculationsRef.current.updateConfig({
+         passengerWeight: flightSettings.passengerWeight, // Use flightSettings state
+         contingencyFuelPercent: flightSettings.contingencyFuelPercent, // Use flightSettings state
+         taxiFuel: flightSettings.taxiFuel, // Use flightSettings state
+         reserveFuel: flightSettings.reserveFuel, // Use flightSettings state
+         deckTimePerStop: flightSettings.deckTimePerStop, // Use flightSettings state
+         deckFuelFlow: flightSettings.deckFuelFlow, // Use flightSettings state
+@@ -627,6 +662,30 @@
+       })
+       .catch(error => {
+         console.error("Failed to import WindCalculations module:", error);
+       });
+     }
++    
++    // Initialize the WaypointInsertionManager - do this after other managers
++    if (!waypointInsertionManagerRef.current && 
++        mapManagerRef.current && 
++        waypointManagerRef.current &&
++        platformManagerRef.current) {
++      console.log("FastPlannerApp: Creating WaypointInsertionManager instance");
++      
++      // Create the manager
++      waypointInsertionManagerRef.current = createWaypointInsertionManager(
++        mapManagerRef.current, 
++        waypointManagerRef.current,
++        platformManagerRef.current
++      );
++      
++      // Set up callbacks
++      setupWaypointCallbacks(
++        waypointInsertionManagerRef.current,
++        (data) => console.log("Waypoint inserted:", data),
++        (data) => console.log("Waypoint removed:", data),
++        (error) => console.error("Waypoint error:", error)
++      );
++      
++      // Patch the WaypointManager to handle waypoints vs stops
++      patchWaypointManager(waypointManagerRef.current);
++    }
+ 
+     // Initialize the AppSettingsManager
+     if (!appSettingsManagerRef.current) {
+@@ -1062,8 +1121,17 @@
+    * @param {boolean} active - Whether to activate (true) or deactivate (false)
+    */
+   const toggleWaypointMode = async (active) => {
+     console.log(`🔄 Toggling waypoint insertion mode: ${active ? 'ON' : 'OFF'}`);
+     
++    // Update state
+     setWaypointModeActive(active);
++    
++    // Toggle waypoint mode in the WaypointInsertionManager
++    if (waypointInsertionManagerRef.current) {
++      // Use our new toggleWaypointMode function
++      toggleWaypointMode(waypointInsertionManagerRef.current, active);
++    }
++    
++    // Original functionality to load waypoints in platform manager
+     
+     if (platformManagerRef.current) {
+       try {
