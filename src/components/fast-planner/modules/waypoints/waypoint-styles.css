@@ -1,0 +1,125 @@
+/* 
+ * Waypoint Styles
+ * Custom styles for waypoints as distinct from regular stops
+ */
+
+/* Waypoint entry in left panel - thinner and distinct styling */
+.waypoint-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(0, 123, 255, 0.08);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 6px;
+  margin-bottom: 6px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.waypoint-entry:hover {
+  background-color: rgba(0, 123, 255, 0.15);
+}
+
+/* When a waypoint is newly added, animate it */
+.waypoint-entry.highlight-new {
+  animation: waypoint-highlight 2s ease-in-out;
+}
+
+/* Make waypoint entries more compact than stops */
+.waypoint-entry input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #3a8eff;
+  font-size: 0.85em;
+  margin-right: 5px;
+  padding: 2px 4px;
+  height: 24px;
+}
+
+.waypoint-entry input:focus {
+  background-color: rgba(255, 255, 255, 0.9);
+  outline: none;
+  border-radius: 2px;
+}
+
+/* Waypoint coordinates - smaller text */
+.waypoint-entry .coordinates {
+  font-size: 0.7em;
+  color: rgba(150, 150, 150, 0.9);
+  margin-top: -2px;
+  margin-left: 5px;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Controls for waypoint entries */
+.waypoint-entry .waypoint-controls {
+  display: flex;
+  align-items: center;
+  font-size: 0.85em;
+}
+
+.waypoint-entry .waypoint-controls .favorite-button {
+  margin-right: 5px;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.waypoint-entry .waypoint-controls .favorite-button:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+.waypoint-entry .waypoint-controls .drag-handle {
+  cursor: grab;
+  margin: 0 5px;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.waypoint-entry .waypoint-controls .drag-handle:hover {
+  opacity: 1;
+}
+
+.waypoint-entry .waypoint-controls .remove-waypoint {
+  cursor: pointer;
+  color: rgba(220, 53, 69, 0.7);
+  transition: all 0.2s ease;
+}
+
+.waypoint-entry .waypoint-controls .remove-waypoint:hover {
+  color: rgba(220, 53, 69, 1);
+  transform: scale(1.2);
+}
+
+/* Waypoint marker on map */
+.waypoint-marker {
+  width: 8px;
+  height: 8px;
+  background-color: #0088ff;
+  border: 1px solid #004477;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.waypoint-marker:hover {
+  transform: scale(1.3);
+}
+
+/* Keyframe animation for highlighting a new waypoint */
+@keyframes waypoint-highlight {
+  0% {
+    background-color: rgba(0, 123, 255, 0.08);
+  }
+  30% {
+    background-color: rgba(0, 123, 255, 0.4);
+  }
+  100% {
+    background-color: rgba(0, 123, 255, 0.08);
+  }
+}
