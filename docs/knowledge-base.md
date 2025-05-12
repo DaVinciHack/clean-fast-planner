@@ -7,6 +7,60 @@ The Fast Planner is a React application connecting to Palantir's OSDK that provi
 - Original version: http://localhost:8080/
 - Refactored version: http://localhost:8080/?context=new
 
+## Flight Structure and Leg System
+
+### Flight Structure
+The Fast Planner application and Palantir backend use a structured model for flights:
+
+1. **Flight**: A collection of legs with metadata
+   - Contains legs, aircraft, crew information, and timestamps
+   - Has unique identifiers and ETD (estimated time of departure)
+   - Supports alternate routes with split points
+
+2. **Leg**: A segment between two stops
+   - Has a departure stop (from) and a destination stop (to)
+   - Contains optional waypoints between stops
+   - Stores distance, time, and fuel information
+
+3. **Stop**: A main point (airport, rig, platform)
+   - Always at the beginning or end of a leg
+   - Never treated as intermediate points
+
+4. **Waypoint**: An intermediate navigation point
+   - Located between two stops within a leg
+   - Enhances route precision and follows specific patterns
+
+### Flight Editing and Creation
+The application provides two distinct methods for flight management:
+
+1. **Flight Creation**:
+   - Initial flight creation accepts stops only
+   - The Palantir backend adds intermediate waypoints automatically
+   - No direct way to specify waypoints during initial creation
+
+2. **Flight Editing**:
+   - Full support for editing both stops and waypoints
+   - Requires an existing flight ID
+   - Supports reordering, adding, and removing points
+
+### Palantir OSDK Integration
+The integration with Palantir's OSDK requires these key elements:
+
+1. **Critical Fields**:
+   - `stops`: Array of location codes (e.g., ["ENZV", "ENLE"])
+   - `displayWaypoints`: Array of labeled waypoints (e.g., ["ENZV (Dep)", "WP1", "ENLE (Des)"])
+   - `combinedWaypoints`: Array of unlabeled waypoints for processing (e.g., ["ENZV", "WP1", "ENLE"])
+
+2. **Data Format Constraints**:
+   - All IDs must be simple strings, not objects with $primaryKey
+   - Location codes must be uppercase
+   - Waypoints in `displayWaypoints` use a specific format with roles (Dep, Stop, Des)
+
+3. **API Functions**:
+   - `createFlightFromLocations`: Creates new flights (stops only initially)
+   - `editExistingFlightV2`: Edits existing flights (supports waypoints)
+   - Both require different parameter formatting
+
 ## Components Reference
 
 ### Core Modules
@@ -15,15 +69,26 @@ These modules handle the business logic and data flow.
 | Module Name | Purpose | Status | Key Files |
 |-------------|---------|--------|-----------|
 | MapManager | Handles map display and interactions | In Use | `modules/MapManager.js` |
-| WaypointManager | Manages route waypoints and coordinates | In Use | `modules/WaypointManager.js` |
+| WaypointManager | Manages route waypoints and coordinates | To be Replaced | `modules/WaypointManager.js` |
+| RouteManager | Replaces WaypointManager with leg support | New | `modules/RouteManager.js` |
 | PlatformManager | Loads and displays rig/platform data | In Use | `modules/PlatformManager.js` |
 | AircraftManager | Loads and filters aircraft data | In Use | `modules/AircraftManager.js` |
-| RouteCalculator | Calculates route statistics | In Use | `modules/RouteCalculator.js` |
+| RouteCalculator | Calculates route statistics | To be Updated | `modules/RouteCalculator.js` |
 | RegionManager | Manages different geographical regions | In Use | `modules/RegionManager.js` |
 | FavoriteLocationsManager | Handles saved favorite locations | In Use | `modules/FavoriteLocationsManager.js` |
-| MapInteractionHandler | Manages user interactions with the map | In Use | `modules/MapInteractionHandler.js` |
+| MapInteractionHandler | Manages user interactions with the map | Updated | `modules/MapInteractionHandler.js` |
 | AppSettingsManager | Handles application settings and preferences | In Use | `modules/AppSettingsManager.js` |
 | FlightCalculations | Performs flight-specific calculations | In Use | `modules/calculations/FlightCalculations.js` |
+
+### New Model System
+The refactored system uses a proper data model system:
+
+| Model | Purpose | File |
+|-------|---------|------|
+| Flight | Main container for legs and metadata | `models/FlightModel.js` |
+| Leg | Segment between two stops with optional waypoints | `models/FlightModel.js` |
+| Stop | Main location point (departure or destination) | `models/FlightModel.js` |
+| Waypoint | Intermediate navigation point within a leg | `models/FlightModel.js` |
 
 ### UI Components
 These components handle the visual presentation and user interactions.
@@ -33,6 +98,8 @@ These components handle the visual presentation and user interactions.
 | MapComponent | Renders the map | Refactored | ModularFastPlannerComponent.jsx | `/components/map/MapComponent.jsx` |
 | LeftPanel | Route editor panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/LeftPanel.jsx` |
 | RightPanel | Controls and statistics panel | Refactored | ModularFastPlannerComponent.jsx | `/components/panels/RightPanel.jsx` |
+| WaypointModeToggle | Toggles between stops and waypoints mode | New | N/A | `/components/controls/WaypointModeToggle.jsx` |
+| LegsPanel | Displays legs and waypoints structure | New | N/A | `/components/route/LegsPanel.jsx` |
 | RightPanelContainer | Container for card components | Implemented | N/A | `/components/panels/RightPanelContainer.jsx` |
 | MainCard | Main controls and region selection | Implemented | RightPanel.jsx | `/components/panels/cards/MainCard.jsx` |
 | SettingsCard | Flight settings controls | Implemented | RightPanel.jsx | `/components/panels/cards/SettingsCard.jsx` |
@@ -62,34 +129,28 @@ These provide state management and data sharing between components.
 
 ## Current Work & Progress
 
-### Completed Tasks
-- Set up basic project structure with module system
-- Implemented core manager classes
-- Created initial UI components
-- Established context providers
-- Implemented basic route functionality
-- Created version switcher in FastPlannerPage
-- Refactored RightPanel into card-based architecture
-- Implemented smooth card animations
-- Created separate card components for different functionality
-- Implemented comprehensive wind effect handling throughout UI
-- Fixed route line display to properly update with wind-adjusted times
-- Created two-step redraw process to ensure display consistency
+### Legs and Waypoints Refactoring
+We've implemented a proper leg-based structure to replace the old WaypointManager:
 
-### In Progress
-- Implementing S92 dropdown calculator
-- Extracting AircraftSelection component from MainCard
-- Refining route calculation logic
-- Improving event handling between components
+1. **Completed Items**:
+   - Created data models for Flight, Leg, Stop, and Waypoint
+   - Implemented RouteManager to replace WaypointManager
+   - Added edit mode switching between 'stops' and 'waypoints'
+   - Created UI components for displaying and editing legs
+   - Updated MapInteractionHandler to work with the new structure
+   - Added route dragging support for adding waypoints
 
-### Next Steps
-- Extract WaypointEditor component
-- Implement comprehensive testing
-- Add error boundaries around components
-- Improve loading indicators
-- Add fuel consumption display to route line
-- Add passenger capacity information to route line
-- Improve handling of long routes with many waypoints
+2. **Integration Requirements**:
+   - Update FastPlannerApp.jsx to use RouteManager instead of WaypointManager
+   - Update RouteCalculator to work with the leg structure
+   - Update OSDK integration to properly handle legs and waypoints
+   - Ensure backward compatibility with existing flights
+
+3. **Palantir Integration Issues**:
+   - The Palantir flight creation API (`createFlightFromLocations`) only accepts stops
+   - Only the edit API (`editExistingFlightV2`) accepts waypoints
+   - We need to create flights first, then edit them to add waypoints
+   - Alternatively, modify the Palantir API to accept waypoints during creation
 
 ## Developer Notes
 
@@ -126,7 +187,6 @@ The application integrates with Palantir OSDK to save flight plans back to Found
    - Error handling is implemented for specific validation errors
 
 When implementing flight saving functionality, always use simple string values for all IDs, not objects with $primaryKey properties, as the Palantir API implementation expects string values directly.
-
 
 ### Wind Effect Handling
 The application accurately calculates and displays wind effects on flight time and fuel consumption:
@@ -190,6 +250,9 @@ The system consists of:
 **Issue**: Flight creation API returning 400 Bad Request errors
 **Solution**: The key is to use simple string values for all IDs, not objects with $primaryKey. When using the createNewFlightFp2 action, the aircraftId must be the numeric ID (e.g., "190") as a simple string. This was fixed in May 2025 by updating the PalantirFlightService.js and SaveFlightButton.jsx components to format parameters correctly.
 
+**Issue**: Flight waypoints not saving to Palantir
+**Solution**: The current Palantir API only accepts waypoints during the edit phase, not during initial creation. The solution is to first create the flight with stops only using `createFlightFromLocations`, then immediately edit it with `editExistingFlightV2` to add the waypoints. Another approach would be to modify the Palantir API to accept waypoints during creation.
+
 ## References & Resources
 
 ### Documentation
@@ -206,6 +269,3 @@ The system consists of:
 - Duncan (Project Lead) - duncan@example.com
 - Flight Operations Team - flight-ops@example.com
 - OSDK Support Team - osdk-support@example.com
-
-## Template Instructions
-This knowledge base template can be maintained in any of the recommended tools like Notion, Confluence, or GitBook. Update sections as work progresses to keep this document accurate and helpful for all developers on the project.
