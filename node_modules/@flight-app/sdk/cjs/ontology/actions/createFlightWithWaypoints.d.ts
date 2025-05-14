@@ -1,0 +1,143 @@
+import type { ActionDefinition, ActionParam, ActionReturnTypeForOptions, ApplyActionOptions, ApplyBatchActionOptions } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+export declare namespace createFlightWithWaypoints {
+    type ParamsDefinition = {
+        aircraftId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        aircraftRegion: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        alternateLocation: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        captainId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        copilotId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        displayWaypoints: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        etd: {
+            multiplicity: false;
+            nullable: true;
+            type: 'timestamp';
+        };
+        flightName: {
+            multiplicity: false;
+            nullable: false;
+            type: 'string';
+        };
+        legs: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        locations: {
+            multiplicity: true;
+            nullable: false;
+            type: 'string';
+        };
+        medicId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        region: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        rswId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        soId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        useOnlyProvidedWaypoints: {
+            multiplicity: false;
+            nullable: true;
+            type: 'boolean';
+        };
+    };
+    /**
+     * createFlightWithWaypoints
+     */
+    interface Params {
+        readonly aircraftId?: ActionParam.PrimitiveType<'string'>;
+        readonly aircraftRegion?: ActionParam.PrimitiveType<'string'>;
+        readonly alternateLocation?: ActionParam.PrimitiveType<'string'>;
+        readonly captainId?: ActionParam.PrimitiveType<'string'>;
+        readonly copilotId?: ActionParam.PrimitiveType<'string'>;
+        readonly displayWaypoints?: ActionParam.PrimitiveType<'string'>;
+        readonly etd?: ActionParam.PrimitiveType<'timestamp'>;
+        readonly flightName: ActionParam.PrimitiveType<'string'>;
+        readonly legs?: ActionParam.PrimitiveType<'string'>;
+        readonly locations: ReadonlyArray<ActionParam.PrimitiveType<'string'>>;
+        readonly medicId?: ActionParam.PrimitiveType<'string'>;
+        readonly region?: ActionParam.PrimitiveType<'string'>;
+        readonly rswId?: ActionParam.PrimitiveType<'string'>;
+        readonly soId?: ActionParam.PrimitiveType<'string'>;
+        readonly useOnlyProvidedWaypoints?: ActionParam.PrimitiveType<'boolean'>;
+    }
+    interface Signatures {
+        /**
+         * createFlightWithWaypoints
+         */
+        applyAction<P extends createFlightWithWaypoints.Params, OP extends ApplyActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+        batchApplyAction<P extends ReadonlyArray<createFlightWithWaypoints.Params>, OP extends ApplyBatchActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+    }
+}
+/**
+ * createFlightWithWaypoints
+ * @param {ActionParam.PrimitiveType<"string">} [aircraftId]
+ * @param {ActionParam.PrimitiveType<"string">} [aircraftRegion]
+ * @param {ActionParam.PrimitiveType<"string">} [alternateLocation]
+ * @param {ActionParam.PrimitiveType<"string">} [captainId]
+ * @param {ActionParam.PrimitiveType<"string">} [copilotId]
+ * @param {ActionParam.PrimitiveType<"string">} [displayWaypoints]
+ * @param {ActionParam.PrimitiveType<"timestamp">} [etd]
+ * @param {ActionParam.PrimitiveType<"string">} flightName
+ * @param {ActionParam.PrimitiveType<"string">} [legs]
+ * @param {ActionParam.PrimitiveType<"string">} locations
+ * @param {ActionParam.PrimitiveType<"string">} [medicId]
+ * @param {ActionParam.PrimitiveType<"string">} [region]
+ * @param {ActionParam.PrimitiveType<"string">} [rswId]
+ * @param {ActionParam.PrimitiveType<"string">} [soId]
+ * @param {ActionParam.PrimitiveType<"boolean">} [useOnlyProvidedWaypoints]
+ */
+export interface createFlightWithWaypoints extends ActionDefinition<createFlightWithWaypoints.Signatures> {
+    __DefinitionMetadata?: {
+        apiName: 'createFlightWithWaypoints';
+        description: 'createFlightWithWaypoints';
+        displayName: 'createFlightWithWaypoints';
+        modifiedEntities: {};
+        parameters: createFlightWithWaypoints.ParamsDefinition;
+        rid: 'ri.actions.main.action-type.544553d2-9cc6-44c8-bdf9-a6f4d049a32b';
+        status: 'EXPERIMENTAL';
+        type: 'action';
+        signatures: createFlightWithWaypoints.Signatures;
+    };
+    apiName: 'createFlightWithWaypoints';
+    type: 'action';
+    osdkMetadata: typeof $osdkMetadata;
+}
+export declare const createFlightWithWaypoints: createFlightWithWaypoints;

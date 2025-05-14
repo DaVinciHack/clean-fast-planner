@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Map - Click Test</title>
+  
+  <!-- Load Mapbox GL JS -->
+  <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+    
+    .debug-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      z-index: 1000;
+    }
+    
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <div class="debug-panel">
+    <h3>Debug Controls</h3>
+    <p>Click Test: <span id="click-status">No clicks yet</span></p>
+    <button id="test-click-btn">Add Test Marker</button>
+    <div id="click-log" style="max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 12px;">
+      Click log will appear here
+    </div>
+  </div>
+  
+  <script src="js/debug-map.js"></script>
+  <script>
+    // Add event handler for test button
+    document.getElementById('test-click-btn').addEventListener('click', function() {
+      console.log('Test click button pressed');
+      document.getElementById('click-status').textContent = 'Test button clicked';
+      
+      // If debug map is available, add a marker
+      if (window.debugMap) {
+        console.log('Adding test marker via debugMap');
+        new mapboxgl.Marker({
+          color: "#00FF00"
+        })
+          .setLngLat([-90.5, 27.5])
+          .addTo(window.debugMap);
+      } else {
+        console.error('debugMap not available');
+      }
+      
+      // Log the click
+      logClick('Test button click');
+    });
+    
+    // Function to log clicks
+    function logClick(message) {
+      const logElement = document.getElementById('click-log');
+      const logEntry = document.createElement('div');
+      logEntry.textContent = new Date().toLocaleTimeString() + ': ' + message;
+      logElement.prepend(logEntry);
+    }
+    
+    // Override console.log to also show in our UI
+    const originalConsoleLog = console.log;
+    console.log = function() {
+      // Call original console.log
+      originalConsoleLog.apply(console, arguments);
+      
+      // Log to our UI
+      const message = Array.from(arguments).map(arg => {
+        if (typeof arg === 'object') {
+          return JSON.stringify(arg).slice(0, 50) + '...';
+        }
+        return String(arg);
+      }).join(' ');
+      
+      logClick(message);
+    };
+  </script>
+</body>
+</html>

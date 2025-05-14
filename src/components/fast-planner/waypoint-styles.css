@@ -1,0 +1,72 @@
+/* Waypoint vs Landing Stop Styles */
+
+/* Style for navigation waypoints markers */
+.mapboxgl-marker[data-marker-type="waypoint"] {
+  filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.9));
+}
+
+/* Style for landing stop markers */
+.mapboxgl-marker[data-marker-type="stop"] {
+  filter: drop-shadow(0 0 1px rgba(255, 65, 54, 0.7));
+}
+
+/* Style for navigation waypoints in route list */
+.waypoint-item[data-point-type="NAVIGATION_WAYPOINT"],
+.waypoint-item.navigation-point {
+  background-color: rgba(255, 204, 0, 0.1);
+  border-left: 3px solid #FFCC00;
+}
+
+/* Style for landing stops in route list */
+.waypoint-item[data-point-type="LANDING_STOP"],
+.waypoint-item.landing-stop {
+  background-color: rgba(255, 65, 54, 0.05);
+  border-left: 3px solid #FF4136;
+}
+
+/* Icons for different point types */
+.waypoint-item[data-point-type="NAVIGATION_WAYPOINT"] .waypoint-icon:before,
+.waypoint-item.navigation-point .waypoint-icon:before {
+  content: "✈️";
+}
+
+.waypoint-item[data-point-type="LANDING_STOP"] .waypoint-icon:before,
+.waypoint-item.landing-stop .waypoint-icon:before {
+  content: "🛬";
+}
+
+/* Make waypointModeActive button more visible when active */
+button[data-waypoint-mode-button].active,
+.waypoint-mode-toggle.active {
+  background-color: #FFCC00 !important;
+  color: #333 !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 5px rgba(255, 204, 0, 0.7) !important;
+}
+
+/* Style popups */
+.waypoint-popup .mapboxgl-popup-content {
+  border-left: 3px solid #FFCC00;
+}
+
+.stop-popup .mapboxgl-popup-content {
+  border-left: 3px solid #FF4136;
+}
+
+/* Full app waypoint mode indicator */
+body[data-waypoint-mode="active"] .route-stats-card {
+  border-top: 2px solid #FFCC00;
+}
+
+body[data-waypoint-mode="active"] .route-stats-header::after {
+  content: "WAYPOINT MODE";
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 10px;
+  background-color: #FFCC00;
+  color: #333;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: bold;
+}

@@ -1,0 +1,251 @@
+const $osdkMetadata = { extraUserAgent: 'typescript-sdk/0.4.0 typescript-sdk-generator/2.2.0-beta.15' };
+const $ontologyRid = 'ri.ontology.main.ontology.ab265709-5927-4853-99f0-c8f173e324e0';
+
+const buildLegsFlightPlanner20 = {
+    apiName: 'buildLegsFlightPlanner20',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const calculateFlightTimes = {
+    apiName: 'calculateFlightTimes',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const calculateSunriseSunset = {
+    apiName: 'calculateSunriseSunset',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const createFlightLogObject = {
+    apiName: 'createFlightLogObject',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const createFlightWithWaypoints = {
+    apiName: 'createFlightWithWaypoints',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const createNewFlightFp2 = {
+    apiName: 'createNewFlightFp2',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const editExistingFlightFp2 = {
+    apiName: 'editExistingFlightFp2',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const flightAppUpdateEtdAndCrew = {
+    apiName: 'flightAppUpdateEtdAndCrew',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const flightFuelFpv2 = {
+    apiName: 'flightFuelFpv2',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const flightWeatherRiskTriggeredLightningWaves = {
+    apiName: 'flightWeatherRiskTriggeredLightningWaves',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const getGlobalWindsForFlight = {
+    apiName: 'getGlobalWindsForFlight',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const getWeatherForAlternates = {
+    apiName: 'getWeatherForAlternates',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const pseudoWeatherSegments = {
+    apiName: 'pseudoWeatherSegments',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const singleFlightAutomation = {
+    apiName: 'singleFlightAutomation',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const updateAlternantOneStep = {
+    apiName: 'updateAlternantOneStep',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const updateFastPlannerFlight = {
+    apiName: 'updateFastPlannerFlight',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const updateWeatherByRegion = {
+    apiName: 'updateWeatherByRegion',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+const weatherWebookNorwayV9 = {
+    apiName: 'weatherWebookNorwayV9',
+    type: 'action',
+    osdkMetadata: $osdkMetadata,
+};
+
+var actions = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    buildLegsFlightPlanner20: buildLegsFlightPlanner20,
+    calculateFlightTimes: calculateFlightTimes,
+    calculateSunriseSunset: calculateSunriseSunset,
+    createFlightLogObject: createFlightLogObject,
+    createFlightWithWaypoints: createFlightWithWaypoints,
+    createNewFlightFp2: createNewFlightFp2,
+    editExistingFlightFp2: editExistingFlightFp2,
+    flightAppUpdateEtdAndCrew: flightAppUpdateEtdAndCrew,
+    flightFuelFpv2: flightFuelFpv2,
+    flightWeatherRiskTriggeredLightningWaves: flightWeatherRiskTriggeredLightningWaves,
+    getGlobalWindsForFlight: getGlobalWindsForFlight,
+    getWeatherForAlternates: getWeatherForAlternates,
+    pseudoWeatherSegments: pseudoWeatherSegments,
+    singleFlightAutomation: singleFlightAutomation,
+    updateAlternantOneStep: updateAlternantOneStep,
+    updateFastPlannerFlight: updateFastPlannerFlight,
+    updateWeatherByRegion: updateWeatherByRegion,
+    weatherWebookNorwayV9: weatherWebookNorwayV9
+});
+
+var interfaces = /*#__PURE__*/Object.freeze({
+    __proto__: null
+});
+
+const AirportsData = {
+    type: 'object',
+    apiName: 'AirportsData',
+    osdkMetadata: $osdkMetadata,
+};
+
+const AllGtLocationsV2 = {
+    type: 'object',
+    apiName: 'AllGtLocationsV2',
+    osdkMetadata: $osdkMetadata,
+};
+
+const Asset = {
+    type: 'object',
+    apiName: 'Asset',
+    osdkMetadata: $osdkMetadata,
+};
+
+const BristowHelidecks = {
+    type: 'object',
+    apiName: 'BristowHelidecks',
+    osdkMetadata: $osdkMetadata,
+};
+
+const FlightFuelDburbury = {
+    type: 'object',
+    apiName: 'FlightFuelDburbury',
+    osdkMetadata: $osdkMetadata,
+};
+
+const FlightLogObject = {
+    type: 'object',
+    apiName: 'FlightLogObject',
+    osdkMetadata: $osdkMetadata,
+};
+
+const FuelPolicyBuilder = {
+    type: 'object',
+    apiName: 'FuelPolicyBuilder',
+    osdkMetadata: $osdkMetadata,
+};
+
+const InternationalWeather = {
+    type: 'object',
+    apiName: 'InternationalWeather',
+    osdkMetadata: $osdkMetadata,
+};
+
+const LegObjectOutputObject = {
+    type: 'object',
+    apiName: 'LegObjectOutputObject',
+    osdkMetadata: $osdkMetadata,
+};
+
+const MainFlightObjectFp2 = {
+    type: 'object',
+    apiName: 'MainFlightObjectFp2',
+    osdkMetadata: $osdkMetadata,
+};
+
+const MainFuelV2 = {
+    type: 'object',
+    apiName: 'MainFuelV2',
+    osdkMetadata: $osdkMetadata,
+};
+
+const NorwayWeatherSegments = {
+    type: 'object',
+    apiName: 'NorwayWeatherSegments',
+    osdkMetadata: $osdkMetadata,
+};
+
+const NorwayWeatherXv8 = {
+    type: 'object',
+    apiName: 'NorwayWeatherXv8',
+    osdkMetadata: $osdkMetadata,
+};
+
+const RegionalWeatherMinimaSettings = {
+    type: 'object',
+    apiName: 'RegionalWeatherMinimaSettings',
+    osdkMetadata: $osdkMetadata,
+};
+
+const User = {
+    type: 'object',
+    apiName: 'User',
+    osdkMetadata: $osdkMetadata,
+};
+
+var objects = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    AirportsData: AirportsData,
+    AllGtLocationsV2: AllGtLocationsV2,
+    Asset: Asset,
+    BristowHelidecks: BristowHelidecks,
+    FlightFuelDburbury: FlightFuelDburbury,
+    FlightLogObject: FlightLogObject,
+    FuelPolicyBuilder: FuelPolicyBuilder,
+    InternationalWeather: InternationalWeather,
+    LegObjectOutputObject: LegObjectOutputObject,
+    MainFlightObjectFp2: MainFlightObjectFp2,
+    MainFuelV2: MainFuelV2,
+    NorwayWeatherSegments: NorwayWeatherSegments,
+    NorwayWeatherXv8: NorwayWeatherXv8,
+    RegionalWeatherMinimaSettings: RegionalWeatherMinimaSettings,
+    User: User
+});
+
+var queries = /*#__PURE__*/Object.freeze({
+    __proto__: null
+});
+
+export { actions as $Actions, interfaces as $Interfaces, objects as $Objects, queries as $Queries, $ontologyRid, $osdkMetadata, AirportsData, AllGtLocationsV2, Asset, BristowHelidecks, FlightFuelDburbury, FlightLogObject, FuelPolicyBuilder, InternationalWeather, LegObjectOutputObject, MainFlightObjectFp2, MainFuelV2, NorwayWeatherSegments, NorwayWeatherXv8, RegionalWeatherMinimaSettings, User, buildLegsFlightPlanner20, calculateFlightTimes, calculateSunriseSunset, createFlightLogObject, createFlightWithWaypoints, createNewFlightFp2, editExistingFlightFp2, flightAppUpdateEtdAndCrew, flightFuelFpv2, flightWeatherRiskTriggeredLightningWaves, getGlobalWindsForFlight, getWeatherForAlternates, pseudoWeatherSegments, singleFlightAutomation, updateAlternantOneStep, updateFastPlannerFlight, updateWeatherByRegion, weatherWebookNorwayV9 };

@@ -1,0 +1,218 @@
+import type { ActionDefinition, ActionMetadata, ActionParam, ActionReturnTypeForOptions, ApplyActionOptions, ApplyBatchActionOptions } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+import type { User } from '../objects/User.js';
+import type { FuelPolicyBuilder } from '../objects/FuelPolicyBuilder.js';
+import type { MainFlightObjectFp2 } from '../objects/MainFlightObjectFp2.js';
+import type { Asset } from '../objects/Asset.js';
+export declare namespace editExistingFlightFp2 {
+    type ParamsDefinition = {
+        alternateName: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        combinedWaypoints: {
+            multiplicity: true;
+            nullable: true;
+            type: 'string';
+        };
+        displayWaypoints: {
+            description: "Don't delete or change the stops or destination here, just edit the waypoints";
+            multiplicity: true;
+            nullable: true;
+            type: 'string';
+        };
+        flightId: {
+            multiplicity: false;
+            nullable: false;
+            type: ActionMetadata.DataType.Object<MainFlightObjectFp2>;
+        };
+        legWaypointsString: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        new_parameter: {
+            multiplicity: false;
+            nullable: false;
+            type: 'string';
+        };
+        newAircraftId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<Asset>;
+        };
+        newAircraftRegion: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newCaptainId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<User>;
+        };
+        newCopilotId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<User>;
+        };
+        newCreatedBy: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newETD: {
+            multiplicity: false;
+            nullable: true;
+            type: 'timestamp';
+        };
+        newFlightNumber: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newFuelPlanId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newLogId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newMedicId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<User>;
+        };
+        newPolicyUuid: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<FuelPolicyBuilder>;
+        };
+        newRegion: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newRswId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<User>;
+        };
+        newSoId: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<User>;
+        };
+        newTimingId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        newWeightBalanceId: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        stops: {
+            description: 'Change the stops or the route here.';
+            multiplicity: true;
+            nullable: true;
+            type: 'string';
+        };
+        useDirectRoutes: {
+            multiplicity: false;
+            nullable: true;
+            type: 'boolean';
+        };
+    };
+    /**
+     * Edit existing flight FP2
+     */
+    interface Params {
+        readonly alternateName?: ActionParam.PrimitiveType<'string'>;
+        readonly combinedWaypoints?: ReadonlyArray<ActionParam.PrimitiveType<'string'>>;
+        /**
+         * Don't delete or change the stops or destination here, just edit the waypoints
+         */
+        readonly displayWaypoints?: ReadonlyArray<ActionParam.PrimitiveType<'string'>>;
+        readonly flightId: ActionParam.ObjectType<MainFlightObjectFp2>;
+        readonly legWaypointsString?: ActionParam.PrimitiveType<'string'>;
+        readonly new_parameter: ActionParam.PrimitiveType<'string'>;
+        readonly newAircraftId?: ActionParam.ObjectType<Asset>;
+        readonly newAircraftRegion?: ActionParam.PrimitiveType<'string'>;
+        readonly newCaptainId?: ActionParam.ObjectType<User>;
+        readonly newCopilotId?: ActionParam.ObjectType<User>;
+        readonly newCreatedBy?: ActionParam.PrimitiveType<'string'>;
+        readonly newETD?: ActionParam.PrimitiveType<'timestamp'>;
+        readonly newFlightNumber?: ActionParam.PrimitiveType<'string'>;
+        readonly newFuelPlanId?: ActionParam.PrimitiveType<'string'>;
+        readonly newLogId?: ActionParam.PrimitiveType<'string'>;
+        readonly newMedicId?: ActionParam.ObjectType<User>;
+        readonly newPolicyUuid?: ActionParam.ObjectType<FuelPolicyBuilder>;
+        readonly newRegion?: ActionParam.PrimitiveType<'string'>;
+        readonly newRswId?: ActionParam.ObjectType<User>;
+        readonly newSoId?: ActionParam.ObjectType<User>;
+        readonly newTimingId?: ActionParam.PrimitiveType<'string'>;
+        readonly newWeightBalanceId?: ActionParam.PrimitiveType<'string'>;
+        /**
+         * Change the stops or the route here.
+         */
+        readonly stops?: ReadonlyArray<ActionParam.PrimitiveType<'string'>>;
+        readonly useDirectRoutes?: ActionParam.PrimitiveType<'boolean'>;
+    }
+    interface Signatures {
+        /**
+         * Edit existing flight FP2
+         */
+        applyAction<P extends editExistingFlightFp2.Params, OP extends ApplyActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+        batchApplyAction<P extends ReadonlyArray<editExistingFlightFp2.Params>, OP extends ApplyBatchActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+    }
+}
+/**
+ * Edit existing flight FP2
+ * @param {ActionParam.PrimitiveType<"string">} [alternateName]
+ * @param {ActionParam.PrimitiveType<"string">} [combinedWaypoints]
+ * @param {ActionParam.PrimitiveType<"string">} [displayWaypoints] Don't delete or change the stops or destination here, just edit the waypoints
+ * @param {ActionParam.ObjectType<MainFlightObjectFp2>} flightId
+ * @param {ActionParam.PrimitiveType<"string">} [legWaypointsString]
+ * @param {ActionParam.PrimitiveType<"string">} new_parameter
+ * @param {ActionParam.ObjectType<Asset>} [newAircraftId]
+ * @param {ActionParam.PrimitiveType<"string">} [newAircraftRegion]
+ * @param {ActionParam.ObjectType<User>} [newCaptainId]
+ * @param {ActionParam.ObjectType<User>} [newCopilotId]
+ * @param {ActionParam.PrimitiveType<"string">} [newCreatedBy]
+ * @param {ActionParam.PrimitiveType<"timestamp">} [newETD]
+ * @param {ActionParam.PrimitiveType<"string">} [newFlightNumber]
+ * @param {ActionParam.PrimitiveType<"string">} [newFuelPlanId]
+ * @param {ActionParam.PrimitiveType<"string">} [newLogId]
+ * @param {ActionParam.ObjectType<User>} [newMedicId]
+ * @param {ActionParam.ObjectType<FuelPolicyBuilder>} [newPolicyUuid]
+ * @param {ActionParam.PrimitiveType<"string">} [newRegion]
+ * @param {ActionParam.ObjectType<User>} [newRswId]
+ * @param {ActionParam.ObjectType<User>} [newSoId]
+ * @param {ActionParam.PrimitiveType<"string">} [newTimingId]
+ * @param {ActionParam.PrimitiveType<"string">} [newWeightBalanceId]
+ * @param {ActionParam.PrimitiveType<"string">} [stops] Change the stops or the route here.
+ * @param {ActionParam.PrimitiveType<"boolean">} [useDirectRoutes]
+ */
+export interface editExistingFlightFp2 extends ActionDefinition<editExistingFlightFp2.Signatures> {
+    __DefinitionMetadata?: {
+        apiName: 'editExistingFlightFp2';
+        description: 'Edit existing flight FP2';
+        displayName: 'Edit Existing Flight FP2';
+        modifiedEntities: {};
+        parameters: editExistingFlightFp2.ParamsDefinition;
+        rid: 'ri.actions.main.action-type.24a550b8-ba6e-44ee-bc79-d3bb8fdf8c8f';
+        status: 'EXPERIMENTAL';
+        type: 'action';
+        signatures: editExistingFlightFp2.Signatures;
+    };
+    apiName: 'editExistingFlightFp2';
+    type: 'action';
+    osdkMetadata: typeof $osdkMetadata;
+}
+export declare const editExistingFlightFp2: editExistingFlightFp2;

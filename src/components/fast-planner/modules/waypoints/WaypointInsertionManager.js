@@ -64,8 +64,86 @@ class WaypointInsertionManager {
       const map = this.mapManager.getMap();
       if (!map) {
         console.error("WaypointInsertionManager: Map not initialized");
+        
+        // Schedule a delayed retry - this is important for when the map is initializing
+        console.log("WaypointInsertionManager: Will retry initialization in 2 seconds");
+        setTimeout(() => {
+          console.log("WaypointInsertionManager: Retrying initialization...");
+          const map = this.mapManager.getMap();
+          if (map) {
+            console.log("WaypointInsertionManager: Map now available, completing initialization");
+            // Just make the map globally available for debugging
+            window._waypointInsertionMap = map;
+            this.triggerCallback('onWaypointInserted', {
+              status: "Map now available for waypoint insertion"
+            });
+          } else {
+            console.error("WaypointInsertionManager: Map still not initialized after retry");
+          }
+        }, 2000);
+        
         return false;
       }
+      
+      // Make sure we have turf.js available for distance calculations
+      if (!window.turf) {
+        console.warn("WaypointInsertionManager: Turf.js not available, some functionality may be limited");
+        
+        // Create a simple placeholder if turf is missing
+        window.turf = window.turf || {};
+        window.turf.distance = window.turf.distance || function(p1, p2, options) {
+          // Simple approximation for nautical miles
+          const lat1 = p1.geometry.coordinates[1];
+          const lon1 = p1.geometry.coordinates[0];
+          const lat2 = p2.geometry.coordinates[1];
+          const lon2 = p2.geometry.coordinates[0];
+          
+          // Simple Euclidean distance (not accurate for long distances)
+          const R = 3440.065; // Earth's radius in nautical miles
+          const x = (lon2 - lon1) * Math.cos((lat1 + lat2) / 2);
+          const y = lat2 - lat1;
+          return Math.sqrt(x * x + y * y) * R * Math.PI / 180;
+        };
+        
+        window.turf.point = window.turf.point || function(coords) {
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: coords
+            },
+            properties: {}
+          };
+        };
+        
+        window.turf.lineString = window.turf.lineString || function(coords) {
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: coords
+            },
+            properties: {}
+          };
+        };
+        
+        window.turf.nearestPointOnLine = window.turf.nearestPointOnLine || function(line, point) {
+          // Extremely simplified version
+          return {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: line.geometry.coordinates[0]
+            },
+            properties: {
+              dist: 0.1
+            }
+          };
+        };
+      }
+      
+      // Just make the map globally available for debugging
+      window._waypointInsertionMap = map;
       
       console.log("WaypointInsertionManager: Successfully initialized");
       return true;
@@ -129,11 +207,18 @@ class WaypointInsertionManager {
         
         // Find nearest waypoint from the platformManager
         this.findAndInsertNearestWaypoint(clickData);
+        
+        // Prevent event propagation to stop other handlers from running
+        e.preventDefault();
+        e.stopPropagation();
       };
       
       // Add the click handler to the map
-      // Note: We need to ensure the route layer ID matches what's used in the main app
-      map.on('click', 'route-line-layer', this.routeClickHandler);
+      // CRITICAL FIX: Use the actual route layer ID used in the main app ('route')
+      map.on('click', 'route', this.routeClickHandler);
+      
+      // Also set up route dragging in waypoint mode
+      this.setupRouteDragging();
       
       console.log("WaypointInsertionManager: Route click handler set up");
     } catch (error) {
@@ -143,20 +228,324 @@ class WaypointInsertionManager {
   }
   
   /**
-   * Remove event handler for route line clicks
+   * Set up route dragging functionality specifically for waypoint mode
+   */
+  setupRouteDragging() {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+
+    console.log('WaypointInsertionManager: Setting up route dragging for waypoint mode');
+
+    let isDragging = false;
+    let draggedLineCoordinates = [];
+    let originalLineCoordinates = [];
+    let dragStartPoint = null;
+    let closestPointIndex = -1;
+    let dragLineSource = null;
+
+    // Function to add the temporary drag line - using yellow color for waypoint mode
+    const addDragLine = (coordinates) => {
+      try {
+        if (map.getSource('waypoint-drag-line')) {
+          map.removeLayer('waypoint-drag-line');
+          map.removeSource('waypoint-drag-line');
+        }
+        
+        map.addSource('waypoint-drag-line', {
+          'type': 'geojson',
+          'data': {
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+              'type': 'LineString',
+              'coordinates': coordinates
+            }
+          }
+        });
+        
+        map.addLayer({
+          'id': 'waypoint-drag-line',
+          'type': 'line',
+          'source': 'waypoint-drag-line',
+          'layout': {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          'paint': {
+            'line-color': '#FFC107', // Yellow for waypoint mode
+            'line-width': 4,
+            'line-dasharray': [2, 1] // Dashed line for the temp route
+          }
+        });
+
+        dragLineSource = map.getSource('waypoint-drag-line');
+      } catch (error) {
+        console.error('Error adding waypoint drag line:', error);
+      }
+    };
+
+    // Helper to find closest point on the line and the segment it belongs to
+    const findClosestPointOnLine = (mouseLngLat, mousePoint) => {
+      try {
+        if (!map.getSource('route')) return null;
+        
+        // First check if the mouse is over a route feature using rendered features
+        const routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: ['route'] });
+        const isMouseOverRoute = routeFeatures && routeFeatures.length > 0;
+        
+        const routeSource = map.getSource('route');
+        if (!routeSource || !routeSource._data) return null;
+        
+        const coordinates = routeSource._data.geometry.coordinates;
+        if (!coordinates || coordinates.length < 2) return null;
+        
+        let minDistance = Infinity;
+        let closestPoint = null;
+        let segmentIndex = -1;
+        
+        // Check each segment of the line
+        for (let i = 0; i < coordinates.length - 1; i++) {
+          const line = window.turf.lineString([coordinates[i], coordinates[i + 1]]);
+          const point = window.turf.point([mouseLngLat.lng, mouseLngLat.lat]);
+          const snapped = window.turf.nearestPointOnLine(line, point);
+          
+          if (snapped.properties.dist < minDistance) {
+            minDistance = snapped.properties.dist;
+            closestPoint = snapped.geometry.coordinates;
+            segmentIndex = i;
+          }
+        }
+        
+        // Convert distance to nautical miles for easy comparison
+        const distanceNM = window.turf.distance(
+          window.turf.point([mouseLngLat.lng, mouseLngLat.lat]),
+          window.turf.point(closestPoint),
+          { units: 'nauticalmiles' }
+        );
+        
+        // If mouse is directly over the route or within distance threshold
+        const maxDistanceThreshold = 0.5; // nautical miles
+        
+        if (isMouseOverRoute || distanceNM < maxDistanceThreshold) {
+          return { 
+            point: closestPoint, 
+            index: segmentIndex,
+            distance: distanceNM,
+            isDirectlyOver: isMouseOverRoute
+          };
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('Error finding closest point on line:', error);
+        return null;
+      }
+    };
+
+    // Setup mousedown event for starting the drag - SPECIFIC TO WAYPOINT MODE
+    const waypointMouseDownHandler = (e) => {
+      // Only handle this in waypoint mode
+      if (!this.isActive) return;
+      
+      // Skip if no route or if clicking on a waypoint
+      if (!map.getSource('route')) return;
+      
+      // Don't start drag if right-click
+      if (e.originalEvent.button === 2) return;
+      
+      // Check for platform markers and don't start drag if clicked on one
+      const waypointFeatures = map.queryRenderedFeatures(e.point, { layers: ['waypoints-layer'] });
+      if (waypointFeatures.length > 0) return;
+      
+      // Find the closest point on the route line
+      const mousePos = e.lngLat;
+      const closestInfo = findClosestPointOnLine(mousePos, e.point);
+      
+      // If mouse is directly over the route or within distance threshold
+      if (closestInfo) {
+        console.log('WaypointInsertionManager: Starting route drag at segment:', closestInfo.index, 
+                   'Distance:', closestInfo.distance.toFixed(2) + ' nm',
+                   'Directly over route:', closestInfo.isDirectlyOver);
+        
+        // Get the original route coordinates
+        const routeSource = map.getSource('route');
+        if (!routeSource || !routeSource._data) return;
+        originalLineCoordinates = [...routeSource._data.geometry.coordinates];
+        
+        // Start dragging
+        isDragging = true;
+        dragStartPoint = closestInfo.point;
+        closestPointIndex = closestInfo.index;
+        
+        // Make a copy of the coordinates for dragging
+        draggedLineCoordinates = [...originalLineCoordinates];
+        
+        // Insert a new point at the drag location, right after the closest segment start
+        draggedLineCoordinates.splice(
+          closestPointIndex + 1, 
+          0, 
+          closestInfo.point
+        );
+        
+        // Add the temporary drag line
+        addDragLine(draggedLineCoordinates);
+        
+        // Hide the original route and glow during dragging
+        map.setLayoutProperty('route', 'visibility', 'none');
+        if (map.getLayer('route-glow')) {
+          map.setLayoutProperty('route-glow', 'visibility', 'none');
+        }
+        
+        // Change cursor to grabbing
+        map.getCanvas().style.cursor = 'grabbing';
+        
+        // Prevent default behavior
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    // Set up mousemove handler for dragging - SPECIFIC TO WAYPOINT MODE
+    const waypointMouseMoveHandler = (e) => {
+      // Only handle this in waypoint mode
+      if (!this.isActive) return;
+      
+      if (isDragging) {
+        // Update the position of the dragged point
+        draggedLineCoordinates[closestPointIndex + 1] = [e.lngLat.lng, e.lngLat.lat];
+        
+        // Update the drag line
+        if (dragLineSource) {
+          dragLineSource.setData({
+            'type': 'Feature',
+            'properties': {},
+            'geometry': {
+              'type': 'LineString',
+              'coordinates': draggedLineCoordinates
+            }
+          });
+        }
+      } else {
+        // Check if mouse is over the route when not dragging
+        const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+        
+        if (closestInfo && closestInfo.isDirectlyOver) {
+          // Change cursor to indicate draggable route
+          map.getCanvas().style.cursor = 'pointer';
+        } else if (map.getCanvas().style.cursor === 'pointer') {
+          // Reset cursor if it was previously set by this handler
+          // (but don't reset if it might have been set by waypoint hover)
+          const waypointFeatures = map.queryRenderedFeatures(e.point, { layers: ['waypoints-layer'] });
+          if (waypointFeatures.length === 0) {
+            map.getCanvas().style.cursor = '';
+          }
+        }
+      }
+    };
+
+    // Setup mouseup handler for completing the drag - SPECIFIC TO WAYPOINT MODE
+    const waypointMouseUpHandler = (e) => {
+      // Only handle this in waypoint mode
+      if (!this.isActive) return;
+      
+      if (!isDragging) return;
+      
+      // Clean up
+      isDragging = false;
+      
+      // Remove the temporary drag line
+      if (map.getSource('waypoint-drag-line')) {
+        map.removeLayer('waypoint-drag-line');
+        map.removeSource('waypoint-drag-line');
+      }
+      
+      // Show the original route and glow again
+      map.setLayoutProperty('route', 'visibility', 'visible');
+      if (map.getLayer('route-glow')) {
+        map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      }
+      
+      // Reset cursor
+      map.getCanvas().style.cursor = '';
+      
+      // Find the nearest waypoint to where we dropped
+      this.findAndInsertNearestWaypoint({
+        lngLat: e.lngLat,
+        insertIndex: closestPointIndex + 1
+      });
+      
+      // Reset variables
+      draggedLineCoordinates = [];
+      originalLineCoordinates = [];
+      dragStartPoint = null;
+      closestPointIndex = -1;
+      dragLineSource = null;
+      
+      // Prevent default behavior
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    // Add the waypoint-specific handlers
+    map.on('mousedown', waypointMouseDownHandler);
+    map.on('mousemove', waypointMouseMoveHandler);
+    map.on('mouseup', waypointMouseUpHandler);
+    
+    // Store handlers for removal later
+    this.waypointDragHandlers = {
+      mousedown: waypointMouseDownHandler,
+      mousemove: waypointMouseMoveHandler,
+      mouseup: waypointMouseUpHandler
+    };
+    
+    console.log('WaypointInsertionManager: Route dragging for waypoint mode set up');
+  }
+  
+  /**
+   * Remove event handler for route line clicks and dragging
    */
   removeRouteClickHandler() {
     try {
+      const map = this.mapManager.getMap();
+      if (!map) return;
+      
+      // Remove the route click handler
       if (this.routeClickHandler) {
-        const map = this.mapManager.getMap();
-        if (map) {
-          map.off('click', 'route-line-layer', this.routeClickHandler);
-        }
+        // CRITICAL FIX: Use the correct layer ID 'route'
+        map.off('click', 'route', this.routeClickHandler);
         this.routeClickHandler = null;
         console.log("WaypointInsertionManager: Route click handler removed");
       }
+      
+      // Remove waypoint drag handlers
+      if (this.waypointDragHandlers) {
+        map.off('mousedown', this.waypointDragHandlers.mousedown);
+        map.off('mousemove', this.waypointDragHandlers.mousemove);
+        map.off('mouseup', this.waypointDragHandlers.mouseup);
+        this.waypointDragHandlers = null;
+        console.log("WaypointInsertionManager: Waypoint drag handlers removed");
+      }
+      
+      // Also make sure any temporary drag lines are removed
+      if (map.getSource('waypoint-drag-line')) {
+        if (map.getLayer('waypoint-drag-line')) {
+          map.removeLayer('waypoint-drag-line');
+        }
+        map.removeSource('waypoint-drag-line');
+      }
+      
+      // Restore the original route display if it was hidden
+      if (map.getLayer('route')) {
+        map.setLayoutProperty('route', 'visibility', 'visible');
+      }
+      if (map.getLayer('route-glow')) {
+        map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      }
+      
+      // Reset cursor
+      map.getCanvas().style.cursor = '';
     } catch (error) {
-      console.error("WaypointInsertionManager: Error removing route click handler:", error);
+      console.error("WaypointInsertionManager: Error removing route handlers:", error);
     }
   }
   

@@ -1,0 +1,13 @@
+    // Add event listener for aircraft settings
+    window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    window.addEventListener('settings-changed', handleSettingsChanged);
+
+    // Force a rerender after initializing all managers
+    setForceUpdate(prev => prev + 1);
+
+    // Clean up event listener on unmount
+    return () => {
+      window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+      window.removeEventListener('settings-changed', handleSettingsChanged);
+    };
+  }, [selectedAircraft, waypointManagerRef, routeCalculatorRef, weather, flightSettings]); // Added flightSettings to dependencies

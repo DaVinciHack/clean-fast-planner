@@ -46,9 +46,12 @@ const WaypointEntry = ({
     }
   };
   
+  // Check if this is a waypoint (not a regular stop)
+  const isWaypoint = waypoint.isWaypoint === true;
+  
   return (
     <div 
-      className={`waypoint-entry ${isRecentlyAdded ? 'highlight-new' : ''}`}
+      className={`waypoint-entry ${isRecentlyAdded ? 'highlight-new' : ''} ${isWaypoint ? 'waypoint-marker' : ''}`}
       draggable={true}
       onDragStart={(e) => onDragStart && onDragStart(e, waypoint.id)}
       onDragEnd={onDragEnd}
@@ -57,13 +60,17 @@ const WaypointEntry = ({
       onDragLeave={(e) => onDragLeave && onDragLeave(e)}
       onDrop={(e) => onDrop && onDrop(e, waypoint.id, index)}
       data-id={waypoint.id}
-      data-is-waypoint="true" // Flag to identify as a waypoint vs. regular stop
+      data-is-waypoint={isWaypoint ? "true" : "false"} // Flag to identify as a waypoint vs. regular stop
     >
+      {/* Add a visual indicator for waypoints */}
+      {isWaypoint && <div className="waypoint-indicator">WYPT</div>}
+      
       <input 
         type="text" 
         value={name}
         onChange={handleNameChange}
         title={name}
+        className={isWaypoint ? 'waypoint-name' : ''}
       />
       <div className="coordinates">
         Lat: {waypoint.coords[1].toFixed(5)}, Lon: {waypoint.coords[0].toFixed(5)}

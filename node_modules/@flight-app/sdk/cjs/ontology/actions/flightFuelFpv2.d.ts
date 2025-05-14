@@ -1,0 +1,88 @@
+import type { ActionDefinition, ActionMetadata, ActionParam, ActionReturnTypeForOptions, ApplyActionOptions, ApplyBatchActionOptions } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+import type { FuelPolicyBuilder } from '../objects/FuelPolicyBuilder.js';
+export declare namespace flightFuelFpv2 {
+    type ParamsDefinition = {
+        extraFuel: {
+            multiplicity: false;
+            nullable: true;
+            type: 'double';
+        };
+        extraFuelReason: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        flightId: {
+            multiplicity: false;
+            nullable: false;
+            type: 'string';
+        };
+        manualApproachFuel: {
+            multiplicity: false;
+            nullable: true;
+            type: 'double';
+        };
+        manualAraFuel: {
+            multiplicity: false;
+            nullable: true;
+            type: 'double';
+        };
+        new_parameter: {
+            multiplicity: false;
+            nullable: true;
+            type: 'string';
+        };
+        selectedPolicyUuid: {
+            multiplicity: false;
+            nullable: true;
+            type: ActionMetadata.DataType.Object<FuelPolicyBuilder>;
+        };
+    };
+    /**
+     * Flight fuel function
+     */
+    interface Params {
+        readonly extraFuel?: ActionParam.PrimitiveType<'double'>;
+        readonly extraFuelReason?: ActionParam.PrimitiveType<'string'>;
+        readonly flightId: ActionParam.PrimitiveType<'string'>;
+        readonly manualApproachFuel?: ActionParam.PrimitiveType<'double'>;
+        readonly manualAraFuel?: ActionParam.PrimitiveType<'double'>;
+        readonly new_parameter?: ActionParam.PrimitiveType<'string'>;
+        readonly selectedPolicyUuid?: ActionParam.ObjectType<FuelPolicyBuilder>;
+    }
+    interface Signatures {
+        /**
+         * Flight fuel function
+         */
+        applyAction<P extends flightFuelFpv2.Params, OP extends ApplyActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+        batchApplyAction<P extends ReadonlyArray<flightFuelFpv2.Params>, OP extends ApplyBatchActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+    }
+}
+/**
+ * Flight fuel function
+ * @param {ActionParam.PrimitiveType<"double">} [extraFuel]
+ * @param {ActionParam.PrimitiveType<"string">} [extraFuelReason]
+ * @param {ActionParam.PrimitiveType<"string">} flightId
+ * @param {ActionParam.PrimitiveType<"double">} [manualApproachFuel]
+ * @param {ActionParam.PrimitiveType<"double">} [manualAraFuel]
+ * @param {ActionParam.PrimitiveType<"string">} [new_parameter]
+ * @param {ActionParam.ObjectType<FuelPolicyBuilder>} [selectedPolicyUuid]
+ */
+export interface flightFuelFpv2 extends ActionDefinition<flightFuelFpv2.Signatures> {
+    __DefinitionMetadata?: {
+        apiName: 'flightFuelFpv2';
+        description: 'Flight fuel function';
+        displayName: 'Flight Fuel FPV2';
+        modifiedEntities: {};
+        parameters: flightFuelFpv2.ParamsDefinition;
+        rid: 'ri.actions.main.action-type.27eb488b-efc1-439a-b943-8cd9c695b87d';
+        status: 'EXPERIMENTAL';
+        type: 'action';
+        signatures: flightFuelFpv2.Signatures;
+    };
+    apiName: 'flightFuelFpv2';
+    type: 'action';
+    osdkMetadata: typeof $osdkMetadata;
+}
+export declare const flightFuelFpv2: flightFuelFpv2;

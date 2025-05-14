@@ -1,0 +1,84 @@
+/* 
+ * panel-interaction-fix.css
+ * Fix for panel interaction issues
+ */
+
+/* Fix z-index hierarchy for proper event handling */
+.left-panel {
+  position: absolute !important;
+  z-index: 15 !important; /* Higher than map and route-stats-card */
+  pointer-events: auto !important;
+}
+
+.right-panel {
+  position: absolute !important;
+  z-index: 15 !important; /* Higher than map and route-stats-card */
+  pointer-events: auto !important;
+}
+
+.route-stats-card {
+  position: absolute !important;
+  z-index: 14 !important; /* Higher than map but lower than panels */
+  pointer-events: auto !important;
+}
+
+/* Ensure that the map container allows appropriate pointer events */
+.maplibregl-canvas-container,
+.mapboxgl-canvas-container {
+  pointer-events: auto !important;
+}
+
+/* Make overlay elements capture events correctly */
+.route-editor-panel {
+  pointer-events: auto !important;
+}
+
+.info-panel {
+  pointer-events: auto !important;
+}
+
+/* Make sure panel content gets events */
+.panel-content {
+  pointer-events: auto !important;
+}
+
+.waypoint-item {
+  pointer-events: auto !important;
+}
+
+.waypoint-actions {
+  pointer-events: auto !important;
+}
+
+.waypoints-list {
+  pointer-events: auto !important;
+}
+
+/* Fix modal dialogs and overlays */
+.modal-overlay {
+  z-index: 999 !important;
+  pointer-events: auto !important;
+}
+
+.loading-overlay {
+  z-index: 1000 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure buttons are clickable */
+button, 
+.btn, 
+.button,
+.toggle-button {
+  pointer-events: auto !important;
+}
+
+/* Make the entire document body respond correctly to pointer events */
+body {
+  overflow: hidden;
+}
+
+/* Create isolation contexts for better event handling */
+.fast-planner-container {
+  isolation: isolate;
+}

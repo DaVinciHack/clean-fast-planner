@@ -1,0 +1,400 @@
+import type { PropertyDef as $PropertyDef } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+import type { ObjectTypeDefinition as $ObjectTypeDefinition } from '@osdk/client';
+import type { ObjectSet as $ObjectSet, Osdk as $Osdk, PropertyValueWireToClient as $PropType } from '@osdk/client';
+export declare namespace FlightLogObject {
+    type PropertyKeys = 'captainDayTime' | 'comments' | 'captainId' | 'copilotId' | 'shutdownFuel' | 'soId' | 'legDayMinutes' | 'flightNumber' | 'medicName' | 'waypointActualTimes' | 'startupTime' | 'totalPaxWeight' | 'approachType' | 'logId' | 'onBlocksTime' | 'copilotDayTime' | 'legFuelUplifted' | 'onBlocksFuel' | 'totalBagsPaxWeight' | 'legLandingTimes' | 'paxNumber' | 'waypointActualFuel' | 'captainNightTime' | 'copilot' | 'bagsWeight' | 'offBlocksTime' | 'deviceId' | 'legPlannedTakeoffTimes' | 'copilotTotalTime' | 'soName' | 'copilotNightTime' | 'aircraftId' | 'legPlannedLandingTimes' | 'flightId' | 'legNightMinutes' | 'waypointNames' | 'captainTotalTime' | 'legTakeoffFuel' | 'landingOn' | 'captain' | 'isUploaded' | 'captainLandings' | 'incidentId' | 'copilotLandings' | 'rswId' | 'maintenanceNotes' | 'totalTime' | 'delayReasons' | 'totalFlightTime' | 'totalFuelBurned' | 'medicId' | 'legPilotFlying' | 'lastSyncTime' | 'legPlannedTakeoffFuel' | 'legTakeoffTimes' | 'rswName' | 'hasPendingChanges' | 'legLandingFuel' | 'legIds' | 'waypointPlannedTimes' | 'additionalCrewIds' | 'legNames' | 'logDate' | 'averagePaxWeight' | 'offBlocksFuel' | 'legLandings' | 'waypointPlannedFuel' | 'startupFuel' | 'legPlannedLandingFuel' | 'initialFuelUplifted';
+    type Links = {};
+    interface Props {
+        readonly additionalCrewIds: $PropType['string'][] | undefined;
+        readonly aircraftId: $PropType['string'] | undefined;
+        readonly approachType: $PropType['string'][] | undefined;
+        readonly averagePaxWeight: $PropType['integer'][] | undefined;
+        readonly bagsWeight: $PropType['string'][] | undefined;
+        readonly captain: $PropType['string'] | undefined;
+        readonly captainDayTime: $PropType['integer'] | undefined;
+        readonly captainId: $PropType['string'] | undefined;
+        readonly captainLandings: $PropType['integer'] | undefined;
+        readonly captainNightTime: $PropType['integer'] | undefined;
+        readonly captainTotalTime: $PropType['integer'] | undefined;
+        readonly comments: $PropType['string'] | undefined;
+        readonly copilot: $PropType['string'] | undefined;
+        readonly copilotDayTime: $PropType['integer'] | undefined;
+        readonly copilotId: $PropType['string'] | undefined;
+        readonly copilotLandings: $PropType['integer'] | undefined;
+        readonly copilotNightTime: $PropType['integer'] | undefined;
+        readonly copilotTotalTime: $PropType['integer'] | undefined;
+        readonly delayReasons: $PropType['string'] | undefined;
+        readonly deviceId: $PropType['string'] | undefined;
+        readonly flightId: $PropType['string'] | undefined;
+        readonly flightNumber: $PropType['string'] | undefined;
+        readonly hasPendingChanges: $PropType['boolean'] | undefined;
+        readonly incidentId: $PropType['string'] | undefined;
+        readonly initialFuelUplifted: $PropType['double'] | undefined;
+        readonly isUploaded: $PropType['boolean'] | undefined;
+        readonly landingOn: $PropType['string'][] | undefined;
+        readonly lastSyncTime: $PropType['timestamp'] | undefined;
+        readonly legDayMinutes: $PropType['integer'][] | undefined;
+        readonly legFuelUplifted: $PropType['double'][] | undefined;
+        readonly legIds: $PropType['string'][] | undefined;
+        readonly legLandingFuel: $PropType['double'][] | undefined;
+        readonly legLandings: $PropType['string'][] | undefined;
+        readonly legLandingTimes: $PropType['timestamp'][] | undefined;
+        readonly legNames: $PropType['string'][] | undefined;
+        readonly legNightMinutes: $PropType['integer'][] | undefined;
+        readonly legPilotFlying: $PropType['string'][] | undefined;
+        readonly legPlannedLandingFuel: $PropType['double'][] | undefined;
+        readonly legPlannedLandingTimes: $PropType['timestamp'][] | undefined;
+        readonly legPlannedTakeoffFuel: $PropType['double'][] | undefined;
+        readonly legPlannedTakeoffTimes: $PropType['timestamp'][] | undefined;
+        readonly legTakeoffFuel: $PropType['double'][] | undefined;
+        readonly legTakeoffTimes: $PropType['timestamp'][] | undefined;
+        readonly logDate: $PropType['timestamp'] | undefined;
+        readonly logId: $PropType['string'];
+        readonly maintenanceNotes: $PropType['string'] | undefined;
+        readonly medicId: $PropType['string'] | undefined;
+        readonly medicName: $PropType['string'] | undefined;
+        readonly offBlocksFuel: $PropType['double'] | undefined;
+        readonly offBlocksTime: $PropType['timestamp'] | undefined;
+        readonly onBlocksFuel: $PropType['double'] | undefined;
+        readonly onBlocksTime: $PropType['timestamp'] | undefined;
+        readonly paxNumber: $PropType['integer'][] | undefined;
+        readonly rswId: $PropType['string'] | undefined;
+        readonly rswName: $PropType['string'] | undefined;
+        readonly shutdownFuel: $PropType['double'] | undefined;
+        readonly soId: $PropType['string'] | undefined;
+        readonly soName: $PropType['string'] | undefined;
+        readonly startupFuel: $PropType['double'] | undefined;
+        readonly startupTime: $PropType['timestamp'] | undefined;
+        readonly totalBagsPaxWeight: $PropType['string'][] | undefined;
+        readonly totalFlightTime: $PropType['integer'] | undefined;
+        readonly totalFuelBurned: $PropType['double'] | undefined;
+        readonly totalPaxWeight: $PropType['integer'][] | undefined;
+        readonly totalTime: $PropType['integer'] | undefined;
+        readonly waypointActualFuel: $PropType['double'][] | undefined;
+        readonly waypointActualTimes: $PropType['string'][] | undefined;
+        readonly waypointNames: $PropType['string'][] | undefined;
+        readonly waypointPlannedFuel: $PropType['double'][] | undefined;
+        readonly waypointPlannedTimes: $PropType['string'][] | undefined;
+    }
+    type StrictProps = Props;
+    interface ObjectSet extends $ObjectSet<FlightLogObject, FlightLogObject.ObjectSet> {
+    }
+    type OsdkInstance<OPTIONS extends never | '$rid' = never, K extends keyof FlightLogObject.Props = keyof FlightLogObject.Props> = $Osdk.Instance<FlightLogObject, OPTIONS, K>;
+    /** @deprecated use OsdkInstance */
+    type OsdkObject<OPTIONS extends never | '$rid' = never, K extends keyof FlightLogObject.Props = keyof FlightLogObject.Props> = OsdkInstance<OPTIONS, K>;
+}
+export interface FlightLogObject extends $ObjectTypeDefinition {
+    osdkMetadata: typeof $osdkMetadata;
+    type: 'object';
+    apiName: 'FlightLogObject';
+    __DefinitionMetadata?: {
+        objectSet: FlightLogObject.ObjectSet;
+        props: FlightLogObject.Props;
+        linksType: FlightLogObject.Links;
+        strictProps: FlightLogObject.StrictProps;
+        apiName: 'FlightLogObject';
+        description: 'FlightLogObject';
+        displayName: 'Flight Log Object';
+        icon: {
+            type: 'blueprint';
+            color: '#BD6BBD';
+            name: 'cube';
+        };
+        implements: [];
+        interfaceMap: {};
+        inverseInterfaceMap: {};
+        links: {};
+        pluralDisplayName: 'Flight Log Objects';
+        primaryKeyApiName: 'logId';
+        primaryKeyType: 'string';
+        properties: {
+            /**
+             * (no ontology metadata)
+             */
+            additionalCrewIds: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             *   display name: ' aircraftId'
+             */
+            aircraftId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            approachType: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             *   display name: 'averagePaxWeight '
+             */
+            averagePaxWeight: $PropertyDef<'integer', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            bagsWeight: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            captain: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            captainDayTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            captainId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            captainLandings: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            captainNightTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            captainTotalTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            comments: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilot: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilotDayTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilotId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilotLandings: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilotNightTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            copilotTotalTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            delayReasons: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            deviceId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: ' flightId'
+             */
+            flightId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            flightNumber: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            hasPendingChanges: $PropertyDef<'boolean', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            incidentId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            initialFuelUplifted: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            isUploaded: $PropertyDef<'boolean', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            landingOn: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            lastSyncTime: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            legDayMinutes: $PropertyDef<'integer', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legFuelUplifted: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legIds: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legLandingFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legLandings: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legLandingTimes: $PropertyDef<'timestamp', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legNames: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legNightMinutes: $PropertyDef<'integer', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legPilotFlying: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legPlannedLandingFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legPlannedLandingTimes: $PropertyDef<'timestamp', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legPlannedTakeoffFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legPlannedTakeoffTimes: $PropertyDef<'timestamp', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legTakeoffFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            legTakeoffTimes: $PropertyDef<'timestamp', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            logDate: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            logId: $PropertyDef<'string', 'non-nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            maintenanceNotes: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            medicId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            medicName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            offBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            offBlocksTime: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            onBlocksFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            onBlocksTime: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            paxNumber: $PropertyDef<'integer', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            rswId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            rswName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            shutdownFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            soId: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            soName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            startupFuel: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            startupTime: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            totalBagsPaxWeight: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            totalFlightTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            totalFuelBurned: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            totalPaxWeight: $PropertyDef<'integer', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            totalTime: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            waypointActualFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            waypointActualTimes: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            waypointNames: $PropertyDef<'string', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            waypointPlannedFuel: $PropertyDef<'double', 'nullable', 'array'>;
+            /**
+             * (no ontology metadata)
+             */
+            waypointPlannedTimes: $PropertyDef<'string', 'nullable', 'array'>;
+        };
+        rid: 'ri.ontology.main.object-type.7d54b120-836f-4f39-9679-541e3a081f02';
+        status: 'EXPERIMENTAL';
+        titleProperty: 'flightNumber';
+        type: 'object';
+        visibility: 'NORMAL';
+    };
+}
+export declare const FlightLogObject: FlightLogObject;
