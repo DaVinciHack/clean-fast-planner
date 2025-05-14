@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Authentication Callback</title>
+  <script>
+    // This page receives the authentication callback from Palantir Foundry
+    // It processes the callback and redirects back to the main application
+    window.onload = function() {
+      // If we're in a callback flow, let the parent window know
+      if (window.opener) {
+        window.opener.postMessage(window.location.href, window.location.origin);
+        window.close();
+      } else {
+        // Redirect back to the main app
+        window.location.href = '/planner/';
+      }
+    };
+  </script>
+</head>
+<body>
+  <h2>Authentication in progress...</h2>
+  <p>Please wait while we complete the authentication process.</p>
+</body>
+</html>

@@ -6,20 +6,72 @@
 import LoadingIndicator from './LoadingIndicator';
 
 class PlatformManager {
+  /**
+   * Process waypoint results to extract valid waypoints
+   * @param {Object} result - The OSDK query result
+   * @returns {Array} - Array of waypoint objects
+   */
+  processWaypointResults(result) {
+    console.log(`PlatformManager: Processing ${result?.data?.length || 0} waypoint results`);
+    
+    if (!result || !result.data || result.data.length === 0) {
+      console.log("PlatformManager: No waypoint data to process");
+      return [];
+    }
+    
+    // Convert results to waypoint objects
+    const waypoints = result.data
+      .map(item => {
+        // Extract coordinates
+        let coordinates;
+        if (item.geoPoint?.coordinates) {
+          coordinates = item.geoPoint.coordinates;
+        } else if (item.geoPoint) {
+          coordinates = item.geoPoint;
+        } else if (item.longitude !== undefined && item.latitude !== undefined) {
+          coordinates = [item.longitude, item.latitude];
+        } else if (item.lon !== undefined && item.lat !== undefined) {
+          coordinates = [item.lon, item.lat];
+        } else {
+          return null; // Skip items without coordinates
+        }
+        
+        // Skip if coordinates are invalid
+        if (!coordinates || coordinates.length !== 2 || 
+            typeof coordinates[0] !== 'number' || typeof coordinates[1] !== 'number') {
+          return null;
+        }
+        
+        // Create waypoint object
+        return {
+          name: item.locName || item.name || 'Waypoint',
+          coordinates: coordinates,
+          type: item.locationType || 'WAYPOINT', // Store original type
+          region: item.region || '',
+          activeSite: item.activeSite || ''
+        };
+      })
+      .filter(wp => wp !== null); // Remove null entries
+    
+    console.log(`PlatformManager: Processed ${waypoints.length} valid waypoints`);
+    
+    return waypoints;
+  }
   constructor(mapManager) {
     this.mapManager = mapManager;
     this.platforms = [];
-    this.waypoints = []; // New array to store waypoints separately
     this.isVisible = true;
-    this.waypointModeActive = false; // New flag to track waypoint insertion mode
     this.callbacks = {
       onPlatformsLoaded: null,
       onVisibilityChanged: null,
       onError: null,
-      onWaypointsLoaded: null // New callback for when waypoints are loaded
+      onOsdkWaypointsLoaded: null // Added callback for OSDK waypoints
     };
     // Flag to prevent duplicate source/layer creation
     this.skipNextClear = false;
+    this.osdkWaypoints = []; // To store loaded OSDK navigation waypoints
+    this.osdkWaypointsVisible = false; // To track visibility of OSDK waypoints layer
+    this.waypointModeActive = false; // To track if waypoint mode is active
   }
   
   /**
@@ -128,15 +180,15 @@ class PlatformManager {
         // Update loading indicator
         LoadingIndicator.updateText(loaderId, `Querying for platforms in ${regionName}...`);
         
-        // Fetch for this region, explicitly excluding reporting points
+        // Fetch for this region, including all location types
         const result = await client(locationObject)
           .where({ 
-            region: regionName,
-            locationType: { $ne: "REPORTING POINT OFFSHORE" }
+            region: regionName
+            // Removed filter: locationType: { $ne: "REPORTING POINT OFFSHORE" }
           })
           .fetchPage({
             $pageSize: 5000, // Increased to make sure we get everything
-            $filter: `locationType ne 'REPORTING POINT ONSHORE'` // Also exclude onshore reporting points
+            // Removed additional filter: no longer excluding reporting points
           });
         
         console.log(`Found ${result.data ? result.data.length : 0} total items for region ${regionName}`);
@@ -168,8 +220,7 @@ class PlatformManager {
             
             const type = item.locationType.toUpperCase();
             
-            // Explicitly exclude reporting points
-            if (type.includes("REPORTING POINT")) return false;
+            // Don't exclude reporting points here anymore, let the specific layers handle them
             
             // Include all platform types
             if (type.includes("PLATFORM") || 
@@ -188,7 +239,7 @@ class PlatformManager {
                 type.includes("OIL") ||
                 type.includes("GAS") ||
                 type.includes("JACKET") ||
-                (type.includes("OFFSHORE") && !type.includes("REPORTING"))) {
+                (type.includes("OFFSHORE"))) {
               return true;
             }
             
@@ -533,8 +584,9 @@ class PlatformManager {
                 (upperType.includes('FIXED') && upperType.includes('PLATFORM')) ||
                 (upperType === 'FIXED PLATFORM');
                 
-            // Skip unwanted navigation points ONLY if they're not any kind of platform
-            if (!isPlatformOrVessel && 
+            // Don't skip navigation points in waypoint mode
+            if (window.isWaypointModeActive !== true && 
+                !isPlatformOrVessel && 
                 (upperType.includes('WAYPOINT') || 
                 upperType.includes('REPORTING POINT') || 
                 upperType.includes('FIX') ||
@@ -546,10 +598,7 @@ class PlatformManager {
             
             // Process item type without excessive logging
             
-            // Skip reporting points explicitly
-            if (upperType.includes('REPORTING POINT')) {
-              continue;
-            }
+            // Don't skip reporting points anymore
               
             // First check for airfields (take priority over platform detection)
             if (item.ISAIRPORT === 'Yes' || item.isAirport === 'Yes' || 
@@ -715,62 +764,72 @@ class PlatformManager {
       return [];
     }
   }
+
+  /**
+   * Dedicated function to remove platform layers and source.
+   * Ensures layers are removed before the source to prevent errors.
+   * @private
+   */
+  _removePlatformLayersAndSource() {
+    const map = this.mapManager.getMap();
+    // Ensure map is loaded and available
+    if (!map || !this.mapManager.isMapLoaded()) {
+      // console.log("PlatformManager: Map not ready for _removePlatformLayersAndSource, or no map.");
+      return;
+    }
+
+    const layerIds = [
+      'platforms-fixed-layer',
+      'platforms-movable-layer',
+      'airfields-layer',
+      'platforms-fixed-labels',
+      'platforms-movable-labels',
+      'airfields-labels',
+      'platforms-layer' // Generic layer name, just in case it was used previously
+    ];
+    const sourceId = 'major-platforms';
+
+    // console.log("PlatformManager: Attempting to remove platform layers and source.");
+
+    layerIds.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        try {
+          map.removeLayer(layerId);
+          // console.log(`PlatformManager: Removed layer ${layerId}`);
+        } catch (e) {
+          // console.warn(`PlatformManager: Error removing layer ${layerId}: ${e.message}`);
+        }
+      }
+    });
+    
+    // It's crucial to ensure layers are removed before the source.
+    // A small timeout can help, but a more robust solution might involve checking layer removal status.
+    if (map.getSource(sourceId)) {
+      try {
+        map.removeSource(sourceId);
+        // console.log(`PlatformManager: Removed source ${sourceId}`);
+      } catch (e) {
+        // console.warn(`PlatformManager: Error removing source ${sourceId}: ${e.message}`);
+      }
+    }
+  }
   
   /**
    * Clear all platforms from the map
    */
   clearPlatforms() {
     const map = this.mapManager.getMap();
-    if (!map) return;
+    if (!map) {
+      console.log('PlatformManager: Map not available for clearPlatforms.');
+      return;
+    }
     
-    console.log('Clearing all platforms from map');
+    console.log('PlatformManager: Clearing all platforms from map.');
     
-    // Make sure the map is loaded before attempting to remove layers
     this.mapManager.onMapLoaded(() => {
-      try {
-        // Define all possible platform-related layer IDs
-        const allLayers = [
-          'platforms-layer',           // Main platform layer
-          'platforms-fixed-layer',     // Fixed platforms layer
-          'platforms-movable-layer',   // Movable platforms layer
-          'platforms-labels',          // Main platform labels
-          'platforms-fixed-labels',    // Fixed platform labels
-          'platforms-movable-labels',  // Movable platform labels
-          'airfields-layer',           // Airfields layer
-          'airfields-labels'           // Airfield labels
-        ];
-        
-        // First remove all layers
-        for (const layerId of allLayers) {
-          if (map.getLayer(layerId)) {
-            try {
-              map.removeLayer(layerId);
-              console.log(`Successfully removed layer: ${layerId}`);
-            } catch (e) {
-              console.warn(`Error removing layer ${layerId}:`, e);
-            }
-          }
-        }
-        
-        // Wait a moment before removing the source
-        setTimeout(() => {
-          // THEN remove the source (after all layers using it are gone)
-          if (map.getSource('major-platforms')) {
-            try {
-              map.removeSource('major-platforms');
-              console.log('Successfully removed source: major-platforms');
-            } catch (e) {
-              console.warn('Error removing source major-platforms:', e);
-            }
-          }
-        }, 100);
-        
-        // Clear the platforms array
-        this.platforms = [];
-        
-      } catch (error) {
-        console.error('Error clearing platforms:', error);
-      }
+      this._removePlatformLayersAndSource();
+      this.platforms = []; // Clear the internal platform data
+      // console.log('PlatformManager: Platforms cleared from map and data store.');
     });
   }
   
@@ -779,354 +838,213 @@ class PlatformManager {
    * @param {Array} platforms - Array of platform objects
    */
   addPlatformsToMap(platforms) {
-    const map = this.mapManager.getMap();
-    if (!map) return;
-    
-    // Count how many of each type for debugging
-    const airfieldCount = platforms.filter(p => p.isAirfield).length;
-    const platformCount = platforms.length - airfieldCount;
-    
-    console.log(`Adding ${platforms.length} locations to map: ${platformCount} platforms and ${airfieldCount} airfields`);
-    
-    // Store the platforms
-    this.platforms = platforms;
-
-    // Define the function to actually add layers/sources
-    const addLayersAndSource = () => {
-      const map = this.mapManager.getMap(); // Re-get map instance inside callback if needed
+    this.mapManager.onMapLoaded(() => {
+      const map = this.mapManager.getMap();
       if (!map) {
-        console.error("Map became unavailable before adding platforms.");
-        this.triggerCallback('onError', "Map became unavailable");
+        console.error("PlatformManager: Map not ready in addPlatformsToMap (inside onMapLoaded).");
+        this.triggerCallback('onError', 'Map not ready to add platforms');
         return;
       }
-      
-      // Load airport icon if not already loaded
-      // This ensures we have a proper airport icon even if the default style doesn't include it
-      if (!map.hasImage('airport-icon')) {
-        try {
-          // Create a simple airport icon as fallback
-          const size = 16;
-          const halfSize = size / 2;
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          
-          // Draw a blue circle
-          ctx.beginPath();
-          ctx.arc(halfSize, halfSize, halfSize - 2, 0, 2 * Math.PI);
-          ctx.fillStyle = '#043277'; // Lighter blue
-          ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          
-          // Draw an "A" letter in white
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 8px sans-serif'; // Smaller A
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('A', halfSize, halfSize);
-          
-          map.addImage('airport-icon', { 
-            data: ctx.getImageData(0, 0, size, size).data, 
-            width: size, 
-            height: size 
-          });
-          console.log('Created custom airport icon');
-        } catch (error) {
-          console.error('Error creating airport icon:', error);
+
+      console.log(`PlatformManager: Adding/updating ${platforms.length} platforms on map.`);
+      this.platforms = platforms; // Store the platforms
+
+      const sourceId = 'major-platforms';
+
+      // Prepare features for GeoJSON source
+      const features = platforms.map(p => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: p.coordinates
+        },
+        properties: {
+          name: p.name,
+          operator: p.operator,
+          isAirfield: p.isAirfield || false,
+          isMovable: p.isMovable || false,
+          platformType: p.isAirfield ? 'airfield' : (p.isMovable ? 'movable' : 'fixed')
         }
-      }
+      }));
+
+      const geoJsonData = {
+        type: 'FeatureCollection',
+        features: features
+      };
+
+      // Use the new centralized cleanup method
+      this._removePlatformLayersAndSource();
       
+      // Add new source and layers directly after cleanup
       try {
-        // CRITICAL FIX: Check if we should skip removing/recreating sources
-        // to avoid the "already exists" error during region changes
-        if (!this.skipNextClear) {
-          console.log("Removing existing platform layers and sources...");
-          // Remove existing layers first if they exist
-          const platformLayers = [
-            'platforms-layer',         // Check for old layer name too
-            'platforms-fixed-layer',
-            'platforms-movable-layer',
-            'platforms-fixed-labels',
-            'platforms-movable-labels',
-            'airfields-layer',
-            'airfields-labels'
-          ];
-          
-          // First remove all layers
-          platformLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              try {
-                map.removeLayer(layerId);
-              } catch (e) {
-                console.warn(`Error removing layer ${layerId}:`, e);
-              }
+        // Load airport icon if not already loaded (from backup)
+        if (!map.hasImage('airport-icon')) {
+          try {
+            const size = 16;
+            const halfSize = size / 2;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.beginPath();
+            ctx.arc(halfSize, halfSize, halfSize - 2, 0, 2 * Math.PI);
+            ctx.fillStyle = '#043277'; // Lighter blue from backup
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 8px sans-serif'; // Smaller A from backup
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', halfSize, halfSize);
+            
+            map.addImage('airport-icon', { 
+              data: ctx.getImageData(0, 0, size, size).data, 
+              width: size, 
+              height: size 
+            });
+            console.log('PlatformManager: Created custom airport icon');
+          } catch (error) {
+            console.error('PlatformManager: Error creating airport icon:', error);
+          }
+        }
+
+        console.log(`PlatformManager: Adding source ${sourceId}`);
+        map.addSource(sourceId, {
+            type: 'geojson',
+            data: geoJsonData,
+            cluster: false
+          });
+
+          // Layer for Fixed Platforms (styled circle from backup)
+          map.addLayer({
+            id: 'platforms-fixed-layer', // Keep current ID
+            type: 'circle', // Changed from symbol
+            source: sourceId,
+            filter: ['all', 
+                     ['==', ['get', 'platformType'], 'fixed']
+                    ], 
+            paint: { // Paint properties from backup for fixed platforms
+              'circle-radius': 2,
+              'circle-color': '#073b8e',       // Darker blue center
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#03bf42', // Teal ring
+              'circle-opacity': 1
+            },
+            layout: { // Add visibility toggle
+                'visibility': this.isVisible ? 'visible' : 'none'
+            }
+          });
+
+          // Layer for Movable Platforms (styled circle from backup)
+          map.addLayer({
+            id: 'platforms-movable-layer',
+            type: 'circle', // Changed from symbol
+            source: sourceId,
+            filter: ['all', 
+                     ['==', ['get', 'platformType'], 'movable']
+                    ],
+            paint: { // Paint properties from backup for movable platforms
+              'circle-radius': 2,
+              'circle-color': '#ad0303',       // Dark red center
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#f2efef', // Light ring (backup used #f2efef, might be white/light gray)
+              'circle-opacity': 1
+            },
+            layout: { // Add visibility toggle
+                'visibility': this.isVisible ? 'visible' : 'none'
+            }
+          });
+
+          // Layer for Airfields/Heliports (using custom/fallback icon from backup)
+          map.addLayer({
+            id: 'airfields-layer',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'airfield']],
+            layout: {
+              'icon-image': map.hasImage('airport-icon') ? 'airport-icon' : 'airport-15', // Logic from backup
+              'icon-size': 1,
+              'icon-allow-overlap': true,
+              'icon-anchor': 'bottom', // From backup for pin-style
+              'icon-offset': [0, -5],  // From backup
+              'visibility': this.isVisible ? 'visible' : 'none'
             }
           });
           
-          // IMPORTANT: Wait briefly before removing the source
-          // This helps avoid "source in use" errors
-          setTimeout(() => {
-            // Then remove source
-            if (map.getSource('major-platforms')) {
-              try {
-                map.removeSource('major-platforms');
-              } catch (e) {
-                console.warn("Error removing source:", e);
-              }
-            }
-          }, 50);
-        } else {
-          console.log("SKIPPING source/layer removal due to skipNextClear flag");
-          // Reset the flag for next time
-          this.skipNextClear = false;
-        }
-        
-        // Check if source already exists to prevent duplicate error
-        const sourceExists = map.getSource('major-platforms');
-        
-        // Debug - check for specific platforms before mapping
-        const debugPlatforms = ["ENLE", "ENWS", "ENWV", "ENZV"];
-        console.log("CHECKING PLATFORMS IN MAP DATA:");
-        debugPlatforms.forEach(name => {
-          const found = platforms.find(p => p.name === name);
-          if (found) {
-            console.log(`🗺️ Found ${name} in map data at coordinates [${found.coordinates}]`);
-          } else {
-            console.log(`❓ ${name} NOT found in map data`);
-          }
-        });
-        
-        // Create GeoJSON data with isAirfield and isMovable properties
-        console.log("Creating features for map display from", platforms.length, "platforms");
-        
-        // Count for debugging
-        let fixedPlatformsCount = 0;
-        let movablePlatformsCount = 0;
-        let airfieldsCount = 0;
-        
-        const features = platforms.map(platform => {
-          // Debug any platforms with invalid coordinates
-          if (!Array.isArray(platform.coordinates) || platform.coordinates.length !== 2 ||
-              typeof platform.coordinates[0] !== 'number' || typeof platform.coordinates[1] !== 'number') {
-            console.log(`⚠️ Platform ${platform.name} has invalid coordinates: ${JSON.stringify(platform.coordinates)}`);
-          }
-          
-          // Count by type for debugging
-          if (platform.isAirfield) {
-            airfieldsCount++;
-          } else if (platform.isMovable) {
-            movablePlatformsCount++;
-          } else {
-            fixedPlatformsCount++;
-          }
-          
-          return {
-            type: 'Feature',
-            properties: {
-              name: platform.name,
-              operator: platform.operator || 'Unknown',
-              isAirfield: !!platform.isAirfield, // Convert to boolean
-              isMovable: !!platform.isMovable   // Convert to boolean
+          // Labels for Fixed Platforms
+          map.addLayer({
+            id: 'platforms-fixed-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'fixed']],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+              'text-size': 10,
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top',
+              'visibility': this.isVisible ? 'visible' : 'none'
             },
-            geometry: {
-              type: 'Point',
-              coordinates: platform.coordinates
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 0.5
             }
-          };
-        });
-        
-        // Debug log to verify we have features of each type
-        console.log(`Created ${features.length} features for map:`);
-        console.log(`- ${airfieldsCount} airfields`);
-        console.log(`- ${fixedPlatformsCount} fixed platforms`);
-        console.log(`- ${movablePlatformsCount} movable platforms`);
-        
-        console.log("Adding source with features data");
-        // Add source
-        // Add source only if it doesn't exist yet
-        if (!sourceExists) {
-          try {
-            map.addSource('major-platforms', {
-              type: 'geojson',
-              data: {
-                type: 'FeatureCollection',
-                features: features
-              }
-            });
-          } catch (e) {
-            // If source already exists error, try to update it
-            if (e.message && e.message.includes("already exists")) {
-              console.log("Source already exists, trying to update data instead");
-              try {
-                const source = map.getSource('major-platforms');
-                if (source && typeof source.setData === 'function') {
-                  source.setData({
-                    type: 'FeatureCollection',
-                    features: features
-                  });
-                }
-              } catch (updateError) {
-                console.error("Error updating source data:", updateError);
-              }
+          });
+
+          // Labels for Movable Platforms
+          map.addLayer({
+            id: 'platforms-movable-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'movable']],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+              'text-size': 10,
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top',
+              'visibility': this.isVisible ? 'visible' : 'none'
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 0.5
             }
-          }
-        } else {
-          // If source exists, update its data
-          try {
-            const source = map.getSource('major-platforms');
-            if (source && typeof source.setData === 'function') {
-              source.setData({
-                type: 'FeatureCollection',
-                features: features
-              });
+          });
+
+          // Labels for Airfields
+          map.addLayer({
+            id: 'airfields-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'airfield']],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+              'text-size': 10,
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top',
+              'visibility': this.isVisible ? 'visible' : 'none'
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 0.5
             }
-          } catch (updateError) {
-            console.error("Error updating source data:", updateError);
-          }
+          });
+          console.log('PlatformManager: Platform layers added/updated.');
+          this.triggerCallback('onPlatformsLoaded', platforms);
+
+        } catch (error) {
+          console.error('PlatformManager: Error adding platform source/layers:', error);
+          this.triggerCallback('onError', 'Error adding platform layers: ' + error.message);
         }
-
-        console.log("Adding fixed platforms layer");
-        // Add FIXED platforms with teal ring and darker blue center
-        map.addLayer({
-          id: 'platforms-layer',  // Changed to match event handler in MapComponent
-          type: 'circle',
-          source: 'major-platforms',
-          filter: ['all', 
-                  ['==', ['get', 'isAirfield'], false],  // Not an airfield
-                  ['==', ['get', 'isMovable'], false]    // Not a movable platform
-                 ], 
-          paint: {
-            'circle-radius': 2,              // Slightly larger
-            'circle-color': '#073b8e',       // Darker blue center
-            'circle-stroke-width': 1,        // Thicker stroke for better visibility
-            'circle-stroke-color': '#03bf42', // Teal ring
-            'circle-opacity': 1              // Fully opaque
-          }
-        });
-        
-        console.log("Adding movable platforms layer");
-        // Add MOVABLE platforms with orange ring and dark red center
-        map.addLayer({
-          id: 'platforms-movable-layer',
-          type: 'circle',
-          source: 'major-platforms',
-          filter: ['all', 
-                  ['==', ['get', 'isAirfield'], false],  // Not an airfield
-                  ['==', ['get', 'isMovable'], true]     // Is a movable platform
-                 ],
-          paint: {
-            'circle-radius': 2,              // Slightly larger
-            'circle-color': '#ad0303',       // Dark red center
-            'circle-stroke-width': 1,        // Thicker stroke for better visibility
-            'circle-stroke-color': '#f2efef', // Orange ring
-            'circle-opacity': 1              // Fully opaque
-          }
-        });
-
-        // No debug layer - just use the regular platform layers
-        
-        // Add airfields with pin-style markers
-        map.addLayer({
-          id: 'airfields-layer',
-          type: 'symbol',
-          source: 'major-platforms',
-          filter: ['==', ['get', 'isAirfield'], true], // Only airfields
-          layout: {
-            // Try to use our custom icon first, fallback to built-in if available
-            'icon-image': map.hasImage('airport-icon') ? 'airport-icon' : 'airport-15',
-            'icon-size': 1,                 // Make it slightly larger
-            'icon-allow-overlap': true,       // Allow icons to overlap
-            'icon-anchor': 'bottom',          // Anchor at bottom so it looks like a pin
-            'icon-offset': [0, -5]            // Small offset to fine-tune position
-          }
-        });
-        
-        // Add platform labels for fixed platforms - white text
-        map.addLayer({
-          id: 'platforms-fixed-labels',
-          type: 'symbol',
-          source: 'major-platforms',
-          filter: ['all', 
-                  ['==', ['get', 'isAirfield'], false],  // Not an airfield
-                  ['==', ['get', 'isMovable'], false]    // Not a movable platform
-                 ],
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 10,               // Slightly larger for readability
-            'text-anchor': 'top',
-            'text-offset': [0, 0.8],       // Moved further from the marker
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'symbol-sort-key': ['get', 'name']
-          },
-          paint: {
-            'text-color': '#7192c4',       // White text
-            'text-halo-color': '#000000',  
-            'text-halo-width': 1           // Thicker halo for better contrast
-          }
-        });
-        
-        // Add platform labels for movable platforms - light orange text
-        map.addLayer({
-          id: 'platforms-movable-labels',
-          type: 'symbol',
-          source: 'major-platforms',
-          filter: ['all', 
-                  ['==', ['get', 'isAirfield'], false],  // Not an airfield
-                  ['==', ['get', 'isMovable'], true]     // Is a movable platform
-                 ],
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 10,               // Slightly larger for readability
-            'text-anchor': 'top',
-            'text-offset': [0, 0.8],       // Moved further from the marker
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'symbol-sort-key': ['get', 'name']
-          },
-          paint: {
-            'text-color': '#7192c4',       // Light orange text
-            'text-halo-color': '#000000',  
-            'text-halo-width': 1           // Thicker halo for better contrast
-          }
-        });
-        
-        // Add airfield labels - lighter blue text, closer to icon
-        map.addLayer({
-          id: 'airfields-labels',
-          type: 'symbol',
-          source: 'major-platforms',
-          filter: ['==', ['get', 'isAirfield'], true], // Only airfields
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 12,                // Larger text
-            'text-anchor': 'top',
-            'text-offset': [0, 0.6],       // Move text closer to icon
-            'text-allow-overlap': false,
-            'text-ignore-placement': false,
-            'symbol-sort-key': ['get', 'name']
-          },
-          paint: {
-            'text-color': '#66aaff',       // Lighter blue text
-            'text-halo-color': '#000000',  
-            'text-halo-width': 1.5         // Thicker halo for better visibility
-          }
-        });
-        
-        // Trigger callback
-        this.triggerCallback('onPlatformsLoaded', platforms);
-      } catch (error) {
-        console.error('Error adding platforms to map:', error);
-        this.triggerCallback('onError', error.message);
-      }
-    };
-
-    // Use onMapLoaded to handle timing, whether map is already loaded or needs to wait
-    console.log('Requesting to add layers/source, using onMapLoaded for timing.');
-    this.mapManager.onMapLoaded(addLayersAndSource);
+    });
   }
   
   /**
@@ -1163,6 +1081,640 @@ class PlatformManager {
     
     this.triggerCallback('onVisibilityChanged', this.isVisible);
     return this.isVisible;
+  }
+
+  /**
+   * Helper to set visibility of main platform/airport layers
+   * @param {boolean} visible - True to show, false to hide
+   */
+  _setPlatformLayersVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    const visibility = visible ? 'visible' : 'none';
+    const platformLayerIds = [
+      'platforms-layer',
+      'platforms-fixed-layer',
+      'platforms-movable-layer',
+      'platforms-fixed-labels',
+      'platforms-movable-labels',
+      'airfields-layer',
+      'airfields-labels'
+    ];
+    
+    // Just set visibility property instead of removing layers
+    platformLayerIds.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        try {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+          console.log(`Set ${layerId} visibility to ${visibility}`);
+        } catch (e) {
+          console.warn(`Error setting visibility for ${layerId}:`, e);
+        }
+      }
+    });
+    
+    console.log(`Platform layers visibility set to: ${visibility}`);
+  }
+
+  /**
+   * Helper to set visibility of OSDK waypoint layer
+   * @param {boolean} visible - True to show, false to hide
+   */
+  _setOsdkWaypointLayerVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    const visibility = visible ? 'visible' : 'none';
+    const waypointLayers = [
+      'osdk-waypoints-layer',
+      'osdk-waypoints-labels'
+    ];
+    
+    // Set visibility property for each layer
+    let layersFound = false;
+    waypointLayers.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        try {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+          console.log(`Set ${layerId} visibility to ${visibility}`);
+          layersFound = true;
+        } catch (e) {
+          console.warn(`Error setting visibility for ${layerId}:`, e);
+        }
+      } else {
+        console.log(`Layer ${layerId} not found on map for visibility change`);
+      }
+    });
+    
+    // Store visibility state
+    this.osdkWaypointsVisible = visible;
+    console.log(`OSDK waypoint layer visibility set to: ${visibility}`);
+    
+    // If no layers were found but we have waypoints and want to make them visible,
+    // call _addOsdkWaypointsToMap to create the layers
+    if (!layersFound && visible && this.osdkWaypoints && this.osdkWaypoints.length > 0) {
+      console.log("No waypoint layers found but have waypoints. Creating layers now...");
+      this._addOsdkWaypointsToMap();
+    }
+  }
+
+  /**
+   * Toggle waypoint mode for platform display.
+   * Hides regular platforms/airports and shows OSDK navigation waypoints.
+   * @param {boolean} active - True to activate waypoint mode, false to deactivate.
+   * @param {Object} client - The OSDK client, required if waypoints need to be loaded.
+   * @param {string} regionName - The current region name, required if waypoints need to be loaded.
+   */
+  toggleWaypointMode(active, client, regionName) {
+    console.log(`PlatformManager: Toggling waypoint mode to ${active} for region ${regionName}`);
+    this.waypointModeActive = active;
+    
+    // Update global flag for other components to check
+    window.isWaypointModeActive = active;
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.error("PlatformManager: Map not available for toggleWaypointMode.");
+      return;
+    }
+
+    if (active) {
+      // Entering waypoint mode
+      console.log("PlatformManager: Entering waypoint mode - hiding platforms, showing waypoints");
+      this._setPlatformLayersVisibility(false); // Hide normal platforms and airfields
+      
+      // Check if we already have waypoints loaded
+      if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
+        console.log(`PlatformManager: ${this.osdkWaypoints.length} waypoints already loaded, making visible`);
+        this._setOsdkWaypointLayerVisibility(true);
+        
+        // Show success message
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Showing ${this.osdkWaypoints.length} navigation waypoints. Click to add to route.`,
+            'success',
+            3000
+          );
+        }
+      } else {
+        console.log("PlatformManager: No waypoints loaded yet. Loading from OSDK...");
+        
+        // Validate client and region name
+        if (!client) {
+          console.warn("PlatformManager: No client provided - attempting to find global client");
+          client = window.client || window.osdkClient;
+        }
+        
+        if (!client) {
+          console.error("PlatformManager: No OSDK client available - cannot load waypoints");
+          
+          // Show error to user
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              'Cannot load waypoints: No connection to OSDK. Try refreshing the page.',
+              'error',
+              5000
+            );
+          }
+          return;
+        }
+        
+        // Validate region name
+        if (!regionName) {
+          console.warn("PlatformManager: No region name provided, using default");
+          
+          // Try to get region name from various sources
+          if (this.currentRegion) {
+            regionName = typeof this.currentRegion === 'string' ? 
+                        this.currentRegion : 
+                        (this.currentRegion.name || this.currentRegion.id);
+          } else if (window.currentRegion) {
+            regionName = typeof window.currentRegion === 'string' ? 
+                        window.currentRegion : 
+                        (window.currentRegion.name || window.currentRegion.id);
+          } else {
+            // Default to NORWAY which has good waypoint data
+            regionName = "NORWAY";
+          }
+        }
+        
+        // Convert region names to standard format
+        // Ensure upper case for OSDK regions (GULF OF MEXICO, NORWAY)
+        if (regionName && typeof regionName === 'string' && 
+            (regionName.toLowerCase() === 'norway' || 
+             regionName.toLowerCase() === 'gulf of mexico')) {
+          regionName = regionName.toUpperCase();
+        }
+        
+        console.log(`PlatformManager: Loading waypoints for ${regionName} using OSDK client...`);
+        
+        // Show loading message
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Loading navigation waypoints for ${regionName}...`,
+            'info',
+            3000
+          );
+        }
+        
+        // Load waypoints with standardized region name
+        this.loadOsdkWaypointsFromFoundry(client, regionName).then(waypoints => {
+          console.log(`PlatformManager: Successfully loaded ${waypoints.length} waypoints`);
+          
+          // If still in waypoint mode, make the waypoints visible
+          if (this.waypointModeActive) {
+            this._setOsdkWaypointLayerVisibility(true);
+            
+            // Show success message
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Loaded ${waypoints.length} navigation waypoints. Click to add to route.`,
+                'success',
+                3000
+              );
+            }
+          }
+        }).catch(error => {
+          console.error("PlatformManager: Error loading waypoints:", error);
+          
+          // Show error to user
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              `Error loading waypoints: ${error.message}. Try refreshing the page.`,
+              'error',
+              5000
+            );
+          }
+        });
+      }
+    } else {
+      // Exiting waypoint mode
+      console.log("PlatformManager: Exiting waypoint mode - hiding waypoints, showing platforms");
+      this._setOsdkWaypointLayerVisibility(false); // Hide OSDK waypoints
+      this._setPlatformLayersVisibility(this.isVisible); // Restore normal platform/airfield visibility
+    }
+    
+    // Trigger visibility change callback
+    this.triggerCallback('onVisibilityChanged', this.isVisible && !active);
+  }
+
+  /**
+   * Clear OSDK waypoint layers from the map
+   */
+  _clearOsdkWaypointLayers() {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+
+    const sourceId = 'osdk-waypoints-source';
+    const layerIds = [
+      'osdk-waypoints-layer',
+      'osdk-waypoints-labels'
+    ];
+
+    // First remove all layers that use the source
+    layerIds.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        try {
+          console.log(`Removing layer: ${layerId}`);
+          map.removeLayer(layerId);
+        } catch (e) {
+          console.warn(`Error removing layer ${layerId}:`, e);
+        }
+      }
+    });
+    
+    // Then remove the source
+    if (map.getSource(sourceId)) {
+      try {
+        // console.log(`Removing source: ${sourceId}`);
+        map.removeSource(sourceId);
+      } catch (e) {
+        console.warn(`Error removing source ${sourceId}:`, e.message);
+        // If "source in use", it implies layers weren't fully removed or are still being processed.
+      }
+    }
+    
+    // Clear the stored waypoints
+    this.osdkWaypoints = [];
+    console.log("PlatformManager: Cleared OSDK waypoint layers and data.");
+  }
+
+  /**
+   * Load OSDK navigational waypoints from Foundry
+   * @param {Object} client - The OSDK client
+   * @param {string} regionName - The region name to filter by
+   * @returns {Promise<Array>} - Resolves with array of loaded waypoints
+   */
+  async loadOsdkWaypointsFromFoundry(client, regionName) {
+    // Clean up any existing waypoint layers first
+    this._clearOsdkWaypointLayers();
+
+    // Validate parameters
+    if (!client) {
+      console.error("PlatformManager: No OSDK client provided for waypoint loading");
+      return Promise.reject(new Error("OSDK client is required"));
+    }
+    
+    if (!regionName) {
+      console.warn("PlatformManager: No region name provided - defaulting to NORWAY");
+      regionName = "NORWAY";
+    }
+    
+    // Ensure uppercase for OSDK regions
+    if (typeof regionName === 'string') {
+      if (regionName.toLowerCase() === 'norway') {
+        regionName = "NORWAY";
+      } else if (regionName.toLowerCase() === 'gulf of mexico') {
+        regionName = "GULF OF MEXICO";
+      }
+    }
+    
+    console.log(`PlatformManager: Loading OSDK waypoints for region: ${regionName}`);
+    
+    // Show loading indicator
+    const loaderId = LoadingIndicator.show('.route-stats-title', 
+      `Loading navigation waypoints for ${regionName}...`, 
+      { position: 'bottom' });
+
+    try {
+      // Import the SDK
+      const sdk = await import('@flight-app/sdk');
+      let locationObject = sdk.AllGtLocationsV2 || sdk.AllGtLocations;
+      
+      // If the specific objects aren't found, try to find any location-related object
+      if (!locationObject) {
+         const locationOptions = Object.keys(sdk).filter(key => 
+           key.includes('Location') || key.includes('location')
+         );
+         
+         if (locationOptions.length > 0) {
+           locationObject = sdk[locationOptions[0]];
+           console.log(`PlatformManager: Using ${locationOptions[0]} for waypoints`);
+         } else {
+           throw new Error('No location-related objects found in SDK for waypoints');
+         }
+      }
+
+      // Define comprehensive waypoint location types for each region
+      let waypointLocationTypes;
+      
+      // Use different types based on region - include ALL possible waypoint types for Norway
+      if (regionName === "NORWAY") {
+        // For Norway, we need to be VERY inclusive with waypoint types
+        waypointLocationTypes = [
+          "WAYPOINT", 
+          "waypoint",
+          "REPORTING POINT OFFSHORE",
+          "REPORTING POINT ONSHORE",
+          "REPORTING POINT",
+          "NAVAID",
+          "FIX", 
+          "INTERSECTION",
+          "POINT",
+          "WAYPOINT FOR HELICOPTERS",
+          "CHECKPOINT",
+          "NAVAID"
+        ];
+      } else if (regionName === "GULF OF MEXICO") {
+        waypointLocationTypes = [
+          "WAYPOINT", 
+          "waypoint",
+          "REPORTING POINT OFFSHORE",
+          "REPORTING POINT ONSHORE",
+          "REPORTING POINT",
+          "NAVAID",
+          "FIX", 
+          "INTERSECTION",
+          "POINT",
+          "WAYPOINT FOR HELICOPTERS"
+        ];
+      } else {
+        // Default for other regions - be inclusive with all types
+        waypointLocationTypes = [
+          "WAYPOINT",
+          "waypoint",
+          "REPORTING POINT OFFSHORE",
+          "REPORTING POINT ONSHORE",
+          "REPORTING POINT",
+          "INTERSECTION",
+          "FIX",
+          "NAVAID"
+        ];
+      }
+      
+      console.log(`PlatformManager: Querying for ${regionName} waypoints with types: ${waypointLocationTypes.join(', ')}`);
+      
+      // Store client reference to global for later use if needed
+      window.osdkClient = client;
+
+      // For Norway, make two queries to be extra thorough
+      let result;
+      if (regionName === "NORWAY") {
+        console.log(`PlatformManager: Using special Norway waypoint loading logic`);
+        
+        // First query: With locationType filter
+        console.log(`PlatformManager: First Norway query with locationType filter`);
+        const result1 = await client(locationObject)
+          .where({ 
+            region: regionName,
+            locationType: { $in: waypointLocationTypes }
+          })
+          .fetchPage({ $pageSize: 5000 });
+        
+        console.log(`PlatformManager: First query returned ${result1?.data?.length || 0} results`);
+        
+        // Second query: Without locationType filter to get everything
+        console.log(`PlatformManager: Second Norway query without locationType filter`);
+        const result2 = await client(locationObject)
+          .where({ region: regionName })
+          .fetchPage({ $pageSize: 5000 });
+        
+        console.log(`PlatformManager: Second query returned ${result2?.data?.length || 0} results`);
+        
+        // Combine results, avoiding duplicates
+        const combinedData = [];
+        const processedNames = new Set();
+        
+        // Add items from first query
+        if (result1?.data) {
+          for (const item of result1.data) {
+            const name = item.locName || item.name;
+            if (name) {
+              processedNames.add(name);
+              combinedData.push(item);
+            }
+          }
+        }
+        
+        // Add items from second query if not already included
+        if (result2?.data) {
+          for (const item of result2.data) {
+            const name = item.locName || item.name;
+            if (name && !processedNames.has(name)) {
+              // Check if it's a navigation point type before adding
+              const type = (item.locationType || '').toUpperCase();
+              if (type.includes('WAYPOINT') || 
+                  type.includes('POINT') || 
+                  type.includes('FIX') || 
+                  type.includes('INTERSECTION') ||
+                  type.includes('NAVAID')) {
+                combinedData.push(item);
+                processedNames.add(name);
+              }
+            }
+          }
+        }
+        
+        console.log(`PlatformManager: Combined ${combinedData.length} unique results for Norway`);
+        
+        // Create a result object similar to the OSDK response
+        result = { data: combinedData };
+      }
+      else {
+        // For other regions, use normal query
+        console.log(`PlatformManager: Executing OSDK query for waypoints in ${regionName}`);
+        result = await client(locationObject)
+          .where({ 
+            region: regionName,
+            locationType: { $in: waypointLocationTypes }
+          })
+          .fetchPage({ $pageSize: 5000 });
+        
+        console.log(`PlatformManager: OSDK query returned ${result?.data?.length || 0} raw results`);
+      }
+      
+      this.osdkWaypoints = this.processWaypointResults(result);
+
+      console.log(`PlatformManager: Loaded ${this.osdkWaypoints.length} OSDK waypoints for ${regionName}.`);
+      
+      if (this.waypointModeActive) { // If waypoint mode is active when waypoints are loaded
+        this.osdkWaypointsVisible = true; // Set them to be visible
+      }
+      this._addOsdkWaypointsToMap(); // Add them to the map (this will respect osdkWaypointsVisible)
+      this.triggerCallback('onOsdkWaypointsLoaded', this.osdkWaypoints);
+      
+      // Hide loading indicator
+      if (loaderId) {
+        LoadingIndicator.hide(loaderId);
+      }
+      return this.osdkWaypoints; // Return the loaded waypoints
+
+    } catch (error) {
+      console.error("PlatformManager: Error loading OSDK waypoints:", error);
+      
+      // Hide loading indicator with error
+      if (loaderId) {
+        LoadingIndicator.updateText(loaderId, `Error: ${error.message}`);
+        setTimeout(() => LoadingIndicator.hide(loaderId), 3000);
+      }
+      
+      // Trigger error callback
+      this.triggerCallback('onError', "Error loading OSDK waypoints: " + error.message);
+      
+      // Clear waypoints on error
+      this.osdkWaypoints = [];
+      
+      // Reject the promise to inform caller of the error
+      return Promise.reject(error);
+    }
+  }
+
+  /**
+   * Add OSDK waypoints to the map
+   */
+  _addOsdkWaypointsToMap() {
+    this.mapManager.onMapLoaded(() => {
+      const map = this.mapManager.getMap();
+      if (!map || !this.mapManager.isMapLoaded() || !this.osdkWaypoints || this.osdkWaypoints.length === 0) {
+        // console.log("PlatformManager: Map not ready, or no OSDK waypoints to display for _addOsdkWaypointsToMap.");
+        return;
+      }
+
+      const sourceId = 'osdk-waypoints-source';
+      const layerId = 'osdk-waypoints-layer';
+      const labelsLayerId = 'osdk-waypoints-labels';
+
+      // Create features from waypoints
+      const features = this.osdkWaypoints.map(wp => ({
+        type: 'Feature',
+        properties: {
+          name: wp.name,
+          type: wp.type
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: wp.coordinates
+        }
+      }));
+
+      // Ensure existing OSDK waypoint layers and source are cleared first
+      this._clearOsdkWaypointLayers(); // This is now more synchronous
+
+      // Proceed to add the new source and layers
+      try {
+        // Add source if it doesn't exist (it should have been cleared by _clearOsdkWaypointLayers)
+        if (!map.getSource(sourceId)) {
+          map.addSource(sourceId, {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: features
+            }
+          });
+        } else {
+           // If source somehow still exists, update its data. This shouldn't happen if _clearOsdkWaypointLayers is effective.
+          console.warn(`PlatformManager: Source ${sourceId} still exists in _addOsdkWaypointsToMap. Attempting to set data.`);
+          map.getSource(sourceId).setData({ type: 'FeatureCollection', features: features });
+        }
+        
+        // Add waypoint circles layer if it doesn't exist
+        if (!map.getLayer(layerId)) {
+          map.addLayer({
+            id: layerId,
+            type: 'circle',
+            source: sourceId,
+            paint: {
+              'circle-radius': 3,
+              'circle-color': '#FFCC00', // Yellow
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#FFFFFF'
+            },
+            layout: {
+              'visibility': this.osdkWaypointsVisible ? 'visible' : 'none'
+            }
+          });
+        }
+        
+        // Add waypoint labels layer if it doesn't exist
+        if (!map.getLayer(labelsLayerId)) {
+          map.addLayer({
+            id: labelsLayerId,
+            type: 'symbol',
+            source: sourceId,
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-size': 9,
+              'text-anchor': 'top',
+              'text-offset': [0, 0.5],
+              'text-allow-overlap': false,
+              'visibility': this.osdkWaypointsVisible ? 'visible' : 'none'
+            },
+            paint: {
+              'text-color': '#FFCC00',
+              'text-halo-color': '#000000',
+              'text-halo-width': 0.5
+            }
+          });
+        }
+        
+        // console.log(`Successfully added/updated ${features.length} OSDK waypoints to map`);
+      } catch (e) {
+        console.error("Error adding OSDK waypoint source/layers in _addOsdkWaypointsToMap:", e.message);
+      }
+    });
+  }
+
+  /**
+   * Find the nearest OSDK navigational waypoint to a given coordinate
+   * @param {number} lat - Latitude
+   * @param {number} lng - Longitude
+   * @param {number} maxDistance - Maximum distance in nautical miles
+   * @returns {Object|null} - The nearest OSDK waypoint or null if not found
+   */
+  findNearestOsdkWaypoint(lat, lng, maxDistance = 5) {
+    if (!this.osdkWaypoints || this.osdkWaypoints.length === 0) {
+      // console.log('PlatformManager: No OSDK waypoints loaded, cannot find nearest OSDK waypoint');
+      return null;
+    }
+    
+    if (!window.turf) {
+      console.error('PlatformManager: Turf.js not loaded');
+      return null;
+    }
+    
+    try {
+      let nearestWaypoint = null;
+      let minDistance = Number.MAX_VALUE;
+      
+      this.osdkWaypoints.forEach(waypoint => {
+        if (!waypoint.coordinates || waypoint.coordinates.length !== 2) {
+          return;
+        }
+        
+        const coords = waypoint.coordinates;
+        const distance = window.turf.distance(
+          window.turf.point([lng, lat]),
+          window.turf.point(coords),
+          { units: 'nauticalmiles' }
+        );
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestWaypoint = {
+            name: waypoint.name,
+            type: waypoint.type, // Original OSDK type
+            coords: coords,
+            coordinates: coords,
+            lat: coords[1],
+            lng: coords[0],
+            distance: distance,
+            isWaypoint: true // Mark as a navigational waypoint for consistency
+          };
+        }
+      });
+      
+      if (minDistance <= maxDistance) {
+        // console.log(`PlatformManager: Found nearest OSDK waypoint ${nearestWaypoint.name} at distance ${nearestWaypoint.distance.toFixed(2)} nm`);
+        return nearestWaypoint;
+      } else if (nearestWaypoint) {
+        // console.log(`PlatformManager: Nearest OSDK waypoint ${nearestWaypoint.name} is too far (${nearestWaypoint.distance.toFixed(2)} nm > ${maxDistance} nm)`);
+      }
+    } catch (error) {
+      console.error('PlatformManager: Error finding nearest OSDK waypoint:', error);
+    }
+    
+    return null;
   }
   
   /**
@@ -1329,532 +1881,6 @@ class PlatformManager {
       console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
       return null;
     }
-  }
-  
-  /**
-   * Load waypoints from Foundry OSDK
-   * This function loads waypoints instead of platforms and rigs.
-   * Used for waypoint insertion mode.
-   * 
-   * @param {Object} client - The OSDK client
-   * @param {string} regionName - The region name to filter by
-   * @returns {Promise} - Resolves when waypoints are loaded
-   */
-  async loadWaypointsFromFoundry(client, regionName = "GULF OF MEXICO") {
-    // Show loading indicator
-    const loaderId = LoadingIndicator.show('.route-stats-title', 
-      `Loading waypoints for ${regionName}...`, 
-      { position: 'bottom' });
-    
-    // Clear any existing waypoints first
-    this.clearWaypoints();
-    
-    console.log(`Loading waypoints for region: ${regionName}`);
-    
-    try {
-      // Check if we have a client
-      if (!client) {
-        console.warn("No OSDK client provided for waypoint loading");
-        LoadingIndicator.updateText(loaderId, "No client available - reconnecting...");
-        setTimeout(() => {
-          LoadingIndicator.hide(loaderId);
-        }, 2000);
-        
-        // Return empty array
-        this.waypoints = [];
-        this.triggerCallback('onWaypointsLoaded', []);
-        return [];
-      }
-      
-      console.log("Using OSDK client to load waypoints...");
-      
-      try {
-        // Import the SDK
-        const sdk = await import('@flight-app/sdk');
-        
-        // Find location object without excessive logging
-        let locationObject = null;
-        if (sdk.AllGtLocationsV2) {
-          locationObject = sdk.AllGtLocationsV2;
-        } else if (sdk.AllGtLocations) {
-          locationObject = sdk.AllGtLocations;
-        } else {
-          // Look for any location-related objects
-          const locationOptions = Object.keys(sdk).filter(key => 
-            key.includes('Location') || key.includes('location')
-          );
-          
-          if (locationOptions.length > 0) {
-            locationObject = sdk[locationOptions[0]];
-          } else {
-            throw new Error('No location-related objects found in SDK');
-          }
-        }
-        
-        // Query specifically for waypoints and reporting points
-        console.log(`Querying for waypoints and reporting points in ${regionName}`);
-        
-        // Update loading indicator
-        LoadingIndicator.updateText(loaderId, `Querying for waypoints in ${regionName}...`);
-        
-        // Fetch waypoints - specifically look for reporting points and navigation points
-        // Log the query we're about to make
-        console.log(`Querying for waypoints with the following criteria:
-          - region: ${regionName}
-          - locationType: REPORTING POINT OFFSHORE, REPORTING POINT ONSHORE, WAYPOINT, or contains keywords like POINT, INTERSECTION, FIX, NAVAID
-        `);
-        
-        // First try simpler query that just uses filter conditions directly
-        const result = await client(locationObject)
-          .where({
-            region: regionName
-          })
-          .fetchPage({
-            $pageSize: 5000,
-            $filter: `locationType eq 'REPORTING POINT OFFSHORE' or locationType eq 'REPORTING POINT ONSHORE' or locationType eq 'WAYPOINT' or contains(locationType, 'POINT') or contains(locationType, 'INTERSECTION') or contains(locationType, 'FIX') or contains(locationType, 'NAVAID')`
-          });
-        
-        console.log(`Found ${result.data ? result.data.length : 0} waypoints for region ${regionName}`);
-        
-        if (!result || !result.data || result.data.length === 0) {
-          console.warn(`No waypoints found for region ${regionName}`);
-          LoadingIndicator.updateText(loaderId, `No waypoints found for ${regionName}`);
-          setTimeout(() => {
-            LoadingIndicator.hide(loaderId);
-          }, 2000);
-          
-          this.waypoints = [];
-          this.triggerCallback('onWaypointsLoaded', []);
-          return [];
-        }
-        
-        // Log all location types for reference
-        const allTypes = new Set();
-        result.data.forEach(item => {
-          if (item.locationType) {
-            allTypes.add(item.locationType);
-          }
-        });
-        console.log("Waypoint location types in results:", Array.from(allTypes));
-        
-        // Let's log the first few results to understand the data structure
-        if (result.data && result.data.length > 0) {
-          console.log("Sample waypoint data structure:", Object.keys(result.data[0]));
-          console.log("First waypoint:", result.data[0]);
-        }
-        
-        // Process waypoints
-        const waypoints = [];
-        let processedCount = 0;
-        let skippedNoName = 0;
-        let skippedNoCoords = 0;
-        
-        for (const item of result.data) {
-          let name = '';
-          let coords = null;
-          let type = '';
-          
-          // Try to extract name
-          if (item.locName) name = item.locName;
-          else if (item.name) name = item.name;
-          else if (item.location_name) name = item.location_name;
-          else if (item.id) name = item.id.toString();
-          else {
-            skippedNoName++;
-            continue; // Skip items with no identifiable name
-          }
-          
-          // Try to extract coordinates
-          if (item.geoPoint) {
-            if (typeof item.geoPoint.longitude === 'number' && typeof item.geoPoint.latitude === 'number') {
-              coords = [item.geoPoint.longitude, item.geoPoint.latitude];
-            } else if (Array.isArray(item.geoPoint) && item.geoPoint.length === 2) {
-              coords = item.geoPoint;
-            } else if (item.geoPoint.coordinates && Array.isArray(item.geoPoint.coordinates)) {
-              coords = item.geoPoint.coordinates;
-            }
-          }
-          
-          // Check for direct lat/lon fields
-          if (!coords) {
-            if (item.LAT !== undefined && item.LON !== undefined) {
-              coords = [parseFloat(item.LON), parseFloat(item.LAT)];
-            } else if (item.lat !== undefined && item.lon !== undefined) {
-              coords = [parseFloat(item.lon), parseFloat(item.lat)];
-            } else if (item.latitude !== undefined && item.longitude !== undefined) {
-              coords = [parseFloat(item.longitude), parseFloat(item.latitude)];
-            }
-          }
-          
-          // Skip if we couldn't get coordinates
-          if (!coords) {
-            skippedNoCoords++;
-            console.log(`Skipping waypoint ${name} - no coordinates found`);
-            continue;
-          }
-          
-          // Try to determine type
-          if (item.locationType) type = item.locationType;
-          else if (item.type) type = item.type;
-          else if (item.location_type) type = item.location_type;
-          
-          // Add to waypoints array
-          waypoints.push({
-            name: name,
-            coordinates: coords,
-            type: type || 'WAYPOINT'
-          });
-          processedCount++;
-        }
-        
-        console.log(`Successfully processed ${processedCount} waypoints`);
-        console.log(`Skipped ${skippedNoName} items with no name, ${skippedNoCoords} items with no coordinates`);
-        
-        // Log a few sample waypoints for verification
-        if (waypoints.length > 0) {
-          console.log("Sample processed waypoints:");
-          waypoints.slice(0, 3).forEach((wp, i) => {
-            console.log(`Waypoint ${i+1}: ${wp.name}, type: ${wp.type}, coordinates: [${wp.coordinates.join(', ')}]`);
-          });
-        }
-        
-        console.log(`Processed ${waypoints.length} waypoints`);
-        
-        // Store the waypoints
-        this.waypoints = waypoints;
-        
-        // Add waypoints to the map
-        this.addWaypointsToMap(waypoints);
-        
-        // Hide loading indicator
-        LoadingIndicator.hide(loaderId);
-        
-        // Trigger callback
-        this.triggerCallback('onWaypointsLoaded', waypoints);
-        
-        return waypoints;
-        
-      } catch (error) {
-        console.error('OSDK API error loading waypoints:', error);
-        
-        LoadingIndicator.updateText(loaderId, `Error loading waypoints: ${error.message}`);
-        setTimeout(() => {
-          LoadingIndicator.hide(loaderId);
-        }, 3000);
-        
-        this.waypoints = [];
-        this.triggerCallback('onWaypointsLoaded', []);
-        return [];
-      }
-    } catch (error) {
-      console.error('General error loading waypoints:', error);
-      
-      LoadingIndicator.updateText(loaderId, `Error: ${error.message}`);
-      setTimeout(() => {
-        LoadingIndicator.hide(loaderId);
-      }, 3000);
-      
-      this.waypoints = [];
-      this.triggerCallback('onWaypointsLoaded', []);
-      return [];
-    }
-  }
-  
-  /**
-   * Clear all waypoints from the map
-   */
-  clearWaypoints() {
-    const map = this.mapManager.getMap();
-    if (!map) return;
-    
-    console.log('Clearing all waypoints from map');
-    
-    this.mapManager.onMapLoaded(() => {
-      try {
-        // Define waypoint layer IDs
-        const waypontLayers = [
-          'waypoints-layer',
-          'waypoints-labels'
-        ];
-        
-        // Remove layers
-        for (const layerId of waypontLayers) {
-          if (map.getLayer(layerId)) {
-            try {
-              map.removeLayer(layerId);
-            } catch (e) {
-              console.warn(`Error removing waypoint layer ${layerId}:`, e);
-            }
-          }
-        }
-        
-        // Wait before removing source
-        setTimeout(() => {
-          if (map.getSource('waypoints-source')) {
-            try {
-              map.removeSource('waypoints-source');
-            } catch (e) {
-              console.warn('Error removing waypoints source:', e);
-            }
-          }
-        }, 100);
-        
-        // Clear the waypoints array
-        this.waypoints = [];
-        
-      } catch (error) {
-        console.error('Error clearing waypoints:', error);
-      }
-    });
-  }
-  
-  /**
-   * Add waypoints to the map
-   * @param {Array} waypoints - Array of waypoint objects
-   */
-  addWaypointsToMap(waypoints) {
-    const map = this.mapManager.getMap();
-    if (!map) {
-      console.error("Cannot add waypoints: map is not initialized");
-      return;
-    }
-    
-    // Validate waypoints array
-    if (!waypoints || !Array.isArray(waypoints) || waypoints.length === 0) {
-      console.warn("No valid waypoints to add to map");
-      return;
-    }
-    
-    console.log(`Adding ${waypoints.length} waypoints to map`);
-    
-    // Store the waypoints
-    this.waypoints = waypoints;
-    
-    // Define function to add layers/source
-    const addWaypointLayers = () => {
-      const map = this.mapManager.getMap();
-      if (!map) {
-        console.error("Map unavailable when adding waypoints");
-        return;
-      }
-      
-      try {
-        // Remove existing waypoint layers/source if they exist
-        const waypointLayers = ['waypoints-layer', 'waypoints-labels'];
-        
-        waypointLayers.forEach(layerId => {
-          if (map.getLayer(layerId)) {
-            map.removeLayer(layerId);
-          }
-        });
-        
-        // Wait a moment for layer removal to complete
-        setTimeout(() => {
-          if (map.getSource('waypoints-source')) {
-            map.removeSource('waypoints-source');
-          }
-          
-          // Create features for GeoJSON
-          const features = waypoints.map(waypoint => ({
-            type: 'Feature',
-            properties: {
-              name: waypoint.name,
-              type: waypoint.type || 'WAYPOINT'
-            },
-            geometry: {
-              type: 'Point',
-              coordinates: waypoint.coordinates
-            }
-          }));
-          
-          // Add source
-          map.addSource('waypoints-source', {
-            type: 'geojson',
-            data: {
-              type: 'FeatureCollection',
-              features: features
-            }
-          });
-          
-          // Add waypoints layer - use a tiny bright yellow circle with thin dark outline
-          map.addLayer({
-            id: 'waypoints-layer',
-            type: 'circle',
-            source: 'waypoints-source',
-            paint: {
-              'circle-radius': 2,                // Tiny circles (2 pixels)
-              'circle-color': '#FFCC00',         // Bright yellow
-              'circle-stroke-width': 1,          // Thin stroke
-              'circle-stroke-color': '#000000',  // Black outline
-              'circle-opacity': 1                // Fully opaque
-            }
-          });
-          
-          // Add waypoint labels with white text and dark outline, visible only at certain zoom levels
-          map.addLayer({
-            id: 'waypoints-labels',
-            type: 'symbol',
-            source: 'waypoints-source',
-            layout: {
-              'text-field': ['get', 'name'],
-              // Only show labels at zoom level 10 and above (since waypoints are now tiny)
-              'text-size': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                9, 0,      // Hide text at zoom level 9 and below
-                10, 10,    // Show medium text at zoom level 10
-                12, 12     // Show larger text at zoom level 12+
-              ],
-              'text-anchor': 'top',
-              'text-offset': [0, 0.5],           // Keep labels closer to the tiny points
-              'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'text-max-width': 10,              // Wider text wrapping for readability
-              'text-letter-spacing': 0.05        // Slightly increased letter spacing for readability
-            },
-            paint: {
-              'text-color': '#FFFFFF',           // White text for better visibility
-              'text-halo-color': '#000000',      // Black halo for contrast
-              'text-halo-width': 1.8             // Medium halo thickness
-            }
-          });
-          
-          // Set visibility based on current mode
-          const visibility = this.waypointModeActive ? 'visible' : 'none';
-          map.setLayoutProperty('waypoints-layer', 'visibility', visibility);
-          map.setLayoutProperty('waypoints-labels', 'visibility', visibility);
-          
-          // Trigger callback
-          this.triggerCallback('onWaypointsLoaded', waypoints);
-          
-        }, 100);
-      } catch (error) {
-        console.error('Error adding waypoints to map:', error);
-      }
-    };
-    
-    // Use onMapLoaded to handle timing
-    this.mapManager.onMapLoaded(addWaypointLayers);
-  }
-  
-  /**
-   * Toggle between platform mode and waypoint mode
-   * @param {boolean} waypointMode - Whether to show waypoints (true) or platforms (false)
-   */
-  toggleWaypointMode(waypointMode) {
-    console.log(`Toggling waypoint mode: ${waypointMode ? 'ON' : 'OFF'}`);
-    
-    const map = this.mapManager.getMap();
-    if (!map) {
-      console.error("Cannot toggle waypoint mode: map is not initialized");
-      return;
-    }
-    
-    this.waypointModeActive = waypointMode;
-    
-    // Hide/show the appropriate layers based on mode
-    this.mapManager.onMapLoaded(() => {
-      try {
-        // Check if waypoints have been loaded
-        if (waypointMode && (!this.waypoints || this.waypoints.length === 0)) {
-          console.warn("No waypoints loaded yet - waypoint layers may not be visible");
-          // We'll still try to toggle layers, but let's add a UI message
-          if (window.LoadingIndicator) {
-            window.LoadingIndicator.updateStatusIndicator(
-              "No waypoints found. Please reload or try a different region.", 
-              "warning"
-            );
-          }
-        }
-        
-        // Log current layers for debugging
-        const layers = map.getStyle().layers.map(l => l.id);
-        console.log("Available map layers:", layers);
-        
-        // Platform layers
-        const platformLayers = [
-          'platforms-layer',
-          'platforms-movable-layer',
-          'platforms-fixed-labels',
-          'platforms-movable-labels',
-          'airfields-layer',
-          'airfields-labels'
-        ];
-        
-        // Waypoint layers
-        const waypointLayers = [
-          'waypoints-layer',
-          'waypoints-labels'
-        ];
-        
-        // Show/hide layers based on mode
-        if (waypointMode) {
-          console.log("Setting waypoint mode ON - showing waypoint layers, hiding platform layers");
-          
-          // Hide platform layers
-          platformLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              console.log(`Hiding platform layer: ${layerId}`);
-              map.setLayoutProperty(layerId, 'visibility', 'none');
-            } else {
-              console.log(`Platform layer not found: ${layerId}`);
-            }
-          });
-          
-          // Show waypoint layers if they exist
-          let foundWaypointLayers = false;
-          waypointLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              console.log(`Showing waypoint layer: ${layerId}`);
-              map.setLayoutProperty(layerId, 'visibility', 'visible');
-              foundWaypointLayers = true;
-            } else {
-              console.log(`Waypoint layer not found: ${layerId}`);
-            }
-          });
-          
-          // If no waypoint layers were found but we have waypoints data, try adding them
-          if (!foundWaypointLayers && this.waypoints && this.waypoints.length > 0) {
-            console.log(`No waypoint layers found but we have ${this.waypoints.length} waypoints - adding to map now`);
-            // Add waypoints to map if not already displayed
-            this.addWaypointsToMap(this.waypoints);
-          }
-        } else {
-          console.log("Setting waypoint mode OFF - showing platform layers, hiding waypoint layers");
-          
-          // Show platform layers
-          platformLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              console.log(`Showing platform layer: ${layerId}`);
-              map.setLayoutProperty(layerId, 'visibility', 'visible');
-            } else {
-              console.log(`Platform layer not found: ${layerId}`);
-            }
-          });
-          
-          // Hide waypoint layers
-          waypointLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              console.log(`Hiding waypoint layer: ${layerId}`);
-              map.setLayoutProperty(layerId, 'visibility', 'none');
-            } else {
-              console.log(`Waypoint layer not found: ${layerId}`);
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error toggling waypoint mode:', error);
-        
-        // Show error message to user
-        if (window.LoadingIndicator) {
-          window.LoadingIndicator.updateStatusIndicator(
-            `Error toggling waypoint mode: ${error.message}`, 
-            "error"
-          );
-        }
-      }
-    });
   }
 }
 

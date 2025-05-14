@@ -1,0 +1,2 @@
+// Import emergency OSDK fix directly (relative to FastPlannerApp.jsx)
+import '../emergency-osdk-layer-fix.js'; // EMERGENCY FIX for OSDK client and layer flickering

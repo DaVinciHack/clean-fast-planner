@@ -1,0 +1,115 @@
+import type { PropertyDef as $PropertyDef } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+import type { ObjectTypeDefinition as $ObjectTypeDefinition } from '@osdk/client';
+import type { ObjectSet as $ObjectSet, Osdk as $Osdk, PropertyValueWireToClient as $PropType } from '@osdk/client';
+export declare namespace LegObjectOutputObject {
+    type PropertyKeys = 'segmentsJson' | 'estimatedDuration' | 'legId' | 'legArrivalTimeEstimated' | 'isMaster' | 'fullRouteGeoShape' | 'legName' | 'region' | 'destinationIsRig' | 'totalDistance' | 'waypointIds' | 'destinationLocationType' | 'isPartFlight';
+    type Links = {};
+    interface Props {
+        readonly destinationIsRig: $PropType['boolean'] | undefined;
+        readonly destinationLocationType: $PropType['string'] | undefined;
+        readonly estimatedDuration: $PropType['integer'] | undefined;
+        readonly fullRouteGeoShape: $PropType['geoshape'] | undefined;
+        readonly isMaster: $PropType['boolean'] | undefined;
+        readonly isPartFlight: $PropType['boolean'] | undefined;
+        readonly legArrivalTimeEstimated: $PropType['timestamp'] | undefined;
+        readonly legId: $PropType['string'];
+        readonly legName: $PropType['string'] | undefined;
+        readonly region: $PropType['string'] | undefined;
+        readonly segmentsJson: $PropType['string'] | undefined;
+        readonly totalDistance: $PropType['double'] | undefined;
+        readonly waypointIds: $PropType['string'][] | undefined;
+    }
+    type StrictProps = Props;
+    interface ObjectSet extends $ObjectSet<LegObjectOutputObject, LegObjectOutputObject.ObjectSet> {
+    }
+    type OsdkInstance<OPTIONS extends never | '$rid' = never, K extends keyof LegObjectOutputObject.Props = keyof LegObjectOutputObject.Props> = $Osdk.Instance<LegObjectOutputObject, OPTIONS, K>;
+    /** @deprecated use OsdkInstance */
+    type OsdkObject<OPTIONS extends never | '$rid' = never, K extends keyof LegObjectOutputObject.Props = keyof LegObjectOutputObject.Props> = OsdkInstance<OPTIONS, K>;
+}
+export interface LegObjectOutputObject extends $ObjectTypeDefinition {
+    osdkMetadata: typeof $osdkMetadata;
+    type: 'object';
+    apiName: 'LegObjectOutputObject';
+    __DefinitionMetadata?: {
+        objectSet: LegObjectOutputObject.ObjectSet;
+        props: LegObjectOutputObject.Props;
+        linksType: LegObjectOutputObject.Links;
+        strictProps: LegObjectOutputObject.StrictProps;
+        apiName: 'LegObjectOutputObject';
+        description: 'Leg object for flight planner 2.0';
+        displayName: 'Leg Object Output Object';
+        icon: {
+            type: 'blueprint';
+            color: '#3FA6DA';
+            name: 'send-to-graph';
+        };
+        implements: [];
+        interfaceMap: {};
+        inverseInterfaceMap: {};
+        links: {};
+        pluralDisplayName: 'Leg Object Output Objects';
+        primaryKeyApiName: 'legId';
+        primaryKeyType: 'string';
+        properties: {
+            /**
+             * (no ontology metadata)
+             */
+            destinationIsRig: $PropertyDef<'boolean', 'nullable', 'single'>;
+            /**
+             * (no ontology metadata)
+             */
+            destinationLocationType: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Estimated Duration'
+             */
+            estimatedDuration: $PropertyDef<'integer', 'nullable', 'single'>;
+            /**
+             *   display name: 'Full Route Geo Shape'
+             */
+            fullRouteGeoShape: $PropertyDef<'geoshape', 'nullable', 'single'>;
+            /**
+             *   display name: 'Is Master'
+             */
+            isMaster: $PropertyDef<'boolean', 'nullable', 'single'>;
+            /**
+             *   display name: 'Is Part Flight'
+             */
+            isPartFlight: $PropertyDef<'boolean', 'nullable', 'single'>;
+            /**
+             *   display name: 'Leg Arrival Time Estimated'
+             */
+            legArrivalTimeEstimated: $PropertyDef<'timestamp', 'nullable', 'single'>;
+            /**
+             *   display name: 'Leg Id'
+             */
+            legId: $PropertyDef<'string', 'non-nullable', 'single'>;
+            /**
+             *   display name: 'Leg Name'
+             */
+            legName: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Region'
+             */
+            region: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Segments Json'
+             */
+            segmentsJson: $PropertyDef<'string', 'nullable', 'single'>;
+            /**
+             *   display name: 'Total Distance'
+             */
+            totalDistance: $PropertyDef<'double', 'nullable', 'single'>;
+            /**
+             *   display name: 'Waypoint Ids'
+             */
+            waypointIds: $PropertyDef<'string', 'nullable', 'array'>;
+        };
+        rid: 'ri.ontology.main.object-type.cab378f6-bd0a-46c4-a5a7-704d1cd081b5';
+        status: 'EXPERIMENTAL';
+        titleProperty: 'legName';
+        type: 'object';
+        visibility: 'NORMAL';
+    };
+}
+export declare const LegObjectOutputObject: LegObjectOutputObject;

@@ -1,0 +1,668 @@
+/**
+ * complete-route-drag-fix.js
+ * 
+ * This is a comprehensive fix for the route dragging issues where:
+ * 1. Dragging the route adds waypoints to the end of the list instead of the correct position
+ * 2. Ensures proper waypoint/stop type based on active mode
+ * 
+ * This fix completely overrides both handleRouteDragComplete and the setupRouteDragging
+ * functions to ensure waypoints are added at the correct positions.
+ */
+
+(function() {
+  console.log('🛠️ Applying COMPLETE route drag fix...');
+  
+  // Wait for required managers to be available
+  const checkInterval = setInterval(() => {
+    if (!window.mapInteractionHandler || !window.waypointManager) {
+      console.log('🛠️ Waiting for managers to become available...');
+      return;
+    }
+    
+    clearInterval(checkInterval);
+    console.log('🛠️ Required managers found, initializing comprehensive drag fix...');
+    
+    /**
+     * FIX 1: Override setupRouteDragging in waypointManager
+     * This ensures the routeDrag handlers correctly store the insertion index
+     */
+    if (typeof window.waypointManager.setupRouteDragging === 'function') {
+      console.log('🛠️ Overriding waypointManager.setupRouteDragging...');
+      
+      // Store original method
+      const originalSetupRouteDragging = window.waypointManager.setupRouteDragging;
+      
+      // Override with improved version
+      window.waypointManager.setupRouteDragging = function(onRoutePointAdded) {
+        const map = this.mapManager.getMap();
+        if (!map) return;
+        
+        console.log('🛠️ Setting up FIXED route dragging functionality');
+        
+        // Clear any existing handlers to avoid doubling up
+        if (this._routeDragHandlers) {
+          console.log('🛠️ Removing existing route drag handlers');
+          map.off('mousedown', this._routeDragHandlers.mousedown);
+          map.off('mousemove', this._routeDragHandlers.mousemove);
+          map.off('mouseup', this._routeDragHandlers.mouseup);
+          map.off('mouseout', this._routeDragHandlers.mouseout);
+          this._routeDragHandlers = null;
+        }
+        
+        // Initialize state variables for drag tracking
+        let isDragging = false;
+        let draggedLineCoordinates = [];
+        let originalLineCoordinates = [];
+        let dragStartPoint = null;
+        let closestPointIndex = -1;
+        let dragLineSource = null;
+        
+        // Helper function to add temporary drag line
+        const addDragLine = (coordinates) => {
+          try {
+            if (map.getSource('drag-line')) {
+              map.removeLayer('drag-line');
+              map.removeSource('drag-line');
+            }
+            
+            const isWaypointMode = window.isWaypointModeActive === true;
+            
+            map.addSource('drag-line', {
+              'type': 'geojson',
+              'data': {
+                'type': 'Feature',
+                'properties': {},
+                'geometry': {
+                  'type': 'LineString',
+                  'coordinates': coordinates
+                }
+              }
+            });
+            
+            map.addLayer({
+              'id': 'drag-line',
+              'type': 'line',
+              'source': 'drag-line',
+              'layout': {
+                'line-join': 'round',
+                'line-cap': 'round'
+              },
+              'paint': {
+                'line-color': isWaypointMode ? '#FFCC00' : '#ff0000', // Yellow for waypoints, red for stops
+                'line-width': 4,
+                'line-dasharray': [2, 1] // Dashed line
+              }
+            });
+            
+            dragLineSource = map.getSource('drag-line');
+          } catch (error) {
+            console.error('🛠️ Error adding drag line:', error);
+          }
+        };
+        
+        // Helper to find closest point on route to mouse
+        const findClosestPointOnLine = (mouseLngLat, mousePoint) => {
+          try {
+            if (!map.getSource('route')) return null;
+            
+            // Check if mouse is directly over route
+            const routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: ['route'] });
+            const isMouseOverRoute = routeFeatures && routeFeatures.length > 0;
+            
+            // Get route data
+            const routeSource = map.getSource('route');
+            if (!routeSource || !routeSource._data) return null;
+            
+            const coordinates = routeSource._data.geometry.coordinates;
+            if (!coordinates || coordinates.length < 2) return null;
+            
+            // Find closest segment
+            let minDistance = Infinity;
+            let closestPoint = null;
+            let segmentIndex = -1;
+            
+            for (let i = 0; i < coordinates.length - 1; i++) {
+              // Use turf.js to find nearest point on line segment
+              const line = window.turf.lineString([coordinates[i], coordinates[i + 1]]);
+              const point = window.turf.point([mouseLngLat.lng, mouseLngLat.lat]);
+              const snapped = window.turf.nearestPointOnLine(line, point);
+              
+              if (snapped.properties.dist < minDistance) {
+                minDistance = snapped.properties.dist;
+                closestPoint = snapped.geometry.coordinates;
+                segmentIndex = i;
+              }
+            }
+            
+            // Calculate distance in nautical miles
+            const distanceNM = window.turf.distance(
+              window.turf.point([mouseLngLat.lng, mouseLngLat.lat]),
+              window.turf.point(closestPoint),
+              { units: 'nauticalmiles' }
+            );
+            
+            // Return info if close enough or directly over route
+            if (isMouseOverRoute || distanceNM < 0.5) {
+              return {
+                point: closestPoint,
+                index: segmentIndex,
+                distance: distanceNM,
+                isDirectlyOver: isMouseOverRoute
+              };
+            }
+            
+            return null;
+          } catch (error) {
+            console.error('🛠️ Error finding closest point on line:', error);
+            return null;
+          }
+        };
+        
+        // Handle mouse down to start dragging
+        const handleMouseDown = (e) => {
+          // Skip if no route or right-click
+          if (!map.getSource('route') || e.originalEvent.button === 2) return;
+          
+          // Don't drag if clicked on a platform
+          const platformFeatures = map.queryRenderedFeatures(e.point, { layers: ['platforms-layer'] });
+          if (platformFeatures.length > 0) return;
+          
+          // Find closest point on route
+          const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+          
+          if (closestInfo) {
+            // Set global flag to track route dragging
+            window._isRouteDragging = true;
+            
+            console.log('🛠️ Starting route drag at segment:', closestInfo.index);
+            
+            // Get original route
+            const routeSource = map.getSource('route');
+            if (!routeSource || !routeSource._data) return;
+            
+            originalLineCoordinates = [...routeSource._data.geometry.coordinates];
+            
+            // Start dragging
+            isDragging = true;
+            dragStartPoint = closestInfo.point;
+            closestPointIndex = closestInfo.index;
+            
+            // Clone coordinates and add new point at drag position
+            draggedLineCoordinates = [...originalLineCoordinates];
+            draggedLineCoordinates.splice(closestPointIndex + 1, 0, closestInfo.point);
+            
+            // Show drag line and hide original route
+            addDragLine(draggedLineCoordinates);
+            map.setLayoutProperty('route', 'visibility', 'none');
+            if (map.getLayer('route-glow')) {
+              map.setLayoutProperty('route-glow', 'visibility', 'none');
+            }
+            
+            // Update cursor
+            map.getCanvas().style.cursor = 'grabbing';
+            
+            // Prevent default behavior
+            e.preventDefault();
+          }
+        };
+        
+        // Handle mouse move during drag
+        const handleMouseMove = (e) => {
+          if (isDragging) {
+            // Update drag position
+            draggedLineCoordinates[closestPointIndex + 1] = [e.lngLat.lng, e.lngLat.lat];
+            
+            // Update drag line
+            if (dragLineSource) {
+              dragLineSource.setData({
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'LineString',
+                  coordinates: draggedLineCoordinates
+                }
+              });
+            }
+          } else {
+            // Mouse hover effect when not dragging
+            const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+            
+            if (closestInfo && closestInfo.isDirectlyOver) {
+              map.getCanvas().style.cursor = 'pointer';
+            } else if (map.getCanvas().style.cursor === 'pointer') {
+              // Only reset if not over a platform
+              const platformFeatures = map.queryRenderedFeatures(e.point, { layers: ['platforms-layer'] });
+              if (platformFeatures.length === 0) {
+                map.getCanvas().style.cursor = '';
+              }
+            }
+          }
+        };
+        
+        // Handle mouse up to complete drag
+        const handleMouseUp = (e) => {
+          if (!isDragging) return;
+          
+          // Set flag to prevent normal map click processing
+          window._routeDragJustFinished = true;
+          
+          // Stop event propagation
+          e.preventDefault();
+          if (e.originalEvent && typeof e.originalEvent.stopPropagation === 'function') {
+            e.originalEvent.stopPropagation();
+          }
+          if (e.originalEvent && typeof e.originalEvent.stopImmediatePropagation === 'function') {
+            e.originalEvent.stopImmediatePropagation();
+          }
+          
+          // End dragging state
+          isDragging = false;
+          
+          // Clean up drag line
+          if (map.getSource('drag-line')) {
+            map.removeLayer('drag-line');
+            map.removeSource('drag-line');
+          }
+          
+          // Show original route
+          map.setLayoutProperty('route', 'visibility', 'visible');
+          if (map.getLayer('route-glow')) {
+            map.setLayoutProperty('route-glow', 'visibility', 'visible');
+          }
+          
+          // CRITICAL FIX: Get waypoint mode state for correct type
+          const isWaypointMode = window.isWaypointModeActive === true;
+          
+          // CRITICAL FIX: Validate insertion index before using
+          const validatedInsertIndex = closestPointIndex + 1;
+          
+          console.log(`🛠️ Route drag completed in ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'} mode at index: ${validatedInsertIndex}`);
+          
+          // Let the MapInteractionHandler add the waypoint at proper index
+          if (onRoutePointAdded && typeof onRoutePointAdded === 'function') {
+            onRoutePointAdded(validatedInsertIndex, [e.lngLat.lng, e.lngLat.lat], {
+              isWaypointMode: isWaypointMode,
+              originalIndex: closestPointIndex + 1,
+              dragSource: 'fixed-drag-handler' // Mark as coming from our fixed handler
+            });
+          }
+          
+          // Reset cursor
+          map.getCanvas().style.cursor = '';
+          
+          // Reset state variables
+          draggedLineCoordinates = [];
+          originalLineCoordinates = [];
+          dragStartPoint = null;
+          closestPointIndex = -1;
+          dragLineSource = null;
+          
+          // Clear flags after a short delay
+          setTimeout(() => {
+            window._isRouteDragging = false;
+            window._routeDragJustFinished = false;
+          }, 50);
+        };
+        
+        // Handle mouse out to cancel drag
+        const handleMouseOut = () => {
+          if (!isDragging) return;
+          
+          console.log('🛠️ Mouse left map, canceling route drag');
+          
+          // End dragging state
+          isDragging = false;
+          
+          // Clean up drag line
+          if (map.getSource('drag-line')) {
+            map.removeLayer('drag-line');
+            map.removeSource('drag-line');
+          }
+          
+          // Show original route
+          map.setLayoutProperty('route', 'visibility', 'visible');
+          if (map.getLayer('route-glow')) {
+            map.setLayoutProperty('route-glow', 'visibility', 'visible');
+          }
+          
+          // Reset cursor
+          map.getCanvas().style.cursor = '';
+          
+          // Reset state variables
+          draggedLineCoordinates = [];
+          originalLineCoordinates = [];
+          dragStartPoint = null;
+          closestPointIndex = -1;
+          dragLineSource = null;
+          
+          // Clear flags
+          window._isRouteDragging = false;
+          window._routeDragJustFinished = false;
+        };
+        
+        // Add event listeners
+        map.on('mousedown', handleMouseDown);
+        map.on('mousemove', handleMouseMove);
+        map.on('mouseup', handleMouseUp);
+        map.on('mouseout', handleMouseOut);
+        
+        // Store references to handlers for cleanup
+        this._routeDragHandlers = {
+          mousedown: handleMouseDown,
+          mousemove: handleMouseMove,
+          mouseup: handleMouseUp,
+          mouseout: handleMouseOut
+        };
+        
+        console.log('🛠️ FIXED route drag handlers installed');
+      };
+    } else {
+      console.error('🛠️ setupRouteDragging method not found on waypointManager');
+    }
+    
+    /**
+     * FIX 2: Override handleRouteDragComplete in mapInteractionHandler
+     * This ensures waypoints are added at the correct position
+     */
+    if (typeof window.mapInteractionHandler.handleRouteDragComplete === 'function') {
+      console.log('🛠️ Overriding mapInteractionHandler.handleRouteDragComplete...');
+      
+      // Store original method
+      const originalHandleRouteDragComplete = window.mapInteractionHandler.handleRouteDragComplete;
+      
+      // Override with improved version
+      window.mapInteractionHandler.handleRouteDragComplete = function(insertIndex, coords, dragData = {}) {
+        console.log(`🛠️ Route drag completed at index: ${insertIndex}, coords: [${coords[0]}, ${coords[1]}]`);
+        
+        // CRITICAL FIX: Get current waypoint mode
+        const isWaypointMode = dragData.isWaypointMode === true || window.isWaypointModeActive === true;
+        console.log(`🛠️ Current waypoint mode: ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'}`);
+        
+        // Validate the insertion index
+        const waypointCount = this.waypointManager.getWaypoints().length;
+        let validatedIndex = insertIndex;
+        
+        if (typeof validatedIndex !== 'number' || isNaN(validatedIndex)) {
+          console.warn('🛠️ Invalid insertIndex, defaulting to 0');
+          validatedIndex = 0;
+        } else if (validatedIndex < 0) {
+          console.warn(`🛠️ Negative insertIndex (${insertIndex}), correcting to 0`);
+          validatedIndex = 0;
+        } else if (validatedIndex > waypointCount) {
+          console.warn(`🛠️ insertIndex (${insertIndex}) > waypointCount (${waypointCount}), correcting to ${waypointCount}`);
+          validatedIndex = waypointCount;
+        }
+        
+        console.log(`🛠️ Using validated insertIndex: ${validatedIndex}`);
+        
+        // Get current waypoints to log for debugging
+        const currentWaypoints = this.waypointManager.getWaypoints();
+        console.log(`🛠️ Current waypoints (${currentWaypoints.length}):`, 
+          currentWaypoints.map((wp, i) => `[${i}] ${wp.name}`).join(", "));
+        
+        try {
+          // WAYPOINT MODE: Look for nearest navigation point
+          if (isWaypointMode) {
+            let nearestNavWaypoint = null;
+            
+            // Try to find nearest OSDK waypoint
+            if (this.platformManager && typeof this.platformManager.findNearestOsdkWaypoint === 'function') {
+              nearestNavWaypoint = this.platformManager.findNearestOsdkWaypoint(coords[1], coords[0], 2);
+              if (nearestNavWaypoint) {
+                console.log(`🛠️ Found nearest OSDK waypoint: ${nearestNavWaypoint.name}`);
+              }
+            }
+            
+            // Try alternative waypoint function if first one failed
+            if (!nearestNavWaypoint && this.platformManager && typeof this.platformManager.findNearestWaypoint === 'function') {
+              nearestNavWaypoint = this.platformManager.findNearestWaypoint(coords[1], coords[0], 2);
+              if (nearestNavWaypoint) {
+                console.log(`🛠️ Found nearest waypoint: ${nearestNavWaypoint.name}`);
+              }
+            }
+            
+            // Add waypoint with appropriate data
+            if (nearestNavWaypoint && nearestNavWaypoint.distance < 2) {
+              console.log(`🛠️ Adding navigation waypoint from nearest: ${nearestNavWaypoint.name} at index ${validatedIndex}`);
+              
+              // CRITICAL FIX: Add at the proper index with waypoint flags
+              this.waypointManager.addWaypointAtIndex(
+                nearestNavWaypoint.coordinates,
+                nearestNavWaypoint.name,
+                validatedIndex,
+                { 
+                  isWaypoint: true, 
+                  type: 'WAYPOINT',
+                  pointType: 'NAVIGATION_WAYPOINT'
+                }
+              );
+            } else {
+              // No nearby waypoint found, add custom one
+              console.log(`🛠️ Adding custom navigation waypoint at index ${validatedIndex}`);
+              
+              // CRITICAL FIX: Add at the proper index with waypoint flags
+              this.waypointManager.addWaypointAtIndex(
+                coords,
+                `Waypoint ${validatedIndex + 1}`,
+                validatedIndex,
+                { 
+                  isWaypoint: true, 
+                  type: 'WAYPOINT',
+                  pointType: 'NAVIGATION_WAYPOINT'
+                }
+              );
+            }
+            
+            // Verify the waypoint was added at the correct position
+            setTimeout(() => {
+              const updatedWaypoints = this.waypointManager.getWaypoints();
+              console.log(`🛠️ VERIFICATION - Waypoints after addition (${updatedWaypoints.length}):`, 
+                updatedWaypoints.map((wp, i) => `[${i}] ${wp.name}`).join(", "));
+            }, 100);
+            
+            return;
+          } 
+          // NORMAL MODE: Look for nearest platform/rig
+          else {
+            let nearestPlatform = null;
+            
+            // Find nearest platform
+            if (this.platformManager && typeof this.platformManager.findNearestPlatform === 'function') {
+              nearestPlatform = this.platformManager.findNearestPlatform(coords[1], coords[0], 2);
+              if (nearestPlatform) {
+                console.log(`🛠️ Found nearest platform: ${nearestPlatform.name}`);
+              }
+            }
+            
+            // Add landing stop with appropriate data
+            if (nearestPlatform && nearestPlatform.distance < 2) {
+              console.log(`🛠️ Adding landing stop from nearest platform: ${nearestPlatform.name} at index ${validatedIndex}`);
+              
+              // CRITICAL FIX: Add at the proper index with stop flags
+              this.waypointManager.addWaypointAtIndex(
+                nearestPlatform.coordinates,
+                nearestPlatform.name,
+                validatedIndex,
+                { 
+                  isWaypoint: false, 
+                  type: 'STOP',
+                  pointType: 'LANDING_STOP'
+                }
+              );
+            } else {
+              // No nearby platform found, add custom stop
+              console.log(`🛠️ Adding custom landing stop at index ${validatedIndex}`);
+              
+              // CRITICAL FIX: Add at the proper index with stop flags
+              this.waypointManager.addWaypointAtIndex(
+                coords,
+                `Stop ${validatedIndex + 1}`,
+                validatedIndex,
+                { 
+                  isWaypoint: false, 
+                  type: 'STOP',
+                  pointType: 'LANDING_STOP'
+                }
+              );
+            }
+            
+            // Verify the stop was added at the correct position
+            setTimeout(() => {
+              const updatedWaypoints = this.waypointManager.getWaypoints();
+              console.log(`🛠️ VERIFICATION - Waypoints after addition (${updatedWaypoints.length}):`, 
+                updatedWaypoints.map((wp, i) => `[${i}] ${wp.name}`).join(", "));
+            }, 100);
+            
+            return;
+          }
+        } catch (error) {
+          console.error('🛠️ Error in handleRouteDragComplete:', error);
+          
+          // Fall back to original method if our implementation fails
+          console.log('🛠️ Falling back to original drag complete handler due to error');
+          return originalHandleRouteDragComplete.call(this, insertIndex, coords, {
+            ...dragData,
+            isWaypointMode: isWaypointMode
+          });
+        }
+      };
+    } else {
+      console.error('🛠️ handleRouteDragComplete method not found on mapInteractionHandler');
+    }
+    
+    // Force reinitialize route dragging handlers
+    if (window.waypointManager && window.mapInteractionHandler) {
+      console.log('🛠️ Reinitializing route drag handlers with our fixed implementation...');
+      
+      try {
+        // Ensure method binding is correct
+        const boundHandler = window.mapInteractionHandler.handleRouteDragComplete.bind(window.mapInteractionHandler);
+        
+        // Setup drag handlers with our fixed implementation
+        window.waypointManager.setupRouteDragging(boundHandler);
+        
+        console.log('✅ Successfully applied and initialized route drag fix!');
+      } catch (error) {
+        console.error('🛠️ Error setting up route drag handlers:', error);
+      }
+    }
+    
+    // Add a test function to verify our fix works correctly
+    window.testRouteDragFix = function(insertAtPosition = 1) {
+      console.log('🧪 Testing complete route drag fix...');
+      
+      // Check if we have the necessary objects
+      if (!window.mapInteractionHandler || !window.waypointManager) {
+        console.error('🧪 Required objects not found. Make sure the app is fully loaded.');
+        return false;
+      }
+      
+      // Get a good insertion position to test
+      const waypointCount = window.waypointManager.getWaypoints().length;
+      let testInsertIndex = Math.min(insertAtPosition, waypointCount);
+      if (waypointCount < 2) {
+        // If we don't have at least 2 waypoints, add some test waypoints
+        console.log('🧪 Not enough waypoints for testing, adding test waypoints...');
+        
+        if (window.mapManager && window.mapManager.getMap()) {
+          const center = window.mapManager.getMap().getCenter();
+          const startCoords = [center.lng - 0.1, center.lat - 0.1];
+          const endCoords = [center.lng + 0.1, center.lat + 0.1];
+          
+          window.waypointManager.addWaypoint(startCoords, 'Test Start');
+          window.waypointManager.addWaypoint(endCoords, 'Test End');
+          
+          testInsertIndex = 1; // Insert between the two test waypoints
+        }
+      }
+      
+      console.log(`🧪 Will test insertion at index: ${testInsertIndex}`);
+      
+      // Get current waypoints
+      const waypointsBefore = window.waypointManager.getWaypoints();
+      console.log('🧪 Waypoints before test:', waypointsBefore.map(wp => wp.name));
+      
+      // Get test coordinates at the midpoint
+      let testCoords = [0, 0];
+      if (testInsertIndex > 0 && testInsertIndex < waypointsBefore.length) {
+        // Get midpoint between waypoints
+        const wpBefore = waypointsBefore[testInsertIndex - 1].coords;
+        const wpAfter = waypointsBefore[testInsertIndex].coords;
+        
+        testCoords = [
+          (wpBefore[0] + wpAfter[0]) / 2,
+          (wpBefore[1] + wpAfter[1]) / 2
+        ];
+      } else if (window.mapManager && window.mapManager.getMap()) {
+        // Fallback to map center
+        const center = window.mapManager.getMap().getCenter();
+        testCoords = [center.lng, center.lat];
+      }
+      
+      // Test in both normal and waypoint modes
+      const initialWaypointMode = window.isWaypointModeActive;
+      
+      // Test 1: Normal mode
+      window.isWaypointModeActive = false;
+      console.log('🧪 Test 1: Simulating route drag in NORMAL mode...');
+      window.mapInteractionHandler.handleRouteDragComplete(testInsertIndex, testCoords, { isTest: true });
+      
+      // Wait a bit and check result
+      setTimeout(() => {
+        const waypointsAfterTest1 = window.waypointManager.getWaypoints();
+        console.log('🧪 Waypoints after Test 1:', waypointsAfterTest1.map(wp => wp.name));
+        
+        if (waypointsAfterTest1.length === waypointsBefore.length + 1) {
+          // Check if inserted at correct position
+          const insertedWaypoint = waypointsAfterTest1[testInsertIndex];
+          console.log(`🧪 Test 1 PASSED! Waypoint inserted at correct position ${testInsertIndex}: ${insertedWaypoint.name}`);
+          
+          // Test 2: Waypoint mode
+          window.isWaypointModeActive = true;
+          console.log('🧪 Test 2: Simulating route drag in WAYPOINT mode...');
+          
+          // Use different coords to make it clearer in the results
+          const test2Coords = [testCoords[0] + 0.05, testCoords[1] + 0.05];
+          
+          window.mapInteractionHandler.handleRouteDragComplete(testInsertIndex, test2Coords, { isTest: true });
+          
+          // Wait a bit and check result
+          setTimeout(() => {
+            const waypointsAfterTest2 = window.waypointManager.getWaypoints();
+            console.log('🧪 Waypoints after Test 2:', waypointsAfterTest2.map(wp => wp.name));
+            
+            if (waypointsAfterTest2.length === waypointsAfterTest1.length + 1) {
+              // Check if inserted at correct position
+              const insertedWaypoint = waypointsAfterTest2[testInsertIndex];
+              console.log(`🧪 Test 2 PASSED! Waypoint inserted at correct position ${testInsertIndex}: ${insertedWaypoint.name}`);
+              
+              console.log('🧪 Both tests PASSED! Route drag fix is working correctly. 🎉');
+              
+              // Reset waypoint mode
+              window.isWaypointModeActive = initialWaypointMode;
+              return true;
+            } else {
+              console.error('🧪 Test 2 FAILED! Waypoint was not inserted properly in WAYPOINT mode.');
+              
+              // Reset waypoint mode
+              window.isWaypointModeActive = initialWaypointMode;
+              return false;
+            }
+          }, 300);
+        } else {
+          console.error('🧪 Test 1 FAILED! Waypoint was not inserted properly in NORMAL mode.');
+          
+          // Reset waypoint mode
+          window.isWaypointModeActive = initialWaypointMode;
+          return false;
+        }
+      }, 300);
+    };
+  }, 100);
+  
+  // Set a timeout to clear the interval if managers never become available
+  setTimeout(() => {
+    clearInterval(checkInterval);
+    console.error('🛠️ Timed out waiting for managers to be available');
+  }, 10000);
+})();

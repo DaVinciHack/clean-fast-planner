@@ -1,0 +1,15 @@
+<!-- 
+WAYPOINT FIX INJECTION
+This script must be manually added to index.html in the head section 
+to fix waypoint functionality without modifying React code.
+-->
+<script type="text/javascript">
+// Fix waypoint mode functionality by loading a standalone script
+document.addEventListener('DOMContentLoaded', function() {
+  const script = document.createElement('script');
+  script.src = '/waypoint-fix.js?v=' + Date.now(); // Add cache-busting parameter
+  script.type = 'text/javascript';
+  document.head.appendChild(script);
+  console.log('WAYPOINT FIX: Loaded standalone fix script');
+});
+</script>

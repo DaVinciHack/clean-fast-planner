@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fast Planner - Gulf of Mexico Edition</title>
+  
+  <!-- Load Mapbox GL JS -->
+  <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
+  <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+  
+  <!-- Load Turf.js for distance calculations -->
+  <script src='https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js'></script>
+  
+  <!-- Load GeoTIFF.js for handling GeoTIFF files -->
+  <script src='https://cdn.jsdelivr.net/npm/geotiff@2.0.7/dist-browser/geotiff.js'></script>
+  
+  <!-- App configuration and code -->
+  <script src="js/config.js"></script>
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div id="map" class="fast-planner-map"></div>
+  
+  <!-- Top Center Route Statistics Card -->
+  <div id="route-stats-card">
+    <div class="card-header">
+      <div class="aircraft-info">
+        <img src="https://bristow.info/SAR/VTOL-5a215f01.png" alt="Logo" class="card-logo">
+        <span id="aircraft-id">N603PW - AW139</span>
+      </div>
+      <div class="card-title">Route Statistics</div>
+    </div>
+    <div class="card-content">
+      <div class="stats-section">
+        <div class="stat-item">
+          <div class="stat-label">Endurance (excl. reserve):</div>
+          <div class="stat-value"><span id="endurance-value">2.3</span> hrs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Available Mission Fuel:</div>
+          <div class="stat-value"><span id="mission-fuel-value">3070</span> lbs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Actual Fuel Uplift:</div>
+          <div class="stat-value"><span id="fuel-uplift-value">2039</span> lbs</div>
+        </div>
+      </div>
+      <div class="stats-section">
+        <div class="stat-item">
+          <div class="stat-label">Est. Takeoff Weight:</div>
+          <div class="stat-value"><span id="takeoff-weight-value">24807</span> lbs</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Operational Radius:</div>
+          <div class="stat-value"><span id="operational-radius-value">85</span> NM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="stops-panel">
+    <h3>Flight Stops</h3>
+    <div id="stops-container">
+      <!-- Stop entries will be added here dynamically -->
+    </div>
+    <button id="add-stop-btn" class="control-button">Add Stop</button>
+  </div>
+  
+  <div id="info-panel">
+    <div class="panel-header">
+      <div class="header-left">
+        <img src="https://bristow.info/SAR/VTOL-5a215f01.png" alt="Logo" class="vtol-logo">
+      </div>
+    </div>
+    
+    <div class="control-section region-section">
+      <div class="region-selector">
+        <label for="region-select">Region:</label>
+        <select id="region-select">
+          <option value="gulf-of-mexico" selected>Gulf of Mexico</option>
+          <option value="north-sea">North Sea</option>
+          <option value="brazil">Brazil</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <button id="clear-route" class="control-button">Clear Route</button>
+      <button id="load-rig-data" class="control-button">Load Rig Data</button>
+      <button id="toggle-chart" class="control-button" style="display: none;">Hide Rigs</button>
+      <button id="load-custom-chart" class="control-button">Load Custom Chart</button>
+      <input type="file" id="chart-input" accept=".tif,.tiff,.png,.jpg,.jpeg" style="display:none">
+    </div>
+    
+    <div class="control-section">
+      <h4>Aircraft Configuration</h4>
+      <label for="aircraft-type">Aircraft Type:</label>
+      <select id="aircraft-type">
+        <option value="s92">Sikorsky S-92</option>
+        <option value="aw139">Leonardo AW139</option>
+        <option value="h175">Airbus H175</option>
+        <option value="h160">Airbus H160</option>
+      </select>
+      
+      <label for="payload-weight">Payload Weight (lbs):</label>
+      <input type="number" id="payload-weight" value="2000" min="0" max="10000">
+      
+      <label for="reserve-fuel">Reserve Fuel (lbs):</label>
+      <input type="number" id="reserve-fuel" value="600" min="0" max="2000">
+    </div>
+    
+    <!-- Route Statistics section moved to top center card -->
+    
+    <div class="control-section">
+      <h4>Waypoints</h4>
+      <div class="waypoint-list" id="waypoint-list">
+        <!-- Waypoints will be listed here -->
+      </div>
+    </div>
+    
+    <div id="auth-status" class="control-section">
+      <h4>Connection Status</h4>
+      <div id="auth-message">Not connected to Foundry</div>
+      <a href="https://bristow.palantirfoundry.com/api/oauth/authorize?client_id=7db2ec0841ba7cd5697f25eebde0a64e&redirect_uri=http://localhost:8080/auth/callback&response_type=token&scope=api:ontologies-read%20api:ontologies-write%20api:mediasets-read%20api:mediasets-write%20api:admin-read" class="control-button" id="login-button">Login to Foundry</a>
+    </div>
+  </div>
+  
+  <div id="loading-overlay">Loading Data...</div>
+  
+  <!-- OSDK Integration -->
+  <script src="js/osdk-loader.js"></script>
+  <script src="js/osdk-client.js"></script>
+  
+  <!-- Load application JS after DOM is ready -->
+  <script src="js/map.js"></script>
+  <script src="js/route.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

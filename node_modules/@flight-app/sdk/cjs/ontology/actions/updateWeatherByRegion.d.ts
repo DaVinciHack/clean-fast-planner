@@ -1,0 +1,52 @@
+import type { ActionDefinition, ActionParam, ActionReturnTypeForOptions, ApplyActionOptions, ApplyBatchActionOptions } from '@osdk/client';
+import { $osdkMetadata } from '../../OntologyMetadata.js';
+export declare namespace updateWeatherByRegion {
+    type ParamsDefinition = {
+        regionName: {
+            multiplicity: false;
+            nullable: false;
+            type: 'string';
+        };
+        timestamp: {
+            multiplicity: false;
+            nullable: true;
+            type: 'timestamp';
+        };
+    };
+    /**
+     * Update weather by region
+     */
+    interface Params {
+        readonly regionName: ActionParam.PrimitiveType<'string'>;
+        readonly timestamp?: ActionParam.PrimitiveType<'timestamp'>;
+    }
+    interface Signatures {
+        /**
+         * Update weather by region
+         */
+        applyAction<P extends updateWeatherByRegion.Params, OP extends ApplyActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+        batchApplyAction<P extends ReadonlyArray<updateWeatherByRegion.Params>, OP extends ApplyBatchActionOptions>(args: P, options?: OP): Promise<ActionReturnTypeForOptions<OP>>;
+    }
+}
+/**
+ * Update weather by region
+ * @param {ActionParam.PrimitiveType<"string">} regionName
+ * @param {ActionParam.PrimitiveType<"timestamp">} [timestamp]
+ */
+export interface updateWeatherByRegion extends ActionDefinition<updateWeatherByRegion.Signatures> {
+    __DefinitionMetadata?: {
+        apiName: 'updateWeatherByRegion';
+        description: 'Update weather by region';
+        displayName: 'Update weather by region';
+        modifiedEntities: {};
+        parameters: updateWeatherByRegion.ParamsDefinition;
+        rid: 'ri.actions.main.action-type.1f8f4f94-7e56-487c-87c5-aa083c8a83f5';
+        status: 'EXPERIMENTAL';
+        type: 'action';
+        signatures: updateWeatherByRegion.Signatures;
+    };
+    apiName: 'updateWeatherByRegion';
+    type: 'action';
+    osdkMetadata: typeof $osdkMetadata;
+}
+export declare const updateWeatherByRegion: updateWeatherByRegion;

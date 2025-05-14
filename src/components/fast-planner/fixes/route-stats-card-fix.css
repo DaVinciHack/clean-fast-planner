@@ -1,0 +1,60 @@
+/* 
+ * route-stats-card-fix.css
+ * Fix for route stats card styling issues
+ */
+
+/* Override problematic route-stats-card styles */
+.route-stats-card {
+  position: absolute !important;
+  top: 10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 12 !important;
+  width: auto !important; /* Auto width instead of full width */
+  min-width: 600px !important; /* Reasonable minimum width */
+  max-width: 800px !important; /* Maximum width to prevent overflow */
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Make sure route-stats-card children have correct styles */
+.route-stats-card .route-stats-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* Fix stats row layout */
+.route-stats-card .stats-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+/* Fix individual stat items */
+.route-stats-card .route-stat-item {
+  flex: 1 !important;
+  padding: 0 5px !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Remove debug UI elements */
+.waypoint-stop-debug,
+.waypoint-debug,
+.waypoint-stop-debug-monitor,
+#waypoint-stop-debug-button,
+.debug-popup,
+.fix-applied-popup {
+  display: none !important;
+}
+
+/* Make sure map interaction works properly */
+.maplibregl-canvas-container,
+.mapboxgl-canvas-container {
+  pointer-events: auto !important;
+}
+
+/* Make sure pointer events for panels work properly */
+.left-panel, .right-panel, .route-stats-card {
+  pointer-events: auto !important;
+}
