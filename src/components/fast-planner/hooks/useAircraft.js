@@ -1,6 +1,6 @@
 // src/components/fast-planner/hooks/useAircraft.js
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * Custom hook for managing aircraft selection and data
@@ -11,10 +11,10 @@ const useAircraft = ({
   appSettingsManagerRef,
   setFlightSettings
 }) => {
-  // Internal refs to store the real managers once they're available
-  const internalAircraftManagerRef = useRef(aircraftManagerRef);
-  const internalAppSettingsManagerRef = useRef(appSettingsManagerRef);
-  const internalCurrentRegion = useRef(currentRegion);
+  // Internal refs to store the actual manager instances and current region instance
+  const aircraftManagerInstanceRef = useRef(null);
+  const appSettingsManagerInstanceRef = useRef(null);
+  const currentRegionInstanceRef = useRef(null);
 
   // State for aircraft selection and data
   const [aircraftType, setAircraftType] = useState('');
@@ -25,114 +25,93 @@ const useAircraft = ({
   const [aircraftsByType, setAircraftsByType] = useState({});
   const [aircraftLoading, setAircraftLoading] = useState(false);
 
-  // Setup aircraft loading/filtering callbacks
-  useEffect(() => {
-    if (internalAircraftManagerRef.current?.current) {
-      // Set up aircraft manager callbacks if they haven't been set
-      setupAircraftCallbacks();
-    }
-  }, [internalAircraftManagerRef.current?.current]);
-
-  // Load aircraft data when region changes
-  useEffect(() => {
-    if (internalAircraftManagerRef.current?.current && internalCurrentRegion.current?.id) {
-      console.log(`Loading aircraft for region ${internalCurrentRegion.current.name}`);
-      setAircraftLoading(true);
-
-      // Filter aircraft for the current region
-      internalAircraftManagerRef.current.current.filterAircraft(internalCurrentRegion.current.id, aircraftType);
-    }
-  }, [internalCurrentRegion.current?.id, aircraftType]);
-
-  /**
-   * Update the internal manager references
-   * 
-   * @param {Object} aircraftManager - The aircraft manager reference
-   * @param {Object} appSettingsManager - The app settings manager reference
-   */
-  const setAircraftManagers = (aircraftManager, appSettingsManager) => {
-    console.log('Setting aircraft managers:', { 
-      aircraftManager: !!aircraftManager, 
-      appSettingsManager: !!appSettingsManager
-    });
-    
-    internalAircraftManagerRef.current = { current: aircraftManager };
-    internalAppSettingsManagerRef.current = { current: appSettingsManager };
-    
-    // Set up callbacks now that we have the managers
-    setupAircraftCallbacks();
-  };
-
-  /**
-   * Update the current region reference
-   * 
-   * @param {Object} region - The current region
-   */
-  const setCurrentAircraftRegion = (region) => {
-    console.log('Setting current aircraft region:', region?.name);
-    internalCurrentRegion.current = region;
-    
-    // If we have the aircraft manager, filter aircraft for this region
-    if (internalAircraftManagerRef.current?.current && region?.id) {
-      internalAircraftManagerRef.current.current.filterAircraft(region.id, aircraftType);
-    }
-  };
-
-  /**
-   * Set up callbacks for the AircraftManager
-   */
-  const setupAircraftCallbacks = () => {
-    if (!internalAircraftManagerRef.current?.current) {
+  // Memoized setupAircraftCallbacks
+  const setupAircraftCallbacks = useCallback(() => {
+    if (!aircraftManagerInstanceRef.current) {
       console.log('Cannot set up aircraft callbacks - manager not available');
       return;
     }
 
     console.log('Setting up aircraft manager callbacks');
     
-    // Callback for when aircraft are loaded from OSDK
-    internalAircraftManagerRef.current.current.setCallback('onAircraftLoaded', (aircraftList) => {
-      console.log(`Loaded ${aircraftList.length} total aircraft`);
-      setAircraftList(aircraftList);
-
-      // After loading all aircraft, filter by region if we have a current region
-      if (internalCurrentRegion.current) {
-        internalAircraftManagerRef.current.current.filterAircraft(internalCurrentRegion.current.id);
+    aircraftManagerInstanceRef.current.setCallback('onAircraftLoaded', (loadedAircraftList) => {
+      console.log(`Loaded ${loadedAircraftList.length} total aircraft`);
+      setAircraftList(loadedAircraftList);
+      if (currentRegionInstanceRef.current) {
+        aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id);
       }
     });
 
-    // Callback for when aircraft are filtered by type or region
-    internalAircraftManagerRef.current.current.setCallback('onAircraftFiltered', (filteredAircraft, type) => {
+    aircraftManagerInstanceRef.current.setCallback('onAircraftFiltered', (filteredAircraft, type) => {
       console.log(`Filtered to ${filteredAircraft.length} aircraft of type ${type || 'all'}`);
-
       if (type) {
-        // Update the aircraftsByType with the filtered aircraft for this type
-        setAircraftsByType(prev => ({
-          ...prev,
-          [type]: filteredAircraft
-        }));
+        setAircraftsByType(prev => ({ ...prev, [type]: filteredAircraft }));
       } else {
-        // If no type specified, organize all aircraft by type
         const byType = {};
         const availableTypes = [];
-
-        // Create empty buckets for each type
         filteredAircraft.forEach(aircraft => {
-          const type = aircraft.modelType || 'Unknown';
-          if (!byType[type]) {
-            byType[type] = [];
-            availableTypes.push(type);
+          const modelType = aircraft.modelType || 'Unknown';
+          if (!byType[modelType]) {
+            byType[modelType] = [];
+            availableTypes.push(modelType);
           }
-          byType[type].push(aircraft);
+          byType[modelType].push(aircraft);
         });
-
-        console.log(`Available aircraft types: ${availableTypes.join(', ')}`);
-        setAircraftTypes(availableTypes);
+        setAircraftTypes(availableTypes.sort());
         setAircraftsByType(byType);
       }
-
       setAircraftLoading(false);
     });
-  };
+  }, [ // Dependencies for setupAircraftCallbacks
+    aircraftManagerInstanceRef, 
+    currentRegionInstanceRef,
+    setAircraftList, 
+    setAircraftsByType, 
+    setAircraftTypes, 
+    setAircraftLoading
+  ]);
+
+  // Setup aircraft loading/filtering callbacks
+  useEffect(() => {
+    if (aircraftManagerInstanceRef.current) {
+      setupAircraftCallbacks();
+    }
+  }, [aircraftManagerInstanceRef.current, setupAircraftCallbacks]);
+
+  // Load aircraft data when region changes or aircraftType changes
+  useEffect(() => {
+    if (aircraftManagerInstanceRef.current && currentRegionInstanceRef.current?.id) {
+      console.log(`Loading aircraft for region ${currentRegionInstanceRef.current.name} and type ${aircraftType || 'any'}`);
+      setAircraftLoading(true);
+      aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id, aircraftType);
+    }
+  }, [currentRegionInstanceRef.current?.id, aircraftType, aircraftManagerInstanceRef]); // Removed setupAircraftCallbacks from here
+
+  const setAircraftManagers = useCallback((aircraftManager, appSettingsManager) => {
+    console.log('Setting aircraft managers:', { 
+      aircraftManager: !!aircraftManager, 
+      appSettingsManager: !!appSettingsManager
+    });
+    
+    aircraftManagerInstanceRef.current = aircraftManager;
+    appSettingsManagerInstanceRef.current = appSettingsManager;
+    
+    // Call setupAircraftCallbacks if managers are now available
+    if (aircraftManager) {
+        setupAircraftCallbacks();
+    }
+  }, [setupAircraftCallbacks]); // Dependency: setupAircraftCallbacks
+
+  const setCurrentAircraftRegion = useCallback((region) => {
+    console.log('Setting current aircraft region:', region?.name);
+    currentRegionInstanceRef.current = region; // Update the ref for the current region
+    
+    // Trigger aircraft filtering for the new region
+    if (aircraftManagerInstanceRef.current && region?.id) {
+      setAircraftLoading(true); // Set loading true before filtering
+      aircraftManagerInstanceRef.current.filterAircraft(region.id, aircraftType);
+    }
+  }, [aircraftType, aircraftManagerInstanceRef, setAircraftLoading]); // Dependencies
 
   /**
    * Change the selected aircraft type
@@ -145,13 +124,13 @@ const useAircraft = ({
     setSelectedAircraft(null);    // Clear selected aircraft
 
     // Save to settings
-    if (internalAppSettingsManagerRef.current?.current) {
-      internalAppSettingsManagerRef.current.current.setAircraft(type, '');
+    if (appSettingsManagerInstanceRef.current) {
+      appSettingsManagerInstanceRef.current.setAircraft(type, '');
     }
 
-    if (internalAircraftManagerRef.current?.current && internalCurrentRegion.current) {
+    if (aircraftManagerInstanceRef.current && currentRegionInstanceRef.current) {
       setAircraftLoading(true);
-      internalAircraftManagerRef.current.current.filterAircraft(internalCurrentRegion.current.id, type);
+      aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id, type);
     }
   };
 
@@ -181,8 +160,8 @@ const useAircraft = ({
       });
 
       // Save to settings
-      if (internalAppSettingsManagerRef.current?.current) {
-        internalAppSettingsManagerRef.current.current.setAircraft(aircraftType, registration);
+      if (appSettingsManagerInstanceRef.current) {
+        appSettingsManagerInstanceRef.current.setAircraft(aircraftType, registration);
       }
 
       // Load aircraft-specific settings if they exist

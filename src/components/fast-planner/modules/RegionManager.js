@@ -79,7 +79,7 @@ class RegionManager {
       return null;
     }
     
-    console.log(`RegionManager: Setting region to ${regionId}`);
+    console.log(`RegionManager: Setting region to ${regionId}`, region);
     
     // Clear any static data flags to ensure we load fresh data for the new region
     window.staticDataLoaded = false;
@@ -116,7 +116,7 @@ class RegionManager {
           // The loadPlatformsFromFoundry method will need to be modified to accept region info
           this.platformManager.loadPlatformsFromFoundry(null, region.osdkRegion)
             .then(platforms => {
-              console.log(`Loaded ${platforms.length} platforms for ${region.name}`);
+              console.log(`Loaded ${platforms?.length || 0} platforms for ${region.name}`);
               this.triggerCallback('onRegionLoaded', {
                 region: region,
                 platforms: platforms
@@ -126,6 +126,13 @@ class RegionManager {
               console.error(`Error loading platforms for region ${region.name}:`, error);
               this.triggerCallback('onError', `Failed to load platforms for ${region.name}: ${error.message}`);
             });
+        } else {
+          console.log(`No platform manager available for region: ${region.name}`);
+          // Still trigger the region loaded callback
+          this.triggerCallback('onRegionLoaded', {
+            region: region,
+            platforms: []
+          });
         }
       } catch (error) {
         console.error(`Error setting region ${region.name}:`, error);

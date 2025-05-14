@@ -1243,6 +1243,7 @@ class WaypointManager {
       wrappedHandler(validatedInsertIndex, [e.lngLat.lng, e.lngLat.lat], { 
         isWaypointMode: isWaypointMode,
         lngLat: e.lngLat,
+        point: e.point, // Add the pixel point
         originalIndex: closestPointIndex + 1
       });
       

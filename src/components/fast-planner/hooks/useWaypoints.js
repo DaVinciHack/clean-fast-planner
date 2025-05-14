@@ -9,7 +9,10 @@ import { interactionController } from '../cleanIntegration';
 const useWaypoints = ({
   waypointManagerRef,
   platformManagerRef,
-  setWaypoints
+  setWaypoints,
+  // Add client and currentRegion from FastPlannerApp
+  client, 
+  currentRegion 
 }) => {
   // State for waypoint mode
   const [waypointModeActive, setWaypointModeActive] = useState(false);
@@ -257,22 +260,23 @@ const useWaypoints = ({
       
       // Update our local state to stay in sync
       setWaypointModeActive(active);
-      return;
+      // REMOVED 'return;' TO ALLOW ORIGINAL LOGIC TO RUN AS WELL
     }
     
-    // Fall back to the original implementation
-    console.log(`Toggling waypoint insertion mode: ${active ? 'ON' : 'OFF'}`);
+    // Original implementation (or the part that handles PlatformManager)
+    // This will now run even if the clean implementation was called.
+    console.log(`Toggling waypoint insertion mode (useWaypoints): ${active ? 'ON' : 'OFF'}`);
     
     setWaypointModeActive(active);
     window.isWaypointModeActive = active;
     
     if (platformManagerRef.current) {
-      const currentRegion = window.currentRegion || null;
+      // Use client and currentRegion passed as props
       const regionIdentifier = currentRegion ? currentRegion.osdkRegion || currentRegion.name : null;
-      const osdkClient = window.client;
       
       if (platformManagerRef.current.toggleWaypointMode) {
-        platformManagerRef.current.toggleWaypointMode(active, osdkClient, regionIdentifier);
+        // Pass the client and regionIdentifier from props
+        platformManagerRef.current.toggleWaypointMode(active, client, regionIdentifier);
       } else {
         if (platformManagerRef.current) {
           platformManagerRef.current.waypointModeActive = active;

@@ -1105,12 +1105,15 @@ class PlatformManager {
     // Just set visibility property instead of removing layers
     platformLayerIds.forEach(layerId => {
       if (map.getLayer(layerId)) {
+        console.log(`PlatformManager: Layer ${layerId} found. Setting visibility to ${visibility}.`);
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`Set ${layerId} visibility to ${visibility}`);
+          console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
         } catch (e) {
-          console.warn(`Error setting visibility for ${layerId}:`, e);
+          console.error(`PlatformManager: Error setting visibility for ${layerId}:`, e);
         }
+      } else {
+        console.log(`PlatformManager: Layer ${layerId} NOT found for platform visibility change.`);
       }
     });
     
@@ -1135,15 +1138,16 @@ class PlatformManager {
     let layersFound = false;
     waypointLayers.forEach(layerId => {
       if (map.getLayer(layerId)) {
+        console.log(`PlatformManager: Layer ${layerId} found. Setting visibility to ${visibility}.`);
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`Set ${layerId} visibility to ${visibility}`);
+          console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
           layersFound = true;
         } catch (e) {
-          console.warn(`Error setting visibility for ${layerId}:`, e);
+          console.error(`PlatformManager: Error setting visibility for ${layerId}:`, e);
         }
       } else {
-        console.log(`Layer ${layerId} not found on map for visibility change`);
+        console.log(`PlatformManager: Layer ${layerId} NOT found for OSDK waypoint visibility change.`);
       }
     });
     
@@ -1167,19 +1171,19 @@ class PlatformManager {
    * @param {string} regionName - The current region name, required if waypoints need to be loaded.
    */
   toggleWaypointMode(active, client, regionName) {
-    console.log(`PlatformManager: Toggling waypoint mode to ${active} for region ${regionName}`);
+    console.log(`PlatformManager: ENTERING toggleWaypointMode. Active: ${active}, Region: ${regionName}`);
     this.waypointModeActive = active;
-    
-    // Update global flag for other components to check
     window.isWaypointModeActive = active;
-    
-    const map = this.mapManager.getMap();
-    if (!map) {
-      console.error("PlatformManager: Map not available for toggleWaypointMode.");
-      return;
-    }
 
-    if (active) {
+    this.mapManager.onMapLoaded(() => {
+      const map = this.mapManager.getMap();
+      console.log(`PlatformManager: toggleWaypointMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
+      if (!map) {
+        console.error("PlatformManager: Map not available for toggleWaypointMode even after onMapLoaded. Exiting.");
+        return;
+      }
+
+      if (active) {
       // Entering waypoint mode
       console.log("PlatformManager: Entering waypoint mode - hiding platforms, showing waypoints");
       this._setPlatformLayersVisibility(false); // Hide normal platforms and airfields
@@ -1295,8 +1299,9 @@ class PlatformManager {
       this._setPlatformLayersVisibility(this.isVisible); // Restore normal platform/airfield visibility
     }
     
-    // Trigger visibility change callback
-    this.triggerCallback('onVisibilityChanged', this.isVisible && !active);
+      // Trigger visibility change callback
+      this.triggerCallback('onVisibilityChanged', this.isVisible && !active);
+    }); // End of onMapLoaded wrapper
   }
 
   /**
