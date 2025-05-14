@@ -9,27 +9,33 @@ const useUIControls = ({
   appSettingsManagerRef,
   platformManagerRef,
   regionManagerRef,
-  client
+  client,
+  // Props for lifted state
+  regions,
+  currentRegion,
+  regionLoading,
+  setRegions,
+  setCurrentRegion,
+  setRegionLoading
 }) => {
   // UI panel visibility state
   const [leftPanelVisible, setLeftPanelVisible] = useState(false);
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
   const [platformsVisible, setPlatformsVisible] = useState(true);
   
-  // Platform/region loading state
+  // Platform loading state (rigsError, rigsLoading, platformsLoaded are still local)
   const [platformsLoaded, setPlatformsLoaded] = useState(false);
   const [rigsLoading, setRigsLoading] = useState(false);
   const [rigsError, setRigsError] = useState(null);
-  const [regions, setRegions] = useState([]);
-  const [currentRegion, setCurrentRegion] = useState(null);
-  const [regionLoading, setRegionLoading] = useState(false);
+  // regions, currentRegion, regionLoading are now props
   
   // Input state
   const [routeInput, setRouteInput] = useState('');
 
   // Apply saved UI settings on mount
   useEffect(() => {
-    if (appSettingsManagerRef.current) {
+    // Ensure appSettingsManagerRef.current exists before accessing it
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
       // Load saved UI settings
       const savedSettings = appSettingsManagerRef.current.getAllSettings();
       const uiSettings = savedSettings.uiSettings;
@@ -45,56 +51,49 @@ const useUIControls = ({
 
   // Load platform data and OSDK waypoints when region changes
   useEffect(() => {
-    if (platformManagerRef.current && currentRegion && client) {
+    // Ensure platformManagerRef.current exists before accessing it
+    if (platformManagerRef && platformManagerRef.current && currentRegion && client) {
       console.log(`Loading platforms for region ${currentRegion.name}`);
-      setRigsLoading(true);
+      setRigsLoading(true); // Local state for rig loading
 
       try {
-        // Check if the method exists
         if (typeof platformManagerRef.current.loadPlatformsFromFoundry === 'function') {
           platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
             .then(() => {
-              setPlatformsLoaded(true);
-              setRigsLoading(false);
-              setPlatformsVisible(true);
+              setPlatformsLoaded(true); // Local state
+              setRigsLoading(false);    // Local state
+              // setPlatformsVisible(true); // This is a local state, might be controlled elsewhere or fine here
             })
             .catch(error => {
               console.error(`Error loading platforms: ${error}`);
-              setRigsError(error?.message || 'Unknown error loading platforms');
-              setRigsLoading(false);
+              setRigsError(error?.message || 'Unknown error loading platforms'); // Local state
+              setRigsLoading(false); // Local state
             });
         } else {
-          // Method doesn't exist, show error
           console.error('PlatformManager.loadPlatformsFromFoundry is not a function');
-          setRigsError('Platform loading method not available');
-          setRigsLoading(false);
+          setRigsError('Platform loading method not available'); // Local state
+          setRigsLoading(false); // Local state
         }
       } catch (error) {
         console.error(`Error calling platform loading method: ${error}`);
-        setRigsError(error?.message || 'Error loading platforms');
-        setRigsLoading(false);
+        setRigsError(error?.message || 'Error loading platforms'); // Local state
+        setRigsLoading(false); // Local state
       }
 
-      // Also load OSDK waypoints for the current region
       if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
         let regionQueryTerm = currentRegion.osdkRegion || currentRegion.name;
-        // Specifically ensure "NORWAY" is uppercase if that's the region, as OSDK might be case-sensitive
         if (regionQueryTerm && regionQueryTerm.toLowerCase() === 'norway') {
           regionQueryTerm = 'NORWAY';
         }
         console.log(`Loading OSDK waypoints for region identifier: ${regionQueryTerm}`);
         platformManagerRef.current.loadOsdkWaypointsFromFoundry(client, regionQueryTerm)
-          .then(() => {
-            console.log(`OSDK waypoints loaded for ${regionQueryTerm}`);
-          })
-          .catch(error => {
-            console.error(`Error loading OSDK waypoints for ${regionQueryTerm}:`, error);
-          });
+          .then(() => console.log(`OSDK waypoints loaded for ${regionQueryTerm}`))
+          .catch(error => console.error(`Error loading OSDK waypoints for ${regionQueryTerm}:`, error));
       } else {
         console.error('PlatformManager.loadOsdkWaypointsFromFoundry is not a function');
       }
     }
-  }, [currentRegion, client]);
+  }, [platformManagerRef, currentRegion?.id, client, setRigsLoading, setPlatformsLoaded, setRigsError]); // Changed to currentRegion?.id
 
   /**
    * Toggles the left panel visibility
@@ -104,7 +103,7 @@ const useUIControls = ({
     setLeftPanelVisible(newState);
 
     // Save to settings
-    if (appSettingsManagerRef.current) {
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
       appSettingsManagerRef.current.updateUISettings({
         leftPanelVisible: newState
       });
@@ -131,7 +130,7 @@ const useUIControls = ({
     setRightPanelVisible(newState);
 
     // Save to settings
-    if (appSettingsManagerRef.current) {
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
       appSettingsManagerRef.current.updateUISettings({
         rightPanelVisible: newState
       });
@@ -157,12 +156,12 @@ const useUIControls = ({
     const newState = !platformsVisible;
     setPlatformsVisible(newState);
 
-    if (platformManagerRef.current) {
+    if (platformManagerRef && platformManagerRef.current) {
       platformManagerRef.current.toggleVisibility(newState);
     }
 
     // Save to settings
-    if (appSettingsManagerRef.current) {
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
       appSettingsManagerRef.current.updateUISettings({
         platformsVisible: newState
       });
@@ -175,17 +174,30 @@ const useUIControls = ({
    * @param {string} regionId - ID of the region to change to
    */
   const changeRegion = (regionId) => {
-    if (regionManagerRef.current) {
+    // Use the passed-in setters for region state
+    if (regionManagerRef && regionManagerRef.current && setCurrentRegion && setRegionLoading) {
       console.log(`Changing region to ${regionId}`);
-      setRegionLoading(true);
+      setRegionLoading(true); // Use prop setter
+      
+      console.log('RegionManager reference:', regionManagerRef.current);
+      
+      const regionObject = regionManagerRef.current.getRegionById(regionId); // Get the full region object
+      if (regionObject) {
+        setCurrentRegion(regionObject); // Use prop setter with the full object
+        console.log('Region change initiated, new currentRegion object:', regionObject);
 
-      // Set the new region
-      regionManagerRef.current.setRegion(regionId);
-
-      // Save to settings
-      if (appSettingsManagerRef.current) {
-        appSettingsManagerRef.current.setRegion(regionId);
+        // Save to settings
+        if (appSettingsManagerRef && appSettingsManagerRef.current) {
+          appSettingsManagerRef.current.setRegion(regionId); // Persist the ID
+        }
+      } else {
+        console.error(`Region with ID ${regionId} not found by RegionManager.`);
+        setRegionLoading(false); // Reset loading state if region not found
       }
+      // setRegionLoading(false) might be better placed after platform loading in useEffect
+    } else {
+      console.error('Cannot change region: regionManagerRef, setCurrentRegion, or setRegionLoading is missing/null');
+      if(setRegionLoading) setRegionLoading(false); // Attempt to reset loading state
     }
   };
 
@@ -193,18 +205,18 @@ const useUIControls = ({
    * Reloads platform data from Foundry
    */
   const reloadPlatformData = () => {
-    if (platformManagerRef.current && currentRegion) {
-      setRigsLoading(true);
+    if (platformManagerRef && platformManagerRef.current && currentRegion) {
+      setRigsLoading(true); // Local state
       platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
         .then(() => {
-          setPlatformsLoaded(true);
-          setRigsLoading(false);
-          setPlatformsVisible(true);
+          setPlatformsLoaded(true); // Local state
+          setRigsLoading(false);    // Local state
+          // setPlatformsVisible(true); // Local state
         })
         .catch(error => {
           console.error(`Error loading platforms: ${error}`);
-          setRigsError(error.message);
-          setRigsLoading(false);
+          setRigsError(error.message); // Local state
+          setRigsLoading(false);       // Local state
         });
     }
   };
@@ -220,23 +232,23 @@ const useUIControls = ({
 
   return {
     leftPanelVisible,
-    setLeftPanelVisible,
+    setLeftPanelVisible, // Keep local state setters if panels are fully managed here
     rightPanelVisible,
-    setRightPanelVisible,
+    setRightPanelVisible, // Keep local state setters
     platformsVisible,
-    setPlatformsVisible,
+    setPlatformsVisible, // Keep local state setters
     platformsLoaded,
-    setPlatformsLoaded,
+    // setPlatformsLoaded, // This is local, no need to return setter if not used externally
     rigsLoading,
     rigsError,
-    regions,
-    setRegions,
-    currentRegion,
-    setCurrentRegion,
-    regionLoading,
-    setRegionLoading,
+    // regions, // Prop, no longer returned
+    // setRegions, // Prop, no longer returned
+    // currentRegion, // Prop, no longer returned
+    // setCurrentRegion, // Prop, no longer returned
+    // regionLoading, // Prop, no longer returned
+    // setRegionLoading, // Prop, no longer returned
     routeInput,
-    setRouteInput,
+    setRouteInput, // Keep local state setter
     toggleLeftPanel,
     toggleRightPanel,
     togglePlatformsVisibility,

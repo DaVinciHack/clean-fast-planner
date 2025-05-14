@@ -134,7 +134,11 @@ const useManagers = ({
       // Set up region manager callbacks
       regionManagerRef.current.setCallback('onRegionLoaded', (data) => {
         console.log(`Region loaded: ${data.region.name}`);
-        setRegionLoading(false);
+        if (typeof setRegionLoading === 'function') {
+          setRegionLoading(false);
+        } else {
+          console.warn('setRegionLoading is not a function in onRegionLoaded callback');
+        }
       });
 
       regionManagerRef.current.setCallback('onRegionChanged', (region) => {
@@ -142,6 +146,7 @@ const useManagers = ({
         
         // Check if setCurrentRegion is a function before calling it
         if (typeof setCurrentRegion === 'function') {
+          console.log('Calling setCurrentRegion with:', region);
           setCurrentRegion(region);
         } else {
           console.warn('setCurrentRegion is not a function in onRegionChanged callback');
@@ -164,7 +169,9 @@ const useManagers = ({
 
       regionManagerRef.current.setCallback('onError', (error) => {
         console.error(`Region manager error: ${error}`);
-        setRegionLoading(false);
+        if (typeof setRegionLoading === 'function') {
+          setRegionLoading(false);
+        }
       });
     }
 
@@ -562,137 +569,224 @@ const useManagers = ({
     window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
     window.addEventListener('settings-changed', handleSettingsChanged);
 
-    // Force a rerender after initializing all managers
-    setForceUpdate(prev => prev + 1);
+    // Force a rerender after initializing all managers - REMOVING THIS CALL
+    // setForceUpdate(prev => prev + 1);
 
     // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
       window.removeEventListener('settings-changed', handleSettingsChanged);
     };
-  }, [client, currentRegion, flightSettings]);
+  }, [
+    client, 
+    setFavoriteLocations, 
+    setWaypoints, 
+    setFlightSettings, 
+    setForceUpdate, 
+    addWaypoint, 
+    setAircraftLoading, 
+    setCurrentRegion, 
+    setRegions, 
+    setRegionLoading,
+    // waypointModeActive // This might also cause re-runs if it changes often. Let's test without it first.
+    // If issues persist, we might need to ensure waypointModeActive is stable or handle its effects separately.
+  ]); // Main initialization effect - should run less frequently.
 
-  // Map initialization handler
+  // Effect to handle currentRegion changes specifically
+  useEffect(() => {
+    if (currentRegion && aircraftManagerRef.current) {
+      console.log(`useManagers: currentRegion changed to ${currentRegion.name}, filtering aircraft.`);
+      aircraftManagerRef.current.filterAircraft(currentRegion.id);
+    }
+    if (currentRegion && favoriteLocationsManagerRef.current && setFavoriteLocations) {
+      console.log(`useManagers: currentRegion changed, reloading favorites for ${currentRegion.id}`);
+      const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
+      setFavoriteLocations(regionFavorites);
+    }
+  }, [currentRegion?.id, aircraftManagerRef, favoriteLocationsManagerRef, setFavoriteLocations]); // Changed to currentRegion?.id
+
+  // Effect to handle flightSettings changes specifically
+  useEffect(() => {
+    if (flightSettings && flightCalculationsRef.current) {
+      console.log("useManagers: flightSettings changed, updating flightCalculationsRef config.");
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight: flightSettings.passengerWeight,
+        contingencyFuelPercent: flightSettings.contingencyFuelPercent,
+        taxiFuel: flightSettings.taxiFuel,
+        reserveFuel: flightSettings.reserveFuel,
+        deckTimePerStop: flightSettings.deckTimePerStop,
+        deckFuelFlow: flightSettings.deckFuelFlow,
+      });
+    }
+    if (flightSettings && appSettingsManagerRef.current) {
+        // This ensures AppSettingsManager is also updated if flightSettings change from elsewhere.
+        // However, AppSettingsManager itself calls setFlightSettings, so this might be redundant
+        // or could cause a loop if not handled carefully.
+        // For now, let's assume AppSettingsManager is the source of truth or updates are idempotent.
+        // appSettingsManagerRef.current.updateFlightSettings(flightSettings);
+    }
+  }, [flightSettings, flightCalculationsRef, appSettingsManagerRef]);
+  
+  // Map initialization handler (defined outside main useEffect to be stable)
+  // It uses props like client, setRegionLoading, setRegions, setCurrentRegion, setWaypoints, waypointModeActive
+  // These props are passed from FastPlannerApp and should be stable or their changes handled by FastPlannerApp's re-renders.
   const handleMapReady = (mapInstance) => {
     console.log("🗺️ Map is ready", mapInstance);
 
-    // When map is ready, initialize other components that depend on the map
-    if (regionManagerRef.current) {
-      console.log("🗺️ Initializing regions...");
-      setRegionLoading(true);
+    // Wrap in try/catch for safety
+    try {
+      // When map is ready, initialize other components that depend on the map
+      if (regionManagerRef.current) {
+        console.log("🗺️ Initializing regions with better error handling...");
+        if (typeof setRegionLoading === 'function') {
+          setRegionLoading(true);
+        }
 
-      // Get available regions
-      setRegions(regionManagerRef.current.getRegions());
-
-      // Get the initial region from settings if available
-      const initialRegion = appSettingsManagerRef.current ?
-        appSettingsManagerRef.current.getRegion() : 'gulf-of-mexico';
-
-      console.log(`🗺️ Initializing with region: ${initialRegion}`);
-      // CRITICAL FIX: Make sure we're using the setRegion method, not setCurrentRegion
-      regionManagerRef.current.setRegion(initialRegion);
-      
-      // Initialize OSDK data loading after region is set
-      if (client && platformManagerRef.current && initialRegion) {
-        console.log(`🗺️ Loading OSDK data for region: ${initialRegion}`);
+        // Get available regions
+        const availableRegions = regionManagerRef.current.getRegions();
+        console.log("🗺️ Available regions:", availableRegions);
         
-        // Get the region object
-        const regionObj = regionManagerRef.current.getRegionById(initialRegion);
-        if (regionObj) {
-          // Load platforms
-          platformManagerRef.current.loadPlatformsFromFoundry(client, regionObj.osdkRegion || regionObj.name)
-            .then(() => {
-              console.log(`🗺️ Platforms loaded successfully for ${regionObj.name}`);
-              // Also load OSDK waypoints if needed
-              if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
-                const regionQueryTerm = regionObj.osdkRegion || regionObj.name;
-                platformManagerRef.current.loadOsdkWaypointsFromFoundry(client, regionQueryTerm)
-                  .then(() => {
-                    console.log(`🗺️ OSDK waypoints loaded for ${regionQueryTerm}`);
-                  })
-                  .catch(error => {
-                    console.error(`Error loading OSDK waypoints: ${error.message}`);
-                  });
-              }
-            })
-            .catch(error => {
-              console.error(`Error loading platforms: ${error.message}`);
-            });
-            
-          // Load aircraft
-          if (aircraftManagerRef.current) {
-            aircraftManagerRef.current.loadAircraftFromOSDK(client)
+        if (typeof setRegions === 'function') {
+          setRegions(availableRegions);
+        } else {
+          console.warn('setRegions is not a function in handleMapReady');
+        }
+
+        // Get the initial region from settings if available
+        const initialRegion = appSettingsManagerRef.current ?
+          appSettingsManagerRef.current.getRegion() : 'gulf-of-mexico';
+
+        console.log(`🗺️ Initializing with region: ${initialRegion}`);
+        
+        // Double check all components are set up correctly before initializing
+        if (!regionManagerRef.current) {
+          console.error("regionManagerRef.current is null in handleMapReady");
+          return;
+        }
+        
+        if (!regionManagerRef.current.setRegion) {
+          console.error("regionManagerRef.current.setRegion is not a function in handleMapReady");
+          return;
+        }
+        
+        // CRITICAL FIX: Make sure we're using the setRegion method, not setCurrentRegion
+        const region = regionManagerRef.current.setRegion(initialRegion);
+        console.log("🗺️ Region initialization result:", region);
+        
+        // Initialize OSDK data loading after region is set
+        if (client && platformManagerRef.current && initialRegion) {
+          console.log(`🗺️ Loading OSDK data for region: ${initialRegion}`);
+          
+          // Get the region object
+          const regionObj = regionManagerRef.current.getRegionById(initialRegion);
+          if (regionObj) {
+            // Load platforms
+            platformManagerRef.current.loadPlatformsFromFoundry(client, regionObj.osdkRegion || regionObj.name)
               .then(() => {
-                console.log(`🗺️ Aircraft loaded successfully`);
-                // Filter by region
-                aircraftManagerRef.current.filterAircraft(regionObj.id);
+                console.log(`🗺️ Platforms loaded successfully for ${regionObj.name}`);
+                // Also load OSDK waypoints if needed
+                if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
+                  const regionQueryTerm = regionObj.osdkRegion || regionObj.name;
+                  platformManagerRef.current.loadOsdkWaypointsFromFoundry(client, regionQueryTerm)
+                    .then(() => {
+                      console.log(`🗺️ OSDK waypoints loaded for ${regionQueryTerm}`);
+                    })
+                    .catch(error => {
+                      console.error(`Error loading OSDK waypoints: ${error.message}`);
+                    });
+                }
               })
               .catch(error => {
-                console.error(`Error loading aircraft: ${error.message}`);
+                console.error(`Error loading platforms: ${error.message}`);
               });
-          }
-        }
-      }
-    }
-
-    // Initialize the map interaction handler
-    if (mapInteractionHandlerRef.current) {
-      console.log("🗺️ Initializing map interaction handler...");
-
-      // Make sure the waypointManager is properly connected
-      if (waypointManagerRef.current) {
-        // Set up the waypoint manager's callbacks
-        waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
-          console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
-
-          // Update the waypoints state
-          setWaypoints([...updatedWaypoints]);
-        });
-
-        waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
-          console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
-        });
-      }
-
-      // CRITICAL FIX: Force re-initialization of map handler to apply our fixes - with proper safety checks
-      console.log("🧹 Carefully initializing map interaction handler to prevent duplicates");
-      
-      // First, make sure global flags are properly set
-      window.isWaypointModeActive = waypointModeActive;
-      
-      // Clean up any existing handlers before initializing new ones
-      const map = mapManagerRef.current.getMap();
-      if (map && map._listeners && map._listeners.click) {
-        console.log(`🧹 Removing ${map._listeners.click.length} existing click handlers before initializing`);
-        map.off('click');
-      }
-      
-      // Then, add a small delay to ensure the map is fully loaded
-      setTimeout(() => {
-        // Initialize map interactions carefully
-        if (mapInteractionHandlerRef.current) {
-          // Only initialize if we haven't already
-          if (!mapInteractionHandlerRef.current.isInitialized) {
-            const initSuccess = mapInteractionHandlerRef.current.initialize();
-            
-            if (initSuccess) {
-              console.log("🧹 Map interaction handler initialized successfully");
-            } else {
-              console.error("🧹 Failed to initialize map interaction handler, will retry once");
               
-              // Try again after a longer delay
-              setTimeout(() => {
-                if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
-                  console.log("🧹 Second attempt at initializing map handler");
-                  mapInteractionHandlerRef.current.initialize();
-                }
-              }, 1000);
+            // Load aircraft
+            if (aircraftManagerRef.current) {
+              aircraftManagerRef.current.loadAircraftFromOSDK(client)
+                .then(() => {
+                  console.log(`🗺️ Aircraft loaded successfully`);
+                  // Filter by region
+                  aircraftManagerRef.current.filterAircraft(regionObj.id);
+                })
+                .catch(error => {
+                  console.error(`Error loading aircraft: ${error.message}`);
+                });
             }
-          } else {
-            console.log("🧹 Map interaction handler already initialized, skipping");
           }
         }
-      }, 500);
+      } else {
+        console.error("Region manager is not initialized in handleMapReady");
+      }
+
+      // Initialize the map interaction handler
+      if (mapInteractionHandlerRef.current) {
+        console.log("🗺️ Initializing map interaction handler...");
+
+        // Make sure the waypointManager is properly connected
+        if (waypointManagerRef.current) {
+          // Set up the waypoint manager's callbacks
+          waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
+            console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
+
+            // Update the waypoints state
+            if (typeof setWaypoints === 'function') {
+              setWaypoints([...updatedWaypoints]);
+            } else {
+              console.warn('setWaypoints is not a function in onChange callback');
+            }
+          });
+
+          waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
+            console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
+          });
+        }
+
+        // CRITICAL FIX: Force re-initialization of map handler to apply our fixes - with proper safety checks
+        console.log("🧹 Carefully initializing map interaction handler to prevent duplicates");
+        
+        // First, make sure global flags are properly set
+        window.isWaypointModeActive = waypointModeActive;
+        
+        // Clean up any existing handlers before initializing new ones
+        const map = mapManagerRef.current.getMap();
+        if (map && map._listeners && map._listeners.click) {
+          console.log(`🧹 Removing ${map._listeners.click.length} existing click handlers before initializing`);
+          map.off('click');
+        }
+        
+        // Then, add a small delay to ensure the map is fully loaded
+        setTimeout(() => {
+          // Initialize map interactions carefully
+          if (mapInteractionHandlerRef.current) {
+            // Only initialize if we haven't already
+            if (!mapInteractionHandlerRef.current.isInitialized) {
+              const initSuccess = mapInteractionHandlerRef.current.initialize();
+              
+              if (initSuccess) {
+                console.log("🧹 Map interaction handler initialized successfully");
+              } else {
+                console.error("🧹 Failed to initialize map interaction handler, will retry once");
+                
+                // Try again after a longer delay
+                setTimeout(() => {
+                  if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
+                    console.log("🧹 Second attempt at initializing map handler");
+                    mapInteractionHandlerRef.current.initialize();
+                  }
+                }, 1000);
+              }
+            } else {
+              console.log("🧹 Map interaction handler already initialized, skipping");
+            }
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error("Error in handleMapReady:", error);
+      // Set loading to false in case of error
+      if (typeof setRegionLoading === 'function') {
+        setRegionLoading(false);
+      }
     }
   };
 
