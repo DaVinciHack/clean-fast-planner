@@ -3,17 +3,18 @@ import SaveFlightModal from './SaveFlightModal';
 import PalantirFlightService from '../../services/PalantirFlightService';
 import AutomationService from '../../services/AutomationService';
 import { usePanelContext } from '../../context/PanelContext';
+import { useRegion } from '../../context/region';
 
 /**
  * SaveFlightButton Component
  * Creates a button that sends the current route data to Palantir to create a new flight
  * and optionally runs automation on the newly created flight
+ * Now using RegionContext for region management
  */
 const SaveFlightButton = ({ 
   selectedAircraft, 
   waypoints, 
   routeStats,
-  currentRegion,
   onSuccess,
   onError,
   runAutomation = true, // New prop to determine if automation should run after save
@@ -26,6 +27,9 @@ const SaveFlightButton = ({
   
   // Access the panel context for card navigation
   const panelContext = usePanelContext();
+  
+  // Get current region from context
+  const { currentRegion } = useRegion();
   
   const handleButtonClick = () => {
     // Use the panel context to change to the saveflight card
@@ -215,6 +219,9 @@ const SaveFlightButton = ({
         window.LoadingIndicator.updateStatusIndicator('Saving flight to Palantir...');
       }
       
+      // Get the region code from context
+      const regionCode = currentRegion?.osdkRegion || "NORWAY";
+      
       // Get waypoint locations for the API - clean up whitespace
       const locations = waypoints.map(wp => {
         // Clean up location names - trim whitespace to avoid issues
@@ -236,7 +243,8 @@ const SaveFlightButton = ({
         displayReg: selectedAircraft.registration,
         aircraftAssetId: selectedAircraft.assetId || '(none)',
         captainId: flightData.captainId,
-        copilotId: flightData.copilotId
+        copilotId: flightData.copilotId,
+        regionCode: regionCode
       });
       
       // Prepare waypoints with leg structure
@@ -254,9 +262,9 @@ const SaveFlightButton = ({
       const apiParams = {
         // Basic parameters
         flightName: flightData.flightName,
-        aircraftRegion: "NORWAY",
+        aircraftRegion: regionCode,
         aircraftId: finalAircraftId,
-        region: "NORWAY",
+        region: regionCode,
         etd: etdTimestamp,
         locations: locations,
         alternateLocation: flightData.alternateLocation || "",

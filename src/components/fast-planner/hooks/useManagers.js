@@ -1,6 +1,6 @@
 // src/components/fast-planner/hooks/useManagers.js
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   MapManager,
   WaypointManager,
@@ -19,6 +19,8 @@ import WaypointHandler from '../modules/WaypointHandler';
 
 /**
  * Custom hook to initialize and manage all manager instances
+ * 
+ * Region management has been moved to RegionContext
  */
 const useManagers = ({
   client,
@@ -30,14 +32,11 @@ const useManagers = ({
   setForceUpdate,
   addWaypoint,
   weather,
-  waypoints,
-  currentRegion,
-  setAircraftLoading,
-  setCurrentRegion,
-  setRegions,
-  setRegionLoading,
-  waypointModeActive
+  setWeather
 }) => {
+  // Local state for aircraft loading - no longer dependent on parent component
+  const [localAircraftLoading, setLocalAircraftLoading] = useState(false);
+  
   // Core managers refs
   const mapManagerRef = useRef(null);
   const waypointManagerRef = useRef(null);
@@ -87,6 +86,8 @@ const useManagers = ({
             // Once the map is ready, load aircraft
             if (aircraftManagerRef.current && client) {
               console.log("Loading aircraft after map initialization");
+              setLocalAircraftLoading(true); // Use local state
+              
               aircraftManagerRef.current.loadAircraftFromOSDK(client)
                 .then(() => {
                   console.log("Aircraft loaded successfully");
@@ -95,7 +96,7 @@ const useManagers = ({
                 })
                 .catch(error => {
                   console.error(`Error loading aircraft: ${error}`);
-                  setAircraftLoading(false);
+                  setLocalAircraftLoading(false); // Use local state
                 });
             }
           })
@@ -112,11 +113,8 @@ const useManagers = ({
 
       // Set up callback for when favorites change
       favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
-        if (currentRegion) {
-          console.log(`Favorites changed, updating UI for region ${currentRegion.id}`);
-          const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
-          setFavoriteLocations(regionFavorites);
-        }
+        console.log(`Favorites changed, updating UI`);
+        setFavoriteLocations(favorites);
       });
     }
 
@@ -126,53 +124,13 @@ const useManagers = ({
       platformManagerRef.current = new PlatformManager(mapManagerRef.current);
     }
 
-    // Create RegionManager
+    // Create RegionManager 
+    // (Still needed for some functionality, but main state is managed by RegionContext)
     if (!regionManagerRef.current && mapManagerRef.current && platformManagerRef.current) {
       console.log("FastPlannerApp: Creating RegionManager instance");
       regionManagerRef.current = new RegionManager(mapManagerRef.current, platformManagerRef.current);
-
-      // Set up region manager callbacks
-      regionManagerRef.current.setCallback('onRegionLoaded', (data) => {
-        console.log(`Region loaded: ${data.region.name}`);
-        if (typeof setRegionLoading === 'function') {
-          setRegionLoading(false);
-        } else {
-          console.warn('setRegionLoading is not a function in onRegionLoaded callback');
-        }
-      });
-
-      regionManagerRef.current.setCallback('onRegionChanged', (region) => {
-        console.log(`Region changed to: ${region.name}`);
-        
-        // Check if setCurrentRegion is a function before calling it
-        if (typeof setCurrentRegion === 'function') {
-          console.log('Calling setCurrentRegion with:', region);
-          setCurrentRegion(region);
-        } else {
-          console.warn('setCurrentRegion is not a function in onRegionChanged callback');
-          // As a workaround, store the current region in a global variable
-          window.currentRegion = region;
-        }
-
-        // IMPORTANT: Load favorites for this region
-        if (favoriteLocationsManagerRef.current && region) {
-          console.log(`Loading favorites for region ${region.id}`);
-          const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(region.id);
-          console.log(`Found ${regionFavorites.length} favorites for region ${region.id}:`, regionFavorites);
-          if (typeof setFavoriteLocations === 'function') {
-            setFavoriteLocations(regionFavorites);
-          } else {
-            console.warn('setFavoriteLocations is not a function in onRegionChanged callback');
-          }
-        }
-      });
-
-      regionManagerRef.current.setCallback('onError', (error) => {
-        console.error(`Region manager error: ${error}`);
-        if (typeof setRegionLoading === 'function') {
-          setRegionLoading(false);
-        }
-      });
+      
+      // We don't set callbacks here anymore as RegionContext handles this
     }
 
     // Create WaypointManager
@@ -221,16 +179,11 @@ const useManagers = ({
       // Set up aircraft manager callbacks
       aircraftManagerRef.current.setCallback('onAircraftLoaded', (aircraftList) => {
         console.log(`Loaded ${aircraftList.length} total aircraft`);
-
-        // After loading all aircraft, filter by region if we have a current region
-        if (currentRegion) {
-          aircraftManagerRef.current.filterAircraft(currentRegion.id);
-        }
       });
 
       aircraftManagerRef.current.setCallback('onAircraftFiltered', (filteredAircraft, type) => {
         console.log(`Filtered to ${filteredAircraft.length} aircraft of type ${type || 'all'}`);
-        setAircraftLoading(false);
+        setLocalAircraftLoading(false); // Use local state
       });
     }
 
@@ -303,11 +256,6 @@ const useManagers = ({
                   (data) => console.log("Waypoint removed:", data),
                   (error) => console.error("Waypoint error:", error)
                 );
-                
-                // Also patch the WaypointManager on successful retry
-                // Commenting out patch to isolate duplicate waypoint addition issue
-                // patchWaypointManager(waypointManagerRef.current);
-                console.log("[useManagers] RETRY BLOCK: Skipping patchWaypointManager for now to test duplicate add issue.");
               }
             }
           }, 3000);
@@ -320,11 +268,6 @@ const useManagers = ({
             (data) => console.log("Waypoint removed:", data),
             (error) => console.error("Waypoint error:", error)
           );
-          
-          // Patch the WaypointManager to handle waypoints vs stops
-          // Commenting out patch to isolate duplicate waypoint addition issue
-          // patchWaypointManager(waypointManagerRef.current); 
-          console.log("[useManagers] Skipping patchWaypointManager for now to test duplicate add issue.");
         }
         
       } catch (error) {
@@ -385,13 +328,18 @@ const useManagers = ({
 
       mapInteractionHandlerRef.current.setCallback('onMapClick', async (data) => {
         console.log('🗺️ Map click callback received in useManagers', data);
-        // The window._processingMapClick flag is managed by MapInteractionHandler.handleMapClick
-        // No need to check or set it here again.
         try {
           // Create a local copy of the data to avoid reference issues
           const clickData = {...data};
           
-          await addWaypoint(clickData); // addWaypoint is from FastPlannerApp props
+          // Use the implementation if available
+          if (typeof addWaypoint.implementation === 'function') {
+            await addWaypoint.implementation(clickData);
+          } else if (typeof addWaypoint === 'function') {
+            await addWaypoint(clickData);
+          } else {
+            console.error('No valid addWaypoint function available');
+          }
           
         } catch (error) {
           console.error('Error processing map click in useManagers:', error);
@@ -400,13 +348,18 @@ const useManagers = ({
 
       mapInteractionHandlerRef.current.setCallback('onPlatformClick', async (data) => {
         console.log('🏢 Platform click callback received in useManagers', data);
-        // The window._processingMapClick flag is managed by MapInteractionHandler.handleMapClick
-        // No need to check or set it here again.
         try {
           // Create a local copy of the data to avoid reference issues
           const clickData = {...data};
 
-          await addWaypoint(clickData); // addWaypoint is from FastPlannerApp props
+          // Use the implementation if available
+          if (typeof addWaypoint.implementation === 'function') {
+            await addWaypoint.implementation(clickData);
+          } else if (typeof addWaypoint === 'function') {
+            await addWaypoint(clickData);
+          } else {
+            console.error('No valid addWaypoint function available');
+          }
 
         } catch (error) {
           console.error('Error processing platform click in useManagers:', error);
@@ -415,8 +368,6 @@ const useManagers = ({
 
       mapInteractionHandlerRef.current.setCallback('onRouteClick', async (data) => {
         console.log('🛣️ Route click callback received in useManagers', data);
-        // The window._processingMapClick flag is managed by MapInteractionHandler.handleMapClick
-        // No need to check or set it here again.
         try {
           // Create a local copy of the data
           const clickData = {...data};
@@ -529,12 +480,11 @@ const useManagers = ({
           console.log('🛣️ Waypoints updated. Centralized useEffect will recalculate fuel.');
           
           // Add a small delay to prevent rapid-fire clicks
-          await new Promise(resolve => setTimeout(resolve, 300)); // Keep existing delay if needed for other reasons
+          await new Promise(resolve => setTimeout(resolve, 300));
           
         } catch (error) {
           console.error('Error processing route click in useManagers:', error);
         }
-        // Flag is cleared by MapInteractionHandler.handleMapClick's finally block
       });
 
       mapInteractionHandlerRef.current.setCallback('onError', (error) => {
@@ -569,9 +519,6 @@ const useManagers = ({
     window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
     window.addEventListener('settings-changed', handleSettingsChanged);
 
-    // Force a rerender after initializing all managers - REMOVING THIS CALL
-    // setForceUpdate(prev => prev + 1);
-
     // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
@@ -584,28 +531,10 @@ const useManagers = ({
     setFlightSettings, 
     setForceUpdate, 
     addWaypoint, 
-    setAircraftLoading, 
-    setCurrentRegion, 
-    setRegions, 
-    setRegionLoading,
-    // waypointModeActive // This might also cause re-runs if it changes often. Let's test without it first.
-    // If issues persist, we might need to ensure waypointModeActive is stable or handle its effects separately.
-  ]); // Main initialization effect - should run less frequently.
+    flightSettings
+  ]); 
 
-  // Effect to handle currentRegion changes specifically
-  useEffect(() => {
-    if (currentRegion && aircraftManagerRef.current) {
-      console.log(`useManagers: currentRegion changed to ${currentRegion.name}, filtering aircraft.`);
-      aircraftManagerRef.current.filterAircraft(currentRegion.id);
-    }
-    if (currentRegion && favoriteLocationsManagerRef.current && setFavoriteLocations) {
-      console.log(`useManagers: currentRegion changed, reloading favorites for ${currentRegion.id}`);
-      const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
-      setFavoriteLocations(regionFavorites);
-    }
-  }, [currentRegion?.id, aircraftManagerRef, favoriteLocationsManagerRef, setFavoriteLocations]); // Changed to currentRegion?.id
-
-  // Effect to handle flightSettings changes specifically
+  // Effect to handle flightSettings changes
   useEffect(() => {
     if (flightSettings && flightCalculationsRef.current) {
       console.log("useManagers: flightSettings changed, updating flightCalculationsRef config.");
@@ -618,106 +547,14 @@ const useManagers = ({
         deckFuelFlow: flightSettings.deckFuelFlow,
       });
     }
-    if (flightSettings && appSettingsManagerRef.current) {
-        // This ensures AppSettingsManager is also updated if flightSettings change from elsewhere.
-        // However, AppSettingsManager itself calls setFlightSettings, so this might be redundant
-        // or could cause a loop if not handled carefully.
-        // For now, let's assume AppSettingsManager is the source of truth or updates are idempotent.
-        // appSettingsManagerRef.current.updateFlightSettings(flightSettings);
-    }
-  }, [flightSettings, flightCalculationsRef, appSettingsManagerRef]);
+  }, [flightSettings]);
   
-  // Map initialization handler (defined outside main useEffect to be stable)
-  // It uses props like client, setRegionLoading, setRegions, setCurrentRegion, setWaypoints, waypointModeActive
-  // These props are passed from FastPlannerApp and should be stable or their changes handled by FastPlannerApp's re-renders.
+  // Map initialization handler
   const handleMapReady = (mapInstance) => {
     console.log("🗺️ Map is ready", mapInstance);
 
     // Wrap in try/catch for safety
     try {
-      // When map is ready, initialize other components that depend on the map
-      if (regionManagerRef.current) {
-        console.log("🗺️ Initializing regions with better error handling...");
-        if (typeof setRegionLoading === 'function') {
-          setRegionLoading(true);
-        }
-
-        // Get available regions
-        const availableRegions = regionManagerRef.current.getRegions();
-        console.log("🗺️ Available regions:", availableRegions);
-        
-        if (typeof setRegions === 'function') {
-          setRegions(availableRegions);
-        } else {
-          console.warn('setRegions is not a function in handleMapReady');
-        }
-
-        // Get the initial region from settings if available
-        const initialRegion = appSettingsManagerRef.current ?
-          appSettingsManagerRef.current.getRegion() : 'gulf-of-mexico';
-
-        console.log(`🗺️ Initializing with region: ${initialRegion}`);
-        
-        // Double check all components are set up correctly before initializing
-        if (!regionManagerRef.current) {
-          console.error("regionManagerRef.current is null in handleMapReady");
-          return;
-        }
-        
-        if (!regionManagerRef.current.setRegion) {
-          console.error("regionManagerRef.current.setRegion is not a function in handleMapReady");
-          return;
-        }
-        
-        // CRITICAL FIX: Make sure we're using the setRegion method, not setCurrentRegion
-        const region = regionManagerRef.current.setRegion(initialRegion);
-        console.log("🗺️ Region initialization result:", region);
-        
-        // Initialize OSDK data loading after region is set
-        if (client && platformManagerRef.current && initialRegion) {
-          console.log(`🗺️ Loading OSDK data for region: ${initialRegion}`);
-          
-          // Get the region object
-          const regionObj = regionManagerRef.current.getRegionById(initialRegion);
-          if (regionObj) {
-            // Load platforms
-            platformManagerRef.current.loadPlatformsFromFoundry(client, regionObj.osdkRegion || regionObj.name)
-              .then(() => {
-                console.log(`🗺️ Platforms loaded successfully for ${regionObj.name}`);
-                // Also load OSDK waypoints if needed
-                if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
-                  const regionQueryTerm = regionObj.osdkRegion || regionObj.name;
-                  platformManagerRef.current.loadOsdkWaypointsFromFoundry(client, regionQueryTerm)
-                    .then(() => {
-                      console.log(`🗺️ OSDK waypoints loaded for ${regionQueryTerm}`);
-                    })
-                    .catch(error => {
-                      console.error(`Error loading OSDK waypoints: ${error.message}`);
-                    });
-                }
-              })
-              .catch(error => {
-                console.error(`Error loading platforms: ${error.message}`);
-              });
-              
-            // Load aircraft
-            if (aircraftManagerRef.current) {
-              aircraftManagerRef.current.loadAircraftFromOSDK(client)
-                .then(() => {
-                  console.log(`🗺️ Aircraft loaded successfully`);
-                  // Filter by region
-                  aircraftManagerRef.current.filterAircraft(regionObj.id);
-                })
-                .catch(error => {
-                  console.error(`Error loading aircraft: ${error.message}`);
-                });
-            }
-          }
-        }
-      } else {
-        console.error("Region manager is not initialized in handleMapReady");
-      }
-
       // Initialize the map interaction handler
       if (mapInteractionHandlerRef.current) {
         console.log("🗺️ Initializing map interaction handler...");
@@ -741,11 +578,11 @@ const useManagers = ({
           });
         }
 
-        // CRITICAL FIX: Force re-initialization of map handler to apply our fixes - with proper safety checks
-        console.log("🧹 Carefully initializing map interaction handler to prevent duplicates");
+        // Initialize map interactions
+        console.log("🧹 Initializing map interaction handler");
         
         // First, make sure global flags are properly set
-        window.isWaypointModeActive = waypointModeActive;
+        window.isWaypointModeActive = window.isWaypointModeActive || false;
         
         // Clean up any existing handlers before initializing new ones
         const map = mapManagerRef.current.getMap();
@@ -754,7 +591,7 @@ const useManagers = ({
           map.off('click');
         }
         
-        // Then, add a small delay to ensure the map is fully loaded
+        // Add a small delay to ensure the map is fully loaded
         setTimeout(() => {
           // Initialize map interactions carefully
           if (mapInteractionHandlerRef.current) {
@@ -783,10 +620,6 @@ const useManagers = ({
       }
     } catch (error) {
       console.error("Error in handleMapReady:", error);
-      // Set loading to false in case of error
-      if (typeof setRegionLoading === 'function') {
-        setRegionLoading(false);
-      }
     }
   };
 

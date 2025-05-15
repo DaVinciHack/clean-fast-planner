@@ -136,84 +136,134 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const legDetails = [];
 
   // First, pre-calculate all leg details and total values for LANDING STOPS ONLY
+  // but include all waypoints between landing stops
   for (let i = 0; i < stopsToProcess.length - 1; i++) {
     const fromWaypoint = stopsToProcess[i];
     const toWaypoint = stopsToProcess[i + 1];
-
-    // Calculate leg distance
-    let legDistance = 0;
-    if (routeStats && routeStats.legs && routeStats.legs[i]) {
-      legDistance = parseFloat(routeStats.legs[i].distance);
-    } else if (window.turf) {
-      // Calculate using turf
-      const from = window.turf.point(fromWaypoint.coords);
-      const to = window.turf.point(toWaypoint.coords);
-      legDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+    
+    // Find the indices of these waypoints in the full waypoints array
+    const fromIndex = waypoints.findIndex(wp => wp.id === fromWaypoint.id);
+    const toIndex = waypoints.findIndex(wp => wp.id === toWaypoint.id);
+    
+    // Get all waypoints between these two landing stops (inclusive)
+    const legWaypoints = [];
+    if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
+      // Extract all waypoints in this leg
+      for (let j = fromIndex; j <= toIndex; j++) {
+        legWaypoints.push(waypoints[j]);
+      }
+    } else {
+      // Fallback if we can't find the waypoints in the array
+      legWaypoints.push(fromWaypoint, toWaypoint);
     }
-
-    // Calculate leg time and fuel with wind adjustments
+    
+    console.log(`StopCardCalculator: Processing leg ${i+1} with ${legWaypoints.length} waypoints (including navigation waypoints)`);
+    
+    // Calculate the total leg distance by summing all segments
+    let legDistance = 0;
     let legTimeHours = 0;
     let legFuel = 0;
-    let legGroundSpeed = aircraft.cruiseSpeed;
-    let headwindComponent = 0;
-
-    // Check for coordinates
-    const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) ||
-                          (fromWaypoint.coords && fromWaypoint.coords.length === 2);
-    const toHasCoords = (toWaypoint.lat && toWaypoint.lon) ||
-                        (toWaypoint.coords && toWaypoint.coords.length === 2);
-
-    if (fromHasCoords && toHasCoords) {
-      // Create lat/lon objects
+    let totalLegGroundSpeed = 0;
+    let totalLegHeadwind = 0;
+    let segmentCount = 0;
+    
+    // Process each segment in the leg
+    for (let j = 0; j < legWaypoints.length - 1; j++) {
+      const segmentFrom = legWaypoints[j];
+      const segmentTo = legWaypoints[j + 1];
+      
+      // Check for coordinates
+      const fromHasCoords = (segmentFrom.lat && segmentFrom.lon) ||
+                          (segmentFrom.coords && segmentFrom.coords.length === 2);
+      const toHasCoords = (segmentTo.lat && segmentTo.lon) ||
+                        (segmentTo.coords && segmentTo.coords.length === 2);
+      
+      if (!fromHasCoords || !toHasCoords) {
+        console.error(`StopCardCalculator: Missing coordinates for segment in leg ${i+1}`);
+        continue;
+      }
+      
+      // Get segment coordinates
       const fromCoords = {
-        lat: fromWaypoint.lat || fromWaypoint.coords[1],
-        lon: fromWaypoint.lon || fromWaypoint.coords[0]
+        lat: segmentFrom.lat || segmentFrom.coords[1],
+        lon: segmentFrom.lon || segmentFrom.coords[0]
       };
-
+      
       const toCoords = {
-        lat: toWaypoint.lat || toWaypoint.coords[1],
-        lon: toWaypoint.lon || toWaypoint.coords[0]
+        lat: segmentTo.lat || segmentTo.coords[1],
+        lon: segmentTo.lon || segmentTo.coords[0]
       };
-
+      
+      // Calculate segment distance
+      let segmentDistance = 0;
+      try {
+        // Calculate using turf
+        const from = window.turf.point([fromCoords.lon, fromCoords.lat]);
+        const to = window.turf.point([toCoords.lon, toCoords.lat]);
+        segmentDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+      } catch (error) {
+        console.error(`StopCardCalculator: Error calculating segment distance in leg ${i+1}:`, error);
+        continue;
+      }
+      
+      // Calculate segment time and fuel with wind adjustments
+      let segmentTimeHours = 0;
+      let segmentFuel = 0;
+      let segmentGroundSpeed = aircraft.cruiseSpeed;
+      let segmentHeadwind = 0;
+      
       // Calculate with wind if available
       if (window.WindCalculations) {
         try {
-          const legDetails = window.WindCalculations.calculateLegWithWind(
+          const segmentDetails = window.WindCalculations.calculateLegWithWind(
             fromCoords,
             toCoords,
-            legDistance,
+            segmentDistance,
             aircraft,
             weather
           );
-
-          legTimeHours = legDetails.time;
-          legFuel = Math.round(legDetails.fuel);
-          legGroundSpeed = Math.round(legDetails.groundSpeed);
-          headwindComponent = Math.round(legDetails.headwindComponent);
+          
+          segmentTimeHours = segmentDetails.time;
+          segmentFuel = Math.round(segmentDetails.fuel);
+          segmentGroundSpeed = Math.round(segmentDetails.groundSpeed);
+          segmentHeadwind = Math.round(segmentDetails.headwindComponent);
+          
+          console.log(`StopCardCalculator: Segment ${j+1} in leg ${i+1}: distance=${segmentDistance.toFixed(1)}nm, time=${segmentTimeHours.toFixed(2)}h, fuel=${segmentFuel}lbs`);
         } catch (error) {
           // Fallback to basic calculation
-          legTimeHours = legDistance / aircraft.cruiseSpeed;
-          legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
-          legGroundSpeed = aircraft.cruiseSpeed;
-          headwindComponent = 0;
+          console.error(`StopCardCalculator: Error calculating wind adjustments for segment in leg ${i+1}:`, error);
+          segmentTimeHours = segmentDistance / aircraft.cruiseSpeed;
+          segmentFuel = Math.round(segmentTimeHours * aircraft.fuelBurn);
+          segmentGroundSpeed = aircraft.cruiseSpeed;
+          segmentHeadwind = 0;
         }
       } else {
-        // Basic calculation
-        legTimeHours = legDistance / aircraft.cruiseSpeed;
-        legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
-        legGroundSpeed = aircraft.cruiseSpeed;
-        headwindComponent = 0;
+        // Basic calculation without wind
+        segmentTimeHours = segmentDistance / aircraft.cruiseSpeed;
+        segmentFuel = Math.round(segmentTimeHours * aircraft.fuelBurn);
+        segmentGroundSpeed = aircraft.cruiseSpeed;
+        segmentHeadwind = 0;
       }
-    } else {
-      // Simple calculation
-      legTimeHours = legDistance / aircraft.cruiseSpeed;
-      legFuel = Math.round(legTimeHours * aircraft.fuelBurn);
+      
+      // Add segment values to leg totals
+      legDistance += segmentDistance;
+      legTimeHours += segmentTimeHours;
+      legFuel += segmentFuel;
+      totalLegGroundSpeed += segmentGroundSpeed;
+      totalLegHeadwind += segmentHeadwind;
+      segmentCount++;
     }
-
-    // Update totals
+    
+    // Calculate average ground speed and headwind for the leg
+    const legGroundSpeed = segmentCount > 0 ? Math.round(totalLegGroundSpeed / segmentCount) : aircraft.cruiseSpeed;
+    const headwindComponent = segmentCount > 0 ? Math.round(totalLegHeadwind / segmentCount) : 0;
+    
+    console.log(`StopCardCalculator: Leg ${i+1} totals: distance=${legDistance.toFixed(1)}nm, time=${legTimeHours.toFixed(2)}h, fuel=${legFuel}lbs`);
+    
+    // Update route totals
     totalDistance += legDistance;
     totalTripFuel += legFuel;
-
+    
     // Store leg details for later use
     legDetails.push({
       fromWaypoint,
@@ -239,7 +289,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   });
 
   // Calculate intermediate stops (for deck fuel)
-  const intermediateStops = Math.max(0, waypoints.length - 2);
+  // Only count landing stops that are not departure or destination
+  const landingStopsCount = landingStopsOnly.length;
+  const intermediateStops = Math.max(0, landingStopsCount - 2);
+  
+  console.log(`StopCardCalculator: Calculating deck time for ${intermediateStops} intermediate stops out of ${landingStopsCount} total landing stops`);
   
   // Calculate deck time and fuel
   const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours

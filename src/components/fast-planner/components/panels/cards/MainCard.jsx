@@ -9,6 +9,7 @@ import '../../flight/stops/StopCards.css';
  * 
  * Contains the main controls including region selection, aircraft configuration,
  * and route statistics from the original RightPanel component.
+ * Now using RegionContext for region management.
  */
 const MainCard = ({
   onClearRoute,
@@ -27,22 +28,15 @@ const MainCard = ({
   authUserName,
   rigsLoading,
   onLogin,
-  // Region selector props
-  regions = [],
-  currentRegion = null,
-  onRegionChange = () => {},
-  regionLoading = false,
   // Read-only values from settings
-  reserveFuel = 0, // Changed default to 0 for safety
+  reserveFuel = 0,
   // Waypoints for stop cards
   waypoints = [],
-  passengerWeight = 0, // Changed default to 0 for safety
-  deckTimePerStop = 0, // Changed default to 0 for safety
-  deckFuelFlow = 0, // Changed default to 0 for safety
-  contingencyFuelPercent = 0, // Added with 0 default for safety
-  taxiFuel = 0, // Added with 0 default for safety
-  // Stop cards prop
-  stopCards = [],
+  passengerWeight = 0,
+  deckTimePerStop = 0,
+  deckFuelFlow = 0,
+  contingencyFuelPercent = 0,
+  taxiFuel = 0,
   // Weather props
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {},
@@ -82,12 +76,8 @@ const MainCard = ({
     <div className="tab-content main-tab">
       <div className="panel-header">
         <div className="region-selector-container">
-          <RegionSelector
-            regions={regions}
-            currentRegion={currentRegion}
-            onRegionChange={onRegionChange}
-            isLoading={regionLoading}
-          />
+          {/* RegionSelector no longer needs props as it gets everything from RegionContext */}
+          <RegionSelector />
         </div>
       </div>
       
@@ -98,7 +88,6 @@ const MainCard = ({
             selectedAircraft={selectedAircraft}
             waypoints={waypoints}
             routeStats={routeStats}
-            currentRegion={currentRegion}
             onSuccess={handleSaveSuccess}
             onError={handleSaveError}
             style={{ flex: 1, margin: 0 }}
@@ -499,17 +488,14 @@ const MainCard = ({
             selectedAircraft={selectedAircraft}
             passengerWeight={passengerWeight}
             reserveFuel={reserveFuel}
-            contingencyFuelPercent={contingencyFuelPercent} // Use the value passed from props
+            contingencyFuelPercent={contingencyFuelPercent}
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}
-            taxiFuel={taxiFuel} // Use the value passed from props
+            taxiFuel={taxiFuel}
             weather={weather}
-            stopCards={stopCards}
           />
         )}
       </div>
-      
-      {/* API Testing Tools section removed */}
     </div>
   );
 };
