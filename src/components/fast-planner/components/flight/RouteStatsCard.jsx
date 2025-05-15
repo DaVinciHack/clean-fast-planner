@@ -311,14 +311,13 @@ const RouteStatsCard = ({
           }
         }
       } else if (routeStats.windData.windSpeed > 0) {
-        // Fallback if no legs with headwind - use simple approximation
-        // This is a crude approximation based on wind speed
-        const windSpeed = routeStats.windData.windSpeed;
-        const avgHeadwind = Math.round(windSpeed / 2); // Simple approximation
+        // SAFETY FIX: Always use 0 when no leg headwind data is available
+        // Do NOT use any estimation or fallback calculation for safety reasons
+        const avgHeadwind = 0;
         
-        console.log(`⚠️ No leg headwind data, using simple approximation: ${avgHeadwind}kt`);
+        console.log(`⚠️ No leg headwind data, defaulting to 0kt for safety`);
         
-        // Update the windData with the approximated avgHeadwind
+        // Update the windData with 0 avgHeadwind
         routeStats.windData.avgHeadwind = avgHeadwind;
         
         // Also update window.currentRouteStats
