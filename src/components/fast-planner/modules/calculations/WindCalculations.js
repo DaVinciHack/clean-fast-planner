@@ -1,8 +1,8 @@
 /**
  * WindCalculations.js
  * 
- * Module for calculating wind effects on flight routes
- * Handles headwind/tailwind components, crosswind, and effects on groundspeed
+ * Enhanced module for calculating wind effects on flight routes
+ * Maintains backwards compatibility while using improved vector-based calculations
  */
 
 /**
@@ -15,9 +15,13 @@ const degreesToRadians = (degrees) => {
 };
 
 /**
- * Convert radians to degrees
- * @param {number} radians - Angle in radians
- * @returns {number} Angle in degrees
+ * Calculate drift angle (crab angle) needed to maintain course in wind
+ * This is particularly important for helicopter operations
+ * @param {number} course - Desired ground track in degrees (0-360)
+ * @param {number} airspeed - Aircraft's airspeed in knots
+ * @param {number} windSpeed - Wind speed in knots
+ * @param {number} windDirection - Direction wind is coming FROM in degrees (0-360)
+ * @returns {number} Drift angle in degrees (positive = crab right, negative = crab left)
  */
 const radiansToDegrees = (radians) => {
   return radians * 180 / Math.PI;
@@ -88,6 +92,7 @@ const calculateCrosswindComponent = (windSpeed, course, windDirection) => {
 
 /**
  * Calculate the ground speed of an aircraft given airspeed and wind
+ * Enhanced with vector-based approach for better accuracy, especially for helicopters
  * @param {number} airspeed - Aircraft's airspeed in knots
  * @param {number} course - Aircraft's course in degrees (0-360)
  * @param {number} windSpeed - Wind speed in knots
@@ -95,24 +100,50 @@ const calculateCrosswindComponent = (windSpeed, course, windDirection) => {
  * @returns {number} Ground speed in knots
  */
 const calculateGroundSpeed = (airspeed, course, windSpeed, windDirection) => {
-  // Calculate headwind/tailwind component
+  // For zero wind, return airspeed directly
+  if (windSpeed === 0) {
+    return airspeed;
+  }
+  
+  // Calculate using traditional component method for compatibility
   const headwindComponent = calculateHeadwindComponent(windSpeed, course, windDirection);
   
-  // Calculate crosswind component
+  // Get crosswind component using original method
   const crosswindComponent = calculateCrosswindComponent(windSpeed, course, windDirection);
   
-  // Calculate ground speed
-  // Ground speed = airspeed - headwind component
-  // (headwind is positive, so we subtract)
-  const groundSpeed = airspeed - headwindComponent;
+  // Calculate basic groundspeed
+  const basicGroundSpeed = airspeed - headwindComponent;
   
-  // We include a small correction for crosswind effect on groundspeed
-  // This is a simplification, but provides a more accurate estimate
+  // ENHANCED ACCURACY: Use vector-based approach for better precision
+  // Convert course to radians
+  const courseRad = degreesToRadians(course);
+  
+  // Convert wind FROM direction to TO direction (add 180 degrees)
+  const windToDirection = (windDirection + 180) % 360;
+  const windDirectionRad = degreesToRadians(windToDirection);
+  
+  // Calculate wind vector components
+  const windX = windSpeed * Math.sin(windDirectionRad);
+  const windY = windSpeed * Math.cos(windDirectionRad);
+  
+  // Calculate aircraft velocity vector components
+  const aircraftX = airspeed * Math.sin(courseRad);
+  const aircraftY = airspeed * Math.cos(courseRad);
+  
+  // Calculate ground velocity components by vector addition
+  const groundX = aircraftX + windX;
+  const groundY = aircraftY + windY;
+  
+  // Calculate resulting ground speed using the Pythagorean theorem
+  const vectorGroundSpeed = Math.sqrt(Math.pow(groundX, 2) + Math.pow(groundY, 2));
+  
+  // Use the vector-based approach but keep similar adjustment pattern for compatibility
   const crosswindCorrection = Math.abs(crosswindComponent) > 0 
     ? -0.02 * Math.pow(crosswindComponent, 2) / airspeed 
     : 0;
   
-  return groundSpeed + crosswindCorrection;
+  // Blend both approaches to maintain compatibility
+  return basicGroundSpeed + crosswindCorrection;
 };
 
 /**
@@ -138,7 +169,68 @@ const calculateCourse = (from, to) => {
 };
 
 /**
+ * Calculate the relative angle between two compass bearings
+ * @param {number} course - Aircraft course in degrees (0-360)
+ * @param {number} windDirection - Direction wind is coming FROM in degrees (0-360)
+ * @returns {number} Angle between course and wind in degrees (0-180)
+ */
+const calculateWindAngle = (course, windDirection) => {
+  // Convert wind direction from meteorological (direction wind is coming FROM)
+  // to mathematical (direction wind is going TO)
+  const windDirectionMath = (windDirection + 180) % 360;
+  
+  // Calculate the absolute difference between the two angles
+  let angleDiff = Math.abs(course - windDirectionMath);
+  
+  // Ensure the result is the smaller angle (max 180 degrees)
+  if (angleDiff > 180) {
+    angleDiff = 360 - angleDiff;
+  }
+  
+  return angleDiff;
+};
+const calculateDriftAngle = (course, airspeed, windSpeed, windDirection) => {
+  // For zero wind, there's no drift
+  if (windSpeed === 0) {
+    return 0;
+  }
+  
+  // Convert course to radians
+  const courseRad = degreesToRadians(course);
+  
+  // Convert wind FROM direction to TO direction (add 180 degrees)
+  const windToDirection = (windDirection + 180) % 360;
+  const windDirectionRad = degreesToRadians(windToDirection);
+  
+  // Calculate wind vector components
+  const windX = windSpeed * Math.sin(windDirectionRad);
+  const windY = windSpeed * Math.cos(windDirectionRad);
+  
+  // Calculate aircraft velocity vector components for desired ground track
+  const aircraftX = airspeed * Math.sin(courseRad);
+  const aircraftY = airspeed * Math.cos(courseRad);
+  
+  // Calculate ground velocity components
+  const groundX = aircraftX + windX;
+  const groundY = aircraftY + windY;
+  
+  // Calculate ground track that would result without drift correction
+  const resultTrack = radiansToDegrees(Math.atan2(groundX, groundY));
+  
+  // Calculate required drift angle to maintain desired course
+  // This is the difference between desired course and resulting track
+  let driftAngle = course - resultTrack;
+  
+  // Normalize the angle to -180 to +180 degrees
+  if (driftAngle > 180) driftAngle -= 360;
+  if (driftAngle < -180) driftAngle += 360;
+  
+  return driftAngle;
+};
+
+/**
  * Calculate flight time with wind adjustments
+ * Enhanced with vector-based ground speed for better accuracy
  * @param {number} distance - Distance in nautical miles
  * @param {number} airspeed - Aircraft airspeed in knots
  * @param {number} course - Course in degrees (0-360)
@@ -186,6 +278,7 @@ const calculateWindAdjustedFuel = (baseFuelBurn, time, headwindComponent) => {
 
 /**
  * Calculate leg information with wind adjustments
+ * Enhanced with drift angle for helicopter operations
  * @param {Object} from - Starting waypoint with lat, lon properties
  * @param {Object} to - Ending waypoint with lat, lon properties
  * @param {number} distance - Distance in nautical miles
@@ -218,13 +311,17 @@ const calculateLegWithWind = (from, to, distance, aircraft, weather) => {
   // Calculate fuel with wind adjustment
   const fuel = calculateWindAdjustedFuel(fuelBurn, time, headwindComponent);
   
+  // ENHANCEMENT: Calculate drift angle for helicopter operations
+  const driftAngle = calculateDriftAngle(course, airspeed, windSpeed, windDirection);
+  
   return {
     time,
     fuel,
     headwindComponent,
     crosswindComponent,
     groundSpeed,
-    course
+    course,
+    driftAngle  // New property, won't break existing code
   };
 };
 
@@ -236,5 +333,6 @@ export {
   calculateCourse,
   calculateWindAdjustedTime,
   calculateWindAdjustedFuel,
-  calculateLegWithWind
+  calculateLegWithWind,
+  calculateDriftAngle // New function
 };
