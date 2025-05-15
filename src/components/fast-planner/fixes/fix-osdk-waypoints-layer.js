@@ -27,6 +27,22 @@
     window.platformManager._addOsdkWaypointsToMap = function() {
       console.log('🔧 Using fixed _addOsdkWaypointsToMap method...');
       
+      // Fix: Add data-zoom-level to map container when adding waypoints
+      const map = this.mapManager.getMap();
+      if (map) {
+        // Set initial zoom level
+        const currentZoom = map.getZoom();
+        const zoomLevel = currentZoom < 9 ? 'low' : (currentZoom < 13 ? 'medium' : 'high');
+        map.getContainer().setAttribute('data-zoom-level', zoomLevel);
+        
+        // Update on zoom changes
+        map.on('zoomend', () => {
+          const zoom = map.getZoom();
+          const level = zoom < 9 ? 'low' : (zoom < 13 ? 'medium' : 'high');
+          map.getContainer().setAttribute('data-zoom-level', level);
+        });
+      }
+      
       this.mapManager.onMapLoaded(() => {
         const map = this.mapManager.getMap();
         if (!map || !this.osdkWaypoints || this.osdkWaypoints.length === 0) {
@@ -122,9 +138,17 @@
                 type: 'circle',
                 source: sourceId,
                 paint: {
-                  'circle-radius': 3,
+                  // Change size based on zoom level
+                  'circle-radius': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    6, 1.5, // Smallest at low zoom (3px)
+                    9, 2.5, // Medium at medium zoom (5px) 
+                    12, 4   // Largest at high zoom (8px)
+                  ],
                   'circle-color': '#FFCC00', // Yellow
-                  'circle-stroke-width': 1,
+                  'circle-stroke-width': 0.5, // Thinner stroke
                   'circle-stroke-color': '#FFFFFF'
                 },
                 layout: {
@@ -167,12 +191,31 @@
                   'text-anchor': 'top',
                   'text-offset': [0, 0.5],
                   'text-allow-overlap': false,
-                  'visibility': this.osdkWaypointsVisible ? 'visible' : 'none'
+                  // Only show labels when zoom level is 11 or higher
+                  'visibility': this.osdkWaypointsVisible ? 'visible' : 'none',
+                  'text-size': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    8, 0, // No text at zoom level 8 or below
+                    9, 0, // No text at zoom level 9
+                    10, 0, // No text at zoom level 10
+                    11, 8, // Small text at zoom 11
+                    14, 10 // Slightly larger text at zoom 14+
+                  ]
                 },
                 paint: {
                   'text-color': '#FFCC00',
                   'text-halo-color': '#000000',
-                  'text-halo-width': 0.5
+                  'text-halo-width': 0.5,
+                  // Fade in text with zoom level
+                  'text-opacity': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    8, 0, // Completely transparent at zoom 8
+                    11, 1 // Fully opaque at zoom 11
+                  ]
                 }
               });
             } catch (e) {

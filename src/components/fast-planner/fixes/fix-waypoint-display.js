@@ -344,7 +344,13 @@
                     type: 'circle',
                     source: 'osdk-waypoints-source',
                     paint: {
-                      'circle-radius': 3,
+                      'circle-radius': [
+                        'interpolate', ['linear'], ['zoom'],
+                        7, 1,      // Small 1px dots at low zoom
+                        10, 2,     // Medium 2px dots at medium zoom 
+                        13, 3,     // Larger 3px dots at high zoom
+                        16, 5      // Very large 5px dots at very high zoom
+                      ],
                       'circle-color': '#FFCC00',
                       'circle-stroke-width': 1,
                       'circle-stroke-color': '#FFFFFF'
@@ -361,7 +367,13 @@
                     source: 'osdk-waypoints-source',
                     layout: {
                       'text-field': ['get', 'name'],
-                      'text-size': 9,
+                      'text-size': [
+                        'interpolate', ['linear'], ['zoom'],
+                        8, 0,      // No label below zoom level 8
+                        9, 8,      // Small labels at zoom level 9
+                        12, 10,    // Medium labels at zoom level 12
+                        15, 12     // Larger labels at zoom level 15+
+                      ],
                       'text-anchor': 'top',
                       'text-offset': [0, 0.5],
                       'text-allow-overlap': false,
@@ -370,7 +382,7 @@
                     paint: {
                       'text-color': '#FFCC00',
                       'text-halo-color': '#000000',
-                      'text-halo-width': 0.5
+                      'text-halo-width': 1.5
                     }
                   });
                   

@@ -514,6 +514,20 @@
   transition: background-color 0.3s ease;
 }
 
+/* Background color for the waypoint entries - exact match to image 2 */
+.stop-entry[data-waypoint="true"] {
+  padding: 2px 8px 2px 36px;
+  margin: 4px 0; /* More space between cards */
+  background-color: #242b34; /* Exact main background color from image 2 */
+  border: none;
+  border-left: 4px solid #1e8ffe; /* Exact blue color from image 2 */
+  border-radius: 2px; /* Slight rounded corners */
+  display: flex;
+  align-items: center;
+  height: 18px; /* 2px taller as requested */
+  position: relative; /* Ensure positioning context for drag handle */
+}
+
 .stop-entry input {
   width: calc(100% - 50px); /* Make room for controls */
   padding: 4px 5px;
@@ -526,10 +540,38 @@
   height: 26px;
 }
 
+/* Smaller input field for waypoints */
+.stop-entry[data-waypoint="true"] input {
+  height: 22px;
+  font-size: 13px;
+  background-color: transparent; 
+  border: none;
+  padding: 2px 4px;
+  color: white;
+  width: 70px; /* Fixed width for waypoint name similar to image 2 */
+  margin: 0;
+  font-weight: 500;
+}
+
 .stop-entry .coordinates {
   font-size: 10px;
   color: var(--label-color);
   margin-top: 2px;
+}
+
+/* Hide regular coordinates for waypoints */
+.stop-entry[data-waypoint="true"] .coordinates {
+  display: none;
+}
+
+/* Coordinates for waypoints - moved to left side */
+.stop-entry[data-waypoint="true"]::after {
+  content: attr(data-lat) ", " attr(data-lon);
+  position: absolute;
+  left: 115px; /* Position to the right of the waypoint name */
+  top: 5px; /* Align with image 2 */
+  font-size: 7px; /* Even smaller font size */
+  color: rgba(140, 160, 190, 0.8); /* Light blue color */
 }
 
 .stop-controls {
@@ -539,6 +581,59 @@
   display: flex;
   align-items: center;
   gap: 5px; /* Add spacing between controls */
+}
+
+/* Adjust controls position for waypoints */
+.stop-entry[data-waypoint="true"] .stop-controls {
+  position: static;
+  margin-left: auto;
+  gap: 5px;
+}
+
+/* Make the waypoint name element smaller */
+.stop-entry[data-waypoint="true"] input {
+  height: 14px; /* Even smaller height */
+  font-size: 10px; /* Even smaller font */
+  background-color: transparent; 
+  border: none;
+  padding: 1px 3px;
+  color: white;
+  width: 60px; /* Fixed smaller width */
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Hide favorite button for waypoints */
+.stop-entry[data-waypoint="true"] .favorite-button {
+  display: none;
+}
+
+/* Style the delete button for waypoints */
+.stop-entry[data-waypoint="true"] .remove-stop {
+  color: rgba(255, 255, 255, 0.7);
+  padding: 1px;
+  font-size: 9px; /* Smaller X */
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Special WP indicator for navigation waypoints - match image 2 */
+.stop-entry[data-waypoint="true"]::before {
+  content: "WP";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #253f5c; /* Exact background color for WP box */
+  color: #1e8ffe; /* Exact blue text color */
+  font-size: 7px; /* Even smaller font for WP text */
+  font-weight: bold;
+  padding: 1px 2px;
+  border-radius: 2px;
+  width: 16px;
+  text-align: center;
 }
 
 .favorite-button {
@@ -637,6 +732,25 @@
   color: var(--label-color);
 }
 
+/* Waypoint specific drag handle */
+.stop-entry[data-waypoint="true"] .drag-handle {
+  cursor: grab;
+  padding: 1px;
+  color: rgba(255, 255, 255, 0.7);
+  position: absolute;
+  right: 20px; /* Adjusted position */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px; /* Even smaller */
+}
+
+/* Ensure the equals sign appears as drag handle */
+.stop-entry[data-waypoint="true"] .drag-handle::before {
+  content: "≡";
+  display: inline-block;
+  font-weight: normal;
+}
+
 .remove-stop {
   cursor: pointer;
   color: var(--danger-color);
@@ -648,9 +762,23 @@
   border: 2px dashed var(--button-bg);
 }
 
+/* Dragging state for waypoints */
+.stop-entry[data-waypoint="true"].dragging {
+  opacity: 0.5;
+  border-left: 4px solid #4080ff;
+  box-shadow: 0 0 10px rgba(64, 128, 255, 0.5);
+  z-index: 100;
+}
+
 .drag-over {
   border: 2px dashed var(--button-bg);
   background-color: rgba(0, 123, 255, 0.1);
+}
+
+/* Drag-over state for waypoints */
+.stop-entry[data-waypoint="true"].drag-over {
+  border-left: 4px solid #4080ff;
+  background-color: rgba(64, 128, 255, 0.2);
 }
 
 .route-editor-panel h3 {
@@ -1334,14 +1462,93 @@
 .custom-waypoint-marker {
   cursor: grab;
   transition: transform 0.2s ease;
+  width: 1px !important; /* Make smaller: 1px instead of 3px */
+  height: 1px !important; /* Make smaller: 1px instead of 3px */
 }
 
 .custom-waypoint-marker:hover {
-  transform: scale(1.2);
+  transform: scale(1.5);
 }
 
 .custom-waypoint-marker:active {
   cursor: grabbing;
+}
+
+/* Waypoint labels controlled by zoom level */
+.mapboxgl-marker .waypoint-label {
+  display: none; /* Hide labels by default at low zoom */
+  font-size: 0px;
+  color: white;
+  background-color: rgba(30, 143, 254, 0.7);
+  padding: 2px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Show labels at medium zoom levels */
+.mapboxgl-map[data-zoom-level="medium"] .mapboxgl-marker .waypoint-label {
+  display: block;
+  font-size: 8px;
+}
+
+/* Larger labels at high zoom levels */
+.mapboxgl-map[data-zoom-level="high"] .mapboxgl-marker .waypoint-label {
+  display: block;
+  font-size: 10px;
+  padding: 3px 5px;
+}
+
+/* Very large labels at very high zoom levels */
+.mapboxgl-map[data-zoom-level="very-high"] .mapboxgl-marker .waypoint-label {
+  display: block;
+  font-size: 12px;
+  padding: 4px 6px;
+  font-weight: bold;
+}
+
+/* Custom waypoint marker dot size */
+.custom-waypoint-marker {
+  width: 1px !important; /* Default size - small 1px dot */
+  height: 1px !important;
+}
+
+/* Larger markers at higher zoom levels */
+.mapboxgl-map[data-zoom-level="medium"] .custom-waypoint-marker {
+  width: 2px !important; 
+  height: 2px !important;
+}
+
+.mapboxgl-map[data-zoom-level="high"] .custom-waypoint-marker {
+  width: 3px !important;
+  height: 3px !important;
+}
+
+.mapboxgl-map[data-zoom-level="very-high"] .custom-waypoint-marker {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+/* Style for the vector waypoint layer (OSDK waypoints) */
+.mapboxgl-map circle[data-layer="osdk-waypoints-layer"] {
+  r: 1 !important; /* Default size - small 1px radius */
+}
+
+/* Adjust OSDK waypoint sizes based on zoom */
+.mapboxgl-map[data-zoom-level="medium"] circle[data-layer="osdk-waypoints-layer"] {
+  r: 2 !important; /* Medium size at medium zoom */
+}
+
+.mapboxgl-map[data-zoom-level="high"] circle[data-layer="osdk-waypoints-layer"] {
+  r: 3 !important; /* Larger size at high zoom */
+}
+
+.mapboxgl-map[data-zoom-level="very-high"] circle[data-layer="osdk-waypoints-layer"] {
+  r: 5 !important; /* Even larger size at very high zoom */
 }
 
 /* Mapbox overrides for dark theme */
