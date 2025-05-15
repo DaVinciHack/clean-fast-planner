@@ -45,7 +45,15 @@ class MapInteractions {
    */
   initialize(mapInstance, waypointManager, platformManager) {
     if (!mapInstance) {
+      console.error('Map instance is required for MapInteractions');
       this.triggerCallback('onError', new Error('Map instance is required'));
+      return false;
+    }
+    
+    // Wait for map to be fully loaded
+    if (typeof mapInstance.on !== 'function') {
+      console.error('Invalid map instance provided: missing .on method');
+      this.triggerCallback('onError', new Error('Invalid map instance'));
       return false;
     }
     
@@ -53,8 +61,31 @@ class MapInteractions {
     this.waypointManager = waypointManager;
     this.platformManager = platformManager;
     
-    // Set up event handlers
-    this.setupEventHandlers();
+    // Check if the map is fully loaded and has needed methods
+    if (typeof this.map.getLayer !== 'function' || 
+        typeof this.map.addLayer !== 'function') {
+      console.warn('Map instance may not be fully initialized yet');
+      
+      // Set up event handlers when map is loaded
+      if (!this.map.loaded()) {
+        console.log('Map not loaded yet, waiting for load event');
+        this.map.once('load', () => {
+          console.log('Map load event fired, setting up event handlers');
+          this.setupEventHandlers();
+        });
+      } else {
+        // Map is loaded but doesn't have expected methods
+        console.error('Map is loaded but missing required methods');
+        this.triggerCallback('onError', new Error('Invalid map state'));
+        return false;
+      }
+    } else {
+      // Map is already loaded, set up event handlers
+      this.setupEventHandlers();
+    }
+    
+    // Flag as initialized for global tracking
+    window.mapHandlersInitialized = true;
     
     console.log('MapInteractions successfully initialized');
     return true;
@@ -64,54 +95,139 @@ class MapInteractions {
    * Set up map event handlers with clean separation
    */
   setupEventHandlers() {
-    if (!this.map) return false;
+    if (!this.map) {
+      console.error('Map not available for setupEventHandlers');
+      return false;
+    }
     
     const map = this.map;
     
-    // Map click handler
-    if (this.config.enableMapClick) {
-      map.on('click', this.handleMapClick);
-    }
-    
-    // Platform click handler (if layers exist)
-    if (map.getLayer('platforms')) {
-      map.on('click', 'platforms', this.handlePlatformClick);
+    try {
+      // Map click handler
+      if (this.config.enableMapClick) {
+        // First remove any existing handlers to prevent duplicates
+        map.off('click', this.handleMapClick);
+        map.on('click', this.handleMapClick);
+        console.log('Added map click handler');
+      }
       
-      // Add hover effect
-      map.on('mouseenter', 'platforms', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      
-      map.on('mouseleave', 'platforms', () => {
-        map.getCanvas().style.cursor = '';
-      });
-    }
-    
-    // Route click and drag handlers (if route layer exists)
-    if (map.getLayer('route') && this.config.enableDrag) {
-      map.on('click', 'route', this.handleRouteClick);
-      
-      // Setup route drag functionality
-      this.setupRouteDragHandlers();
-      
-      // Add hover effect for route
-      map.on('mouseenter', 'route', () => {
-        if (!this.isDragging) {
-          map.getCanvas().style.cursor = 'pointer';
+      // Set up platform layer handlers if they exist or when they're created
+      const setupPlatformHandlers = () => {
+        const platformLayers = [
+          'platforms-fixed-layer',
+          'platforms-movable-layer',
+          'airfields-layer'
+        ];
+        
+        // Check if any platform layers exist
+        const layerExists = platformLayers.some(layer => map.getLayer(layer));
+        
+        if (layerExists) {
+          // Setup handlers for each layer
+          platformLayers.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              // First remove any existing handlers to prevent duplicates
+              map.off('click', layerId, this.handlePlatformClick);
+              map.on('click', layerId, this.handlePlatformClick);
+              
+              // Add hover effect
+              map.off('mouseenter', layerId);
+              map.on('mouseenter', layerId, () => {
+                map.getCanvas().style.cursor = 'pointer';
+              });
+              
+              map.off('mouseleave', layerId);
+              map.on('mouseleave', layerId, () => {
+                map.getCanvas().style.cursor = '';
+              });
+              
+              console.log(`Added handlers for platform layer: ${layerId}`);
+            }
+          });
+        } else {
+          // No platform layers yet - wait for source events
+          console.log('No platform layers exist yet, will listen for them to be added');
+          
+          // Listen for sourcedata event to detect when layers are added
+          const sourceDataListener = (e) => {
+            if (e.sourceID === 'major-platforms' || e.sourceId === 'major-platforms') {
+              // Check if layers now exist
+              const nowExists = platformLayers.some(layer => map.getLayer(layer));
+              if (nowExists) {
+                console.log('Platform layers detected, adding handlers');
+                map.off('sourcedata', sourceDataListener);
+                setupPlatformHandlers();
+              }
+            }
+          };
+          
+          // Add the listener
+          map.on('sourcedata', sourceDataListener);
         }
-      });
+      };
       
-      map.on('mouseleave', 'route', () => {
-        if (!this.isDragging) {
-          map.getCanvas().style.cursor = '';
+      // Call function to set up platform handlers
+      setupPlatformHandlers();
+      
+      // Set up route layer handlers
+      const setupRouteHandlers = () => {
+        if (map.getLayer('route')) {
+          // Route click handler
+          map.off('click', 'route', this.handleRouteClick);
+          map.on('click', 'route', this.handleRouteClick);
+          
+          // Setup route drag functionality if enabled
+          if (this.config.enableDrag) {
+            this.setupRouteDragHandlers();
+          }
+          
+          // Add hover effect for route
+          map.off('mouseenter', 'route');
+          map.on('mouseenter', 'route', () => {
+            if (!this.isDragging) {
+              map.getCanvas().style.cursor = 'pointer';
+            }
+          });
+          
+          map.off('mouseleave', 'route');
+          map.on('mouseleave', 'route', () => {
+            if (!this.isDragging) {
+              map.getCanvas().style.cursor = '';
+            }
+          });
+          
+          console.log('Added route handlers');
+        } else {
+          // No route layer yet - wait for it to be added
+          console.log('No route layer exists yet, will listen for it to be added');
+          
+          // Listen for sourcedata event to detect when the route layer is added
+          const sourceDataListener = (e) => {
+            if (e.sourceID === 'route' || e.sourceId === 'route') {
+              if (map.getLayer('route')) {
+                console.log('Route layer detected, adding handlers');
+                map.off('sourcedata', sourceDataListener);
+                setupRouteHandlers();
+              }
+            }
+          };
+          
+          // Add the listener
+          map.on('sourcedata', sourceDataListener);
         }
-      });
+      };
+      
+      // Call function to set up route handlers
+      setupRouteHandlers();
+      
+      // Add event listeners to panels to prevent event propagation
+      this.setupPanelEventHandlers();
+      
+      return true;
+    } catch (error) {
+      console.error('Error setting up map event handlers:', error);
+      return false;
     }
-    
-    // Add event listeners to panels to prevent event propagation
-    this.setupPanelEventHandlers();
-    
-    return true;
   }
   
   /**

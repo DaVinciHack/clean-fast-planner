@@ -7,7 +7,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  */
 const useAircraft = ({
   aircraftManagerRef,
-  currentRegion,
   appSettingsManagerRef,
   setFlightSettings
 }) => {
@@ -62,21 +61,21 @@ const useAircraft = ({
       }
       setAircraftLoading(false);
     });
-  }, [ // Dependencies for setupAircraftCallbacks
-    aircraftManagerInstanceRef, 
-    currentRegionInstanceRef,
-    setAircraftList, 
-    setAircraftsByType, 
-    setAircraftTypes, 
-    setAircraftLoading
-  ]);
+  }, []);
 
-  // Setup aircraft loading/filtering callbacks
+  // Update managers when refs change
   useEffect(() => {
-    if (aircraftManagerInstanceRef.current) {
+    if (aircraftManagerRef && aircraftManagerRef.current) {
+      aircraftManagerInstanceRef.current = aircraftManagerRef.current;
       setupAircraftCallbacks();
     }
-  }, [aircraftManagerInstanceRef.current, setupAircraftCallbacks]);
+  }, [aircraftManagerRef, setupAircraftCallbacks]);
+
+  useEffect(() => {
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
+      appSettingsManagerInstanceRef.current = appSettingsManagerRef.current;
+    }
+  }, [appSettingsManagerRef]);
 
   // Load aircraft data when region changes or aircraftType changes
   useEffect(() => {
@@ -85,7 +84,7 @@ const useAircraft = ({
       setAircraftLoading(true);
       aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id, aircraftType);
     }
-  }, [currentRegionInstanceRef.current?.id, aircraftType, aircraftManagerInstanceRef]); // Removed setupAircraftCallbacks from here
+  }, [currentRegionInstanceRef.current?.id, aircraftType]);
 
   const setAircraftManagers = useCallback((aircraftManager, appSettingsManager) => {
     console.log('Setting aircraft managers:', { 
@@ -100,7 +99,7 @@ const useAircraft = ({
     if (aircraftManager) {
         setupAircraftCallbacks();
     }
-  }, [setupAircraftCallbacks]); // Dependency: setupAircraftCallbacks
+  }, [setupAircraftCallbacks]);
 
   const setCurrentAircraftRegion = useCallback((region) => {
     console.log('Setting current aircraft region:', region?.name);
@@ -111,7 +110,7 @@ const useAircraft = ({
       setAircraftLoading(true); // Set loading true before filtering
       aircraftManagerInstanceRef.current.filterAircraft(region.id, aircraftType);
     }
-  }, [aircraftType, aircraftManagerInstanceRef, setAircraftLoading]); // Dependencies
+  }, [aircraftType]);
 
   /**
    * Change the selected aircraft type
