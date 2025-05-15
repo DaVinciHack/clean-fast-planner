@@ -241,6 +241,9 @@ const useWeather = ({
 
       // Process each leg
       let totalHeadwind = 0;
+      let totalHeadwindWeight = 0;
+      let totalLegWeight = 0;
+      
       if (updatedRoute.legs) {
         updatedRoute.legs.forEach((leg, index) => {
           if (leg.course !== undefined) {
@@ -251,14 +254,31 @@ const useWeather = ({
               weather.windDirection
             );
             leg.headwind = headwind;
+            
+            // For simple average (backward compatibility)
             totalHeadwind += headwind;
+            
+            // For time-weighted average (more accurate)
+            if (leg.time !== undefined) {
+              const legWeight = leg.time;
+              totalHeadwindWeight += headwind * legWeight;
+              totalLegWeight += legWeight;
+            }
           }
         });
 
         // Calculate average headwind
-        updatedRoute.windData.avgHeadwind = updatedRoute.legs.length > 0 
-          ? totalHeadwind / updatedRoute.legs.length 
-          : 0;
+        // First try time-weighted average if we have time data
+        if (totalLegWeight > 0) {
+          updatedRoute.windData.avgHeadwind = Math.round(totalHeadwindWeight / totalLegWeight);
+          console.log('🌬️ Using time-weighted average headwind:', updatedRoute.windData.avgHeadwind);
+        } else {
+          // Fall back to simple average if no time data
+          updatedRoute.windData.avgHeadwind = updatedRoute.legs.length > 0 
+            ? Math.round(totalHeadwind / updatedRoute.legs.length) 
+            : 0;
+          console.log('🌬️ Using simple average headwind (no time data):', updatedRoute.windData.avgHeadwind);
+        }
       }
 
       return updatedRoute;
