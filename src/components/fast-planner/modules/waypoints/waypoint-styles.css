@@ -7,21 +7,63 @@
 
 /* Enhance markers for waypoints and stops */
 .mapboxgl-marker[data-marker-type="waypoint"] {
-  filter: drop-shadow(0 0 4px rgba(255, 204, 0, 0.9)) !important;
-  transition: transform 0.2s ease-in-out;
+  filter: drop-shadow(0 0 2px rgba(64, 224, 208, 0.6)) !important; /* Turquoise drop shadow */
+  transition: all 0.2s ease-in-out;
+  width: 3px !important; /* Tiny 3px markers by default */
+  height: 3px !important;
+  background-color: turquoise !important; /* Turquoise color for waypoints */
+  border-radius: 50% !important;
 }
 
 .mapboxgl-marker[data-marker-type="waypoint"]:hover {
-  transform: scale(1.2) !important;
+  transform: scale(1.5) !important;
+  filter: drop-shadow(0 0 3px rgba(64, 224, 208, 0.9)) !important; /* Turquoise drop shadow */
 }
 
-.mapboxgl-marker[data-marker-type="stop"] {
-  filter: drop-shadow(0 0 3px rgba(255, 65, 54, 0.7)) !important;
-  transition: transform 0.2s ease-in-out;
+/* Adjust marker sizes based on zoom level */
+.mapboxgl-map[data-zoom-level="low"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 3px !important;
+  height: 3px !important;
 }
 
-.mapboxgl-marker[data-marker-type="stop"]:hover {
-  transform: scale(1.1) !important;
+.mapboxgl-map[data-zoom-level="medium"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+.mapboxgl-map[data-zoom-level="high"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* Waypoint labels visibility based on zoom */
+.mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: none; /* Hide by default */
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background-color: rgba(36, 43, 52, 0.8);
+  color: white;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 8px;
+  margin-bottom: 3px;
+  pointer-events: none;
+  border: 1px solid rgba(30, 143, 254, 0.5);
+}
+
+/* Show labels at higher zoom levels */
+.mapboxgl-map[data-zoom-level="medium"] .mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: block;
+  font-size: 7px;
+}
+
+.mapboxgl-map[data-zoom-level="high"] .mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: block;
+  font-size: 9px;
+  padding: 3px 6px;
 }
 
 /* Waypoint mode indicator */

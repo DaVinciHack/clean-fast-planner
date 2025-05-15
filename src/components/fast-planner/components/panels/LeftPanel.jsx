@@ -241,6 +241,8 @@ const LeftPanel = ({
               key={waypoint.id} 
               data-id={waypoint.id} 
               data-waypoint={waypoint.isWaypoint === true || waypoint.type === 'WAYPOINT' ? 'true' : 'false'}
+              data-lat={waypoint.coords ? waypoint.coords[1].toFixed(2) : ''}
+              data-lon={waypoint.coords ? waypoint.coords[0].toFixed(2) : ''}
               draggable={true}
               onDragStart={(e) => handleDragStart(e, waypoint.id)}
               onDragEnd={handleDragEnd}

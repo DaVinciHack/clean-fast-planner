@@ -50,9 +50,9 @@
         
         // MARKER SIZE FIX: Create a much smaller marker
         const marker = new window.mapboxgl.Marker({
-          color: isWaypoint ? "#FFCC00" : "#FF4136",
+          color: isWaypoint ? "turquoise" : "#FF4136",
           draggable: true,
-          scale: 0.25 // Make them tiny (25% of normal size)
+          scale: 0.1 // Make them tiny (3px) by scaling way down
         })
         .setLngLat(coords)
         .addTo(map);
@@ -67,6 +67,15 @@
         });
         
         const displayName = name || (isWaypoint ? 'Navigation Waypoint' : 'Landing Stop');
+        
+        // Create a label element for the marker (initially hidden by CSS)
+        if (isWaypoint) {
+          // Create label element
+          const labelDiv = document.createElement('div');
+          labelDiv.className = 'waypoint-label';
+          labelDiv.textContent = displayName;
+          markerElement.appendChild(labelDiv);
+        }
         
         // Improve popup content with cleaner design
         const popupContent = `
@@ -99,7 +108,7 @@
             const currentZoom = map.getZoom();
             
             // Only show popup if zoomed in enough
-            if (currentZoom >= 9) {
+            if (currentZoom >= 12) {
               popup.setLngLat(marker.getLngLat()).addTo(map);
             }
           });
@@ -139,7 +148,20 @@
             .mapboxgl-marker[data-marker-type="waypoint"] svg,
             .mapboxgl-marker[data-marker-type="stop"] svg {
               transform-origin: center;
-              transform: scale(0.6);
+              transform: scale(0.2); /* Make them tiny */
+            }
+            
+            /* Adjust marker appearance based on zoom level */
+            .mapboxgl-map[data-zoom="low"] .mapboxgl-marker svg {
+              transform: scale(0.15); /* Smaller at low zoom */
+            }
+            
+            .mapboxgl-map[data-zoom="medium"] .mapboxgl-marker svg {
+              transform: scale(0.3); /* Medium at medium zoom */
+            }
+            
+            .mapboxgl-map[data-zoom="high"] .mapboxgl-marker svg {
+              transform: scale(0.5); /* Larger at high zoom */
             }
             
             /* Popup styles */
@@ -165,12 +187,57 @@
             /* Pixel-perfect marker sizing for high-DPI displays */
             @media (min-resolution: 1dppx) {
               .mapboxgl-marker[data-marker-type="waypoint"] svg {
-                transform: scale(0.4);
+                transform: scale(0.1); /* Tiny for waypoints */
               }
               
               .mapboxgl-marker[data-marker-type="stop"] svg {
-                transform: scale(0.5);
+                transform: scale(0.3); /* Slightly larger for stops */
               }
+              
+              /* Zoom-based marker sizing */
+              .mapboxgl-map[data-zoom="low"] .mapboxgl-marker[data-marker-type="waypoint"] svg {
+                transform: scale(0.1); /* Tiny at low zoom */
+              }
+              
+              .mapboxgl-map[data-zoom="medium"] .mapboxgl-marker[data-marker-type="waypoint"] svg {
+                transform: scale(0.2); /* Slightly larger at medium zoom */
+              }
+              
+              .mapboxgl-map[data-zoom="high"] .mapboxgl-marker[data-marker-type="waypoint"] svg {
+                transform: scale(0.4); /* Largest at high zoom */
+              }
+            }
+            
+            /* Waypoint labels that appear at higher zoom levels */
+            .waypoint-label {
+              display: none; /* Hidden by default */
+              position: absolute;
+              bottom: 10px;
+              left: 50%;
+              transform: translateX(-50%);
+              background-color: rgba(36, 43, 52, 0.8);
+              color: white;
+              font-size: 8px;
+              padding: 2px 4px;
+              border-radius: 2px;
+              white-space: nowrap;
+              pointer-events: none;
+              border: 1px solid rgba(30, 143, 254, 0.5);
+              text-align: center;
+              z-index: 1;
+            }
+            
+            /* Show labels at medium zoom */
+            .mapboxgl-map[data-zoom="medium"] .waypoint-label {
+              display: block;
+              font-size: 8px;
+            }
+            
+            /* Larger labels at high zoom */
+            .mapboxgl-map[data-zoom="high"] .waypoint-label {
+              display: block;
+              font-size: 10px;
+              padding: 3px 5px;
             }
             
             /* Hover effects */
@@ -237,7 +304,30 @@
           /* Scale down all marker SVGs */
           .mapboxgl-marker svg {
             transform-origin: center;
-            transform: scale(0.5);
+            transform: scale(0.1); /* Make them tiny (3px) */
+          }
+          
+          /* Turquoise dots for waypoints */
+          .mapboxgl-marker[data-marker-type="waypoint"] {
+            filter: drop-shadow(0 0 1px rgba(64, 224, 208, 0.7));
+          }
+          
+          /* Red dots for stops */
+          .mapboxgl-marker[data-marker-type="stop"] {
+            filter: drop-shadow(0 0 1px rgba(255, 65, 54, 0.7));
+          }
+          
+          /* Zoom-based marker sizing */
+          .mapboxgl-map[data-zoom="low"] .mapboxgl-marker svg {
+            transform: scale(0.1); /* Tiny at low zoom */
+          }
+          
+          .mapboxgl-map[data-zoom="medium"] .mapboxgl-marker svg {
+            transform: scale(0.2); /* Medium at medium zoom */
+          }
+          
+          .mapboxgl-map[data-zoom="high"] .mapboxgl-marker svg {
+            transform: scale(0.4); /* Larger at high zoom */
           }
         `;
         
@@ -248,12 +338,22 @@
       // Add zoom level listener for existing markers
       const map = window.waypointManager.mapManager.getMap();
       if (map) {
+        // Set initial zoom level attribute
+        const initialZoom = map.getZoom();
+        const zoomLevel = initialZoom < 9 ? 'low' : (initialZoom < 13 ? 'medium' : 'high');
+        map.getContainer().setAttribute('data-zoom', zoomLevel);
+        
+        // Update zoom level attribute on zoom change
         map.on('zoomend', () => {
           const currentZoom = map.getZoom();
           console.log(`📍 Map zoom changed to: ${currentZoom}`);
           
+          // Set zoom level attribute for CSS targeting
+          const zoomLevel = currentZoom < 9 ? 'low' : (currentZoom < 13 ? 'medium' : 'high');
+          map.getContainer().setAttribute('data-zoom', zoomLevel);
+          
           // Remove any open popups when zoomed out
-          if (currentZoom < 9) {
+          if (currentZoom < 12) {
             const openPopups = document.querySelectorAll('.mapboxgl-popup');
             if (openPopups.length > 0) {
               console.log(`📍 Removing ${openPopups.length} open popups due to zoom level`);

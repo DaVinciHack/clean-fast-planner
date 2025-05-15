@@ -14,6 +14,9 @@ import {
   RouteStatsCard
 } from './components';
 
+// Import MapZoomHandler for waypoint display
+import MapZoomHandler from './components/map/MapZoomHandler';
+
 // Import ModeHandler for backup
 import ModeHandler from './modules/waypoints/ModeHandler';
 
@@ -384,6 +387,7 @@ const FastPlannerApp = () => {
         onMapReady={handleMapReady}
         className="fast-planner-map"
       />
+      <MapZoomHandler mapManagerRef={mapManagerRef} />
       <LeftPanel
         visible={leftPanelVisible}
         onToggleVisibility={toggleLeftPanel}

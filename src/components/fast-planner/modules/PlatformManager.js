@@ -927,8 +927,15 @@ class PlatformManager {
             filter: ['all', 
                      ['==', ['get', 'platformType'], 'fixed']
                     ], 
-            paint: { // Paint properties from backup for fixed platforms
-              'circle-radius': 2,
+            paint: { 
+              // Responsive size based on zoom level
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 2,      // Small dots at low zoom
+                10, 3,     // Medium dots at medium zoom 
+                13, 4,     // Larger dots at high zoom
+                16, 6      // Very large dots at very high zoom
+              ],
               'circle-color': '#073b8e',       // Darker blue center
               'circle-stroke-width': 1,
               'circle-stroke-color': '#03bf42', // Teal ring
@@ -947,11 +954,18 @@ class PlatformManager {
             filter: ['all', 
                      ['==', ['get', 'platformType'], 'movable']
                     ],
-            paint: { // Paint properties from backup for movable platforms
-              'circle-radius': 2,
+            paint: { 
+              // Responsive size based on zoom level
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 2,      // Small dots at low zoom
+                10, 3,     // Medium dots at medium zoom 
+                13, 4,     // Larger dots at high zoom
+                16, 6      // Very large dots at very high zoom
+              ],
               'circle-color': '#ad0303',       // Dark red center
               'circle-stroke-width': 1,
-              'circle-stroke-color': '#f2efef', // Light ring (backup used #f2efef, might be white/light gray)
+              'circle-stroke-color': '#f2efef', // Light ring
               'circle-opacity': 1
             },
             layout: { // Add visibility toggle
@@ -967,7 +981,13 @@ class PlatformManager {
             filter: ['all', ['==', ['get', 'platformType'], 'airfield']],
             layout: {
               'icon-image': map.hasImage('airport-icon') ? 'airport-icon' : 'airport-15', // Logic from backup
-              'icon-size': 1,
+              'icon-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 0.8,    // Small icon at low zoom
+                10, 1.0,   // Normal size at medium zoom 
+                13, 1.2,   // Larger icon at high zoom
+                16, 1.5    // Very large icon at very high zoom
+              ],
               'icon-allow-overlap': true,
               'icon-anchor': 'bottom', // From backup for pin-style
               'icon-offset': [0, -5],  // From backup
@@ -984,7 +1004,13 @@ class PlatformManager {
             layout: {
               'text-field': ['get', 'name'],
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-              'text-size': 10,
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 9,      // Small text at low zoom
+                10, 11,    // Medium text at medium zoom 
+                13, 13,    // Larger text at high zoom
+                16, 15     // Very large text at very high zoom
+              ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
               'visibility': this.isVisible ? 'visible' : 'none'
@@ -1005,7 +1031,13 @@ class PlatformManager {
             layout: {
               'text-field': ['get', 'name'],
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-              'text-size': 10,
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 9,      // Small text at low zoom
+                10, 11,    // Medium text at medium zoom 
+                13, 13,    // Larger text at high zoom
+                16, 15     // Very large text at very high zoom
+              ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
               'visibility': this.isVisible ? 'visible' : 'none'
@@ -1026,7 +1058,13 @@ class PlatformManager {
             layout: {
               'text-field': ['get', 'name'],
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-              'text-size': 10,
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 9,      // Small text at low zoom
+                10, 11,    // Medium text at medium zoom 
+                13, 13,    // Larger text at high zoom
+                16, 15     // Very large text at very high zoom
+              ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
               'visibility': this.isVisible ? 'visible' : 'none'
@@ -1620,7 +1658,7 @@ class PlatformManager {
             type: 'circle',
             source: sourceId,
             paint: {
-              'circle-radius': 3,
+              'circle-radius': 1, // Changed from 3 to 1 to make dots much smaller
               'circle-color': '#FFCC00', // Yellow
               'circle-stroke-width': 1,
               'circle-stroke-color': '#FFFFFF'

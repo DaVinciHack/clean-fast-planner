@@ -552,7 +552,7 @@ class WaypointManager {
       
       // Create marker with appropriate styling based on type
       const marker = new window.mapboxgl.Marker({ 
-        color: isWaypoint ? "#FFCC00" : "#FF4136", // Yellow for waypoints, red for stops
+        color: isWaypoint ? "turquoise" : "#FF4136", // Turquoise for waypoints, red for stops
         draggable: true,
         scale: 0.5 // Make them small (50% of normal size) for better visibility
       })
