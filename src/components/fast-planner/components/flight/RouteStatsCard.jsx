@@ -288,6 +288,47 @@ const RouteStatsCard = ({
   // Determine if time has been adjusted due to wind - with safety check
   const isWindAdjusted = routeStats && routeStats.windAdjusted && routeStats.windData;
   
+  // Calculate average headwind if not present but we have wind data
+  useEffect(() => {
+    if (isWindAdjusted && routeStats && routeStats.windData && routeStats.windData.avgHeadwind === undefined) {
+      console.log("⚠️ avgHeadwind missing, calculating from wind data");
+      
+      // If we have legs with headwind values, calculate average
+      if (routeStats.legs && routeStats.legs.length > 0) {
+        const legsWithHeadwind = routeStats.legs.filter(leg => leg.headwind !== undefined);
+        if (legsWithHeadwind.length > 0) {
+          const totalHeadwind = legsWithHeadwind.reduce((sum, leg) => sum + leg.headwind, 0);
+          const avgHeadwind = Math.round(totalHeadwind / legsWithHeadwind.length);
+          
+          console.log(`⚠️ Calculated avgHeadwind: ${avgHeadwind}kt from ${legsWithHeadwind.length} legs`);
+          
+          // Update the windData with the calculated avgHeadwind
+          routeStats.windData.avgHeadwind = avgHeadwind;
+          
+          // Also update window.currentRouteStats to ensure it's available for map interactions
+          if (window.currentRouteStats && window.currentRouteStats.windData) {
+            window.currentRouteStats.windData.avgHeadwind = avgHeadwind;
+          }
+        }
+      } else if (routeStats.windData.windSpeed > 0) {
+        // Fallback if no legs with headwind - use simple approximation
+        // This is a crude approximation based on wind speed
+        const windSpeed = routeStats.windData.windSpeed;
+        const avgHeadwind = Math.round(windSpeed / 2); // Simple approximation
+        
+        console.log(`⚠️ No leg headwind data, using simple approximation: ${avgHeadwind}kt`);
+        
+        // Update the windData with the approximated avgHeadwind
+        routeStats.windData.avgHeadwind = avgHeadwind;
+        
+        // Also update window.currentRouteStats
+        if (window.currentRouteStats && window.currentRouteStats.windData) {
+          window.currentRouteStats.windData.avgHeadwind = avgHeadwind;
+        }
+      }
+    }
+  }, [routeStats, isWindAdjusted]);
+  
   // Get wind effect direction from actual weather data - with safety check
   const windEffect = isWindAdjusted && routeStats.windData && routeStats.windData.avgHeadwind !== undefined ? 
     routeStats.windData.avgHeadwind : 0;
@@ -312,12 +353,28 @@ const RouteStatsCard = ({
     }
   }, [routeStats]);
   
-  // Calculate the number of landings (waypoints - 1 or 0 if no waypoints)
-  const landingsCount = waypoints && waypoints.length > 1 ? waypoints.length - 1 : 0;
+  // Calculate the number of landings based on actual landing stops only (not waypoints)
+  // Filter out navigation waypoints to get only landing stops
+  const landingStopsOnly = waypoints.filter(wp => {
+    // Check if this is a navigation waypoint based on any property
+    const isWaypoint = 
+      wp.pointType === 'NAVIGATION_WAYPOINT' || // Explicit type
+      wp.isWaypoint === true || // Legacy flag
+      wp.type === 'WAYPOINT'; // Legacy type value
+    
+    // Keep only landing stops by excluding waypoints
+    return !isWaypoint;
+  });
   
-  // Calculate the number of intermediate stops (waypoints - 2 or 0 if less than 3 waypoints)
-  // This matches the StopCardCalculator logic
-  const intermediateStops = waypoints && waypoints.length > 2 ? waypoints.length - 2 : 0;
+  // Log for debugging
+  console.log(`RouteStatsCard: Found ${landingStopsOnly.length} landing stops out of ${waypoints.length} total waypoints`);
+  
+  // Calculate the number of landings (landing stops - 1 or 0 if no landing stops)
+  const landingsCount = landingStopsOnly && landingStopsOnly.length > 1 ? landingStopsOnly.length - 1 : 0;
+  
+  // Calculate the number of intermediate stops (landing stops - 2 or 0 if less than 3 landing stops)
+  // This matches the StopCardCalculator logic - intermediate stops only count landing stops
+  const intermediateStops = landingStopsOnly && landingStopsOnly.length > 2 ? landingStopsOnly.length - 2 : 0;
   
   // Calculate total deck fuel using the same formula as StopCardCalculator
   // FIXED: Force numeric type conversions to avoid string math issues
@@ -326,12 +383,14 @@ const RouteStatsCard = ({
   const deckFuelFlowNum = Number(deckFuelFlow);
   
   // Calculate total deck time in minutes (used for display and total time calculation)
+  // Use intermediateStops which is now based on landing stops only
   const totalDeckTime = intermediateStops * deckTimePerStopNum;
   const deckTimeHours = (intermediateStops * deckTimePerStopNum) / 60;
   const calculatedDeckFuel = Math.round(deckTimeHours * deckFuelFlowNum);
   
   // DEBUG: Log deck fuel calculation
   console.log('🚨 ROUTESTATSCARD DECK FUEL CALCULATION:', {
+    landingStopsCount: landingStopsOnly.length,
     intermediateStops,
     deckTimePerStop_original: deckTimePerStop,
     deckTimePerStop_asNumber: deckTimePerStopNum,
@@ -1137,17 +1196,17 @@ const RouteStatsCard = ({
             <div className="route-stat-item">
               <div className="route-stat-label">
                 Flight Time:
-                {isWindAdjusted && routeStats && routeStats.windData && routeStats.windData.avgHeadwind !== 0 && (
+                {isWindAdjusted && routeStats && routeStats.windData && (
                   <span style={{ 
                     fontSize: '0.8em', 
                     marginLeft: '4px', 
-                    color: routeStats.windData.avgHeadwind > 0 ? '#e74c3c' : '#2ecc71',
+                    color: (routeStats.windData.avgHeadwind > 0) ? '#e74c3c' : '#2ecc71',
                     fontWeight: 'bold'
                   }}
-                  title={`${Math.abs(routeStats.windData.avgHeadwind)} kt ${routeStats.windData.avgHeadwind > 0 ? 'headwind' : 'tailwind'}`}>
-                    {routeStats.windData.avgHeadwind > 0 ? 
+                  title={`${Math.abs(routeStats.windData.avgHeadwind || 0)} kt ${(routeStats.windData.avgHeadwind || 0) > 0 ? 'headwind' : 'tailwind'}`}>
+                    {(routeStats.windData.avgHeadwind || 0) > 0 ? 
                       ` (+${routeStats.windData.avgHeadwind}kt)` : 
-                      ` (${routeStats.windData.avgHeadwind}kt)`}
+                      ` (${routeStats.windData.avgHeadwind || 0}kt)`}
                   </span>
                 )}
               </div>
@@ -1203,38 +1262,82 @@ const RouteStatsCard = ({
             <div className="route-stat-item">
               <div className="route-stat-label">Passengers:</div>
               <div className="route-stat-value" style={{ display: 'flex', alignItems: 'center' }}>
-                {/* First import passenger icon from stop icons */}
-                <div style={{ marginRight: '4px', display: 'flex', alignItems: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
-                      fill="#3498db" />
-                  </svg>
-                </div>
-                {/* Use our dedicated function to get passenger number */}
-                {getDisplayPassengers()} 
-                {stopCards && stopCards.length > 1 && (
-                  <span style={{ fontSize: '0.85em', color: '#fff', marginLeft: '6px', display: 'flex', alignItems: 'center' }}>
-                    {stopCards.filter(card => !card.isDeparture && !card.isDestination)
-                      .map((card, idx) => {
-                        // Define colors matching the menu highlight colors
-                        // Starting with blue for the first stop
-                        const colors = ['#3498db', '#614dd6', '#8c5ed6', '#c05edb', '#e27add', '#1abc9c'];
-                        const color = colors[idx % colors.length];
-                        
+                {/* Try stopCards first, then fallback to localStopCards if needed */}
+                {(stopCards && stopCards.length > 0) || (localStopCards && localStopCards.length > 0) ? (
+                  <>
+                    {(() => {
+                      // Choose which cards to use - stopCards if available, otherwise localStopCards
+                      const cardsToUse = (stopCards && stopCards.length > 0) ? stopCards : localStopCards;
+                      
+                      // Filter cards to get non-destination cards for passenger display
+                      const cardsWithPassengers = cardsToUse.filter(card => !card.isDestination && card.maxPassengers !== undefined);
+                      
+                      // Return early if no valid cards
+                      if (cardsWithPassengers.length === 0) {
                         return (
-                          <span key={idx} title={`${card.stopName || 'Stop'}: ${card.maxPassengers || 0} passengers`}
-                                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '6px' }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '2px' }}>
-                              <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
-                                fill={color} />
-                            </svg>
-                            <span style={{ color: '#fff' }}>{card.maxPassengers || 0}</span>
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <div style={{ marginRight: '2px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
+                                  fill="#3498db" />
+                              </svg>
+                            </div>
+                            <span style={{ fontSize: '0.9em' }}>0</span>
+                          </div>
                         );
-                      })
-                    }
-                  </span>
+                      }
+                      
+                      // Define passenger colors array (same as in StopCard.jsx)
+                      const colors = ['#3498db', '#614dd6', '#8c5ed6', '#c05edb', '#e27add', '#1abc9c'];
+                      
+                      // Display each passenger number with colored icon
+                      return (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {cardsWithPassengers.map((card, idx) => {
+                            // Get appropriate color based on index 
+                            const iconColor = card.isDeparture ? '#3498db' : 
+                                           colors[Math.min(idx, colors.length - 1)];
+                            
+                            return (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', marginRight: '0px' }}>
+                                <div style={{ marginRight: '2px' }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
+                                      fill={iconColor} />
+                                  </svg>
+                                </div>
+                                <span style={{ fontSize: '0.9em' }}>{card.maxPassengers || 0}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ marginRight: '4px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16 11C17.66 11 18.99 9.66 18.99 8C18.99 6.34 17.66 5 16 5C14.34 5 13 6.34 13 8C13 9.66 14.34 11 16 11ZM8 11C9.66 11 10.99 9.66 10.99 8C10.99 6.34 9.66 5 8 5C6.34 5 5 6.34 5 8C5 9.66 6.34 11 8 11ZM8 13C5.67 13 1 14.17 1 16.5V19H15V16.5C15 14.17 10.33 13 8 13ZM16 13C15.71 13 15.38 13.02 15.03 13.05C16.19 13.89 17 15.02 17 16.5V19H23V16.5C23 14.17 18.33 13 16 13Z" 
+                          fill="#3498db" />
+                      </svg>
+                    </div>
+                    <span>{getDisplayPassengers()}</span>
+                  </div>
                 )}
+                
+                {/* Log passenger data for debugging */}
+                {console.log("⭐ PASSENGER DATA DEBUG:", {
+                  stopCardsCount: stopCards?.length || 0,
+                  localStopCardsCount: localStopCards?.length || 0,
+                  stopCards: stopCards?.map(c => ({
+                    id: c.id,
+                    index: c.index, 
+                    isDeparture: c.isDeparture, 
+                    isDestination: c.isDestination, 
+                    maxPax: c.maxPassengers
+                  }))
+                })}
               </div>
             </div>
           </div>

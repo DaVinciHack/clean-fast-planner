@@ -310,7 +310,9 @@ const FastPlannerApp = () => {
     platformManagerRef,
     mapInteractionHandlerRef,
     setWaypoints,
-    client
+    client,
+    setRouteStats,
+    setStopCards
   });
 
   // Weather management hooks

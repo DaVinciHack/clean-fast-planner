@@ -12,7 +12,9 @@ const useWaypoints = ({
   setWaypoints,
   // Add client and currentRegion from FastPlannerApp
   client, 
-  currentRegion 
+  currentRegion,
+  setRouteStats,
+  setStopCards
 }) => {
   // State for waypoint mode
   const [waypointModeActive, setWaypointModeActive] = useState(false);
@@ -241,6 +243,19 @@ const useWaypoints = ({
     if (waypointManagerRef.current) {
       waypointManagerRef.current.clearRoute();
       setWaypoints([]);
+      
+      // Reset all route-related state in FastPlannerApp
+      // These lines are critical to ensure all values reset properly
+      if (typeof setRouteStats === 'function') {
+        setRouteStats(null);
+      }
+      
+      if (typeof setStopCards === 'function') {
+        setStopCards([]);
+      }
+      
+      // Reset global state
+      window.currentRouteStats = null;
     }
   };
 
