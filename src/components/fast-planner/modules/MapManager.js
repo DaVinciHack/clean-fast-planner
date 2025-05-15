@@ -15,9 +15,11 @@ class MapManager {
   /**
    * Initialize the MapBox map
    * @param {string} containerId - The DOM element ID for the map container
+   * @param {Object} options - Optional initialization options
+   * @param {Object} options.initialRegion - Initial region to center map on
    * @returns {Promise} - Resolves with the map instance immediately after creation
    */
-  initializeMap(containerId) {
+  initializeMap(containerId, options = {}) {
     return new Promise((resolve, reject) => {
       try {
         if (!window.mapboxgl) {
@@ -36,19 +38,28 @@ class MapManager {
         
         console.log('Creating MapBox instance...');
         
-        // Create map instance with simpler style
+        // Determine initial map position from options or use default
+        let initialCenter = [-90.5, 27.5]; // Default: Gulf of Mexico
+        let initialZoom = 6;
+        
+        // If initialRegion is provided, use its center and zoom
+        if (options.initialRegion) {
+          initialCenter = options.initialRegion.center || initialCenter;
+          initialZoom = options.initialRegion.zoom || initialZoom;
+          console.log(`Using initial region: ${options.initialRegion.name}`);
+        }
+        
+        // Create map instance with determined settings
         this.map = new window.mapboxgl.Map({
           container: containerId,
           style: 'mapbox://styles/mapbox/dark-v11',
-          center: [-90.5, 27.5], // Gulf of Mexico center
-          zoom: 6,
+          center: initialCenter,
+          zoom: initialZoom,
           attributionControl: false,
           preserveDrawingBuffer: true
         });
         
         console.log('Map instance created successfully');
-        
-        // Navigation controls removed to clean up UI
 
         this._isLoaded = false; // Reset flag on initialization
         this._loadCallbacks = []; // Clear any previous callbacks
@@ -60,6 +71,19 @@ class MapManager {
           
           // Add the grid first
           this.addGridToMap(); 
+          
+          // If we have an initial region with bounds, fit to those bounds
+          if (options.initialRegion && options.initialRegion.bounds) {
+            try {
+              this.map.fitBounds(options.initialRegion.bounds, {
+                padding: 50,
+                maxZoom: options.initialRegion.zoom || 6
+              });
+              console.log(`Initial region bounds applied: ${options.initialRegion.name}`);
+            } catch (e) {
+              console.error("Error applying initial region bounds:", e);
+            }
+          }
           
           // Execute and clear any pending callbacks
           console.log(`Executing ${this._loadCallbacks.length} queued onMapLoaded callbacks.`);
@@ -380,9 +404,11 @@ class MapManager {
   /**
    * Reinitialize the map when there's an issue
    * @param {string} containerId - The DOM element ID for the map container
+   * @param {Object} options - Optional initialization options
+   * @param {Object} options.initialRegion - Initial region to center map on
    * @returns {Promise} - Resolves with the map instance
    */
-  reInitializeMap(containerId) {
+  reInitializeMap(containerId, options = {}) {
     console.log('🗺️ Reinitializing map...');
     
     return new Promise((resolve, reject) => {
@@ -430,8 +456,8 @@ class MapManager {
         this._isLoaded = false;
         this._loadCallbacks = [];
         
-        // Initialize a new map
-        const result = this.initializeMap(containerId);
+        // Initialize a new map with the provided options
+        const result = this.initializeMap(containerId, options);
         
         // Also trigger a global event that other components can listen for
         window.dispatchEvent(new CustomEvent('map-reinitialized'));

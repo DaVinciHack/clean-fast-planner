@@ -42,34 +42,102 @@ class InteractionController {
    * Initialize the controller with required dependencies
    */
   initialize(mapManager, waypointManager, platformManager) {
-    console.log('InteractionController: initialize() called, but deliberately bypassed to prevent duplicate click handling. No listeners will be attached by this controller.');
-    // Returning true to not break any calling code that expects a boolean,
-    // but this controller will no longer interact with the map.
-    return true; 
+    // Store manager references
+    this.mapManager = mapManager;
+    this.waypointManager = waypointManager;
+    this.platformManager = platformManager;
+    
+    console.log('InteractionController: initializing with managers');
+    
+    // Check if mapManager is available
+    if (!mapManager) {
+      console.error('InteractionController: mapManager is required for initialization');
+      return false;
+    }
+    
+    const checkForMapReady = () => {
+      const map = mapManager.getMap();
+      if (map && typeof map.on === 'function') {
+        // Initialize interaction modules with the map instance directly
+        this.mapInteractions.initialize(map, waypointManager, platformManager);
+        this.waypointInteractions.initialize(waypointManager, platformManager);
+        
+        // Set up callback forwarding
+        this.waypointInteractions.setCallback('onWaypointsChanged', (waypoints) => {
+          this.triggerCallback('onWaypointsChanged', waypoints);
+        });
+        
+        console.log('InteractionController: Successfully initialized with map instance');
+        
+        // Setup event listener for map re-initialization
+        window.addEventListener('reinitialize-map-handlers', () => {
+          console.log('InteractionController: Reinitializing map handlers');
+          
+          // Update with the current map instance
+          const updatedMap = mapManager.getMap();
+          if (updatedMap && typeof updatedMap.on === 'function') {
+            this.mapInteractions.initialize(updatedMap, waypointManager, platformManager);
+            console.log('Map handlers reinitialized successfully');
+            window.mapHandlersInitialized = true;
+          }
+        });
+        
+        return true;
+      } else {
+        console.warn('InteractionController: Map not ready, will try again');
+        setTimeout(checkForMapReady, 500);
+        return false;
+      }
+    };
+    
+    // Start checking for map readiness
+    return checkForMapReady();
   }
   
   /**
    * Handle map click events
    */
   handleMapClick(data) {
-    console.log('InteractionController: handleMapClick called, but doing nothing (bypassed). Data:', data);
-    // Deliberately empty to prevent adding waypoints
+    if (!this.mapInteractions || !this.waypointInteractions) {
+      console.warn('InteractionController: handleMapClick called but interaction modules not initialized');
+      return;
+    }
+    
+    console.log('InteractionController: handleMapClick called with data:', data);
+    
+    // Let the map interactions handle the click first
+    const mapResult = this.mapInteractions.handleClick(data);
+    
+    // If the map interactions didn't handle it, let the waypoint interactions try
+    if (!mapResult) {
+      this.waypointInteractions.handleMapClick(data);
+    }
   }
   
   /**
    * Handle platform click events
    */
   handlePlatformClick(data) {
-    console.log('InteractionController: handlePlatformClick called, but doing nothing (bypassed). Data:', data);
-    // Deliberately empty
+    if (!this.waypointInteractions) {
+      console.warn('InteractionController: handlePlatformClick called but waypoint interactions not initialized');
+      return;
+    }
+    
+    console.log('InteractionController: handlePlatformClick called with data:', data);
+    this.waypointInteractions.handlePlatformClick(data);
   }
   
   /**
    * Handle route click events
    */
   handleRouteClick(data) {
-    console.log('InteractionController: handleRouteClick called, but doing nothing (bypassed). Data:', data);
-    // Deliberately empty
+    if (!this.waypointInteractions) {
+      console.warn('InteractionController: handleRouteClick called but waypoint interactions not initialized');
+      return;
+    }
+    
+    console.log('InteractionController: handleRouteClick called with data:', data);
+    this.waypointInteractions.handleRouteClick(data);
   }
   
   /**
