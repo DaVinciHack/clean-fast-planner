@@ -387,8 +387,33 @@ class RouteCalculator {
       console.log(`⭐ Forced time calculation: ${totalTimeHours} hours for ${totalDistance} nm`);
     }
     
-    // Calculate average headwind
-    const avgHeadwind = legCount > 0 ? Math.round(totalHeadwind / legCount) : 0;
+    // Calculate weighted average headwind based on leg time
+    let totalHeadwindWeight = 0;
+    let totalLegWeight = 0;
+
+    for (let i = 0; i < legs.length; i++) {
+      const leg = legs[i];
+      // Use leg time as the weight factor (more accurate than distance)
+      const legWeight = leg.time;
+      
+      // Log details for debugging
+      console.log(`⭐ Leg ${i+1} wind contribution: headwind=${leg.headwind}, time=${legWeight.toFixed(2)}h, weighted=${(leg.headwind * legWeight).toFixed(2)}`);
+      
+      totalHeadwindWeight += leg.headwind * legWeight;
+      totalLegWeight += legWeight;
+    }
+
+    // Calculate weighted average
+    const avgHeadwind = totalLegWeight > 0 ? 
+      Math.round(totalHeadwindWeight / totalLegWeight) : 0;
+
+    // Log detailed calculation for debugging
+    console.log('⭐ Time-weighted wind calculation:', {
+      totalHeadwindWeight: totalHeadwindWeight.toFixed(2),
+      totalLegWeight: totalLegWeight.toFixed(2),
+      weightedAvgHeadwind: totalLegWeight > 0 ? (totalHeadwindWeight / totalLegWeight).toFixed(2) : 0,
+      roundedAvgHeadwind: avgHeadwind
+    });
     
     console.log(`RouteCalculator: Total route stats:`, {
       distance: totalDistance.toFixed(1),
