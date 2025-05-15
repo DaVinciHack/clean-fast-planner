@@ -251,9 +251,12 @@ class WaypointInteractions {
     }
     this.lastRemoveTime = now;
     
+    // Check if properly initialized
     if (!this.waypointManager) {
+      console.error('Cannot remove waypoint: WaypointInteractions not properly initialized');
       this.triggerCallback('onWaypointError', new Error('Waypoint manager not initialized'));
-      return false;
+      // Return undefined to signal that we couldn't handle the request
+      return undefined;
     }
     
     try {

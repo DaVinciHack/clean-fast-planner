@@ -11,6 +11,9 @@ import { showSuccess, showError } from './modules/notifications';
 // Create a singleton instance
 const interactionController = new InteractionController();
 
+// Make it available globally for consistency
+window.interactionController = interactionController;
+
 // Function to integrate the clean modules with the application
 function integrateCleanModules() {
   console.log('Integrating clean interaction modules...');
@@ -80,7 +83,15 @@ function patchGlobalHandlers() {
     return interactionController.addWaypoint(waypointData);
   };
   
+  // Fix the removeWaypointClean function to fall back to original implementation
+  // if interactionController is not properly initialized
   window.removeWaypointClean = (waypointIdOrIndex) => {
+    // Check if interactionController is properly initialized with required managers
+    if (!interactionController || !interactionController.waypointManager) {
+      console.log('Clean implementation not properly initialized, falling back to original implementation');
+      // Return undefined to let the calling code fall back to original implementation
+      return undefined;
+    }
     return interactionController.removeWaypoint(waypointIdOrIndex);
   };
   

@@ -189,10 +189,16 @@ const useWaypoints = ({
    * Uses the clean implementation if available, falls back to original
    */
   const removeWaypoint = (waypointIdOrIndex) => {
-    // Try to use the clean implementation first
+    // Try to use the clean implementation first, but only if it's properly initialized
     if (window.removeWaypointClean && typeof window.removeWaypointClean === 'function') {
       console.log('Using clean implementation for removeWaypoint');
-      return window.removeWaypointClean(waypointIdOrIndex);
+      // Call the clean implementation and check if it handled the request
+      const result = window.removeWaypointClean(waypointIdOrIndex);
+      // If the clean implementation returned something other than undefined, it handled the request
+      if (result !== undefined) {
+        return result;
+      }
+      console.log('Clean implementation did not handle the request, falling back to original implementation');
     }
     
     // Fall back to the original implementation
