@@ -619,22 +619,138 @@ class WaypointManager {
   
   createArrowsAlongLine(allWaypointsCoordinates, routeStats = null) {
     if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) return { type: 'FeatureCollection', features: [] };
-    const features = []; const turf = window.turf; if (!turf) { console.error("Turf.js is not available."); return { type: 'FeatureCollection', features: [] }; }
+    const features = []; 
+    const turf = window.turf; 
+    if (!turf) { 
+      console.error("Turf.js is not available."); 
+      return { type: 'FeatureCollection', features: [] }; 
+    }
+    
     const currentDisplayStats = routeStats || window.currentRouteStats;
+    console.log("⭐ createArrowsAlongLine - waypoints", this.waypoints.length, "coordinates", allWaypointsCoordinates.length);
+    
+    // Use the currentDisplayStats if it has legs data
     if (currentDisplayStats && currentDisplayStats.legs && currentDisplayStats.legs.length > 0) {
+      console.log("⭐ Using currentDisplayStats legs", currentDisplayStats.legs.length);
       currentDisplayStats.legs.forEach((leg, index) => {
-        if (!leg.departureCoords || !leg.arrivalCoords) return;
-        const startPointCoords = leg.departureCoords; const endPointCoords = leg.arrivalCoords;
-        const legDistanceNm = parseFloat(leg.distance); const legBearing = turf.bearing(turf.point(startPointCoords), turf.point(endPointCoords));
+        if (!leg.departureCoords || !leg.arrivalCoords) {
+          console.log("⭐ Missing coords for leg", index);
+          return;
+        }
+        const startPointCoords = leg.departureCoords;
+        const endPointCoords = leg.arrivalCoords;
+        const legDistanceNm = parseFloat(leg.distance);
+        const legBearing = turf.bearing(turf.point(startPointCoords), turf.point(endPointCoords));
         const midPoint = turf.along(turf.lineString([startPointCoords, endPointCoords]), legDistanceNm * 0.5, { units: 'nauticalmiles' });
-        const distanceText = `${legDistanceNm.toFixed(1)} nm`; let timeText = leg.timeFormatted || '00:00';
-        if (currentDisplayStats.windAdjusted && typeof leg.windEffect === 'number' && Math.abs(leg.windEffect) > 1) timeText += '*';
+        const distanceText = `${legDistanceNm.toFixed(1)} nm`;
+        let timeText = leg.timeFormatted || '00:00';
+        if (currentDisplayStats.windAdjusted && typeof leg.windEffect === 'number' && Math.abs(leg.windEffect) > 1) {
+          timeText += '*';
+        }
         const goingLeftToRight = endPointCoords[0] > startPointCoords[0];
         let labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${timeText ? ` • ${timeText}` : ''}${goingLeftToRight ? ' →' : ''}`;
-        let adjustedBearing = legBearing + 90; if (adjustedBearing > 90 && adjustedBearing < 270) adjustedBearing = (adjustedBearing + 180) % 360;
-        features.push({ type: 'Feature', geometry: midPoint.geometry, properties: { isLabel: true, bearing: legBearing, textBearing: adjustedBearing, text: labelText, legIndex: index }});
+        let adjustedBearing = legBearing + 90;
+        if (adjustedBearing > 90 && adjustedBearing < 270) {
+          adjustedBearing = (adjustedBearing + 180) % 360;
+        }
+        console.log("⭐ Adding label for leg", index, labelText);
+        features.push({
+          type: 'Feature',
+          geometry: midPoint.geometry,
+          properties: {
+            isLabel: true,
+            bearing: legBearing,
+            textBearing: adjustedBearing,
+            text: labelText,
+            legIndex: index
+          }
+        });
       });
-    } else { console.warn('⚓ createArrowsAlongLine: No structured leg data in routeStats.'); }
+    } else {
+      // No structured leg data, create our own from landing stops
+      console.log("⭐ No leg data in routeStats, creating from landing stops");
+      
+      // Filter waypoints to get only landing stops
+      const landingStopsOnly = this.waypoints.filter(wp => {
+        // Check if this is a navigation waypoint
+        const isWaypoint = 
+          wp.pointType === 'NAVIGATION_WAYPOINT' || // Explicit type
+          wp.isWaypoint === true || // Legacy flag
+          wp.type === 'WAYPOINT'; // Legacy type value
+        
+        // Keep only landing stops
+        return !isWaypoint;
+      });
+      
+      console.log("⭐ Found", landingStopsOnly.length, "landing stops");
+      
+      // If we have at least 2 landing stops, create labels for legs between landing stops
+      if (landingStopsOnly.length >= 2) {
+        // Process each leg between landing stops
+        for (let i = 0; i < landingStopsOnly.length - 1; i++) {
+          const fromStop = landingStopsOnly[i];
+          const toStop = landingStopsOnly[i + 1];
+          
+          // Get coordinates of the stops
+          const fromStopCoords = fromStop.coords;
+          const toStopCoords = toStop.coords;
+          
+          // Create direct line between stops
+          const from = turf.point(fromStopCoords);
+          const to = turf.point(toStopCoords);
+          const legDistance = turf.distance(from, to, { units: 'nauticalmiles' });
+          const legBearing = turf.bearing(from, to);
+          
+          // Create a line for the leg
+          const legLine = turf.lineString([fromStopCoords, toStopCoords]);
+          
+          // Place the label at the midpoint
+          const midPoint = turf.along(legLine, legDistance * 0.5, { units: 'nauticalmiles' });
+          
+          // Format the time for this leg (if available)
+          let timeText = '00:00';
+          
+          // Calculate time based on distance and cruise speed
+          const cruiseSpeed = currentDisplayStats?.aircraft?.cruiseSpeed || 135;
+          const timeHours = legDistance / cruiseSpeed;
+          const hours = Math.floor(timeHours);
+          const minutes = Math.floor((timeHours - hours) * 60);
+          timeText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          
+          // Format distance text
+          const distanceText = `${legDistance.toFixed(1)} nm`;
+          
+          // Check direction for arrow placement
+          const goingLeftToRight = toStopCoords[0] > fromStopCoords[0];
+          
+          // Create the label text with direction arrows if needed
+          let labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${timeText ? ` • ${timeText}` : ''}${goingLeftToRight ? ' →' : ''}`;
+          
+          // Adjust text rotation for readability
+          let textBearing = legBearing + 90;
+          if (textBearing > 90 && textBearing < 270) {
+            textBearing = (textBearing + 180) % 360;
+          }
+          
+          console.log("⭐ Adding manual label for leg", i, labelText);
+          
+          // Add the feature for this label
+          features.push({
+            type: 'Feature',
+            geometry: midPoint.geometry,
+            properties: {
+              isLabel: true,
+              bearing: legBearing,
+              textBearing: textBearing,
+              text: labelText,
+              legIndex: i
+            }
+          });
+        }
+      }
+    }
+    
+    console.log("⭐ Created", features.length, "label features");
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -724,7 +840,44 @@ class WaypointManager {
           map.addImage('arrow-icon', { data: ctx.getImageData(0, 0, size, size).data, width: size, height: size });
         }
         map.addLayer({ id: routeArrowsLayerId, type: 'symbol', source: routeArrowsSourceId, layout: { 'symbol-placement': 'point', 'icon-image': 'arrow-icon', 'icon-size': 0.5, 'icon-rotate': ['get', 'bearing'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': 2, 'visibility': 'none' }, paint: { 'icon-opacity': 0 }, filter: ['!', ['has', 'isLabel']]}); // Initially hidden, controlled by zoom/logic
-        map.addLayer({ id: legLabelsLayerId, type: 'symbol', source: routeArrowsSourceId, layout: { 'symbol-placement': 'point', 'text-field': ['get', 'text'], 'text-size': 11, 'text-font': ['Arial Unicode MS Bold'], 'text-offset': [0, -0.5], 'text-anchor': 'center', 'text-rotate': ['get', 'textBearing'], 'text-rotation-alignment': 'map', 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-max-width': 30, 'text-line-height': 1.0, 'symbol-sort-key': 3 }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 3, 'text-opacity': 0.9 }, filter: ['has', 'isLabel']});
+          map.addLayer({
+            id: legLabelsLayerId,
+            type: 'symbol',
+            source: routeArrowsSourceId,
+            layout: {
+              'symbol-placement': 'point',
+              'text-field': ['get', 'text'],
+              'text-size': 11,
+              'text-font': ['Arial Unicode MS Bold'],
+              'text-offset': [0, -0.5],
+              'text-anchor': 'center',
+              'text-rotate': ['get', 'textBearing'],
+              'text-rotation-alignment': 'map',
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+              'text-max-width': 30,
+              'text-line-height': 1.0,
+              'symbol-sort-key': 3,
+              // Make label opacity zoom-dependent for short segments
+              'text-opacity': [
+                'case',
+                ['has', 'shortSegment'],
+                // For short segments, fade in as we zoom in
+                ['interpolate', ['linear'], ['zoom'], 
+                  8, 0,    // Fully transparent at zoom 8
+                  12, 1    // Fully opaque at zoom 12
+                ],
+                // Normal segments are always visible
+                0.9
+              ]
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 3
+            },
+            filter: ['has', 'isLabel']
+          });
       }
       
       // Ensure layers exist before trying to set visibility (e.g. for arrows)

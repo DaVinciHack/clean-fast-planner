@@ -19,6 +19,7 @@ import { PanelProvider } from '../../context/PanelContext';
  * Refactored to use a container with individual card components
  * that slide in and out when different tabs are selected.
  * Uses the existing animation system already in the CSS.
+ * Region management is now handled by RegionContext.
  */
 const RightPanel = ({
   visible,
@@ -47,11 +48,6 @@ const RightPanel = ({
   authUserName,
   rigsLoading,
   onLogin,
-  // Region selector props
-  regions = [],
-  currentRegion = null,
-  onRegionChange = () => {},
-  regionLoading = false,
   // Flight settings props
   deckTimePerStop = 5,
   deckFuelPerStop = 100,
@@ -167,20 +163,15 @@ const RightPanel = ({
         authUserName={authUserName}
         rigsLoading={rigsLoading}
         onLogin={onLogin}
-        regions={regions}
-        currentRegion={currentRegion}
-        onRegionChange={onRegionChange}
-        regionLoading={regionLoading}
         reserveFuel={reserveFuel}
         waypoints={waypoints}
         passengerWeight={passengerWeight}
         deckTimePerStop={deckTimePerStop}
         deckFuelFlow={deckFuelFlow}
-        contingencyFuelPercent={contingencyFuelPercent} // Pass contingencyFuelPercent to MainCard
-        taxiFuel={taxiFuel} // Pass taxiFuel to MainCard
+        contingencyFuelPercent={contingencyFuelPercent}
+        taxiFuel={taxiFuel}
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
-        // Added cargoWeight for the Save Flight button to calculate payload
         cargoWeight={cargoWeight}
       />
       
