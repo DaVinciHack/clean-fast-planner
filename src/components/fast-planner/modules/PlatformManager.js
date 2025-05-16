@@ -767,50 +767,75 @@ class PlatformManager {
 
   /**
    * Dedicated function to remove platform layers and source.
-   * Ensures layers are removed before the source to prevent errors.
+   * Enhanced with safety checks and proper sequencing.
    * @private
    */
   _removePlatformLayersAndSource() {
+    // Ensure map manager exists before trying to get the map
+    if (!this.mapManager) {
+      console.warn("PlatformManager: No map manager available for _removePlatformLayersAndSource");
+      return;
+    }
+    
     const map = this.mapManager.getMap();
+    
     // Ensure map is loaded and available
-    if (!map || !this.mapManager.isMapLoaded()) {
-      // console.log("PlatformManager: Map not ready for _removePlatformLayersAndSource, or no map.");
+    if (!map) {
+      console.warn("PlatformManager: Map not available for _removePlatformLayersAndSource");
+      return;
+    }
+
+    // Skip operation if region is changing
+    if (window.regionState && window.regionState.isChangingRegion) {
+      console.log("PlatformManager: Skipping layer removal during region change");
       return;
     }
 
     const layerIds = [
-      'platforms-fixed-layer',
-      'platforms-movable-layer',
-      'airfields-layer',
       'platforms-fixed-labels',
       'platforms-movable-labels',
       'airfields-labels',
+      'platforms-fixed-layer',
+      'platforms-movable-layer',
+      'airfields-layer',
       'platforms-layer' // Generic layer name, just in case it was used previously
     ];
     const sourceId = 'major-platforms';
 
-    // console.log("PlatformManager: Attempting to remove platform layers and source.");
+    console.log("PlatformManager: Removing platform layers and source");
 
+    // First, hide all layers to prevent visual flickering
     layerIds.forEach(layerId => {
-      if (map.getLayer(layerId)) {
-        try {
-          map.removeLayer(layerId);
-          // console.log(`PlatformManager: Removed layer ${layerId}`);
-        } catch (e) {
-          // console.warn(`PlatformManager: Error removing layer ${layerId}: ${e.message}`);
+      try {
+        if (map.getLayer && typeof map.getLayer === 'function' && map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'none');
         }
+      } catch (e) {
+        // Safely ignore errors when setting visibility
       }
     });
-    
-    // It's crucial to ensure layers are removed before the source.
-    // A small timeout can help, but a more robust solution might involve checking layer removal status.
-    if (map.getSource(sourceId)) {
+
+    // Then remove each layer with proper error handling
+    // IMPORTANT: Remove in the correct order - labels first, then main layers
+    for (const layerId of layerIds) {
       try {
-        map.removeSource(sourceId);
-        // console.log(`PlatformManager: Removed source ${sourceId}`);
+        if (map.getLayer && typeof map.getLayer === 'function' && map.getLayer(layerId)) {
+          map.removeLayer(layerId);
+          console.log(`PlatformManager: Removed layer ${layerId}`);
+        }
       } catch (e) {
-        // console.warn(`PlatformManager: Error removing source ${sourceId}: ${e.message}`);
+        console.warn(`PlatformManager: Error removing layer ${layerId}: ${e.message}`);
       }
+    }
+    
+    // Finally remove the source after all layers are removed
+    try {
+      if (map.getSource && typeof map.getSource === 'function' && map.getSource(sourceId)) {
+        map.removeSource(sourceId);
+        console.log(`PlatformManager: Removed source ${sourceId}`);
+      }
+    } catch (e) {
+      console.warn(`PlatformManager: Error removing source ${sourceId}: ${e.message}`);
     }
   }
   
@@ -818,19 +843,37 @@ class PlatformManager {
    * Clear all platforms from the map
    */
   clearPlatforms() {
-    const map = this.mapManager.getMap();
-    if (!map) {
-      console.log('PlatformManager: Map not available for clearPlatforms.');
+    // Check map manager first
+    if (!this.mapManager) {
+      console.warn('PlatformManager: No map manager available for clearPlatforms');
+      this.platforms = []; // Still clear the internal platform data
       return;
     }
     
-    console.log('PlatformManager: Clearing all platforms from map.');
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.warn('PlatformManager: Map not available for clearPlatforms');
+      this.platforms = []; // Still clear the internal platform data
+      return;
+    }
     
-    this.mapManager.onMapLoaded(() => {
+    console.log('PlatformManager: Clearing all platforms from map');
+    
+    // Check if the map is loaded before using onMapLoaded
+    if (this.mapManager.isMapLoaded()) {
+      // Map is loaded, directly remove layers and sources
       this._removePlatformLayersAndSource();
       this.platforms = []; // Clear the internal platform data
-      // console.log('PlatformManager: Platforms cleared from map and data store.');
-    });
+      console.log('PlatformManager: Platforms cleared from map and data store');
+    } else {
+      // Map is not loaded yet, queue it for when the map loads
+      console.log('PlatformManager: Map not loaded, queuing platform clearing');
+      this.mapManager.onMapLoaded(() => {
+        this._removePlatformLayersAndSource();
+        this.platforms = []; // Clear the internal platform data
+        console.log('PlatformManager: Platforms cleared from map and data store (deferred)');
+      });
+    }
   }
   
   /**

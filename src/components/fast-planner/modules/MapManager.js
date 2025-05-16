@@ -476,20 +476,28 @@ class MapManager {
    * @param {Function} callback - Function to call when the map is loaded
    */
   onMapLoaded(callback) {
+    if (!callback || typeof callback !== 'function') {
+      console.error("onMapLoaded: Invalid callback provided");
+      return;
+    }
+    
     if (this.isMapLoaded()) {
-      // Map is already loaded, execute immediately
-      console.log("onMapLoaded: Map already loaded, executing callback immediately.");
+      // Map is already loaded, execute immediately but in a try/catch for safety
+      console.log("onMapLoaded: Map already loaded, executing callback immediately");
       try {
         callback();
       } catch (e) {
-         console.error("Error executing immediate onMapLoaded callback:", e);
+        console.error("Error executing immediate onMapLoaded callback:", e);
       }
     } else if (this.map) {
       // Map exists but not loaded, queue the callback
-      console.log("onMapLoaded: Map not loaded, queuing callback.");
+      console.log("onMapLoaded: Map not loaded, queuing callback for later execution");
       this._loadCallbacks.push(callback);
     } else {
-       console.error("onMapLoaded called before map instance exists.");
+      // Map doesn't exist yet, log warning (this isn't an error case necessarily)
+      console.warn("onMapLoaded called before map instance exists, callback will be deferred");
+      // Still queue the callback - it will run when the map is eventually initialized
+      this._loadCallbacks.push(callback);
     }
   }
   

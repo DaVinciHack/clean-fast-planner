@@ -859,22 +859,14 @@ class WaypointManager {
               'text-line-height': 1.0,
               'symbol-sort-key': 3,
               // Make label opacity zoom-dependent for short segments
-              'text-opacity': [
-                'case',
-                ['has', 'shortSegment'],
-                // For short segments, fade in as we zoom in
-                ['interpolate', ['linear'], ['zoom'], 
-                  8, 0,    // Fully transparent at zoom 8
-                  12, 1    // Fully opaque at zoom 12
-                ],
-                // Normal segments are always visible
-                0.9
-              ]
+              'symbol-sort-key': 3,
             },
             paint: {
               'text-color': '#ffffff',
               'text-halo-color': '#000000',
-              'text-halo-width': 3
+              'text-halo-width': 3,
+              // Simple static opacity value instead of complex expression
+              'text-opacity': 0.9
             },
             filter: ['has', 'isLabel']
           });

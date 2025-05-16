@@ -227,9 +227,20 @@ export const RegionProvider = ({
     console.log(`RegionContext: Loading data for region: ${currentRegion.name}`);
     setRegionLoading(true);
     
+    // Set a global state flag to indicate region is changing (used by other components)
+    window.regionState = window.regionState || {};
+    window.regionState.isChangingRegion = true;
+    
     // Skip platform loading if map is not ready
     if (!mapReady) {
       console.warn(`RegionContext: Map not ready, deferring platform loading for ${currentRegion.name}`);
+      
+      // Set a delayed callback to clear the flag
+      setTimeout(() => {
+        window.regionState.isChangingRegion = false;
+        setRegionLoading(false);
+      }, 1000);
+      
       return;
     }
     
@@ -245,6 +256,9 @@ export const RegionProvider = ({
             platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
               .then(() => {
                 console.log(`RegionContext: Platforms loaded for ${currentRegion.name}`);
+                
+                // Clear the region changing flag
+                window.regionState.isChangingRegion = false;
                 
                 // After successfully loading platforms, try to load waypoints
                 if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
@@ -265,6 +279,9 @@ export const RegionProvider = ({
               .catch(error => {
                 console.error(`RegionContext: Error loading platforms:`, error);
                 
+                // Clear the region changing flag on error
+                window.regionState.isChangingRegion = false;
+                
                 // Retry if within retry attempts
                 if (attempts < maxAttempts) {
                   console.log(`RegionContext: Retrying platform load (${attempts+1}/${maxAttempts})...`);
@@ -276,10 +293,16 @@ export const RegionProvider = ({
               });
           } else {
             console.error('RegionContext: PlatformManager.loadPlatformsFromFoundry is not a function');
+            
+            // Clear the region changing flag on error
+            window.regionState.isChangingRegion = false;
             setRegionLoading(false);
           }
         } catch (error) {
           console.error(`RegionContext: Error calling platform loading method:`, error);
+          
+          // Clear the region changing flag on error
+          window.regionState.isChangingRegion = false;
           
           // Retry if within retry attempts
           if (attempts < maxAttempts) {
@@ -297,6 +320,9 @@ export const RegionProvider = ({
       
     } else {
       console.warn('RegionContext: No platform manager available');
+      
+      // Clear the region changing flag if no platform manager
+      window.regionState.isChangingRegion = false;
       setRegionLoading(false);
     }
     
@@ -326,13 +352,21 @@ export const RegionProvider = ({
    * Change the current region
    */
   const changeRegion = useCallback((regionId) => {
+    console.log(`RegionContext: Changing region to ${regionId}`);
     setRegionLoading(true);
+    
+    // Set a global state flag to indicate region is changing
+    window.regionState = window.regionState || {};
+    window.regionState.isChangingRegion = true;
     
     // Find the region object
     const regionObject = regions.find(region => region.id === regionId);
     if (!regionObject) {
       console.error(`Region with ID ${regionId} not found`);
       setRegionLoading(false);
+      
+      // Clear the region changing flag if region not found
+      window.regionState.isChangingRegion = false;
       return;
     }
     
@@ -342,10 +376,40 @@ export const RegionProvider = ({
     // If map isn't ready yet, store for initialization
     if (!mapReady && mapManagerRef.current) {
       pendingRegionChangeRef.current = regionObject;
+      console.log(`RegionContext: Map not ready, region ${regionObject.name} will be applied when map loads`);
+    } else if (mapReady && mapManagerRef.current && mapManagerRef.current.getMap()) {
+      // If map is ready, clear any platform data before applying the new region
+      // This helps prevent race conditions and layer errors
+      try {
+        if (platformManagerRef.current) {
+          // Use explicit flag to indicate this is a safe time to clear platforms
+          platformManagerRef.current.skipNextClear = false;
+          
+          // Additional safety - wait for next tick before changing region bounds
+          setTimeout(() => {
+            try {
+              // Apply region bounds
+              const map = mapManagerRef.current.getMap();
+              if (map && typeof map.fitBounds === 'function') {
+                console.log(`RegionContext: Applying region bounds for ${regionObject.name}`);
+                map.fitBounds(regionObject.bounds, {
+                  padding: 50,
+                  maxZoom: regionObject.zoom || 6
+                });
+              }
+            } catch (e) {
+              console.error(`RegionContext: Error applying region bounds:`, e);
+            }
+          }, 50);
+        }
+      } catch (e) {
+        console.warn(`RegionContext: Error during platform cleanup for region change:`, e);
+      }
     }
     
     // Note: regionLoading will be set to false after platforms load
-  }, [regions, mapReady, mapManagerRef]);
+    // The region changing flag will also be cleared when platforms finish loading
+  }, [regions, mapReady, mapManagerRef, platformManagerRef]);
 
   // Memoize the context value to prevent unnecessary re-renders
   const value = React.useMemo(() => ({
