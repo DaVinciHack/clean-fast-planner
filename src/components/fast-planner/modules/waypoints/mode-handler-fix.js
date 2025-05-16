@@ -24,6 +24,24 @@ export function initializeHandlers() {
   }
   
   try {
+    // If handlers already exist, clean them up first
+    if (handlers) {
+      try {
+        console.log('MODE HANDLER FIX: Cleaning up existing handlers before initialization');
+        if (handlers.normalModeHandler && handlers.normalModeHandler.deactivate) {
+          handlers.normalModeHandler.deactivate();
+        }
+        if (handlers.waypointModeHandler && handlers.waypointModeHandler.deactivate) {
+          handlers.waypointModeHandler.deactivate();
+        }
+      } catch (error) {
+        console.error('MODE HANDLER FIX: Error cleaning up existing handlers:', error);
+      }
+      
+      // Reset handlers to null
+      handlers = null;
+    }
+    
     // Create handlers using global references
     handlers = createSeparateHandlers(
       window.mapManager,
@@ -48,6 +66,10 @@ export function initializeHandlers() {
     
     initialized = true;
     console.log('MODE HANDLER FIX: Handlers initialized successfully');
+    
+    // Set window flag to avoid duplicate initialization
+    window.mapHandlersInitialized = true;
+    
     return handlers;
   } catch (error) {
     console.error('MODE HANDLER FIX: Error initializing handlers:', error);

@@ -51,6 +51,15 @@ class WaypointInteractions {
     this.mapManager = mapManager;
     this.platformManager = platformManager;
     
+    // Update the callbacks
+    this.callbacks = {
+      onWaypointAdded: null,
+      onWaypointRemoved: null,
+      onWaypointMoved: null,
+      onWaypointError: null,
+      onWaypointsChanged: null
+    };
+    
     console.log('WaypointInteractions successfully initialized');
     return true;
   }
@@ -559,11 +568,20 @@ class WaypointInteractions {
       return;
     }
     
-    if (this.callbacks.hasOwnProperty(eventName)) {
+    // Define valid event names
+    const validEvents = [
+      'onWaypointAdded',
+      'onWaypointRemoved',
+      'onWaypointMoved',
+      'onWaypointError',
+      'onWaypointsChanged'  // Add this as a valid event
+    ];
+    
+    if (validEvents.includes(eventName)) {
       this.callbacks[eventName] = callback;
       console.log(`Set callback for ${eventName}`);
     } else {
-      console.error(`Unknown event name: ${eventName}`);
+      console.warn(`Unknown event name: ${eventName}, valid events are: ${validEvents.join(', ')}`);
     }
   }
   

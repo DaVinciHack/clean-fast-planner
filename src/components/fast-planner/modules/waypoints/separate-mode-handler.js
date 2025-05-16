@@ -82,30 +82,32 @@ export function createSeparateHandlers(mapManager, waypointManager, platformMana
       }
 
       try {
-        // Check if clicking on the route line
-        const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
-        if (routeFeatures && routeFeatures.length > 0) {
-          console.log('NORMAL MODE: Clicked on route line');
-          
-          // Find where to insert on the path
-          const insertIndex = waypointManager.findPathInsertIndex(e.lngLat);
+        // Check if clicking on the route line - first check if route exists
+        if (map.getLayer('route')) {
+          const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
+          if (routeFeatures && routeFeatures.length > 0) {
+            console.log('NORMAL MODE: Clicked on route line');
+            
+            // Find where to insert on the path
+            const insertIndex = waypointManager.findPathInsertIndex(e.lngLat);
 
-          // Check for nearest rig
-          const nearestRig = platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
+            // Check for nearest rig
+            const nearestRig = platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng);
 
-          // Add as STOP (not waypoint)
-          if (nearestRig && nearestRig.distance < 5) {
-            waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex, {
-              isWaypoint: false,
-              type: 'STOP'
-            });
-          } else {
-            waypointManager.addWaypointAtIndex([e.lngLat.lng, e.lngLat.lat], null, insertIndex, {
-              isWaypoint: false,
-              type: 'STOP'
-            });
+            // Add as STOP (not waypoint)
+            if (nearestRig && nearestRig.distance < 5) {
+              waypointManager.addWaypointAtIndex(nearestRig.coordinates, nearestRig.name, insertIndex, {
+                isWaypoint: false,
+                type: 'STOP'
+              });
+            } else {
+              waypointManager.addWaypointAtIndex([e.lngLat.lng, e.lngLat.lat], null, insertIndex, {
+                isWaypoint: false,
+                type: 'STOP'
+              });
+            }
+            return;
           }
-          return;
         }
       } catch (err) {
         console.error('NORMAL MODE: Error handling route click:', err);
@@ -268,36 +270,38 @@ export function createSeparateHandlers(mapManager, waypointManager, platformMana
       console.log('WAYPOINT MODE: Route click', e.lngLat);
       
       try {
-        // Find closest point on route
-        const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
-        if (!routeFeatures || routeFeatures.length === 0) return;
-        
-        // Find insert index
-        const insertIndex = waypointManager.findPathInsertIndex(e.lngLat);
-        
-        // Find nearest waypoint
-        const nearestWaypoint = platformManager.findNearestWaypoint(e.lngLat.lat, e.lngLat.lng, 5);
-        
-        if (nearestWaypoint) {
-          console.log(`WAYPOINT MODE: Adding waypoint at route: ${nearestWaypoint.name}`);
+        // Find closest point on route - first check if route exists
+        if (map.getLayer('route')) {
+          const routeFeatures = map.queryRenderedFeatures(e.point, { layers: ['route'] });
+          if (!routeFeatures || routeFeatures.length === 0) return;
           
-          // Get coordinates in correct format
-          const coordinates = nearestWaypoint.coordinates || 
-                              nearestWaypoint.coords || 
-                              [nearestWaypoint.lng, nearestWaypoint.lat];
+          // Find insert index
+          const insertIndex = waypointManager.findPathInsertIndex(e.lngLat);
           
-          // Add at specific index as WAYPOINT
-          waypointManager.addWaypointAtIndex(coordinates, nearestWaypoint.name, insertIndex, {
-            isWaypoint: true,
-            type: 'WAYPOINT'
-          });
-        } else {
-          // Show message to user
-          if (window.LoadingIndicator) {
-            window.LoadingIndicator.updateStatusIndicator(
-              'No navigation waypoint found near route click. Try clicking on a yellow waypoint.',
-              'warning'
-            );
+          // Find nearest waypoint
+          const nearestWaypoint = platformManager.findNearestWaypoint(e.lngLat.lat, e.lngLat.lng, 5);
+          
+          if (nearestWaypoint) {
+            console.log(`WAYPOINT MODE: Adding waypoint at route: ${nearestWaypoint.name}`);
+            
+            // Get coordinates in correct format
+            const coordinates = nearestWaypoint.coordinates || 
+                                nearestWaypoint.coords || 
+                                [nearestWaypoint.lng, nearestWaypoint.lat];
+            
+            // Add at specific index as WAYPOINT
+            waypointManager.addWaypointAtIndex(coordinates, nearestWaypoint.name, insertIndex, {
+              isWaypoint: true,
+              type: 'WAYPOINT'
+            });
+          } else {
+            // Show message to user
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                'No navigation waypoint found near route click. Try clicking on a yellow waypoint.',
+                'warning'
+              );
+            }
           }
         }
       } catch (error) {

@@ -15,13 +15,9 @@ const degreesToRadians = (degrees) => {
 };
 
 /**
- * Calculate drift angle (crab angle) needed to maintain course in wind
- * This is particularly important for helicopter operations
- * @param {number} course - Desired ground track in degrees (0-360)
- * @param {number} airspeed - Aircraft's airspeed in knots
- * @param {number} windSpeed - Wind speed in knots
- * @param {number} windDirection - Direction wind is coming FROM in degrees (0-360)
- * @returns {number} Drift angle in degrees (positive = crab right, negative = crab left)
+ * Convert radians to degrees
+ * @param {number} radians - Angle in radians
+ * @returns {number} Angle in degrees
  */
 const radiansToDegrees = (radians) => {
   return radians * 180 / Math.PI;
@@ -169,26 +165,14 @@ const calculateCourse = (from, to) => {
 };
 
 /**
- * Calculate the relative angle between two compass bearings
- * @param {number} course - Aircraft course in degrees (0-360)
+ * Calculate drift angle (crab angle) needed to maintain course in wind
+ * This is particularly important for helicopter operations
+ * @param {number} course - Desired ground track in degrees (0-360)
+ * @param {number} airspeed - Aircraft's airspeed in knots
+ * @param {number} windSpeed - Wind speed in knots
  * @param {number} windDirection - Direction wind is coming FROM in degrees (0-360)
- * @returns {number} Angle between course and wind in degrees (0-180)
+ * @returns {number} Drift angle in degrees (positive = crab right, negative = crab left)
  */
-const calculateWindAngle = (course, windDirection) => {
-  // Convert wind direction from meteorological (direction wind is coming FROM)
-  // to mathematical (direction wind is going TO)
-  const windDirectionMath = (windDirection + 180) % 360;
-  
-  // Calculate the absolute difference between the two angles
-  let angleDiff = Math.abs(course - windDirectionMath);
-  
-  // Ensure the result is the smaller angle (max 180 degrees)
-  if (angleDiff > 180) {
-    angleDiff = 360 - angleDiff;
-  }
-  
-  return angleDiff;
-};
 const calculateDriftAngle = (course, airspeed, windSpeed, windDirection) => {
   // For zero wind, there's no drift
   if (windSpeed === 0) {

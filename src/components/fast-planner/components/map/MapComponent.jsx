@@ -53,14 +53,14 @@ const MapComponent = ({
           if (onMapReady) {
             onMapReady(mapInstance); // Pass the newly created map instance
 
-            // SIMPLIFIED FIX: Only dispatch event if handlers haven't been initialized
-            setTimeout(() => {
-              if (mapInstance && !window.mapHandlersInitialized) {
-                // Only dispatch event if handlers haven't been initialized yet
-                const event = new CustomEvent('reinitialize-map-handlers');
-                window.dispatchEvent(event);
-              }
-            }, 1000);
+            // Dispatch map-ready event for other components to listen for
+            const mapReadyEvent = new CustomEvent('map-ready', {
+              detail: { map: mapInstance }
+            });
+            window.dispatchEvent(mapReadyEvent);
+            
+            // Set a global flag to prevent duplicate handlers
+            window.mapIsReady = true;
           }
         } else {
            setLoadingMessage('Error: Map container not found.');
