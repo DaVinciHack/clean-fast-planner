@@ -76,16 +76,38 @@ const MapComponent = ({
     
     // Cleanup function: Runs only on component unmount due to empty dependency array
     return () => {
-      const map = mapManager?.getMap(); // Use the captured manager reference
-      if (map && typeof map.remove === 'function') {
-         try {
-           map.remove();
-         } catch (e) {
-           console.error("Error removing map during cleanup:", e);
-         }
+      try {
+        if (mapManager) {
+          const map = mapManager.getMap();
+          if (map) {
+            // Remove any event listeners
+            try {
+              if (typeof map.off === 'function') {
+                map.off();
+              }
+            } catch (e) {
+              console.warn("Error removing map event listeners:", e);
+            }
+            
+            // Then try to remove the map
+            try {
+              if (typeof map.remove === 'function') {
+                map.remove();
+              }
+            } catch (e) {
+              console.warn("Error removing map instance:", e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("MapComponent: Error in cleanup:", error);
       }
-      // Reset initialized flag if needed, although component is unmounting
-      mapInitializedRef.current = false; 
+      
+      // Reset initialized flag
+      mapInitializedRef.current = false;
+      
+      // Set a flag to indicate map is no longer ready
+      window.mapIsReady = false;
     };
   }, [mapManagerRef, currentRegion]); // Re-run if mapManagerRef or currentRegion changes
   
