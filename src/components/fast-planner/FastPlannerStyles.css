@@ -511,7 +511,7 @@
   border-radius: 5px;
   border: 1px solid var(--input-border);
   position: relative;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
 }
 
 /* Background color for the waypoint entries - exact match to image 2 */

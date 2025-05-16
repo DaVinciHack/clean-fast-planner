@@ -19,13 +19,25 @@ const useWaypoints = ({
   // State for waypoint mode
   const [waypointModeActive, setWaypointModeActive] = useState(false);
 
-  // Register the setWaypoints function with the clean implementation
+  // Effect to update the state whenever the waypoint manager's waypoints change
   useEffect(() => {
-    if (typeof window.registerWaypointsStateSetter === 'function') {
-      window.registerWaypointsStateSetter(setWaypoints);
-      console.log('Registered waypoints state setter with clean implementation');
+    if (waypointManagerRef.current) {
+      // Set up a callback to synchronize state when waypoints change
+      waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
+        console.log('WaypointManager onChange callback triggered with', updatedWaypoints.length, 'waypoints');
+        
+        // Update React state with a copy of the waypoints array to ensure proper re-rendering
+        setWaypoints([...updatedWaypoints]);
+      });
+      
+      return () => {
+        // Clean up by clearing the callback when component unmounts
+        if (waypointManagerRef.current) {
+          waypointManagerRef.current.setCallback('onChange', null);
+        }
+      };
     }
-  }, [setWaypoints]);
+  }, [waypointManagerRef, setWaypoints]);
 
   /**
    * Adds a waypoint to the route
@@ -229,19 +241,31 @@ const useWaypoints = ({
       if (id && index !== -1) {
         console.log(`Removing waypoint id=${id}, index=${index}`);
         
+        // First get a copy of the current waypoints before removal
+        const currentWaypoints = [...waypointManagerRef.current.getWaypoints()];
+        
         // Remove from the map and internal state
         waypointManagerRef.current.removeWaypoint(id, index);
         
-        // Use setTimeout to batch state updates and avoid synchronization issues
+        // Get the updated waypoints immediately after removal
+        const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+        
+        // Force an immediate state update
+        setWaypoints([...updatedWaypoints]);
+        
+        console.log(`Waypoint removed immediately, new count: ${updatedWaypoints.length}`);
+        
+        // Add a second update with a small delay to ensure UI is in sync
         setTimeout(() => {
-          // Get the updated waypoints
-          const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+          // Get the waypoints again to ensure we have the latest state
+          const finalWaypoints = waypointManagerRef.current.getWaypoints();
           
-          // Update the state with the new waypoints
-          setWaypoints([...updatedWaypoints]);
-          
-          console.log(`Waypoint removed, new count: ${updatedWaypoints.length}`);
-        }, 0);
+          // Only update if there was a change to avoid unnecessary re-renders
+          if (JSON.stringify(finalWaypoints) !== JSON.stringify(updatedWaypoints)) {
+            setWaypoints([...finalWaypoints]);
+            console.log(`Waypoint list updated again with delay, count: ${finalWaypoints.length}`);
+          }
+        }, 50);
       }
     }
   }, [waypointManagerRef, setWaypoints]);
