@@ -1,5 +1,5 @@
 // Import React and necessary hooks
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../client';
 import './FastPlannerStyles.css';
@@ -47,7 +47,8 @@ const FastPlannerCore = ({
   routeInput, setRouteInput,       // Pass state and setter
   favoriteLocations, setFavoriteLocations, // Pass state and setter
   reserveMethod, setReserveMethod, // Pass state and setter
-  addWaypointDirectImplementation // Pass the actual implementation function
+  addWaypointDirectImplementation, // Pass the actual implementation function
+  handleMapReadyImpl // Pass the map ready implementation
 }) => {
   const { isAuthenticated, userName, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion(); 
@@ -100,18 +101,24 @@ const FastPlannerCore = ({
     }
   }, [aircraftManagerRef, appSettingsManagerRef, setAircraftManagers]);
 
+  // Memoize the region change handler to maintain stable reference
+  const handleRegionChange = useCallback((event) => {
+    if (event.detail && event.detail.region) {
+      console.log(`FastPlannerCore: Received region change event: ${event.detail.region.name}`);
+      // The actual region update is delegated to the stabilized function in useAircraft
+      setCurrentAircraftRegion(event.detail.region);
+    }
+  }, [setCurrentAircraftRegion]);
+
+  // Set up the event listener with the memoized handler
   useEffect(() => {
-    const handleRegionChange = (event) => {
-      if (event.detail && event.detail.region) {
-        console.log(`FastPlannerCore: Received region change event: ${event.detail.region.name}`);
-        setCurrentAircraftRegion(event.detail.region);
-      }
-    };
+    console.log('FastPlannerCore: Setting up region-changed event listener');
     window.addEventListener('region-changed', handleRegionChange);
     return () => {
+      console.log('FastPlannerCore: Removing region-changed event listener');
       window.removeEventListener('region-changed', handleRegionChange);
     };
-  }, [setCurrentAircraftRegion]);
+  }, [handleRegionChange]);
 
   const {
     leftPanelVisible, rightPanelVisible, platformsVisible, platformsLoaded,
@@ -139,6 +146,39 @@ const FastPlannerCore = ({
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
 
+  // Effect to clear route when activeRegionFromContext (from useRegion) changes
+  const firstLoadDone = useRef(false);
+  const lastRegionId = useRef(null);
+  
+  useEffect(() => {
+    // Skip if region is not set yet
+    if (!activeRegionFromContext) return;
+    
+    // Skip on first load
+    if (!firstLoadDone.current) {
+      firstLoadDone.current = true;
+      lastRegionId.current = activeRegionFromContext.id;
+      return;
+    }
+    
+    // Skip if the region hasn't actually changed (prevents unnecessary clearing)
+    if (lastRegionId.current === activeRegionFromContext.id) {
+      return;
+    }
+    
+    // Update reference for next comparison
+    lastRegionId.current = activeRegionFromContext.id;
+    
+    // Only clear route if it's not the initial region setting and clearRoute is available
+    if (typeof clearRoute === 'function') {
+      console.log('FastPlannerCore: activeRegionFromContext changed to', activeRegionFromContext.name, 'clearing route.');
+      // Use setTimeout to break potential circular dependencies in the render cycle
+      setTimeout(() => {
+        clearRoute();
+      }, 0);
+    }
+  }, [activeRegionFromContext, clearRoute]); // Dependencies: activeRegionFromContext and clearRoute
+
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(location);
@@ -156,23 +196,11 @@ const FastPlannerCore = ({
   
   const loadCustomChart = () => console.log("loadCustomChart - Not implemented");
 
-  const RegionAircraftConnector = ({ aircraftSetter }) => {
-    const { currentRegion: contextRegion } = useRegion();
-    useEffect(() => {
-      if (contextRegion && contextRegion.id) {
-        const timer = setTimeout(() => {
-          console.log(`RegionAircraftConnector: Updating aircraft for region ${contextRegion.name}`);
-          aircraftSetter(contextRegion);
-        }, 0);
-        return () => clearTimeout(timer);
-      }
-    }, [contextRegion, aircraftSetter]);
-    return null; 
-  };
+  // RegionAircraftConnector removed - using only event-based region sync
 
   return (
     <>
-      <RegionAircraftConnector aircraftSetter={setCurrentAircraftRegion} />
+      {/* RegionAircraftConnector removed - using only event-based region sync */}
       <div className="fast-planner-container">
         <ModeHandler 
           mapManagerRef={mapManagerRef}
@@ -191,7 +219,7 @@ const FastPlannerCore = ({
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
           reserveFuel={flightSettings.reserveFuel} weather={weather} stopCards={stopCards}
         />
-        <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReady} className="fast-planner-map" />
+        <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReadyImpl} className="fast-planner-map" />
         <MapZoomHandler mapManagerRef={mapManagerRef} />
         <LeftPanel
           visible={leftPanelVisible} onToggleVisibility={toggleLeftPanel} waypoints={waypoints}
@@ -252,15 +280,32 @@ const FastPlannerApp = () => {
   // and then the implementation to FastPlannerCore
   const addWaypointDirectRef = useRef(async (waypointData) => {
     // Initial placeholder, implementation will be set by addWaypointDirectImpl
-    if (!appManagers.waypointManagerRef || !appManagers.waypointManagerRef.current) {
-        console.error('Cannot add waypoint: No waypoint manager ref in placeholder');
+    // Ensure appManagers is defined before trying to access its properties
+    if (appManagers && appManagers.waypointManagerRef && appManagers.waypointManagerRef.current) {
+        console.warn('addWaypointDirect placeholder called');
+    } else {
+        console.error('Cannot add waypoint: appManagers or waypointManagerRef not available in placeholder');
         return;
     }
-    console.warn('addWaypointDirect placeholder called');
+  });
+
+  // appManagers must be defined before addWaypointDirectImpl can use it.
+  // So, we declare appManagers first.
+  const appManagers = useManagers({
+    client,
+    setFavoriteLocations,
+    setWaypoints,
+    flightSettings,
+    setFlightSettings,
+    forceUpdate,
+    setForceUpdate,
+    addWaypoint: addWaypointDirectRef.current, 
+    weather,
+    setWeather
   });
 
   const addWaypointDirectImpl = async (waypointData) => {
-    const { waypointManagerRef, platformManagerRef } = appManagers; // Get refs from appManagers
+    const { waypointManagerRef, platformManagerRef } = appManagers; 
     console.log('🔧 Using direct addWaypoint implementation (FastPlannerApp)');
     if (!waypointManagerRef.current) {
       console.error('Cannot add waypoint: No waypoint manager ref');
@@ -314,7 +359,6 @@ const FastPlannerApp = () => {
     if (!coords || !Array.isArray(coords) || coords.length !== 2) { if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator(`Invalid coordinates.`, 'error'); return; }
     if (window.isWaypointModeActive === true) isWaypoint = true;
     
-    // Ensure appManagers and its refs are available before using them
     if (appManagers.waypointManagerRef && appManagers.waypointManagerRef.current) {
         appManagers.waypointManagerRef.current.addWaypoint(coords, name, { isWaypoint, type: isWaypoint ? 'WAYPOINT' : 'STOP' });
         const updatedWaypoints = appManagers.waypointManagerRef.current.getWaypoints();
@@ -325,26 +369,51 @@ const FastPlannerApp = () => {
     }
   };
   
-  const appManagers = useManagers({
-    client,
-    setFavoriteLocations,
-    setWaypoints,
-    flightSettings,
-    setFlightSettings,
-    forceUpdate,
-    setForceUpdate,
-    addWaypoint: addWaypointDirectRef.current, // Pass the ref's current value
-    weather,
-    setWeather
-  });
-
   // Effect to set the implementation on the ref after appManagers is initialized
   useEffect(() => {
     if (appManagers.waypointManagerRef && appManagers.platformManagerRef) {
         addWaypointDirectRef.current.implementation = addWaypointDirectImpl;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appManagers.waypointManagerRef, appManagers.platformManagerRef]); // addWaypointDirectImpl is not added to deps to avoid re-assigning on every render.
+  }, [appManagers.waypointManagerRef, appManagers.platformManagerRef]); 
+
+  // Add mapReady handler to load aircraft data when map is ready
+  const handleMapReadyImpl = useCallback((mapInstance) => {
+    console.log("🗺️ Map is ready", mapInstance);
+
+    // Wrap in try/catch for safety
+    try {
+      // Once the map is ready, load aircraft
+      if (appManagers.aircraftManagerRef && appManagers.aircraftManagerRef.current && client) {
+        console.log("Loading aircraft after map initialization");
+        
+        appManagers.aircraftManagerRef.current.loadAircraftFromOSDK(client)
+          .then(() => {
+            console.log("Aircraft loaded successfully");
+            // Force update to refresh the UI with aircraft data
+            setForceUpdate(prev => prev + 1);
+          })
+          .catch(error => {
+            console.error(`Error loading aircraft: ${error}`);
+          });
+      }
+
+      // Initialize map interactions if available
+      if (appManagers.mapInteractionHandlerRef && appManagers.mapInteractionHandlerRef.current) {
+        console.log("🗺️ Initializing map interaction handler...");
+        appManagers.mapInteractionHandlerRef.current.initialize();
+      }
+    } catch (error) {
+      console.error("Error in handleMapReady:", error);
+    }
+  }, [appManagers, client, setForceUpdate]);
+
+  // Connect the handleMapReadyImpl to appManagers
+  useEffect(() => {
+    if (appManagers) {
+      appManagers.handleMapReady = handleMapReadyImpl;
+    }
+  }, [appManagers, handleMapReadyImpl]);
 
   return (
     <RegionProvider
@@ -368,7 +437,8 @@ const FastPlannerApp = () => {
         routeInput={routeInput} setRouteInput={setRouteInput}
         favoriteLocations={favoriteLocations} setFavoriteLocations={setFavoriteLocations}
         reserveMethod={reserveMethod} setReserveMethod={setReserveMethod}
-        addWaypointDirectImplementation={addWaypointDirectImpl} // Pass the actual function
+        addWaypointDirectImplementation={addWaypointDirectImpl}
+        handleMapReadyImpl={handleMapReadyImpl}
       />
     </RegionProvider>
   );

@@ -51,14 +51,24 @@ const useManagers = ({
   const appSettingsManagerRef = useRef(null);
   const waypointHandlerRef = useRef(null);
 
+  // Track initialization status to prevent multiple initializations
+  const [managersInitialized, setManagersInitialized] = useState(false);
+
   // Initialize managers
   useEffect(() => {
+    // Skip if already initialized to prevent re-initialization loops
+    if (managersInitialized) {
+      console.log("FastPlannerApp: Managers already initialized, skipping initialization");
+      return;
+    }
+
     console.log("FastPlannerApp: Initializing managers...");
 
     // Check if OSDK client is available
     if (!client) {
       console.error("OSDK Client Error: client is null or undefined");
       createErrorDialog();
+      return;
     }
 
     // Create MapManager
@@ -69,41 +79,8 @@ const useManagers = ({
       // EMERGENCY FIX: Update global reference
       window.mapManager = mapManagerRef.current;
 
-      // Directly initialize the map
-      setTimeout(() => {
-        console.log("FastPlannerApp: Delayed map initialization");
-        mapManagerRef.current.loadScripts()
-          .then(() => {
-            console.log("FastPlannerApp: Scripts loaded, initializing map...");
-            return mapManagerRef.current.initializeMap('fast-planner-map');
-          })
-          .then((mapInstance) => {
-            console.log("FastPlannerApp: Map initialization complete");
-            if (handleMapReady) {
-              handleMapReady(mapInstance);
-            }
-
-            // Once the map is ready, load aircraft
-            if (aircraftManagerRef.current && client) {
-              console.log("Loading aircraft after map initialization");
-              setLocalAircraftLoading(true); // Use local state
-              
-              aircraftManagerRef.current.loadAircraftFromOSDK(client)
-                .then(() => {
-                  console.log("Aircraft loaded successfully");
-                  // Force update to refresh the UI with aircraft data
-                  setForceUpdate(prev => prev + 1);
-                })
-                .catch(error => {
-                  console.error(`Error loading aircraft: ${error}`);
-                  setLocalAircraftLoading(false); // Use local state
-                });
-            }
-          })
-          .catch(error => {
-            console.error("FastPlannerApp: Error initializing map:", error);
-          });
-      }, 500);
+      // Don't initialize the map here - let MapComponent handle that
+      console.log("FastPlannerApp: MapManager created, initialization will be handled by MapComponent");
     }
 
     // Create FavoriteLocationsManager
@@ -302,8 +279,17 @@ const useManagers = ({
       const savedSettings = appSettingsManagerRef.current.getAllSettings();
 
       // Apply flight settings
-      const flightSettings = savedSettings.flightSettings;
-      setFlightSettings(flightSettings); // Set the entire flightSettings object from saved settings
+      const flightSettingsFromStorage = savedSettings.flightSettings;
+      if (flightSettingsFromStorage) {
+        // Conditional update to prevent loops if flightSettings is a dependency of this useEffect
+        // A proper deep equality check would be more robust here.
+        if (JSON.stringify(flightSettings) !== JSON.stringify(flightSettingsFromStorage)) {
+          console.log("useManagers: Applying saved flight settings from AppSettingsManager as they differ.");
+          setFlightSettings(flightSettingsFromStorage);
+        } else {
+          console.log("useManagers: Saved flight settings are identical to current state, skipping update.");
+        }
+      }
     }
 
     // Create the MapInteractionHandler
@@ -492,6 +478,9 @@ const useManagers = ({
       });
     }
 
+    // Mark initialization as complete
+    setManagersInitialized(true);
+    
     // Set up event listeners
     const handleSaveAircraftSettings = (event) => {
       const { key, settings } = event.detail;
@@ -526,12 +515,7 @@ const useManagers = ({
     };
   }, [
     client, 
-    setFavoriteLocations, 
-    setWaypoints, 
-    setFlightSettings, 
-    setForceUpdate, 
-    addWaypoint, 
-    flightSettings
+    managersInitialized // Only depend on this flag and client
   ]); 
 
   // Effect to handle flightSettings changes

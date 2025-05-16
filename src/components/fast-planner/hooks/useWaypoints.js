@@ -1,6 +1,6 @@
 // src/components/fast-planner/hooks/useWaypoints.js
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { interactionController } from '../cleanIntegration';
 
 /**
@@ -31,7 +31,7 @@ const useWaypoints = ({
    * Adds a waypoint to the route
    * Uses the clean implementation if available, falls back to original
    */
-  const addWaypoint = async (waypointData) => {
+  const addWaypoint = useCallback(async (waypointData) => {
     console.log('🌐 Adding waypoint with data:', waypointData);
     
     // Try to use the clean implementation first
@@ -175,22 +175,29 @@ const useWaypoints = ({
         pointType: isWaypoint ? 'NAVIGATION_WAYPOINT' : 'LANDING_STOP'
       });
 
-      const updatedWaypoints = waypointManagerRef.current.getWaypoints();
-      
+      // Use setTimeout to batch state updates and avoid synchronization issues
       await new Promise(resolve => {
-        setWaypoints([...updatedWaypoints]);
-        setTimeout(resolve, 0);
+        setTimeout(() => {
+          // Get the updated waypoints
+          const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+          
+          // Update the state with the new waypoints
+          setWaypoints([...updatedWaypoints]);
+          
+          console.log(`🌐 Updated waypoints array with ${updatedWaypoints.length} items`);
+          resolve();
+        }, 0);
       });
-      
-      console.log(`🌐 Updated waypoints array with ${updatedWaypoints.length} items`);
     }
-  };
+  }, [waypointManagerRef, platformManagerRef, setWaypoints]);
 
   /**
    * Removes a waypoint from the route
    * Uses the clean implementation if available, falls back to original
    */
-  const removeWaypoint = (waypointIdOrIndex) => {
+  const removeWaypoint = useCallback((waypointIdOrIndex) => {
+    console.log('removeWaypoint called with:', waypointIdOrIndex);
+    
     // Try to use the clean implementation first, but only if it's properly initialized
     if (window.removeWaypointClean && typeof window.removeWaypointClean === 'function') {
       console.log('Using clean implementation for removeWaypoint');
@@ -220,60 +227,102 @@ const useWaypoints = ({
       }
 
       if (id && index !== -1) {
+        console.log(`Removing waypoint id=${id}, index=${index}`);
+        
+        // Remove from the map and internal state
         waypointManagerRef.current.removeWaypoint(id, index);
-        setWaypoints([...waypointManagerRef.current.getWaypoints()]);
+        
+        // Use setTimeout to batch state updates and avoid synchronization issues
+        setTimeout(() => {
+          // Get the updated waypoints
+          const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+          
+          // Update the state with the new waypoints
+          setWaypoints([...updatedWaypoints]);
+          
+          console.log(`Waypoint removed, new count: ${updatedWaypoints.length}`);
+        }, 0);
       }
     }
-  };
+  }, [waypointManagerRef, setWaypoints]);
 
   /**
    * Updates the name of a waypoint
    */
-  const updateWaypointName = (index, name) => {
+  const updateWaypointName = useCallback((index, name) => {
+    console.log(`Updating waypoint name at index ${index} to: ${name}`);
+    
     if (waypointManagerRef.current) {
       waypointManagerRef.current.updateWaypointName(index, name);
-      setWaypoints([...waypointManagerRef.current.getWaypoints()]);
+      
+      // Use setTimeout to batch state updates and avoid synchronization issues
+      setTimeout(() => {
+        // Get the updated waypoints
+        const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+        
+        // Update the state with the new waypoints
+        setWaypoints([...updatedWaypoints]);
+        
+        console.log(`Waypoint name updated, waypoints:`, updatedWaypoints.length);
+      }, 0);
     }
-  };
+  }, [waypointManagerRef, setWaypoints]);
 
   /**
    * Clears all waypoints from the route
    */
-  const clearRoute = () => {
+  const clearRoute = useCallback(() => {
     if (waypointManagerRef.current) {
       waypointManagerRef.current.clearRoute();
-      setWaypoints([]);
       
-      // Reset all route-related state in FastPlannerApp
-      // These lines are critical to ensure all values reset properly
-      if (typeof setRouteStats === 'function') {
-        setRouteStats(null);
-      }
-      
-      if (typeof setStopCards === 'function') {
-        setStopCards([]);
-      }
-      
-      // Reset global state
-      window.currentRouteStats = null;
+      // Use a single batched update to avoid re-render cascades
+      // This prevents the infinite loop when called from effects
+      setTimeout(() => {
+        // Reset waypoints first
+        setWaypoints([]);
+        
+        // Then reset other route-related state in FastPlannerApp
+        if (typeof setRouteStats === 'function') {
+          setRouteStats(null);
+        }
+        
+        if (typeof setStopCards === 'function') {
+          setStopCards([]);
+        }
+        
+        // Reset global state
+        window.currentRouteStats = null;
+      }, 0);
     }
-  };
+  }, [waypointManagerRef, setWaypoints, setRouteStats, setStopCards]);
 
   /**
    * Reorders waypoints via drag and drop
    */
-  const reorderWaypoints = (draggedId, dropTargetId) => {
+  const reorderWaypoints = useCallback((draggedId, dropTargetId) => {
+    console.log(`Reordering waypoints: draggedId=${draggedId}, dropTargetId=${dropTargetId}`);
+    
     if (waypointManagerRef.current && draggedId && dropTargetId) {
       waypointManagerRef.current.reorderWaypoints(draggedId, dropTargetId);
-      setWaypoints([...waypointManagerRef.current.getWaypoints()]);
+      
+      // Use setTimeout to batch state updates and avoid synchronization issues
+      setTimeout(() => {
+        // Get the updated waypoints
+        const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+        
+        // Update the state with the new waypoints
+        setWaypoints([...updatedWaypoints]);
+        
+        console.log(`Waypoints reordered, count: ${updatedWaypoints.length}`);
+      }, 0);
     }
-  };
+  }, [waypointManagerRef, setWaypoints]);
 
   /**
    * Toggles waypoint insertion mode
    * Uses the clean implementation if available, falls back to original
    */
-  const toggleWaypointMode = (active) => {
+  const toggleWaypointMode = useCallback((active) => {
     // Try to use the clean implementation first
     if (window.setWaypointModeClean && typeof window.setWaypointModeClean === 'function') {
       console.log('Using clean implementation for toggleWaypointMode');
@@ -345,7 +394,13 @@ const useWaypoints = ({
         3000
       );
     }
-  };
+  }, [
+    setWaypointModeActive,
+    platformManagerRef,
+    currentRegion,
+    client,
+    mapInteractionHandlerRef
+  ]);
 
   return {
     waypointModeActive,

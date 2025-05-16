@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
  * SaveFlightModal Component
@@ -24,27 +24,38 @@ const SaveFlightModal = ({
   const [soId, setSoId] = useState('');
   const [rswId, setRswId] = useState('');
   const [enableAutomation, setEnableAutomation] = useState(runAutomation);
+  const flightNameInitializedRef = useRef(false);
   
-  // Set up initial values when modal opens
+  // Effect to set ETD and enableAutomation when modal opens or runAutomation prop changes
   useEffect(() => {
-    // Generate a default flight name based on waypoints if not provided
-    if (!initialFlightName && waypoints && waypoints.length >= 2) {
-      const origin = waypoints[0].name || 'Origin';
-      const destination = waypoints[waypoints.length - 1].name || 'Destination';
-      const todayDate = new Date().toISOString().split('T')[0];
-      setFlightName(`${origin} to ${destination} - ${todayDate}`);
-    } else {
-      setFlightName(initialFlightName);
+    if (isOpen) {
+      const now = new Date();
+      const formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+      setEtd(formattedDate);
+      setEnableAutomation(runAutomation);
+      // Reset flightNameInitializedRef when modal re-opens to allow default name generation
+      flightNameInitializedRef.current = false; 
     }
-    
-    // Default ETD to current time
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
-    setEtd(formattedDate);
-    
-    // Set initial automation state from props
-    setEnableAutomation(runAutomation);
-  }, [isOpen, initialFlightName, waypoints, runAutomation]);
+  }, [isOpen, runAutomation]);
+
+  // Effect to set initial/default flightName when modal opens or relevant props change
+  useEffect(() => {
+    if (isOpen) {
+      if (!flightNameInitializedRef.current || initialFlightName) { // Allow initialFlightName prop to always override
+        if (!initialFlightName && waypoints && waypoints.length >= 2) {
+          const origin = waypoints[0].name || 'Origin';
+          const destination = waypoints[waypoints.length - 1].name || 'Destination';
+          const todayDate = new Date().toISOString().split('T')[0];
+          const newDefaultName = `${origin} to ${destination} - ${todayDate}`;
+          setFlightName(newDefaultName);
+          flightNameInitializedRef.current = true;
+        } else {
+          setFlightName(initialFlightName);
+          flightNameInitializedRef.current = true;
+        }
+      }
+    }
+  }, [isOpen, initialFlightName, waypoints]);
   
   // Handle form submission
   const handleSubmit = () => {
