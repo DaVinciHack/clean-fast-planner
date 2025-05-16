@@ -113,8 +113,9 @@ const RouteStatsCard = ({
       } : 'No departure card found'
     });
     
-    // Force a rerender when stopCards change
-    setForceRerender(prev => prev + 1);
+    // The component will re-render if stopCards prop changes.
+    // Forcing a rerender here with setForceRerender can lead to loops if stopCards is a new reference on every parent render.
+    // setForceRerender(prev => prev + 1); // REMOVED to prevent potential loop
   }, [stopCards]);
   
   // Always fetch the currentRouteStats from window for the latest data

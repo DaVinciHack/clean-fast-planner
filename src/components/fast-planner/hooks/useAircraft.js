@@ -10,10 +10,16 @@ const useAircraft = ({
   appSettingsManagerRef,
   setFlightSettings
 }) => {
-  // Internal refs to store the actual manager instances and current region instance
+  // Internal refs to store the actual manager instances
   const aircraftManagerInstanceRef = useRef(null);
   const appSettingsManagerInstanceRef = useRef(null);
-  const currentRegionInstanceRef = useRef(null);
+  const [currentAircraftHookRegion, setCurrentAircraftHookRegion] = useState(null);
+  
+  // Ref to hold the latest version of currentAircraftHookRegion for stable callbacks
+  const latestRegionRef = useRef(currentAircraftHookRegion);
+  useEffect(() => {
+    latestRegionRef.current = currentAircraftHookRegion;
+  }, [currentAircraftHookRegion]);
 
   // State for aircraft selection and data
   const [aircraftType, setAircraftType] = useState('');
@@ -36,8 +42,8 @@ const useAircraft = ({
     aircraftManagerInstanceRef.current.setCallback('onAircraftLoaded', (loadedAircraftList) => {
       console.log(`Loaded ${loadedAircraftList.length} total aircraft`);
       setAircraftList(loadedAircraftList);
-      if (currentRegionInstanceRef.current) {
-        aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id);
+      if (latestRegionRef.current) { // Use ref for latest region
+        aircraftManagerInstanceRef.current.filterAircraft(latestRegionRef.current.id);
       }
     });
 
@@ -69,7 +75,7 @@ const useAircraft = ({
       aircraftManagerInstanceRef.current = aircraftManagerRef.current;
       setupAircraftCallbacks();
     }
-  }, [aircraftManagerRef, setupAircraftCallbacks]);
+  }, [aircraftManagerRef, setupAircraftCallbacks]); // Removed currentAircraftHookRegion from here
 
   useEffect(() => {
     if (appSettingsManagerRef && appSettingsManagerRef.current) {
@@ -79,12 +85,62 @@ const useAircraft = ({
 
   // Load aircraft data when region changes or aircraftType changes
   useEffect(() => {
-    if (aircraftManagerInstanceRef.current && currentRegionInstanceRef.current?.id) {
-      console.log(`Loading aircraft for region ${currentRegionInstanceRef.current.name} and type ${aircraftType || 'any'}`);
-      setAircraftLoading(true);
-      aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id, aircraftType);
+    // Skip effect if no manager or no region
+    if (!aircraftManagerInstanceRef.current || !currentAircraftHookRegion?.id) {
+      return;
     }
-  }, [currentRegionInstanceRef.current?.id, aircraftType]);
+    
+    // Use a ref to track the last filter operation to prevent duplicates
+    const regionId = currentAircraftHookRegion.id;
+    const currentType = aircraftType || '';
+    
+    // Generate a filter key to detect duplicate filter operations
+    const filterKey = `${regionId}:${currentType}`;
+    
+    // Skip if already loading with these params (prevents rapid re-filtering)
+    if (aircraftManagerInstanceRef.current.lastFilterKey === filterKey && 
+        aircraftManagerInstanceRef.current.isFiltering) {
+      console.log(`Skipping duplicate aircraft filter for ${filterKey}`);
+      return;
+    }
+    
+    console.log(`Loading aircraft for region ${currentAircraftHookRegion.name} and type ${aircraftType || 'any'}`);
+    
+    // Set loading state
+    setAircraftLoading(true);
+    
+    // Track this filter operation
+    aircraftManagerInstanceRef.current.lastFilterKey = filterKey;
+    aircraftManagerInstanceRef.current.isFiltering = true;
+    
+    // Execute the filter operation
+    try {
+      const result = aircraftManagerInstanceRef.current.filterAircraft(regionId, currentType);
+      
+      // Handle the case where filterAircraft returns a promise
+      if (result && typeof result.finally === 'function') {
+        result.finally(() => {
+          // Clear filtering flag when done
+          if (aircraftManagerInstanceRef.current) {
+            aircraftManagerInstanceRef.current.isFiltering = false;
+          }
+        });
+      } else {
+        // Handle case where it doesn't return a promise
+        setTimeout(() => {
+          if (aircraftManagerInstanceRef.current) {
+            aircraftManagerInstanceRef.current.isFiltering = false;
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error filtering aircraft:', error);
+      // Clear filtering flag on error
+      if (aircraftManagerInstanceRef.current) {
+        aircraftManagerInstanceRef.current.isFiltering = false;
+      }
+    }
+  }, [currentAircraftHookRegion, aircraftType]);
 
   const setAircraftManagers = useCallback((aircraftManager, appSettingsManager) => {
     console.log('Setting aircraft managers:', { 
@@ -99,97 +155,41 @@ const useAircraft = ({
     if (aircraftManager) {
         setupAircraftCallbacks();
     }
-  }, [setupAircraftCallbacks]);
+  }, [setupAircraftCallbacks]); // Removed currentAircraftHookRegion from here
 
   const setCurrentAircraftRegion = useCallback((region) => {
-    console.log('Setting current aircraft region:', region?.name);
-    currentRegionInstanceRef.current = region; // Update the ref for the current region
+    // Enhanced region comparison logic
+    const hasNewRegion = region && region.id;
+    const hasDifferentRegion = !currentAircraftHookRegion || 
+                              (currentAircraftHookRegion.id !== region?.id);
     
-    // Trigger aircraft filtering for the new region
-    if (aircraftManagerInstanceRef.current && region?.id) {
-      setAircraftLoading(true); // Set loading true before filtering
-      aircraftManagerInstanceRef.current.filterAircraft(region.id, aircraftType);
+    if (hasNewRegion && hasDifferentRegion) {
+      console.log('Setting current aircraft region (useAircraft state):', region?.name);
+      
+      // Update local state for region
+      setCurrentAircraftHookRegion(region);
+      
+      // Only trigger loading state if we have a manager and a valid region
+      if (aircraftManagerInstanceRef.current && region.id) {
+        setAircraftLoading(true);
+      }
+    } else if (!region && currentAircraftHookRegion) {
+      // Handle case where region is explicitly cleared
+      console.log('Clearing current aircraft region (useAircraft state)');
+      setCurrentAircraftHookRegion(null);
+      setAircraftLoading(false);
+    } else {
+      // Skip update for same region to prevent unnecessary rerenders
+      // console.log('setCurrentAircraftRegion called with same or null region, no state change needed.');
     }
-  }, [aircraftType]);
+  }, [currentAircraftHookRegion]); // Only depend on currentAircraftHookRegion
+
 
   /**
-   * Change the selected aircraft type
-   * 
-   * @param {string} type - The aircraft type to select
+   * Helper function to load aircraft settings
+   * Not exposed outside the hook, used internally by changeAircraftRegistration
    */
-  const changeAircraftType = (type) => {
-    setAircraftType(type);
-    setAircraftRegistration('');  // Clear registration when type changes
-    setSelectedAircraft(null);    // Clear selected aircraft
-
-    // Save to settings
-    if (appSettingsManagerInstanceRef.current) {
-      appSettingsManagerInstanceRef.current.setAircraft(type, '');
-    }
-
-    if (aircraftManagerInstanceRef.current && currentRegionInstanceRef.current) {
-      setAircraftLoading(true);
-      aircraftManagerInstanceRef.current.filterAircraft(currentRegionInstanceRef.current.id, type);
-    }
-  };
-
-  /**
-   * Change the selected aircraft registration
-   * 
-   * @param {string} registration - The aircraft registration to select
-   */
-  const changeAircraftRegistration = (registration) => {
-    console.log(`⚡ Changing aircraft registration to: ${registration}`);
-    setAircraftRegistration(registration);
-
-    // Find the selected aircraft in the aircraftsByType
-    let aircraft = null;
-    if (aircraftsByType[aircraftType]) {
-      aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
-      setSelectedAircraft(aircraft);
-
-      // CRITICAL: Make the selected aircraft globally available for API testing
-      window.currentSelectedAircraft = aircraft;
-
-      console.log(`⚡ Selected aircraft:`, {
-        registration: aircraft?.registration,
-        type: aircraft?.modelType,
-        cruiseSpeed: aircraft?.cruiseSpeed,
-        fuelBurn: aircraft?.fuelBurn
-      });
-
-      // Save to settings
-      if (appSettingsManagerInstanceRef.current) {
-        appSettingsManagerInstanceRef.current.setAircraft(aircraftType, registration);
-      }
-
-      // Load aircraft-specific settings if they exist
-      if (aircraft) {
-        loadAircraftSettings(aircraft);
-      }
-
-      // Handle the case when an aircraft is selected (non-empty registration)
-      if (registration) {
-        // After selecting an aircraft, reset dropdown values for next selection
-        // but maintain the actual selected aircraft in state
-        setTimeout(() => {
-          // Reset type dropdown value but DO NOT change state
-          setAircraftType('');
-          // Reset registration dropdown value but DO NOT clear selected aircraft
-          setAircraftRegistration('');
-
-          console.log("Reset dropdowns after aircraft selection while keeping selectedAircraft");
-        }, 100);
-      }
-    }
-  };
-
-  /**
-   * Load aircraft-specific settings
-   * 
-   * @param {Object} aircraft - The selected aircraft
-   */
-  const loadAircraftSettings = (aircraft) => {
+  const handleLoadAircraftSettings = (aircraft) => {
     try {
       const storageKey = `aircraft_${aircraft.registration}`;
       const savedSettingsJson = localStorage.getItem(`fastPlanner_settings_${storageKey}`);
@@ -244,6 +244,60 @@ const useAircraft = ({
       console.error(`Error loading saved settings for ${aircraft.registration}:`, error);
     }
   };
+
+  /**
+   * Change the selected aircraft type
+   * @param {string} type - The aircraft type to select
+   */
+  const changeAircraftType = useCallback((type) => {
+    setAircraftType(type);
+    setAircraftRegistration('');  // Clear registration when type changes
+    setSelectedAircraft(null);    // Clear selected aircraft
+
+    // Save to settings
+    if (appSettingsManagerInstanceRef.current) {
+      appSettingsManagerInstanceRef.current.setAircraft(type, '');
+    }
+
+    // Aircraft filtering will be handled by the useEffect that depends on aircraftType
+    // No need to call filterAircraft directly here, avoiding duplicate calls
+  }, []);
+
+  /**
+   * Change the selected aircraft registration
+   * @param {string} registration - The aircraft registration to select
+   */
+  const changeAircraftRegistration = useCallback((registration) => {
+    console.log(`⚡ Changing aircraft registration to: ${registration}`);
+    setAircraftRegistration(registration);
+
+    // Find the selected aircraft in the aircraftsByType
+    let aircraft = null;
+    if (aircraftsByType[aircraftType]) {
+      aircraft = aircraftsByType[aircraftType].find(a => a.registration === registration);
+      setSelectedAircraft(aircraft);
+
+      // Make the selected aircraft globally available for API testing
+      window.currentSelectedAircraft = aircraft;
+
+      console.log(`⚡ Selected aircraft:`, {
+        registration: aircraft?.registration,
+        type: aircraft?.modelType,
+        cruiseSpeed: aircraft?.cruiseSpeed,
+        fuelBurn: aircraft?.fuelBurn
+      });
+
+      // Save to settings
+      if (appSettingsManagerInstanceRef.current) {
+        appSettingsManagerInstanceRef.current.setAircraft(aircraftType, registration);
+      }
+
+      // Load aircraft-specific settings if they exist
+      if (aircraft) {
+        handleLoadAircraftSettings(aircraft);
+      }
+    }
+  }, [aircraftType, aircraftsByType]);
 
   return {
     aircraftType,

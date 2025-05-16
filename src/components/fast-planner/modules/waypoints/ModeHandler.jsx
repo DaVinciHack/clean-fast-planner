@@ -107,42 +107,43 @@ const ModeHandler = ({
     }
     
     if (!mapManagerRef?.current || !waypointManagerRef?.current || !platformManagerRef?.current) {
-      console.log('ModeHandler: Waiting for required managers to be initialized');
+      console.log('ModeHandler (Backup): Waiting for required manager refs to be populated.');
       return;
     }
     
-    if (!handlersRef.current) {
-      console.log('🚨 ModeHandler: BACKUP - Creating handlers through React lifecycle');
-      
-      // Create separate handlers
-      const handlers = createSeparateHandlers(
-        mapManagerRef.current,
-        waypointManagerRef.current,
-        platformManagerRef.current
-      );
-      
-      // Store handlers in ref
-      handlersRef.current = handlers;
-      
-      // Activate initial mode
-      if (handlers) {
-        console.log(`ModeHandler: Activating initial mode: ${initialMode}`);
+    // Wait for the map to be loaded before creating handlers
+    mapManagerRef.current.onMapLoaded(() => {
+      console.log('ModeHandler (Backup): Map is loaded, proceeding to create handlers via React lifecycle.');
+      if (!handlersRef.current) { // Check again inside onMapLoaded, in case direct init succeeded meanwhile
+        console.log('🚨 ModeHandler: BACKUP - Creating handlers through React lifecycle (map confirmed loaded).');
         
-        if (initialMode === 'waypoint') {
-          handlers.normalModeHandler.deactivate();
-          handlers.waypointModeHandler.activate();
+        const handlers = createSeparateHandlers(
+          mapManagerRef.current,
+          waypointManagerRef.current,
+          platformManagerRef.current
+        );
+        
+        handlersRef.current = handlers;
+        
+        if (handlers) {
+          console.log(`ModeHandler (Backup): Activating initial mode: ${initialMode}`);
+          if (initialMode === 'waypoint') {
+            handlers.normalModeHandler?.deactivate(); // Add null checks
+            handlers.waypointModeHandler?.activate();
+          } else {
+            handlers.waypointModeHandler?.deactivate();
+            handlers.normalModeHandler?.activate();
+          }
+          window.toggleMapMode = (mode) => handleToggleMode(mode);
+          setIsInitialized(true); // Set initialized by backup method
         } else {
-          handlers.waypointModeHandler.deactivate();
-          handlers.normalModeHandler.activate();
+          console.error("ModeHandler (Backup): createSeparateHandlers returned null/undefined.");
         }
-        
-        // Make toggle function available globally
-        window.toggleMapMode = (mode) => handleToggleMode(mode);
-        
-        setIsInitialized(true);
+      } else {
+        console.log('ModeHandler (Backup): handlersRef.current already set, skipping creation.');
       }
-    }
-  }, [mapManagerRef, waypointManagerRef, platformManagerRef, initialMode, isInitialized]);
+    });
+  }, [mapManagerRef, waypointManagerRef, platformManagerRef, initialMode, isInitialized]); // Dependencies remain the same
   
   // Expose toggleMode method
   const handleToggleMode = (targetMode) => {

@@ -1,6 +1,6 @@
 // src/components/fast-planner/hooks/useRouteCalculation.js
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 
 // Fallback when ComprehensiveFuelCalculator isn't available in window
 const createFallbackCalculator = () => {
@@ -45,15 +45,13 @@ const useRouteCalculation = ({
   // Centralized useEffect for comprehensive fuel calculations
   // This effect runs whenever waypoints, selected aircraft, flight settings, or weather change
   useEffect(() => {
-    console.log('⛽ useRouteCalculation: Triggering comprehensive fuel calculation...');
-
-    // Ensure required inputs are available before calculating
+    // Skip calculation if essential inputs are missing
     if (!waypoints || waypoints.length < 2 || !selectedAircraft || !flightSettings) {
         console.log('⛽ useRouteCalculation: Skipping fuel calculation due to missing inputs.');
-        setRouteStats(null);
-        setStopCards([]);
         return;
     }
+    
+    console.log('⛽ useRouteCalculation: Triggering comprehensive fuel calculation...');
 
     // Create a settings object with numeric values
     const numericSettings = {
@@ -79,14 +77,14 @@ const useRouteCalculation = ({
       weather
     );
 
-    // Ensure time values in enhancedResults are valid before updating state
-    if (enhancedResults && selectedAircraft && enhancedResults.totalDistance && 
-        (!enhancedResults.timeHours || enhancedResults.timeHours === 0 || 
-         !enhancedResults.estimatedTime || enhancedResults.estimatedTime === '00:00')) {
-      console.warn('⚠️ enhancedResults missing time values - calculating before setting state...');
+    // Ensure time values are valid
+    let updatedResults = { ...enhancedResults };
+    if (updatedResults && selectedAircraft && updatedResults.totalDistance && 
+        (!updatedResults.timeHours || updatedResults.timeHours === 0 || 
+         !updatedResults.estimatedTime || updatedResults.estimatedTime === '00:00')) {
       
       // Calculate time based on distance and cruise speed
-      const totalDistance = parseFloat(enhancedResults.totalDistance);
+      const totalDistance = parseFloat(updatedResults.totalDistance);
       const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
       
       // Format time string
@@ -95,8 +93,8 @@ const useRouteCalculation = ({
       const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
       
       // Update enhancedResults with calculated time values
-      enhancedResults.timeHours = timeHours;
-      enhancedResults.estimatedTime = estimatedTime;
+      updatedResults.timeHours = timeHours;
+      updatedResults.estimatedTime = estimatedTime;
       
       console.log('⚠️ Added calculated time values to enhancedResults:', {
         timeHours,
@@ -104,54 +102,29 @@ const useRouteCalculation = ({
       });
     }
     
-    // IMPORTANT: Always update window.currentRouteStats first for global access
-    window.currentRouteStats = enhancedResults;
+    // Update global state ONCE, outside of the waypointManager update section
+    // to prevent loops
+    window.currentRouteStats = updatedResults;
     
-    // Update the state with the new results
-    setRouteStats(enhancedResults);
+    // Set state updates in a single batch to prevent cascading updates
+    setRouteStats(updatedResults);
     setStopCards(stopCards);
 
-    console.log('⛽ useRouteCalculation: Fuel calculation complete. State updated.');
-
-    // CRITICAL FIX: Force route display update when fuel/route stats change
-    // This ensures the route line labels are updated with new time/fuel values
-    if (waypointManagerRef.current && enhancedResults) {
-      console.log('⛽ Forcing route display update with new stats');
-      
-      // DEBUG - Check time values exist in enhancedResults
-      if (!enhancedResults.timeHours || enhancedResults.timeHours === 0 || !enhancedResults.estimatedTime || enhancedResults.estimatedTime === '00:00') {
-        console.error('⚠️ CRITICAL: Missing time values in enhancedResults! This will cause display issues.');
-        
-        // If we have distance and aircraft, calculate time directly
-        if (enhancedResults.totalDistance && parseFloat(enhancedResults.totalDistance) > 0 && selectedAircraft && selectedAircraft.cruiseSpeed) {
-          console.log('⚠️ Calculating missing time values for display...');
-          const totalDistance = parseFloat(enhancedResults.totalDistance);
-          const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
-          const hours = Math.floor(timeHours);
-          const minutes = Math.floor((timeHours - hours) * 60);
-          const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          
-          // Update the enhancedResults with the calculated time values
-          enhancedResults.timeHours = timeHours;
-          enhancedResults.estimatedTime = estimatedTime;
-          
-          console.log('⚠️ Fixed enhancedResults with calculated times:', {
-            timeHours,
-            estimatedTime
-          });
+    // Only update route display if we have a valid waypointManager reference
+    // and don't trigger other state updates from here
+    if (waypointManagerRef.current && updatedResults) {
+      // Debounce the updateRoute call to prevent rapid re-renders
+      const currentWaypointManager = waypointManagerRef.current;
+      const debounceId = setTimeout(() => {
+        if (currentWaypointManager) {
+          currentWaypointManager.updateRoute(updatedResults);
         }
-      }
+      }, 50);
       
-      // Directly pass the enhancedResults to updateRoute without clearing first
-      // This ensures the stats are used for the leg labels
-      waypointManagerRef.current.updateRoute(enhancedResults);
-      
-      // Also update window.currentRouteStats to ensure it's available for map interactions
-      window.currentRouteStats = enhancedResults;
-      
-      console.log('⛽ Route display updated with new stats');
+      // Clean up timeout if component unmounts or effect reruns
+      return () => clearTimeout(debounceId);
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather]); // Dependencies for the effect
+  }, [waypoints, selectedAircraft, flightSettings, weather, setRouteStats, setStopCards]);
 
   /**
    * Updates a specific flight setting
@@ -159,9 +132,7 @@ const useRouteCalculation = ({
    * @param {string} settingName - Name of the setting to update
    * @param {number|string} value - New value for the setting
    */
-  const updateFlightSetting = (settingName, value) => {
-    console.log(`⚙️ updateFlightSetting called with: ${settingName} = ${value} (${typeof value})`);
-    
+  const updateFlightSetting = useCallback((settingName, value) => {
     // Ensure value is a number
     const numericValue = Number(value);
     if (isNaN(numericValue)) {
@@ -169,39 +140,38 @@ const useRouteCalculation = ({
       return; // Don't update with invalid values
     }
     
-    // Update the flightSettings object
+    console.log(`⚙️ updateFlightSetting: ${settingName} = ${numericValue}`);
+    
+    // Update the flightSettings object by creating a new object
     const updatedSettings = {
       ...flightSettings,
       [settingName]: numericValue
     };
     
-    console.log(`⚙️ Updating flightSettings:`, updatedSettings);
-    
-    // Update the state
-    setFlightSettings(updatedSettings);
-
-    // Save to AppSettingsManager
+    // Save to AppSettingsManager if available, but don't trigger additional updates
     if (appSettingsManagerRef.current) {
-      console.log(`⚙️ Saving ${settingName} = ${numericValue} to AppSettingsManager`);
-      appSettingsManagerRef.current.updateFlightSettings({
-        [settingName]: numericValue
-      });
+      // Use a setTimeout to avoid synchronous updates that might cause loops
+      setTimeout(() => {
+        try {
+          appSettingsManagerRef.current.updateFlightSettings({
+            [settingName]: numericValue
+          });
+        } catch (error) {
+          console.error('Error updating AppSettingsManager:', error);
+        }
+      }, 0);
     }
-
-    // Force a UI update immediately to ensure consistency
-    const event = new Event('settings-changed');
-    window.dispatchEvent(event);
     
-    console.log(`⚙️ updateFlightSetting completed for ${settingName}`);
-    // The centralized useEffect will handle recalculation
-  };
+    // Update the state - this will trigger the useEffect for recalculation
+    setFlightSettings(updatedSettings);
+  }, [flightSettings, appSettingsManagerRef, setFlightSettings]);
 
   /**
    * Calculates the maximum payload for the current aircraft
    * 
    * @returns {number} - Maximum payload in pounds
    */
-  const calculateMaxPayload = () => {
+  const calculateMaxPayload = useCallback(() => {
     if (!selectedAircraft) return 0;
     
     // Basic calculation based on aircraft properties
@@ -216,14 +186,14 @@ const useRouteCalculation = ({
     }
     
     return basicPayload;
-  };
+  }, [selectedAircraft]);
 
   /**
    * Calculates the maximum passenger count based on aircraft and route
    * 
    * @returns {number} - Maximum number of passengers
    */
-  const calculateMaxPassengers = () => {
+  const calculateMaxPassengers = useCallback(() => {
     if (!selectedAircraft || !flightSettings) return 0;
     
     const maxPayload = calculateMaxPayload();
@@ -235,7 +205,7 @@ const useRouteCalculation = ({
     // Calculate max passengers after accounting for cargo
     const availableForPassengers = Math.max(0, maxPayload - cargoWeight);
     return Math.floor(availableForPassengers / passengerWeight);
-  };
+  }, [selectedAircraft, flightSettings, calculateMaxPayload]);
 
   /**
    * Validates flight settings to ensure they are within reasonable ranges
@@ -243,7 +213,7 @@ const useRouteCalculation = ({
    * @param {Object} settings - Flight settings to validate
    * @returns {Object} - Validated settings object
    */
-  const validateFlightSettings = (settings) => {
+  const validateFlightSettings = useCallback((settings) => {
     const validated = { ...settings };
     
     // Enforce minimum passenger weight
@@ -265,7 +235,7 @@ const useRouteCalculation = ({
     if (validated.deckFuelFlow < 0) validated.deckFuelFlow = 0;
     
     return validated;
-  };
+  }, []);
 
   return {
     updateFlightSetting,
