@@ -100,7 +100,13 @@ export const RegionProvider = ({
         if (pendingRegionChangeRef.current) {
           const region = pendingRegionChangeRef.current;
           try {
-            map.fitBounds(region.bounds, { padding: 50, maxZoom: region.zoom || 6 });
+            map.fitBounds(region.bounds, { 
+              padding: 50, 
+              maxZoom: region.zoom || 6,
+              animate: true,
+              duration: 2000,  // 2 seconds for smooth animation
+              essential: true
+            });
           } catch (error) { console.error(`Error applying pending region change:`, error); }
           pendingRegionChangeRef.current = null;
         }
@@ -135,7 +141,13 @@ export const RegionProvider = ({
             const region = pendingRegionChangeRef.current;
             if (map && typeof map.fitBounds === 'function') {
               try {
-                map.fitBounds(region.bounds, { padding: 50, maxZoom: region.zoom || 6 });
+                map.fitBounds(region.bounds, { 
+                  padding: 50, 
+                  maxZoom: region.zoom || 6,
+                  animate: true,
+                  duration: 2000,  // 2 seconds for smooth animation
+                  essential: true  
+                });
               } catch (error) { console.error(`Error applying pending region change in callback:`, error); }
             }
             pendingRegionChangeRef.current = null;
@@ -222,7 +234,14 @@ export const RegionProvider = ({
       return;
     }
     try {
-      map.fitBounds(currentRegion.bounds, { padding: 50, maxZoom: currentRegion.zoom || 6 });
+      // Use flyTo with duration for smooth animation
+      map.fitBounds(currentRegion.bounds, { 
+        padding: 50, 
+        maxZoom: currentRegion.zoom || 6,
+        animate: true,
+        duration: 2000,  // 2 seconds for smooth animation
+        essential: true
+      });
     } catch (error) { console.error(`RegionContext: Error applying region bounds:`, error); }
   }, [currentRegion, mapManagerRef, appSettingsManagerRef, mapReady]);
 
