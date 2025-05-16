@@ -241,6 +241,11 @@ class WaypointModeHandler {
    * @param {Object} e - The map click event
    */
   handleMapClick(e) {
+    if (window.isRegionLoading === true) {
+      console.log('WaypointModeHandler: Ignoring click - region is loading/changing.');
+      if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator('Map interactions paused during region update...', 'info', 1500);
+      return;
+    }
     // Only process if we're active
     if (!this.isActive) return;
     

@@ -9,10 +9,10 @@ import { interactionController } from '../cleanIntegration';
 const useWaypoints = ({
   waypointManagerRef,
   platformManagerRef,
+  mapInteractionHandlerRef, // Added mapInteractionHandlerRef
   setWaypoints,
-  // Add client and currentRegion from FastPlannerApp
   client, 
-  currentRegion,
+  currentRegion, // This prop will now receive the active region from RegionContext via FastPlannerApp
   setRouteStats,
   setStopCards
 }) => {
@@ -305,8 +305,33 @@ const useWaypoints = ({
       }
     }
     
-    if (window.waypointHandler) {
-      window.waypointHandler.setEnabled(active);
+    // Manage interaction handlers
+    if (window.waypointHandler && typeof window.waypointHandler.toggle === 'function') {
+      window.waypointHandler.toggle(active); // Use toggle method
+      
+      if (!active) { // If deactivating waypoint mode
+        // Re-initialize the main MapInteractionHandler to restore its listeners
+        if (mapInteractionHandlerRef && mapInteractionHandlerRef.current && typeof mapInteractionHandlerRef.current.initialize === 'function') {
+          console.log('useWaypoints: Waypoint mode deactivated. Re-initializing MapInteractionHandler.');
+          mapInteractionHandlerRef.current.initialize();
+        } else {
+          console.warn('useWaypoints: mapInteractionHandlerRef not available to re-initialize after deactivating waypoint mode.');
+        }
+      }
+    } else if (window.waypointHandler) {
+      // Fallback for older setEnabled logic if toggle doesn't exist, though less ideal
+      console.warn('useWaypoints: window.waypointHandler.toggle not found, attempting setEnabled.');
+      if (typeof window.waypointHandler.setEnabled === 'function') {
+        window.waypointHandler.setEnabled(active);
+      }
+       if (!active) { // If deactivating waypoint mode
+        if (mapInteractionHandlerRef && mapInteractionHandlerRef.current && typeof mapInteractionHandlerRef.current.initialize === 'function') {
+          console.log('useWaypoints: Waypoint mode deactivated (via setEnabled). Re-initializing MapInteractionHandler.');
+          mapInteractionHandlerRef.current.initialize();
+        }
+      }
+    } else {
+      console.warn('useWaypoints: window.waypointHandler not found or does not have a toggle/setEnabled method.');
     }
     
     if (typeof window.toggleMapMode === 'function') {

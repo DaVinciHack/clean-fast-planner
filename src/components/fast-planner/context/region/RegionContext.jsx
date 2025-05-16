@@ -24,12 +24,16 @@ export const RegionProvider = ({
   aircraftManagerRef,
   favoriteLocationsManagerRef,
   setFavoriteLocations,
-  appSettingsManagerRef
+  appSettingsManagerRef,
+  mapInteractionHandlerRef // Added mapInteractionHandlerRef
 }) => {
   // Core region state
   const [regions, setRegions] = useState(regionsData);
   const [currentRegion, setCurrentRegion] = useState(null);
   const [regionLoading, setRegionLoading] = useState(false);
+  useEffect(() => { // Effect to keep window.isRegionLoading in sync
+    window.isRegionLoading = regionLoading;
+  }, [regionLoading]);
   
   // Map initialization state
   const [mapReady, setMapReady] = useState(false);
@@ -268,12 +272,24 @@ export const RegionProvider = ({
                   }
                   console.log(`RegionContext: Loading OSDK waypoints for ${regionQueryTerm}`);
                   platformManagerRef.current.loadOsdkWaypointsFromFoundry(client, regionQueryTerm)
-                    .then(() => console.log(`RegionContext: OSDK waypoints loaded for ${regionQueryTerm}`))
+                    .then(() => {
+                      console.log(`RegionContext: OSDK waypoints loaded for ${regionQueryTerm}`);
+                    })
                     .catch(error => console.error(`Error loading OSDK waypoints for ${regionQueryTerm}:`, error))
-                    .finally(() => setRegionLoading(false));
+                    .finally(() => {
+                      setRegionLoading(false);
+                      if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+                        console.log('RegionContext: All region data loaded, re-initializing MapInteractionHandler.');
+                        mapInteractionHandlerRef.current.initialize();
+                      }
+                    });
                 } else {
                   console.warn('RegionContext: loadOsdkWaypointsFromFoundry not available');
                   setRegionLoading(false);
+                  if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+                    console.log('RegionContext: Platform data loaded (no OSDK waypoints), re-initializing MapInteractionHandler.');
+                    mapInteractionHandlerRef.current.initialize();
+                  }
                 }
               })
               .catch(error => {
@@ -289,41 +305,47 @@ export const RegionProvider = ({
                 } else {
                   console.error(`RegionContext: Failed to load platforms after ${maxAttempts} attempts`);
                   setRegionLoading(false);
+                  if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+                    console.log('RegionContext: Failed to load platforms, but still re-initializing MapInteractionHandler.');
+                    mapInteractionHandlerRef.current.initialize();
+                  }
                 }
               });
           } else {
             console.error('RegionContext: PlatformManager.loadPlatformsFromFoundry is not a function');
-            
-            // Clear the region changing flag on error
             window.regionState.isChangingRegion = false;
             setRegionLoading(false);
+            if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+              mapInteractionHandlerRef.current.initialize();
+            }
           }
         } catch (error) {
           console.error(`RegionContext: Error calling platform loading method:`, error);
-          
-          // Clear the region changing flag on error
           window.regionState.isChangingRegion = false;
-          
-          // Retry if within retry attempts
           if (attempts < maxAttempts) {
             console.log(`RegionContext: Retrying platform load (${attempts+1}/${maxAttempts})...`);
             setTimeout(() => loadPlatforms(attempts + 1), 1000);
           } else {
             console.error(`RegionContext: Failed to load platforms after ${maxAttempts} attempts`);
             setRegionLoading(false);
+            if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+              mapInteractionHandlerRef.current.initialize();
+            }
           }
         }
       };
       
-      // Start loading platforms with retry mechanism
       loadPlatforms();
       
-    } else {
-      console.warn('RegionContext: No platform manager available');
-      
-      // Clear the region changing flag if no platform manager
+    } else { // No platformManagerRef or not current
+      console.warn('RegionContext: No platform manager available, or map not ready for platform loading.');
       window.regionState.isChangingRegion = false;
       setRegionLoading(false);
+      // Still try to re-initialize MapInteractionHandler as map might be ready for interactions
+      if (mapReady && mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
+        console.log('RegionContext: No platform manager, but re-initializing MapInteractionHandler.');
+        mapInteractionHandlerRef.current.initialize();
+      }
     }
     
     // Filter aircraft by region
@@ -345,7 +367,8 @@ export const RegionProvider = ({
     aircraftManagerRef,
     favoriteLocationsManagerRef,
     setFavoriteLocations,
-    mapReady
+    mapReady,
+    mapInteractionHandlerRef // Add to dependency array
   ]);
 
   /**
@@ -376,34 +399,13 @@ export const RegionProvider = ({
     // If map isn't ready yet, store for initialization
     if (!mapReady && mapManagerRef.current) {
       pendingRegionChangeRef.current = regionObject;
-      console.log(`RegionContext: Map not ready, region ${regionObject.name} will be applied when map loads`);
+      console.log(`RegionContext: Map not ready, region ${regionObject.name} will be applied when map loads. fitBounds will be handled by useEffect.`);
     } else if (mapReady && mapManagerRef.current && mapManagerRef.current.getMap()) {
-      // If map is ready, clear any platform data before applying the new region
-      // This helps prevent race conditions and layer errors
-      try {
-        if (platformManagerRef.current) {
-          // Use explicit flag to indicate this is a safe time to clear platforms
-          platformManagerRef.current.skipNextClear = false;
-          
-          // Additional safety - wait for next tick before changing region bounds
-          setTimeout(() => {
-            try {
-              // Apply region bounds
-              const map = mapManagerRef.current.getMap();
-              if (map && typeof map.fitBounds === 'function') {
-                console.log(`RegionContext: Applying region bounds for ${regionObject.name}`);
-                map.fitBounds(regionObject.bounds, {
-                  padding: 50,
-                  maxZoom: regionObject.zoom || 6
-                });
-              }
-            } catch (e) {
-              console.error(`RegionContext: Error applying region bounds:`, e);
-            }
-          }, 50);
-        }
-      } catch (e) {
-        console.warn(`RegionContext: Error during platform cleanup for region change:`, e);
+      // If map is ready, ensure platform data is cleared appropriately for the new region.
+      // The actual map.fitBounds will be handled by the useEffect hook reacting to currentRegion change.
+      if (platformManagerRef.current) {
+        platformManagerRef.current.skipNextClear = false; 
+        console.log(`RegionContext: Set skipNextClear to false for ${regionObject.name}. fitBounds will be handled by useEffect.`);
       }
     }
     

@@ -41,63 +41,63 @@ class MapInteractionHandler {
     }
 
     this.mapManager.onMapLoaded(() => {
-      console.log('🗺️ MapInteractionHandler: Map is loaded, proceeding with actual initialization.');
-      const map = this.mapManager.getMap(); 
-      
+      console.log('🗺️ MapInteractionHandler: Map is loaded, (re)initializing click handlers.');
+      const map = this.mapManager.getMap();
       if (!map) {
-        console.error('MapInteractionHandler: Map is not available even after onMapLoaded.');
-        this.triggerCallback('onError', 'Map not available post-load for MapInteractionHandler');
-        this.isInitialized = false; 
-        return; 
+        console.error('MapInteractionHandler: Map not available for (re)initializing click handlers.');
+        this.triggerCallback('onError', 'Map not available for MapInteractionHandler init');
+        this.isInitialized = false; // Can't initialize if no map
+        return;
       }
 
-      if (this.isInitialized) {
-        console.log('MapInteractionHandler: Already initialized, skipping re-initialization inside onMapLoaded.');
-        return;
+      // 1. Remove the previously bound click handler, if it exists and map.off is a function.
+      //    It's safe to call map.off even if the specific listener wasn't previously added for this specific event type.
+      if (this._boundClickHandler && typeof map.off === 'function') {
+        map.off('click', this._boundClickHandler);
+        console.log('MapInteractionHandler: Attempted to remove old _boundClickHandler.');
       }
-      
-      if (typeof window.isWaypointModeActive === 'undefined') {
-        window.isWaypointModeActive = false;
-      }
-      
-      if (this._boundClickHandler && typeof map.off === 'function' && map.listens('click')) { 
-        try {
-          map.off('click', this._boundClickHandler);
-        } catch (e) {
-          console.warn('MapInteractionHandler: Error removing existing click handler:', e.message);
-        }
-      }
-      this._boundClickHandler = null; 
-      
+
+      // 2. Create and store the new bound click handler
       this._boundClickHandler = this.handleMapClick.bind(this);
+
+      // 3. Attach the new click handler
       try {
         map.on('click', this._boundClickHandler);
+        console.log('MapInteractionHandler: Attached new _boundClickHandler.');
       } catch (e) {
-        console.error('MapInteractionHandler: Error attaching click handler:', e.message);
+        console.error('MapInteractionHandler: Error attaching new _boundClickHandler:', e.message);
         this.triggerCallback('onError', 'Error attaching map click handler');
-        this.isInitialized = false; 
+        this.isInitialized = false; // Failed to initialize
         return;
       }
-      
-      console.log('MapInteractionHandler: Setting up route dragging');
+
+      // 4. Setup route dragging (assuming WaypointManager handles its own listener idempotency)
+      console.log('MapInteractionHandler: Setting up route dragging.');
       if (this.waypointManager && typeof this.waypointManager.setupRouteDragging === 'function') {
         const routeDragHandler = this.handleRouteDragComplete.bind(this);
         this.waypointManager.setupRouteDragging(routeDragHandler);
-        window._mapInteractionRouteDragHandler = routeDragHandler;
-        console.log('MapInteractionHandler: Route drag handler registered');
+        window._mapInteractionRouteDragHandler = routeDragHandler; // Consider if this global is necessary
+        console.log('MapInteractionHandler: Route drag handler registered/updated.');
       } else {
-        console.error('MapInteractionHandler: waypointManager.setupRouteDragging is not a function or waypointManager is missing.');
+        console.error('MapInteractionHandler: waypointManager.setupRouteDragging not available.');
       }
-      
-      this.isInitialized = true; 
-      console.log('MapInteractionHandler: Map interactions initialized successfully via onMapLoaded.');
+
+      // 5. Mark as initialized
+      this.isInitialized = true;
+      console.log('MapInteractionHandler: Map interactions (re)initialized successfully.');
     });
 
+    // The initial call to initialize() still returns true to indicate it's queued.
     console.log('MapInteractionHandler: Initialization queued with onMapLoaded.');
-    return true; 
+    return true;
   }
 
   handleMapClick(e) {
+    if (window.isRegionLoading === true) {
+      console.log('MapInteractionHandler: Ignoring click - region is loading/changing.');
+      if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator('Map interactions paused during region update...', 'info', 1500);
+      return;
+    }
     if (window._processingMapClick === true) {
       console.log('MapInteractionHandler: Ignoring duplicate click - already processing');
       return;
@@ -113,11 +113,20 @@ class MapInteractionHandler {
       console.log(`MapInteractionHandler: Map clicked in ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'} mode.`);
 
       if (!this.mapManager || !this.waypointManager || !this.platformManager) {
+        console.error('MapInteractionHandler: Essential managers missing!');
         window._processingMapClick = false; return;
       }
       const map = this.mapManager.getMap();
       if (!map) {
+        console.error('MapInteractionHandler: Map instance not available!');
         window._processingMapClick = false; return;
+      }
+      
+      // Enhanced logging for region change debugging
+      if (window.debugRegionChange) { // A temporary flag you can set in console for verbose logging
+        console.log('[DEBUG Region Change] Map Click Received. Waypoint Mode:', isWaypointMode);
+        console.log('[DEBUG Region Change] PlatformManager All Platforms:', JSON.stringify(this.platformManager.getPlatforms().map(p=>p.name)));
+        console.log('[DEBUG Region Change] PlatformManager OSDK Waypoints:', JSON.stringify(this.platformManager.osdkWaypoints.map(p=>p.name)));
       }
 
       if (isWaypointMode) {
@@ -156,19 +165,33 @@ class MapInteractionHandler {
 
       let featuresClicked = false;
       if (!isWaypointMode) { 
-          const platformLayers = ['platforms-layer', 'platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].filter(id => map.getLayer(id));
-          if (platformLayers.length > 0) {
-              const platformFeatures = map.queryRenderedFeatures(e.point, { layers: platformLayers });
+          const platformLayerIds = ['platforms-layer', 'platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'];
+          const activePlatformLayers = platformLayerIds.filter(id => map.getLayer(id));
+          
+          if (window.debugRegionChange) {
+            console.log('[DEBUG Region Change] Active platform layers for query:', activePlatformLayers);
+          }
+
+          if (activePlatformLayers.length > 0) {
+              const platformFeatures = map.queryRenderedFeatures(e.point, { layers: activePlatformLayers });
+              if (window.debugRegionChange) {
+                console.log('[DEBUG Region Change] queryRenderedFeatures result:', platformFeatures);
+              }
               if (platformFeatures.length > 0) {
                   const feature = platformFeatures[0];
                   console.log(`MapInteractionHandler: Clicked on platform ${feature.properties.name} in normal mode.`);
                   this.handlePlatformClick(feature.geometry.coordinates.slice(), feature.properties.name);
                   featuresClicked = true;
+              } else {
+                 if (window.debugRegionChange) console.log('[DEBUG Region Change] No features found by queryRenderedFeatures.');
               }
+          } else {
+            if (window.debugRegionChange) console.log('[DEBUG Region Change] No active platform layers found to query.');
           }
       }
 
       if (!featuresClicked) {
+          if (window.debugRegionChange) console.log('[DEBUG Region Change] No specific feature clicked, treating as background click.');
           console.log("MapInteractionHandler: No specific feature clicked, treating as background click.");
           this.handleMapBackgroundClick(e.lngLat);
       }
