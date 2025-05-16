@@ -38,16 +38,10 @@ class MapManager {
         
         console.log('Creating MapBox instance...');
         
-        // Determine initial map position from options or use default
+        // Always use Gulf of Mexico as the initial map position
+        // This allows the nice fly animation to work when loading saved regions
         let initialCenter = [-90.5, 27.5]; // Default: Gulf of Mexico
         let initialZoom = 6;
-        
-        // If initialRegion is provided, use its center and zoom
-        if (options.initialRegion) {
-          initialCenter = options.initialRegion.center || initialCenter;
-          initialZoom = options.initialRegion.zoom || initialZoom;
-          console.log(`Using initial region: ${options.initialRegion.name}`);
-        }
         
         // Create map instance with determined settings
         this.map = new window.mapboxgl.Map({
@@ -71,19 +65,6 @@ class MapManager {
           
           // Add the grid first
           this.addGridToMap(); 
-          
-          // If we have an initial region with bounds, fit to those bounds
-          if (options.initialRegion && options.initialRegion.bounds) {
-            try {
-              this.map.fitBounds(options.initialRegion.bounds, {
-                padding: 50,
-                maxZoom: options.initialRegion.zoom || 6
-              });
-              console.log(`Initial region bounds applied: ${options.initialRegion.name}`);
-            } catch (e) {
-              console.error("Error applying initial region bounds:", e);
-            }
-          }
           
           // Execute and clear any pending callbacks
           console.log(`Executing ${this._loadCallbacks.length} queued onMapLoaded callbacks.`);

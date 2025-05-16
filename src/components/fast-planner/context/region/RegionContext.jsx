@@ -90,29 +90,34 @@ export const RegionProvider = ({
       // Skip if we've already set map as ready or exceeded attempts
       if (mapReadyCheckedRef.current) return true;
       
-      const map = mapManagerRef.current?.getMap();
-      const isReady = map && typeof map.on === 'function' && typeof map.fitBounds === 'function';
-      
-      if (isReady) {
-        mapReadyCheckedRef.current = true;
-        setMapReady(true);
+      try {
+        const map = mapManagerRef.current?.getMap();
+        const isReady = map && typeof map.on === 'function' && typeof map.fitBounds === 'function';
         
-        if (pendingRegionChangeRef.current) {
-          const region = pendingRegionChangeRef.current;
-          try {
-            map.fitBounds(region.bounds, { 
-              padding: 50, 
-              maxZoom: region.zoom || 6,
-              animate: true,
-              duration: 2000,  // 2 seconds for smooth animation
-              essential: true
-            });
-          } catch (error) { console.error(`Error applying pending region change:`, error); }
-          pendingRegionChangeRef.current = null;
+        if (isReady) {
+          console.log("RegionContext: Map is ready in checkForMapReady");
+          mapReadyCheckedRef.current = true;
+          setMapReady(true);
+          
+          // Handle pending region change, but don't call fitBounds directly
+          // This avoids errors if anything goes wrong
+          if (pendingRegionChangeRef.current) {
+            const region = pendingRegionChangeRef.current;
+            console.log(`RegionContext: Applying pending region: ${region.name}`);
+            
+            // Simply update currentRegion - the useEffect will handle the transition
+            setCurrentRegion(region);
+            
+            // Clear the pending reference
+            pendingRegionChangeRef.current = null;
+          }
+          return true;
         }
-        return true;
+      } catch (error) {
+        console.warn("RegionContext: Error checking map ready status:", error);
       }
       
+      // Increment attempt counter if we're not ready yet
       initAttemptsRef.current += 1;
       if (initAttemptsRef.current < MAX_INIT_ATTEMPTS) {
         // Only schedule a new check if we haven't exceeded attempts
@@ -133,24 +138,24 @@ export const RegionProvider = ({
     if (typeof mapManagerRef.current.onMapLoaded === 'function') {
       mapLoadedCallback = () => {
         if (!mapReadyCheckedRef.current) {
-          mapReadyCheckedRef.current = true;
-          setMapReady(true);
-          
-          if (pendingRegionChangeRef.current) {
-            const map = mapManagerRef.current.getMap();
-            const region = pendingRegionChangeRef.current;
-            if (map && typeof map.fitBounds === 'function') {
-              try {
-                map.fitBounds(region.bounds, { 
-                  padding: 50, 
-                  maxZoom: region.zoom || 6,
-                  animate: true,
-                  duration: 2000,  // 2 seconds for smooth animation
-                  essential: true  
-                });
-              } catch (error) { console.error(`Error applying pending region change in callback:`, error); }
+          try {
+            console.log("RegionContext: Map loaded callback triggered");
+            mapReadyCheckedRef.current = true;
+            setMapReady(true);
+            
+            // Handle pending region change, but don't call fitBounds directly
+            if (pendingRegionChangeRef.current) {
+              const region = pendingRegionChangeRef.current;
+              console.log(`RegionContext: Applying pending region in callback: ${region.name}`);
+              
+              // Simply update currentRegion - the useEffect will handle the transition
+              setCurrentRegion(region);
+              
+              // Clear the pending reference
+              pendingRegionChangeRef.current = null;
             }
-            pendingRegionChangeRef.current = null;
+          } catch (error) {
+            console.error("RegionContext: Error in mapLoadedCallback:", error);
           }
         }
       };
@@ -177,36 +182,102 @@ export const RegionProvider = ({
   // Effect to handle initialization errors
   useEffect(() => {
     const handleError = (error) => {
-      console.error("RegionContext: Error in initialization:", error);
-      // Prevent infinite loops due to errors
-      mapReadyCheckedRef.current = true;
-      initAttemptsRef.current = MAX_INIT_ATTEMPTS;
-      
-      // If we encounter an error, still try to move forward
-      setMapReady(true);
+      // Filter to only handle errors we care about
+      // Ignore errors from other sources to avoid false positives
+      if (error && error.message && (
+          error.message.includes('getLayer') || 
+          error.message.includes('removeEventListener') ||
+          error.message.includes('Map') ||
+          error.message.includes('RegionContext')
+      )) {
+        console.error("RegionContext: Caught map-related error:", error);
+        
+        // Prevent infinite loops due to errors
+        mapReadyCheckedRef.current = true;
+        initAttemptsRef.current = MAX_INIT_ATTEMPTS;
+        
+        // If we encounter a map error, consider map ready but log it
+        if (!mapReady) {
+          console.warn("RegionContext: Setting mapReady=true to recover from error state");
+          setMapReady(true);
+        }
+      }
     };
     
+    // Add our error handler
     window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
+    
+    // Cleanup 
+    return () => {
+      window.removeEventListener('error', handleError);
+    };
+  }, [mapReady]);
 
   /**
    * Initialize regions
    */
   useEffect(() => {
+    // Skip if regions aren't loaded yet
     if (!regions || regions.length === 0) {
       setRegions(regionsData);
+      return;
     }
+
+    // Skip if we already have a current region
+    if (currentRegion) {
+      return;
+    }
+
+    console.log('RegionContext: Initializing default region');
+    
+    // Determine default region - either saved or Gulf of Mexico
     let defaultRegionId = 'gulf-of-mexico';
+    let savedRegionId = null;
+    
     if (appSettingsManagerRef && appSettingsManagerRef.current) {
-      const savedRegionId = appSettingsManagerRef.current.getRegion();
-      if (savedRegionId) { defaultRegionId = savedRegionId; }
+      savedRegionId = appSettingsManagerRef.current.getRegion();
+      if (savedRegionId) { 
+        console.log(`RegionContext: Found saved region: ${savedRegionId}`);
+      }
     }
-    const defaultRegion = regions.find(r => r.id === defaultRegionId) || regions[0];
-    if (!currentRegion && defaultRegion) {
-      setCurrentRegion(defaultRegion);
-      if (!mapReady) {
-        pendingRegionChangeRef.current = defaultRegion;
+    
+    // First set the Gulf of Mexico as the initial region
+    const gulfRegion = regions.find(r => r.id === 'gulf-of-mexico');
+    if (gulfRegion) {
+      console.log('RegionContext: Setting Gulf of Mexico as initial region');
+      setCurrentRegion(gulfRegion);
+      
+      // If there's a saved region different from Gulf, schedule its application after a delay
+      if (savedRegionId && savedRegionId !== 'gulf-of-mexico') {
+        const savedRegion = regions.find(r => r.id === savedRegionId);
+        if (savedRegion) {
+          console.log(`RegionContext: Will transition to saved region: ${savedRegion.name} after short delay`);
+          
+          // Set a timeout to apply the saved region after a short delay
+          // This creates the nice fly-to effect from Gulf to the saved region
+          setTimeout(() => {
+            if (!mapReady) {
+              console.log(`RegionContext: Map not ready yet, storing ${savedRegion.name} as pending`);
+              pendingRegionChangeRef.current = savedRegion;
+            } else {
+              console.log(`RegionContext: Transitioning to saved region: ${savedRegion.name}`);
+              setCurrentRegion(savedRegion);
+            }
+          }, 1000); // 1 second delay to ensure the Gulf displays first
+        }
+      } else if (!mapReady) {
+        // If Gulf is the default and map isn't ready, set it as pending
+        pendingRegionChangeRef.current = gulfRegion;
+      }
+    } else {
+      // Fallback in case Gulf region isn't available
+      const defaultRegion = regions.find(r => r.id === savedRegionId) || regions[0];
+      if (defaultRegion) {
+        console.log(`RegionContext: Setting ${defaultRegion.name} as fallback default region`);
+        setCurrentRegion(defaultRegion);
+        if (!mapReady) {
+          pendingRegionChangeRef.current = defaultRegion;
+        }
       }
     }
   }, [regions, currentRegion, appSettingsManagerRef, mapReady]);
@@ -234,13 +305,14 @@ export const RegionProvider = ({
       return;
     }
     try {
-      // Use flyTo with duration for smooth animation
+      // Use flyTo with enhanced parameters for a smoother animation
       map.fitBounds(currentRegion.bounds, { 
         padding: 50, 
         maxZoom: currentRegion.zoom || 6,
         animate: true,
-        duration: 2000,  // 2 seconds for smooth animation
-        essential: true
+        duration: 2500,  // 2.5 seconds for smooth animation
+        essential: true,
+        linear: false    // Use default ease-out effect
       });
     } catch (error) { console.error(`RegionContext: Error applying region bounds:`, error); }
   }, [currentRegion, mapManagerRef, appSettingsManagerRef, mapReady]);
@@ -380,6 +452,12 @@ export const RegionProvider = ({
    * Change the current region
    */
   const changeRegion = useCallback((regionId) => {
+    // Skip if this region is already active
+    if (currentRegion && currentRegion.id === regionId) {
+      console.log(`RegionContext: Already in region ${regionId}, skipping change`);
+      return;
+    }
+    
     console.log(`RegionContext: Changing region to ${regionId}`);
     setRegionLoading(true);
     
@@ -394,6 +472,7 @@ export const RegionProvider = ({
       return;
     }
     
+    // Set the current region - this will trigger the flyTo animation via useEffect
     setCurrentRegion(regionObject);
     
     if (!mapReady && mapManagerRef.current) {
@@ -405,7 +484,7 @@ export const RegionProvider = ({
         console.log(`RegionContext: Set skipNextClear to false for ${regionObject.name}. fitBounds will be handled by useEffect.`);
       }
     }
-  }, [regions, mapReady, mapManagerRef, platformManagerRef]);
+  }, [regions, mapReady, mapManagerRef, platformManagerRef, currentRegion]);
 
   const value = React.useMemo(() => ({
     regions,
