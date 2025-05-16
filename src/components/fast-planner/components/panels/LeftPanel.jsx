@@ -336,6 +336,21 @@ const LeftPanel = ({
                   onClick={() => {
                     if (onRemoveWaypoint) {
                       console.log(`LeftPanel: Removing waypoint at index ${index} with ID ${waypoint.id}`);
+                      
+                      // Immediately update local UI for better responsiveness
+                      const wpElement = document.querySelector(`[data-id="${waypoint.id}"]`);
+                      if (wpElement) {
+                        wpElement.style.opacity = '0.5';
+                        wpElement.style.height = wpElement.offsetHeight + 'px';
+                        setTimeout(() => {
+                          wpElement.style.height = '0';
+                          wpElement.style.margin = '0';
+                          wpElement.style.padding = '0';
+                          wpElement.style.overflow = 'hidden';
+                        }, 50);
+                      }
+                      
+                      // Call the actual removal function
                       onRemoveWaypoint(waypoint.id, index);
                     }
                   }}

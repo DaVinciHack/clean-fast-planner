@@ -757,14 +757,42 @@ class WaypointManager {
   removeWaypoint(id, index) {
     if (index === undefined || index < 0 || index >= this.waypoints.length) {
       index = this.waypoints.findIndex(wp => wp.id === id);
-      if (index === -1) { console.error(`WaypointManager: Cannot find waypoint with ID ${id}`); return; }
+      if (index === -1) { 
+        console.error(`WaypointManager: Cannot find waypoint with ID ${id}`); 
+        return; 
+      }
     }
+    
+    // Store reference to the waypoint being removed
     const removedWaypoint = this.waypoints[index];
-    if (this.markers[index]) { try { this.markers[index].remove(); } catch (error) { console.error('Error removing marker:', error); }}
-    this.markers.splice(index, 1); this.waypoints.splice(index, 1);
+    
+    // Remove marker from map
+    if (this.markers[index]) { 
+      try { 
+        this.markers[index].remove(); 
+      } catch (error) { 
+        console.error('Error removing marker:', error); 
+      }
+    }
+    
+    // Remove from internal arrays
+    this.markers.splice(index, 1); 
+    this.waypoints.splice(index, 1);
+    
+    // Update route display
     this.updateRoute();
-    if (removedWaypoint) this.triggerCallback('onWaypointRemoved', removedWaypoint);
-    this.triggerCallback('onChange', this.waypoints);
+    
+    // Trigger callbacks in the correct order
+    if (removedWaypoint) {
+      // First notify about the specific removal
+      this.triggerCallback('onWaypointRemoved', removedWaypoint);
+      
+      // Then notify that the overall waypoints collection changed
+      // This is critical for the UI to update properly
+      this.triggerCallback('onChange', this.waypoints);
+      
+      console.log(`WaypointManager: Waypoint removed and callbacks triggered, ID: ${id}, index: ${index}`);
+    }
   }
 
   _calculateLegIndex(newPointIsNavWaypoint, insertionIndexInAllWaypoints, allCurrentWaypointsBeforeInsertion) {
@@ -879,8 +907,11 @@ class WaypointManager {
           map.setLayoutProperty(routeArrowsLayerId, 'visibility', currentZoom > 7 ? 'visible' : 'none');
       }
 
-
+      // Make sure we trigger both callbacks to fully update the UI
       this.triggerCallback('onRouteUpdated', { waypoints: this.waypoints, coordinates: coordinates });
+      this.triggerCallback('onChange', this.waypoints);
+      
+      // Also update global state for components that depend on it
       if (window.routeCalculator && typeof window.routeCalculator.calculateDistanceOnly === 'function') {
         window.routeCalculator.calculateDistanceOnly(coordinates);
       }
@@ -892,7 +923,10 @@ class WaypointManager {
       [routeSourceId, routeArrowsSourceId].forEach(sourceId => {
         if (map.getSource(sourceId)) map.removeSource(sourceId);
       });
+      
+      // Ensure we trigger callbacks even when removing the route
       this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] });
+      this.triggerCallback('onChange', this.waypoints);
     }
   }
   
