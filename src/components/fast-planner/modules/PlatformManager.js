@@ -785,11 +785,13 @@ class PlatformManager {
       return;
     }
 
-    // Skip operation if region is changing
-    if (window.regionState && window.regionState.isChangingRegion) {
-      console.log("PlatformManager: Skipping layer removal during region change");
-      return;
-    }
+    // REMOVED: This check was preventing proper layer cleanup during a controlled region data reload.
+    // The window.isRegionLoading flag (checked by interaction handlers) should suffice to pause user clicks.
+    // PlatformManager needs to be able to clear its own layers during its refresh cycle.
+    // if (window.regionState && window.regionState.isChangingRegion) {
+    //   console.log("PlatformManager: Skipping layer removal during region change");
+    //   return;
+    // }
 
     const layerIds = [
       'platforms-fixed-labels',
@@ -916,51 +918,44 @@ class PlatformManager {
       };
 
       // Use the new centralized cleanup method
-      this._removePlatformLayersAndSource();
-      
-      // Add new source and layers directly after cleanup
-      try {
-        // Load airport icon if not already loaded (from backup)
-        if (!map.hasImage('airport-icon')) {
-          try {
-            const size = 16;
-            const halfSize = size / 2;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            
-            ctx.beginPath();
-            ctx.arc(halfSize, halfSize, halfSize - 2, 0, 2 * Math.PI);
-            ctx.fillStyle = '#043277'; // Lighter blue from backup
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 8px sans-serif'; // Smaller A from backup
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('A', halfSize, halfSize);
-            
-            map.addImage('airport-icon', { 
-              data: ctx.getImageData(0, 0, size, size).data, 
-              width: size, 
-              height: size 
-            });
-            console.log('PlatformManager: Created custom airport icon');
-          } catch (error) {
-            console.error('PlatformManager: Error creating airport icon:', error);
-          }
-        }
+      this._removePlatformLayersAndSource(); // This removes old source and layers
 
-        console.log(`PlatformManager: Adding source ${sourceId}`);
-        map.addSource(sourceId, {
-            type: 'geojson',
-            data: geoJsonData,
-            cluster: false
-          });
+      const addLayersForSource = () => {
+        try {
+          // Load airport icon if not already loaded (from backup)
+          if (!map.hasImage('airport-icon')) {
+            try {
+              const size = 16;
+              const halfSize = size / 2;
+              const canvas = document.createElement('canvas');
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              
+              ctx.beginPath();
+              ctx.arc(halfSize, halfSize, halfSize - 2, 0, 2 * Math.PI);
+              ctx.fillStyle = '#043277'; // Lighter blue from backup
+              ctx.fill();
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+              
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 8px sans-serif'; // Smaller A from backup
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('A', halfSize, halfSize);
+              
+              map.addImage('airport-icon', { 
+                data: ctx.getImageData(0, 0, size, size).data, 
+                width: size, 
+                height: size 
+              });
+              console.log('PlatformManager: Created custom airport icon');
+            } catch (error) {
+              console.error('PlatformManager: Error creating airport icon:', error);
+            }
+          }
 
           // Layer for Fixed Platforms (styled circle from backup)
           map.addLayer({
@@ -1120,11 +1115,38 @@ class PlatformManager {
           });
           console.log('PlatformManager: Platform layers added/updated.');
           this.triggerCallback('onPlatformsLoaded', platforms);
-
         } catch (error) {
-          console.error('PlatformManager: Error adding platform source/layers:', error);
+          console.error('PlatformManager: Error adding platform layers:', error);
           this.triggerCallback('onError', 'Error adding platform layers: ' + error.message);
         }
+      }; // Function definition ends
+      
+      // Add new source
+      try {
+        console.log(`PlatformManager: Adding source ${sourceId}`);
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: geoJsonData,
+          cluster: false
+        });
+
+        // Wait for the source to be ready before adding layers
+        // This is crucial if addSource is async or if setData on an existing source is async
+        if (map.isSourceLoaded(sourceId)) {
+          addLayersForSource();
+        } else {
+          const onSourceData = (e) => {
+            if (e.sourceId === sourceId && e.isSourceLoaded) {
+              map.off('sourcedata', onSourceData); // Important to remove listener
+              addLayersForSource();
+            }
+          };
+          map.on('sourcedata', onSourceData);
+        }
+      } catch (error) {
+        console.error('PlatformManager: Error adding platform source:', error);
+        this.triggerCallback('onError', 'Error adding platform source: ' + error.message);
+      }
     });
   }
   
