@@ -1,108 +1,13 @@
 // src/components/fast-planner/hooks/useRouteCalculation.js
 
 import { useEffect, useCallback } from 'react';
-// Import the calculator directly
+// Import the calculator directly - never use fallbacks for aviation
 import ComprehensiveFuelCalculator from '../modules/calculations/fuel/ComprehensiveFuelCalculator';
 
 // Ensure the calculator is available globally
 if (!window.ComprehensiveFuelCalculator) {
   window.ComprehensiveFuelCalculator = ComprehensiveFuelCalculator;
 }
-
-// Create a singleton fallback calculator to prevent repeated creations
-let fallbackCalculator = null;
-
-// Fallback when ComprehensiveFuelCalculator isn't available in window
-const createFallbackCalculator = () => {
-  // Only create a new instance if one doesn't already exist
-  if (fallbackCalculator === null) {
-    console.warn('⚠️ Creating fallback for ComprehensiveFuelCalculator in useRouteCalculation');
-    fallbackCalculator = {
-      calculateAllFuelData: function(waypoints, selectedAircraft, flightSettings, weather) {
-        // Only log once per calculation, not on every call
-        console.log('Using fallback ComprehensiveFuelCalculator implementation');
-        
-        // Calculate basic route statistics based on waypoints and aircraft
-        let totalDistance = 0;
-        let estimatedTime = '00:00';
-        let timeHours = 0;
-        
-        // Calculate distance and time if we have waypoints and aircraft
-        if (waypoints && waypoints.length >= 2 && selectedAircraft) {
-          // Calculate distance between each pair of waypoints
-          for (let i = 0; i < waypoints.length - 1; i++) {
-            const wp1 = waypoints[i];
-            const wp2 = waypoints[i + 1];
-            
-            if (wp1.coordinates && wp2.coordinates) {
-              const distance = calculateDistance(wp1.coordinates, wp2.coordinates);
-              totalDistance += distance;
-            }
-          }
-          
-          // Calculate time based on distance and cruise speed
-          if (selectedAircraft.cruiseSpeed) {
-            timeHours = totalDistance / selectedAircraft.cruiseSpeed;
-            const hours = Math.floor(timeHours);
-            const minutes = Math.floor((timeHours - hours) * 60);
-            estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          }
-        }
-        
-        // Calculate basic fuel burn based on distance and fuel flow
-        let fuelBurn = 0;
-        if (selectedAircraft && selectedAircraft.fuelFlow) {
-          fuelBurn = timeHours * selectedAircraft.fuelFlow;
-        }
-        
-        // Calculate total fuel including contingency, reserve, and taxi
-        const contingencyFuel = fuelBurn * (flightSettings.contingencyFuelPercent / 100);
-        const totalFuel = fuelBurn + contingencyFuel + flightSettings.reserveFuel + flightSettings.taxiFuel;
-        
-        return {
-          enhancedResults: {
-            totalDistance,
-            timeHours,
-            estimatedTime,
-            fuelBurn,
-            totalFuel,
-            legs: []
-          },
-          stopCards: []
-        };
-      }
-    };
-  }
-  
-  return fallbackCalculator;
-};
-
-// Helper function to calculate distance between two coordinates (in nm)
-const calculateDistance = (coord1, coord2) => {
-  if (!coord1 || !coord2) return 0;
-  
-  // Extract coordinates, handling different possible formats
-  const lat1 = typeof coord1[1] === 'number' ? coord1[1] : 0;
-  const lon1 = typeof coord1[0] === 'number' ? coord1[0] : 0;
-  const lat2 = typeof coord2[1] === 'number' ? coord2[1] : 0;
-  const lon2 = typeof coord2[0] === 'number' ? coord2[0] : 0;
-  
-  // Convert decimal degrees to radians
-  const toRad = value => value * Math.PI / 180;
-  const R = 3440.07; // Earth radius in nautical miles
-  
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distance = R * c;
-  
-  return distance;
-};
 
 /**
  * Custom hook for handling route and fuel calculations
@@ -126,126 +31,91 @@ const useRouteCalculation = ({
   // Centralized useEffect for comprehensive fuel calculations
   // This effect runs whenever waypoints, selected aircraft, flight settings, or weather change
   useEffect(() => {
-    // Skip calculation if essential inputs are missing
-    if (!waypoints || waypoints.length < 2 || !selectedAircraft || !flightSettings) {
-        console.log('⛽ useRouteCalculation: Skipping fuel calculation due to missing inputs.');
+    // CRITICAL: Skip calculation if essential inputs are missing
+    if (!waypoints || waypoints.length < 2) {
+        console.log('⛽ useRouteCalculation: Skipping fuel calculation - insufficient waypoints');
         return;
     }
     
-    console.log('⛽ useRouteCalculation: Triggering comprehensive fuel calculation...');
+    if (!selectedAircraft) {
+        console.log('⛽ useRouteCalculation: Skipping fuel calculation - no aircraft selected');
+        return;
+    }
+    
+    if (!flightSettings) {
+        console.log('⛽ useRouteCalculation: Skipping fuel calculation - no flight settings');
+        return;
+    }
+    
+    // CRITICAL: Essential aircraft properties check - NEVER proceed if any are missing
+    const requiredProps = ['cruiseSpeed', 'fuelBurn', 'emptyWeight', 'maxTakeoffWeight', 'maxFuel'];
+    const missingProps = requiredProps.filter(prop => 
+      typeof selectedAircraft[prop] !== 'number' || selectedAircraft[prop] <= 0
+    );
+    
+    if (missingProps.length > 0) {
+      console.error(`⛽ useRouteCalculation: Skipping calculation - missing critical aircraft properties: ${missingProps.join(', ')}`);
+      return; // Exit without attempting calculation
+    }
+    
+    console.log('⛽ useRouteCalculation: Aircraft validation passed, performing calculation');
 
-    // Create a settings object with numeric values
-    const numericSettings = {
-      passengerWeight: Number(flightSettings.passengerWeight),
-      taxiFuel: Number(flightSettings.taxiFuel),
-      contingencyFuelPercent: Number(flightSettings.contingencyFuelPercent),
-      reserveFuel: Number(flightSettings.reserveFuel),
-      deckTimePerStop: Number(flightSettings.deckTimePerStop),
-      deckFuelFlow: Number(flightSettings.deckFuelFlow),
-      cargoWeight: Number(flightSettings.cargoWeight || 0)
-    };
-
-    // Get the calculator from window or use fallback - only once per calculation
-    let calculator;
-    try {
-      if (window.ComprehensiveFuelCalculator) {
-        calculator = window.ComprehensiveFuelCalculator;
-      } else {
-        // Import the calculator directly if available
-        try {
-          // Dynamic import (this is a one-time operation)
-          import('../modules/calculations/fuel/ComprehensiveFuelCalculator')
-            .then(module => {
-              window.ComprehensiveFuelCalculator = module.default;
-              // Re-trigger calculation once imported
-              setFlightSettings({...flightSettings});
-            })
-            .catch(err => {
-              console.error('Failed to import ComprehensiveFuelCalculator:', err);
-              // Use fallback but don't trigger another calculation
-              window.ComprehensiveFuelCalculator = createFallbackCalculator();
-            });
-          
-          // Return early - we'll re-run this effect when the import completes
-          return;
-        } catch (importError) {
-          console.error('Error importing ComprehensiveFuelCalculator:', importError);
-          calculator = createFallbackCalculator();
-        }
-      }
-    } catch (error) {
-      console.error('Error accessing or creating calculator:', error);
-      calculator = createFallbackCalculator();
+    // CRITICAL: Never use fallbacks for aviation calculations
+    if (!window.ComprehensiveFuelCalculator) {
+      console.error('⛽ useRouteCalculation: Skipping calculation - ComprehensiveFuelCalculator not available');
+      return; // Exit without attempting calculation
     }
 
-    // Call the calculator with numeric settings
-    let enhancedResults, stopCards;
+    // Create a settings object with explicit numeric values
+    const numericSettings = {
+      passengerWeight: Number(flightSettings.passengerWeight) || 0,
+      taxiFuel: Number(flightSettings.taxiFuel) || 0,
+      contingencyFuelPercent: Number(flightSettings.contingencyFuelPercent) || 0,
+      reserveFuel: Number(flightSettings.reserveFuel) || 0,
+      deckTimePerStop: Number(flightSettings.deckTimePerStop) || 0,
+      deckFuelFlow: Number(flightSettings.deckFuelFlow) || 0,
+      cargoWeight: Number(flightSettings.cargoWeight) || 0
+    };
+
+    // Perform a single calculation attempt with proper error handling
     try {
-      const result = calculator.calculateAllFuelData(
+      const result = window.ComprehensiveFuelCalculator.calculateAllFuelData(
         waypoints,
         selectedAircraft,
         numericSettings,
         weather
       );
       
-      enhancedResults = result.enhancedResults;
-      stopCards = result.stopCards;
-    } catch (calculationError) {
-      console.error('Error in fuel calculation:', calculationError);
-      // Use fallback values if calculation fails
-      enhancedResults = {
-        totalDistance: 0,
-        timeHours: 0,
-        estimatedTime: '00:00',
-        fuelBurn: 0,
-        totalFuel: 0,
-        legs: []
-      };
-      stopCards = [];
-    }
-
-    // Ensure time values are valid
-    let updatedResults = { ...enhancedResults };
-    if (updatedResults && selectedAircraft && updatedResults.totalDistance && 
-        (!updatedResults.timeHours || updatedResults.timeHours === 0 || 
-         !updatedResults.estimatedTime || updatedResults.estimatedTime === '00:00')) {
-      
-      // Calculate time based on distance and cruise speed
-      const totalDistance = parseFloat(updatedResults.totalDistance);
-      const timeHours = totalDistance / selectedAircraft.cruiseSpeed;
-      
-      // Format time string
-      const hours = Math.floor(timeHours);
-      const minutes = Math.floor((timeHours - hours) * 60);
-      const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      
-      // Update enhancedResults with calculated time values
-      updatedResults.timeHours = timeHours;
-      updatedResults.estimatedTime = estimatedTime;
-    }
-    
-    // Update global state ONCE
-    window.currentRouteStats = updatedResults;
-    
-    // Set state updates in a single batch to prevent cascading updates
-    setRouteStats(updatedResults);
-    setStopCards(stopCards);
-
-    // Only update route display if we have a valid waypointManager reference
-    // and don't trigger other state updates from here
-    if (waypointManagerRef?.current && updatedResults) {
-      // Debounce the updateRoute call to prevent rapid re-renders
-      const currentWaypointManager = waypointManagerRef.current;
-      const debounceId = setTimeout(() => {
-        if (currentWaypointManager) {
-          currentWaypointManager.updateRoute(updatedResults);
+      // If calculation succeeded, use the results
+      if (result && result.enhancedResults) {
+        // Update global state with validated results
+        window.currentRouteStats = result.enhancedResults;
+        
+        // Set state updates with validated data
+        setRouteStats(result.enhancedResults);
+        setStopCards(result.stopCards || []);
+        
+        // Only update route display if we have a valid waypointManager reference
+        if (waypointManagerRef && waypointManagerRef.current) {
+          // Debounce the updateRoute call to prevent rapid re-renders
+          const currentWaypointManager = waypointManagerRef.current;
+          const debounceId = setTimeout(() => {
+            if (currentWaypointManager) {
+              currentWaypointManager.updateRoute(result.enhancedResults);
+            }
+          }, 50);
+          
+          // Clean up timeout if component unmounts or effect reruns
+          return () => clearTimeout(debounceId);
         }
-      }, 50);
-      
-      // Clean up timeout if component unmounts or effect reruns
-      return () => clearTimeout(debounceId);
+      } else {
+        console.error('⛽ useRouteCalculation: Calculation returned null or invalid results');
+      }
+    } catch (error) {
+      console.error('⛽ useRouteCalculation: Error during fuel calculation:', error);
+      // Do not attempt any fallback calculations - EXIT
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather, setRouteStats, setStopCards]);
+  }, [waypoints, selectedAircraft, flightSettings, weather, setRouteStats, setStopCards, waypointManagerRef]);
 
   /**
    * Updates a specific flight setting
