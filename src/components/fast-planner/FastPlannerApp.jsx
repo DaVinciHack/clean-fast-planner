@@ -169,15 +169,16 @@ const FastPlannerCore = ({
     // Update reference for next comparison
     lastRegionId.current = activeRegionFromContext.id;
     
-    // Only clear route if it's not the initial region setting and clearRoute is available
-    if (typeof clearRoute === 'function') {
-      console.log('FastPlannerCore: activeRegionFromContext changed to', activeRegionFromContext.name, 'clearing route.');
-      // Use setTimeout to break potential circular dependencies in the render cycle
-      setTimeout(() => {
-        clearRoute();
-      }, 0);
-    }
-  }, [activeRegionFromContext, clearRoute]); // Dependencies: activeRegionFromContext and clearRoute
+    console.log('FastPlannerCore: activeRegionFromContext changed to', activeRegionFromContext.name);
+    
+    // Just clear React state since RegionContext now handles the map cleanup
+    setWaypoints([]);
+    setRouteStats(null);
+    setStopCards([]);
+    
+    // Clear global state
+    window.currentRouteStats = null;
+  }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
@@ -419,6 +420,7 @@ const FastPlannerApp = () => {
     <RegionProvider
       mapManagerRef={appManagers.mapManagerRef}
       platformManagerRef={appManagers.platformManagerRef}
+      waypointManagerRef={appManagers.waypointManagerRef}
       client={client} 
       aircraftManagerRef={appManagers.aircraftManagerRef}
       favoriteLocationsManagerRef={appManagers.favoriteLocationsManagerRef}

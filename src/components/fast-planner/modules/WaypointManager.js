@@ -931,43 +931,96 @@ class WaypointManager {
   }
   
   _removeRouteLayersAndSources() {
-    const map = this.mapManager.getMap();
-    if (!map || !this.mapManager.isMapLoaded()) return;
+    // Safely get map object
+    let map = null;
+    try {
+      if (!this.mapManager) {
+        console.warn('WaypointManager: mapManager is not available for _removeRouteLayersAndSources');
+        return;
+      }
+      
+      map = this.mapManager.getMap();
+      if (!map) {
+        console.warn('WaypointManager: map is not available for _removeRouteLayersAndSources');
+        return;
+      }
+      
+      // Check if map is loaded and has functions we need
+      if (!this.mapManager.isMapLoaded() || 
+          typeof map.getLayer !== 'function' || 
+          typeof map.getSource !== 'function') {
+        console.warn('WaypointManager: map is not fully loaded for _removeRouteLayersAndSources');
+        return;
+      }
+    } catch (error) {
+      console.error('WaypointManager: Error accessing map in _removeRouteLayersAndSources:', error);
+      return;
+    }
 
     const layerIds = ['route-glow', 'route', 'route-arrows', 'leg-labels'];
     const sourceIds = ['route', 'route-arrows'];
 
+    // Try to remove layers first
     layerIds.forEach(layerId => {
-      if (map.getLayer(layerId)) {
-        try {
+      try {
+        if (map.getLayer(layerId)) {
           map.removeLayer(layerId);
-        } catch (e) {
-          console.warn(`Error removing layer ${layerId}: ${e.message}`);
         }
+      } catch (e) {
+        console.warn(`WaypointManager: Error removing layer ${layerId}: ${e.message}`);
       }
     });
 
+    // Then try to remove sources
     sourceIds.forEach(sourceId => {
-      if (map.getSource(sourceId)) {
-        try {
+      try {
+        if (map.getSource(sourceId)) {
           map.removeSource(sourceId);
-        } catch (e) {
-          console.warn(`Error removing source ${sourceId}: ${e.message}`);
         }
+      } catch (e) {
+        console.warn(`WaypointManager: Error removing source ${sourceId}: ${e.message}`);
       }
     });
   }
 
   clearRoute() {
-    this.markers.forEach(marker => marker.remove());
+    console.log('WaypointManager: Clearing route and markers');
+    
+    // Safely remove all markers
+    try {
+      if (this.markers && Array.isArray(this.markers)) {
+        this.markers.forEach(marker => {
+          try {
+            if (marker && typeof marker.remove === 'function') {
+              marker.remove();
+            }
+          } catch (e) {
+            console.warn('Error removing marker:', e);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error clearing markers:', error);
+    }
+    
+    // Reset internal arrays
     this.markers = [];
     this.waypoints = [];
     
-    this._removeRouteLayersAndSources(); // Use the helper method
+    // Safely remove route layers and sources
+    try {
+      this._removeRouteLayersAndSources();
+    } catch (error) {
+      console.error('Error removing route layers/sources:', error);
+    }
     
-    this.triggerCallback('onChange', this.waypoints);
-    // Also explicitly trigger onRouteUpdated with empty data to clear any UI dependent on it
-    this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] }); 
+    // Always trigger callbacks, even if there were errors
+    try {
+      this.triggerCallback('onChange', this.waypoints);
+      this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] });
+    } catch (callbackError) {
+      console.error('Error in clearRoute callbacks:', callbackError);
+    }
   }
   
   reorderWaypoints(draggedId, dropTargetId) {
