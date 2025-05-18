@@ -50,13 +50,11 @@ class RouteCalculator {
     
     // Log call with a distinct marker for tracking in console
     console.log('⭐ RouteCalculator.calculateRouteStats called with:', {
-      coordinates: coordinates.length,
+      coordinates: coordinates ? coordinates.length : 0,
       options: options.selectedAircraft ? 
         `Aircraft: ${options.selectedAircraft.registration || 'Unknown'}` : 'No aircraft',
       weather: options.weather ? 
-        `Wind ${options.weather.windSpeed}kts from ${options.weather.windDirection}°` : 'No weather',
-      // CRITICAL FIX: Log the forceTimeCalculation flag
-      forceTime: options.forceTimeCalculation ? 'true' : 'false'
+        `Wind ${options.weather.windSpeed}kts from ${options.weather.windDirection}°` : 'No weather'
     });
     
     // Get options with defaults for non-aircraft values only
@@ -65,40 +63,31 @@ class RouteCalculator {
       payloadWeight = 0,
       reserveFuel = 0,
       weather = null,
-      // CRITICAL FIX: Add forceTimeCalculation flag
-      forceTimeCalculation = false,
-      // IMPROVED FIX: Add a flag to indicate if these are ALL waypoints (including navigation waypoints)
+      // IMPORTANT: Always disable forceTimeCalculation for safety
+      // NEVER calculate time without a real aircraft
       includeAllWaypoints = true
     } = options;
     
+    // Check if we have valid coordinates
+    if (!coordinates || coordinates.length < 2) {
+      console.error('RouteCalculator: Invalid coordinates - need at least 2 waypoints');
+      return { totalDistance: '0', estimatedTime: '00:00', timeHours: 0 };
+    }
+    
     // Check if we have a selectedAircraft object
     if (!selectedAircraft) {
-      console.error('RouteCalculator: No aircraft data provided, calculating distance only');
+      console.warn('RouteCalculator: No aircraft data provided, calculating distance only');
       return this.calculateDistanceOnly(coordinates);
     }
     
     // Check if aircraft has all required properties
     if (!selectedAircraft.cruiseSpeed) {
       console.error('RouteCalculator: Aircraft missing cruiseSpeed property');
-      
-      // CRITICAL FIX: If forceTimeCalculation is true and we have coordinates, calculate time manually
-      if (forceTimeCalculation && coordinates && coordinates.length >= 2) {
-        console.log('⭐ Forcing time calculation for map click even without proper aircraft data');
-        return this.createBackupTimeCalculation(coordinates, 145); // Use default cruise speed of 145 knots
-      }
-      
       return this.calculateDistanceOnly(coordinates);
     }
     
     if (!selectedAircraft.fuelBurn) {
       console.error('RouteCalculator: Aircraft missing fuelBurn property');
-      
-      // CRITICAL FIX: If forceTimeCalculation is true and we have coordinates, calculate time manually
-      if (forceTimeCalculation && coordinates && coordinates.length >= 2) {
-        console.log('⭐ Forcing time calculation for map click even without complete aircraft data');
-        return this.createBackupTimeCalculation(coordinates, selectedAircraft.cruiseSpeed);
-      }
-      
       return this.calculateDistanceOnly(coordinates);
     }
     
@@ -171,7 +160,25 @@ class RouteCalculator {
   calculateDistanceOnly(coordinates) {
     if (!window.turf) {
       console.error('Turf.js not loaded');
-      return null;
+      return { 
+        totalDistance: '0', 
+        estimatedTime: '00:00', 
+        timeHours: 0,
+        fuelRequired: 0,
+        tripFuel: 0
+      };
+    }
+    
+    // Validate coordinates
+    if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 2) {
+      console.error('RouteCalculator: Invalid coordinates for distance calculation');
+      return { 
+        totalDistance: '0', 
+        estimatedTime: '00:00', 
+        timeHours: 0,
+        fuelRequired: 0,
+        tripFuel: 0
+      };
     }
     
     // Calculate total distance
@@ -180,32 +187,54 @@ class RouteCalculator {
     
     console.log('⭐ RouteCalculator: Calculating distance for', coordinates.length, 'waypoints');
     
-    for (let i = 0; i < coordinates.length - 1; i++) {
-      const from = window.turf.point(coordinates[i]);
-      const to = window.turf.point(coordinates[i + 1]);
-      const options = { units: 'nauticalmiles' };
-      
-      const legDistance = window.turf.distance(from, to, options);
-      totalDistance += legDistance;
-      
-      console.log(`⭐ RouteCalculator: Leg ${i+1} distance: ${legDistance.toFixed(1)} nm`);
-      
-      legs.push({
-        from: coordinates[i],
-        to: coordinates[i + 1],
-        distance: legDistance.toFixed(1)
-      });
+    try {
+      for (let i = 0; i < coordinates.length - 1; i++) {
+        // Validate individual coordinates
+        if (!coordinates[i] || !coordinates[i+1] || 
+            !Array.isArray(coordinates[i]) || !Array.isArray(coordinates[i+1]) ||
+            coordinates[i].length !== 2 || coordinates[i+1].length !== 2) {
+          console.error('RouteCalculator: Invalid coordinate pair at index', i);
+          continue;
+        }
+        
+        const from = window.turf.point(coordinates[i]);
+        const to = window.turf.point(coordinates[i + 1]);
+        const options = { units: 'nauticalmiles' };
+        
+        const legDistance = window.turf.distance(from, to, options);
+        totalDistance += legDistance;
+        
+        console.log(`⭐ RouteCalculator: Leg ${i+1} distance: ${legDistance.toFixed(1)} nm`);
+        
+        legs.push({
+          from: coordinates[i],
+          to: coordinates[i + 1],
+          distance: legDistance.toFixed(1)
+        });
+      }
+    } catch (error) {
+      console.error('RouteCalculator: Error calculating distances:', error);
+      // Return zeros on error
+      return { 
+        totalDistance: '0', 
+        estimatedTime: '00:00', 
+        timeHours: 0,
+        fuelRequired: 0,
+        tripFuel: 0
+      };
     }
     
     console.log('⭐ RouteCalculator: Total distance calculated:', totalDistance.toFixed(1), 'nm');
     
-    // Compile results with consistent fields that the UI expects
+    // SAFETY: Return zeros for time and fuel calculations when no aircraft is selected
     const result = {
       totalDistance: totalDistance.toFixed(1),
-      estimatedTime: '00:00',
-      timeHours: 0,
+      estimatedTime: '00:00',  // Always zero time without aircraft
+      timeHours: 0,            // Always zero time without aircraft
+      fuelRequired: 0,         // Always zero fuel without aircraft
+      tripFuel: 0,             // Always zero fuel without aircraft
       legs: legs,
-      distanceOnly: true // Flag to indicate this is distance-only calculation
+      distanceOnly: true       // Flag to indicate this is distance-only calculation
     };
     
     // Trigger callback with results
@@ -494,73 +523,20 @@ class RouteCalculator {
    * @returns {Object} - Route statistics with time
    */
   createBackupTimeCalculation(coordinates, cruiseSpeed) {
-    console.log('⭐ Creating backup time calculation with cruise speed:', cruiseSpeed);
+    console.log('⚠️ CRITICAL SAFETY ISSUE: Attempted to create backup time calculation without an aircraft');
     
-    if (!window.turf) {
-      console.error('RouteCalculator: Turf.js not loaded for backup calculation');
-      return { totalDistance: '0', estimatedTime: '00:00', timeHours: 0 };
-    }
-    
-    if (!coordinates || coordinates.length < 2 || !cruiseSpeed) {
-      console.error('RouteCalculator: Invalid inputs for backup calculation');
-      return { totalDistance: '0', estimatedTime: '00:00', timeHours: 0 };
-    }
-    
-    try {
-      // Calculate total distance
-      let totalDistance = 0;
-      let legs = [];
-      
-      for (let i = 0; i < coordinates.length - 1; i++) {
-        const from = window.turf.point(coordinates[i]);
-        const to = window.turf.point(coordinates[i + 1]);
-        const options = { units: 'nauticalmiles' };
-        
-        const legDistance = window.turf.distance(from, to, options);
-        totalDistance += legDistance;
-        
-        legs.push({
-          from: coordinates[i],
-          to: coordinates[i + 1],
-          distance: legDistance.toFixed(1)
-        });
-      }
-      
-      // Calculate time based on total distance and cruise speed
-      const timeHours = totalDistance / cruiseSpeed;
-      
-      // Format time as HH:MM
-      const hours = Math.floor(timeHours);
-      const minutes = Math.floor((timeHours - hours) * 60);
-      const estimatedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      
-      console.log('⭐ Backup time calculation results:', {
-        totalDistance: totalDistance.toFixed(1),
-        timeHours: timeHours,
-        estimatedTime: estimatedTime
-      });
-      
-      // Create the result object
-      const result = {
-        totalDistance: totalDistance.toFixed(1),
-        estimatedTime: estimatedTime,
-        timeHours: timeHours,
-        legs: legs,
-        // Add minimal properties to make it compatible with UI expectations
-        fuelRequired: Math.round(timeHours * 1100), // Use a default fuel burn of 1100 lbs/hr
-        tripFuel: Math.round(timeHours * 1100),
-        usableLoad: 0,
-        maxPassengers: 0
-      };
-      
-      // Trigger callback with results
-      this.triggerCallback('onCalculationComplete', result);
-      
-      return result;
-    } catch (error) {
-      console.error('RouteCalculator: Error in backup time calculation:', error);
-      return { totalDistance: '0', estimatedTime: '00:00', timeHours: 0 };
-    }
+    // NEVER calculate for aviation without proper aircraft data - return zeros for all values
+    return { 
+      totalDistance: '0', 
+      estimatedTime: '00:00', 
+      timeHours: 0,
+      fuelRequired: 0,
+      tripFuel: 0,
+      usableLoad: 0,
+      maxPassengers: 0,
+      legs: [],
+      safetyAlert: 'No aircraft selected - calculation disabled for safety'
+    };
   }
 }
 
