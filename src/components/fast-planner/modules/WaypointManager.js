@@ -751,44 +751,106 @@ class WaypointManager {
     }
   }
   
+  /**
+   * Safely removes route layers and sources from the map.
+   * Enhanced with thorough error handling and safety checks.
+   * @private
+   */
   _removeRouteLayersAndSources() {
-    const map = this.mapManager.getMap();
-    if (!map || !this.mapManager.isMapLoaded()) return;
+    // Safely get map object
+    let map = null;
+    try {
+      if (!this.mapManager) {
+        console.warn('WaypointManager: mapManager is not available for _removeRouteLayersAndSources');
+        return;
+      }
+      
+      map = this.mapManager.getMap();
+      if (!map) {
+        console.warn('WaypointManager: map is not available for _removeRouteLayersAndSources');
+        return;
+      }
+      
+      // Check if map is loaded and has functions we need
+      if (!this.mapManager.isMapLoaded() || 
+          typeof map.getLayer !== 'function' || 
+          typeof map.getSource !== 'function') {
+        console.warn('WaypointManager: map is not fully loaded for _removeRouteLayersAndSources');
+        return;
+      }
+    } catch (error) {
+      console.error('WaypointManager: Error accessing map in _removeRouteLayersAndSources:', error);
+      return;
+    }
 
     const layerIds = ['route-glow', 'route', 'route-arrows', 'leg-labels'];
     const sourceIds = ['route', 'route-arrows'];
 
+    // Try to remove layers first
     layerIds.forEach(layerId => {
-      if (map.getLayer(layerId)) {
-        try {
+      try {
+        if (map.getLayer(layerId)) {
           map.removeLayer(layerId);
-        } catch (e) {
-          console.warn(`Error removing layer ${layerId}: ${e.message}`);
         }
+      } catch (e) {
+        console.warn(`WaypointManager: Error removing layer ${layerId}: ${e.message}`);
       }
     });
 
+    // Then try to remove sources
     sourceIds.forEach(sourceId => {
-      if (map.getSource(sourceId)) {
-        try {
+      try {
+        if (map.getSource(sourceId)) {
           map.removeSource(sourceId);
-        } catch (e) {
-          console.warn(`Error removing source ${sourceId}: ${e.message}`);
         }
+      } catch (e) {
+        console.warn(`WaypointManager: Error removing source ${sourceId}: ${e.message}`);
       }
     });
   }
 
+  /**
+   * Completely clear all waypoints, markers, and route data.
+   * Enhanced with robust error handling.
+   */
   clearRoute() {
-    this.markers.forEach(marker => marker.remove());
-    this.markers = [];
-    this.waypoints = [];
-    
-    this._removeRouteLayersAndSources(); // Use the helper method
-    
-    this.triggerCallback('onChange', this.waypoints);
-    // Also explicitly trigger onRouteUpdated with empty data to clear any UI dependent on it
-    this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] }); 
+    try {
+      // Safely remove all markers
+      if (Array.isArray(this.markers)) {
+        this.markers.forEach(marker => {
+          try {
+            if (marker && typeof marker.remove === 'function') {
+              marker.remove();
+            }
+          } catch (e) {
+            console.warn('WaypointManager: Error removing marker:', e);
+          }
+        });
+      }
+      
+      // Reset arrays
+      this.markers = [];
+      this.waypoints = [];
+      
+      // Safely remove route layers and sources
+      this._removeRouteLayersAndSources();
+      
+      // Trigger callbacks to update UI state
+      this.triggerCallback('onChange', this.waypoints);
+      this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] });
+      
+      console.log('WaypointManager: Route cleared successfully');
+    } catch (error) {
+      console.error('WaypointManager: Error in clearRoute:', error);
+      
+      // Even if there's an error, ensure arrays are reset
+      this.markers = [];
+      this.waypoints = [];
+      
+      // Always trigger callbacks, even if there was an error
+      this.triggerCallback('onChange', this.waypoints);
+      this.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] });
+    }
   }
   
   reorderWaypoints(draggedId, dropTargetId) {
