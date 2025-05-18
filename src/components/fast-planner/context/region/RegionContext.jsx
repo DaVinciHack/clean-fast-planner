@@ -25,12 +25,14 @@ export const RegionProvider = ({
   favoriteLocationsManagerRef,
   setFavoriteLocations,
   appSettingsManagerRef,
-  mapInteractionHandlerRef // Added mapInteractionHandlerRef
+  mapInteractionHandlerRef, // Added mapInteractionHandlerRef
+  waypointManagerRef // Explicitly add waypointManagerRef to the props
 }) => {
   // Core region state
   const [regions, setRegions] = useState(regionsData);
   const [currentRegion, setCurrentRegion] = useState(null);
   const [regionLoading, setRegionLoading] = useState(false);
+  const [regionChangeInProgress, setRegionChangeInProgress] = useState(false);
   useEffect(() => { // Effect to keep window.isRegionLoading in sync
     window.isRegionLoading = regionLoading;
   }, [regionLoading]);
@@ -51,31 +53,63 @@ export const RegionProvider = ({
    */
   const mapReadyLastState = useRef(false);
   const checkMapReady = useCallback(() => {
-    if (!mapManagerRef || !mapManagerRef.current) {
-      console.warn("RegionContext: MapManager ref is not available");
-      return false;
-    }
+    // More thorough check for map availability
+    try {
+      if (!mapManagerRef || !mapManagerRef.current) {
+        console.warn("RegionContext: MapManager ref is not available");
+        return false;
+      }
 
-    const map = mapManagerRef.current.getMap();
-    const isReady = map && typeof map.on === 'function' && typeof map.fitBounds === 'function';
-    
-    if (isReady) {
-      // Only update state if there's a change to avoid unnecessary re-renders
-      if (!mapReadyLastState.current && !mapReady) {
-        console.log("RegionContext: Map is now ready for operations");
-        mapReadyLastState.current = true;
-        setMapReady(true);
+      const map = mapManagerRef.current.getMap();
+      if (!map) {
+        console.warn("RegionContext: Map instance not available");
+        return false;
       }
-      return true;
-    } else {
-      // If we previously thought map was ready, but now it's not, update state
-      if (mapReadyLastState.current || mapReady) {
-        console.warn("RegionContext: Map is no longer ready for operations");
-        mapReadyLastState.current = false;
-        setMapReady(false);
+      
+      // Check for multiple critical map functions
+      const isReady = (
+        typeof map.on === 'function' && 
+        typeof map.fitBounds === 'function' && 
+        typeof map.getZoom === 'function'
+      );
+      
+      if (isReady) {
+        // Test a real map operation to confirm it's ready
+        try {
+          const currentZoom = map.getZoom();
+          console.log(`RegionContext: Map is ready with zoom level: ${currentZoom}`);
+        } catch (e) {
+          console.warn("RegionContext: Map operation test failed, not fully ready");
+          return false;
+        }
+        
+        // Only update state if there's a change to avoid unnecessary re-renders
+        if (!mapReadyLastState.current || !mapReady) {
+          console.log("RegionContext: Map is now ready for operations");
+          mapReadyLastState.current = true;
+          setMapReady(true);
+          
+          // If we have a pending region, apply it now
+          if (pendingRegionChangeRef.current) {
+            console.log(`RegionContext: Applying pending region now that map is ready: ${pendingRegionChangeRef.current.name}`);
+            setCurrentRegion(pendingRegionChangeRef.current);
+            pendingRegionChangeRef.current = null;
+          }
+        }
+        return true;
       } else {
-        console.warn("RegionContext: Map is not yet ready for operations");
+        // If we previously thought map was ready, but now it's not, update state
+        if (mapReadyLastState.current || mapReady) {
+          console.warn("RegionContext: Map is no longer ready for operations");
+          mapReadyLastState.current = false;
+          setMapReady(false);
+        } else {
+          console.warn("RegionContext: Map is not yet ready for operations");
+        }
+        return false;
       }
+    } catch (error) {
+      console.error("RegionContext: Error in checkMapReady:", error);
       return false;
     }
   }, [mapManagerRef, mapReady]);
@@ -283,39 +317,150 @@ export const RegionProvider = ({
   }, [regions, currentRegion, appSettingsManagerRef, mapReady]);
 
   /**
+   * Direct method to fly to a region's bounds
+   * This can be called anywhere, anytime to force map navigation
+   */
+  const directFlyToRegion = useCallback((region) => {
+    console.log(`RegionContext [EMERGENCY FLY]: Directly flying to ${region.name}`);
+    
+    if (!mapManagerRef || !mapManagerRef.current) {
+      console.warn("RegionContext [EMERGENCY FLY]: MapManager ref not available");
+      return false;
+    }
+    
+    try {
+      const map = mapManagerRef.current.getMap();
+      if (!map || typeof map.fitBounds !== 'function') {
+        console.warn("RegionContext [EMERGENCY FLY]: Map or fitBounds not available");
+        return false;
+      }
+      
+      // Force map to fly to the region bounds with no conditions
+      map.fitBounds(region.bounds, {
+        padding: 50,
+        maxZoom: region.zoom || 6,
+        animate: true,
+        duration: 3000,
+        essential: true
+      });
+      
+      console.log(`RegionContext [EMERGENCY FLY]: Forced flight to ${region.name}`);
+      return true;
+    } catch (error) {
+      console.error("RegionContext [EMERGENCY FLY]: Error flying to region:", error);
+      return false;
+    }
+  }, [mapManagerRef]);
+  
+  // Add emergency fly method to window for access from console
+  useEffect(() => {
+    window.emergencyFlyToRegion = (regionId) => {
+      const regionObject = regions.find(r => r.id === regionId);
+      if (regionObject) {
+        return directFlyToRegion(regionObject);
+      }
+      return false;
+    };
+    
+    // Also add ability to fly to current region
+    window.emergencyFlyToCurrentRegion = () => {
+      if (currentRegion) {
+        return directFlyToRegion(currentRegion);
+      }
+      return false;
+    };
+    
+    return () => {
+      delete window.emergencyFlyToRegion;
+      delete window.emergencyFlyToCurrentRegion;
+    };
+  }, [regions, currentRegion, directFlyToRegion]);
+
+  /**
    * Effect to update map view when currentRegion changes
    */
   useEffect(() => {
     if (!currentRegion) return;
+    
+    // Update global flags
     window.staticDataLoaded = false;
     window.platformsLoaded = false;
     window.aircraftLoaded = false;
+    
+    // Save region to app settings
     if (appSettingsManagerRef && appSettingsManagerRef.current) {
       appSettingsManagerRef.current.setRegion(currentRegion.id);
     }
+    
+    // Dispatch region change event
     const regionChangedEvent = new CustomEvent('region-changed', { detail: { region: currentRegion } });
     window.dispatchEvent(regionChangedEvent);
-    if (!mapReady) {
-      console.log(`RegionContext: Map not ready, region will be applied when map loads`);
-      return;
+    
+    // Create a direct map fly function that bypasses other checks
+    const flyToRegionBounds = () => {
+      console.log(`RegionContext [DIRECT FLY]: Flying to bounds for region: ${currentRegion.name}`);
+      
+      try {
+        if (!mapManagerRef || !mapManagerRef.current) {
+          console.warn(`RegionContext [DIRECT FLY]: mapManagerRef not available`);
+          return false;
+        }
+        
+        const map = mapManagerRef.current.getMap();
+        if (!map || typeof map.fitBounds !== 'function') {
+          console.warn(`RegionContext [DIRECT FLY]: Map or fitBounds not available`);
+          return false;
+        }
+        
+        // Force a direct flyTo with no conditions
+        map.fitBounds(currentRegion.bounds, { 
+          padding: 50, 
+          maxZoom: currentRegion.zoom || 6,
+          animate: true,
+          duration: 3000,  // 3 seconds for smooth animation
+          essential: true,
+          linear: false    // Use default ease-out effect
+        });
+        
+        console.log(`RegionContext [DIRECT FLY]: Forced flight to ${currentRegion.name} bounds`);
+        return true;
+      } catch (error) { 
+        console.error(`RegionContext [DIRECT FLY]: Error applying region bounds:`, error);
+        return false;
+      }
+    };
+    
+    // Try immediate fly if map is ready
+    if (mapReady) {
+      const success = directFlyToRegion(currentRegion);
+      if (!success) {
+        console.warn(`RegionContext: Initial fly to ${currentRegion.name} failed, will retry`);
+      }
+    } else {
+      console.log(`RegionContext: Map not ready, will try flying to region when map loads`);
     }
-    const map = mapManagerRef.current?.getMap();
-    if (!map || typeof map.fitBounds !== 'function') {
-      console.warn(`RegionContext: Map not available, cannot update view`);
-      return;
-    }
-    try {
-      // Use flyTo with enhanced parameters for a smoother animation
-      map.fitBounds(currentRegion.bounds, { 
-        padding: 50, 
-        maxZoom: currentRegion.zoom || 6,
-        animate: true,
-        duration: 2500,  // 2.5 seconds for smooth animation
-        essential: true,
-        linear: false    // Use default ease-out effect
-      });
-    } catch (error) { console.error(`RegionContext: Error applying region bounds:`, error); }
-  }, [currentRegion, mapManagerRef, appSettingsManagerRef, mapReady]);
+    
+    // Schedule additional attempts with increasing delays to ensure the map moves
+    // This is a safety measure in case the first attempt fails
+    const attemptFlyWithDelay = (attempt = 1) => {
+      const maxAttempts = 5;
+      const delay = attempt * 1000; // Increasing delay with each attempt
+      
+      setTimeout(() => {
+        // Check if we successfully flew to the region
+        if (directFlyToRegion(currentRegion) || attempt >= maxAttempts) {
+          return;
+        }
+        
+        // Try again with increased delay
+        attemptFlyWithDelay(attempt + 1);
+      }, delay);
+    };
+    
+    // Start the delayed attempts
+    attemptFlyWithDelay();
+    
+  }, [currentRegion, mapManagerRef, appSettingsManagerRef, mapReady, directFlyToRegion]);
 
   /**
    * Load region-specific data when region changes
@@ -449,7 +594,7 @@ export const RegionProvider = ({
   ]);
 
   /**
-   * Change the current region
+   * Change the current region with enhanced safety and sequencing
    */
   const changeRegion = useCallback((regionId) => {
     // Skip if this region is already active
@@ -458,41 +603,92 @@ export const RegionProvider = ({
       return;
     }
     
-    console.log(`RegionContext: Changing region to ${regionId}`);
-    setRegionLoading(true);
+    console.log(`RegionContext: Starting DIRECT region change to ${regionId}`);
     
-    window.regionState = window.regionState || {};
-    window.regionState.isChangingRegion = true;
-    
+    // Find the region object first
     const regionObject = regions.find(region => region.id === regionId);
     if (!regionObject) {
       console.error(`Region with ID ${regionId} not found`);
-      setRegionLoading(false);
-      window.regionState.isChangingRegion = false;
       return;
     }
     
-    // Set the current region - this will trigger the flyTo animation via useEffect
+    // Set loading state and global flags
+    setRegionLoading(true);
+    setRegionChangeInProgress(true);
+    window.regionState = window.regionState || {};
+    window.regionState.isChangingRegion = true;
+    
+    // Set the current region first - this is essential
     setCurrentRegion(regionObject);
     
-    if (!mapReady && mapManagerRef.current) {
+    // If the map is ready, directly fly to the region as well
+    if (mapReady) {
+      // Try a direct fly to the region bounds to ensure it works
+      setTimeout(() => {
+        directFlyToRegion(regionObject);
+      }, 100);
+    } else {
+      // If map isn't ready, set as pending region
       pendingRegionChangeRef.current = regionObject;
-      console.log(`RegionContext: Map not ready, region ${regionObject.name} will be applied when map loads. fitBounds will be handled by useEffect.`);
-    } else if (mapReady && mapManagerRef.current && mapManagerRef.current.getMap()) {
-      if (platformManagerRef.current) {
-        platformManagerRef.current.skipNextClear = false; 
-        console.log(`RegionContext: Set skipNextClear to false for ${regionObject.name}. fitBounds will be handled by useEffect.`);
-      }
     }
-  }, [regions, mapReady, mapManagerRef, platformManagerRef, currentRegion]);
+    
+    // Schedule cleanup and reset in a separate microtask to avoid blocking
+    setTimeout(() => {
+      // Try to clear waypoints and route data
+      if (typeof waypointManagerRef !== 'undefined' && waypointManagerRef && waypointManagerRef.current) {
+        try {
+          // Clear internal arrays directly
+          const markers = waypointManagerRef.current.markers || [];
+          markers.forEach(marker => {
+            try { marker.remove(); } catch (e) { /* Ignore errors */ }
+          });
+          waypointManagerRef.current.markers = [];
+          waypointManagerRef.current.waypoints = [];
+          
+          // Trigger callbacks to update UI state
+          if (typeof waypointManagerRef.current.triggerCallback === 'function') {
+            waypointManagerRef.current.triggerCallback('onChange', []);
+            waypointManagerRef.current.triggerCallback('onRouteUpdated', { waypoints: [], coordinates: [] });
+          }
+        } catch (error) {
+          console.error(`RegionContext: Error clearing waypoints:`, error);
+        }
+      }
+      
+      // Set skipNextClear flag on platform manager
+      if (typeof platformManagerRef !== 'undefined' && platformManagerRef && platformManagerRef.current) {
+        platformManagerRef.current.skipNextClear = true;
+      }
+      
+      // Schedule reset of state flags after a delay
+      setTimeout(() => {
+        setRegionChangeInProgress(false);
+        window.regionState.isChangingRegion = false;
+        
+        // Re-initialize map interaction handler after region is fully loaded
+        if (typeof mapInteractionHandlerRef !== 'undefined' && mapInteractionHandlerRef && 
+            mapInteractionHandlerRef.current && typeof mapInteractionHandlerRef.current.initialize === 'function') {
+          setTimeout(() => {
+            try {
+              console.log('RegionContext: Reinitializing map interaction handler');
+              mapInteractionHandlerRef.current.initialize();
+            } catch (error) {
+              console.error('RegionContext: Error initializing map interaction:', error);
+            }
+          }, 1500);
+        }
+      }, 1000);
+    }, 0);
+  }, [regions, currentRegion, mapManagerRef, waypointManagerRef, platformManagerRef, mapInteractionHandlerRef]);
 
   const value = React.useMemo(() => ({
     regions,
     currentRegion,
     regionLoading,
     changeRegion,
-    mapReady
-  }), [regions, currentRegion, regionLoading, changeRegion, mapReady]);
+    mapReady,
+    directFlyToRegion // Add the direct fly method to the context value
+  }), [regions, currentRegion, regionLoading, changeRegion, mapReady, directFlyToRegion]);
 
   return (
     <RegionContext.Provider value={value}>
