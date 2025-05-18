@@ -612,6 +612,27 @@ export const RegionProvider = ({
       return;
     }
     
+    // Capture the current map state before making any changes
+    let fromRegion = currentRegion;
+    let initialCenter = null;
+    let initialZoom = null;
+    
+    try {
+      const map = mapManagerRef?.current?.getMap();
+      if (map) {
+        // Store current map position to avoid flicker
+        if (typeof map.getCenter === 'function') {
+          initialCenter = map.getCenter();
+        }
+        if (typeof map.getZoom === 'function') {
+          initialZoom = map.getZoom();
+        }
+        console.log(`RegionContext: Captured map position before region change: ${initialCenter?.lng},${initialCenter?.lat} Z${initialZoom}`);
+      }
+    } catch (error) {
+      console.warn(`RegionContext: Error capturing initial map state: ${error.message}`);
+    }
+    
     // Set loading state and global flags
     setRegionLoading(true);
     setRegionChangeInProgress(true);
@@ -623,9 +644,30 @@ export const RegionProvider = ({
     
     // If the map is ready, directly fly to the region as well
     if (mapReady) {
-      // Try a direct fly to the region bounds to ensure it works
+      // Add a slight delay to allow state to update
       setTimeout(() => {
-        directFlyToRegion(regionObject);
+        // If we managed to capture the current position, fly from there
+        // This prevents the map from resetting to Gulf of Mexico first
+        try {
+          const map = mapManagerRef?.current?.getMap();
+          if (map && typeof map.fitBounds === 'function' && initialCenter) {
+            console.log(`RegionContext: Flying directly from current position to ${regionObject.name}`);
+            // Skip any intermediate positions and go directly to target
+            map.fitBounds(regionObject.bounds, { 
+              padding: 50, 
+              maxZoom: regionObject.zoom || 6,
+              animate: true,
+              duration: 3000,
+              essential: true
+            });
+          } else {
+            // Fall back to directFlyToRegion
+            directFlyToRegion(regionObject);
+          }
+        } catch (error) {
+          console.error(`RegionContext: Error flying to region: ${error.message}`);
+          directFlyToRegion(regionObject);
+        }
       }, 100);
     } else {
       // If map isn't ready, set as pending region
@@ -679,7 +721,7 @@ export const RegionProvider = ({
         }
       }, 1000);
     }, 0);
-  }, [regions, currentRegion, mapManagerRef, waypointManagerRef, platformManagerRef, mapInteractionHandlerRef]);
+  }, [regions, currentRegion, mapReady, mapManagerRef, waypointManagerRef, platformManagerRef, mapInteractionHandlerRef, directFlyToRegion]);
 
   const value = React.useMemo(() => ({
     regions,
