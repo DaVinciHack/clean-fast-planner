@@ -38,10 +38,23 @@ class MapManager {
         
         console.log('Creating MapBox instance...');
         
+        // DIAGNOSTIC: Log if this is happening during a region change
+        if (window.REGION_CHANGE_IN_PROGRESS) {
+          console.log(`%c MAPMANAGER DIAGNOSTIC: ⚠️ Creating map during region change! 
+            From: ${window.REGION_CHANGE_FROM} 
+            To: ${window.REGION_CHANGE_TO}
+            Time: ${window.REGION_CHANGE_TIME}`, 
+            'background: orange; color: black; font-weight: bold');
+        }
+        
         // Always use Gulf of Mexico as the initial map position
         // This allows the nice fly animation to work when loading saved regions
         let initialCenter = [-90.5, 27.5]; // Default: Gulf of Mexico
         let initialZoom = 6;
+        
+        // DIAGNOSTIC: Log center being used
+        console.log(`%c MAPMANAGER DIAGNOSTIC: Using initial center: [${initialCenter}], zoom: ${initialZoom}`, 
+                    'background: orange; color: black;');
         
         // Create map instance with determined settings
         this.map = new window.mapboxgl.Map({
@@ -76,6 +89,38 @@ class MapManager {
             }
           });
           this._loadCallbacks = []; 
+          
+          // Dispatch a global event for components to listen for
+          const mapLoadedEvent = new CustomEvent('map-loaded', {
+            detail: { map: this.map }
+          });
+          window.dispatchEvent(mapLoadedEvent);
+        });
+        
+        // Add an event listener for region changes
+        window.addEventListener('region-changed', (event) => {
+          if (!this.map || !this._isLoaded) return;
+          
+          try {
+            if (event.detail && event.detail.region) {
+              const region = event.detail.region;
+              console.log(`MapManager: Received region change event for ${region.name}`);
+              
+              // Ensure the map smoothly flies to the region bounds
+              if (this.map && typeof this.map.fitBounds === 'function' && region.bounds) {
+                console.log(`MapManager: Flying to ${region.name} bounds`);
+                this.map.fitBounds(region.bounds, {
+                  padding: 50,
+                  maxZoom: region.zoom || 6,
+                  animate: true,
+                  duration: 3000,
+                  essential: true
+                });
+              }
+            }
+          } catch (error) {
+            console.error('MapManager: Error handling region change:', error);
+          }
         });
         
         // Handle map errors
@@ -355,14 +400,64 @@ class MapManager {
   /**
    * Fit map to the given coordinates
    * @param {Array} bounds - Array of [lng, lat] coordinates
+   * @param {Object} options - Options for fitting bounds
    */
-  fitMapToBounds(bounds) {
-    if (!this.map) return;
+  fitMapToBounds(bounds, options = {}) {
+    if (!this.map) {
+      console.warn('MapManager: Cannot fit bounds - map is not initialized');
+      return false;
+    }
     
-    this.map.fitBounds(bounds, {
-      padding: 50,
-      maxZoom: 10
-    });
+    try {
+      // Default fit bounds options
+      const fitOptions = {
+        padding: options.padding || 50,
+        maxZoom: options.maxZoom || 10,
+        animate: options.hasOwnProperty('animate') ? options.animate : true,
+        duration: options.duration || 2000,
+        essential: options.hasOwnProperty('essential') ? options.essential : true
+      };
+      
+      console.log(`MapManager: Fitting map to bounds with options:`, fitOptions);
+      this.map.fitBounds(bounds, fitOptions);
+      return true;
+    } catch (error) {
+      console.error('MapManager: Error fitting map to bounds:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Fly to a specific region
+   * @param {Object} region - The region object with bounds and other properties
+   * @returns {boolean} - Success status
+   */
+  flyToRegion(region) {
+    if (!this.map || !this._isLoaded) {
+      console.warn('MapManager: Cannot fly to region - map is not initialized or loaded');
+      return false;
+    }
+    
+    try {
+      if (!region || !region.bounds) {
+        console.error('MapManager: Invalid region object for flyToRegion');
+        return false;
+      }
+      
+      console.log(`MapManager: Flying to region ${region.name || 'unknown'}`);
+      
+      // Use fitMapToBounds with region-specific options
+      return this.fitMapToBounds(region.bounds, {
+        padding: 50,
+        maxZoom: region.zoom || 6,
+        animate: true,
+        duration: 3000,
+        essential: true
+      });
+    } catch (error) {
+      console.error('MapManager: Error flying to region:', error);
+      return false;
+    }
   }
   
   /**
