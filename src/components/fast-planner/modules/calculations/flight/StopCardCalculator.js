@@ -225,7 +225,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         timeHours: leg.time || (leg.distance / aircraft.cruiseSpeed),
         fuel: leg.fuel || Math.round((leg.distance / aircraft.cruiseSpeed) * aircraft.fuelBurn),
         groundSpeed: leg.groundSpeed || aircraft.cruiseSpeed,
-        headwind: leg.headwind || 0
+        headwind: parseFloat((leg.headwind || 0).toFixed(1))
       });
       
       console.log(`⭐ StopCardCalculator: Mapped leg ${i} from route stats:`, {
@@ -361,7 +361,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       
       // Calculate average ground speed and headwind for the leg
       const legGroundSpeed = segmentCount > 0 ? Math.round(totalLegGroundSpeed / segmentCount) : aircraft.cruiseSpeed;
-      const headwindComponent = segmentCount > 0 ? Math.round(totalLegHeadwind / segmentCount) : 0;
+      const headwindComponent = segmentCount > 0 ? parseFloat((totalLegHeadwind / segmentCount).toFixed(1)) : 0;
       
       console.log(`StopCardCalculator: Leg ${i+1} totals: distance=${legDistance.toFixed(1)}nm, time=${legTimeHours.toFixed(2)}h, fuel=${legFuel}lbs`);
       
@@ -798,6 +798,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // Ensure other numerical fields are valid
       card.deckFuel = Number(card.deckFuel) || 0;
       card.legFuel = Number(card.legFuel) || 0;
+      card.headwind = parseFloat(Number(card.headwind).toFixed(1)) || 0;
       
       return card;
     });
