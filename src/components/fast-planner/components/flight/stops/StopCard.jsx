@@ -88,7 +88,7 @@ const StopCard = React.forwardRef(({
         {headwind !== undefined && !isDeparture && (
           <div className="stop-wind" title={`Groundspeed: ${groundSpeed || 0} kts`}>
             <span className="wind-value" data-positive={headwind > 0} data-negative={headwind < 0}>
-              {headwind > 0 ? `+${headwind}` : headwind} kts
+              {headwind > 0 ? `+${parseFloat(Number(headwind).toFixed(1))}` : parseFloat(Number(headwind).toFixed(1))} kts
             </span>
           </div>
         )}

@@ -301,8 +301,8 @@ const calculateLegWithWind = (from, to, distance, aircraft, weather) => {
   return {
     time,
     fuel,
-    headwindComponent,
-    crosswindComponent,
+    headwindComponent: parseFloat(headwindComponent.toFixed(1)),
+    crosswindComponent: parseFloat(crosswindComponent.toFixed(1)),
     groundSpeed,
     course,
     driftAngle  // New property, won't break existing code
