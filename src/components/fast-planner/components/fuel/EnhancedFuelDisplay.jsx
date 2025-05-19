@@ -35,6 +35,13 @@ const EnhancedFuelDisplay = ({
   // Extract relevant data for display
   const { fuelByStop, maxCapacity, legResults, auxiliaryFuel } = enhancedResults;
   
+  // Function to safely extract waypoint name
+  const getWaypointName = (waypoint) => {
+    if (typeof waypoint === 'string') return waypoint;
+    if (waypoint && typeof waypoint === 'object' && waypoint.name) return waypoint.name;
+    return 'Unnamed Stop';
+  };
+  
   // Function to format fuel components into a readable string
   const formatFuelComponents = (components) => {
     if (!components) return '';
@@ -90,7 +97,7 @@ const EnhancedFuelDisplay = ({
           <tbody>
             {fuelByStop.map((stop, index) => (
               <tr key={index} className={stop.isLastStop ? 'last-stop' : ''}>
-                <td>{stop.waypoint}</td>
+                <td>{getWaypointName(stop.waypoint)}</td>
                 <td>{stop.requiredFuel} Lbs</td>
                 <td>
                   {stop.isLastStop ? 'Final Stop' : (
@@ -105,7 +112,7 @@ const EnhancedFuelDisplay = ({
                 <td>
                   {stop.leg ? (
                     <React.Fragment>
-                      {stop.leg.from}-{stop.leg.to} → {stop.leg.distance.toFixed(1)} nm
+                      {getWaypointName(stop.leg.from)}-{getWaypointName(stop.leg.to)} → {stop.leg.distance.toFixed(1)} nm
                     </React.Fragment>
                   ) : (
                     'Final destination'
@@ -141,7 +148,7 @@ const EnhancedFuelDisplay = ({
                   <td className="fuel-components-cell">
                     {formatFuelComponents(fuelByStop[0].components)}
                   </td>
-                  <td>Legs to {maxCapacity.limitingWaypoint}</td>
+                  <td>Legs to {getWaypointName(maxCapacity.limitingWaypoint)}</td>
                 </tr>
               </tbody>
             </table>
@@ -162,9 +169,9 @@ const EnhancedFuelDisplay = ({
           <div key={index} className="leg-fuel-card">
             <div className="leg-fuel-header">
               <div className="leg-route">
-                <span className="leg-from">{leg.from}</span>
+                <span className="leg-from">{getWaypointName(leg.from)}</span>
                 <span className="leg-arrow">→</span>
-                <span className="leg-to">{leg.to}</span>
+                <span className="leg-to">{getWaypointName(leg.to)}</span>
               </div>
               
               <div className="leg-stats">

@@ -24,6 +24,10 @@ const LeftPanel = ({
   onToggleWaypointMode, // Handler for the "Add Insert Waypoints" button
   waypointModeActive // State to track if waypoint insertion mode is active
 }) => {
+  // Initialize with safe, sanitized defaults
+  const safeWaypoints = Array.isArray(waypoints) ? waypoints : [];
+  const safeFavoriteLocations = Array.isArray(favoriteLocations) ? favoriteLocations : [];
+  
   // Keep track of recently added waypoint IDs for highlighting
   const [recentWaypoints, setRecentWaypoints] = useState({});
   const prevWaypointsRef = useRef([]);
@@ -37,9 +41,9 @@ const LeftPanel = ({
   
   // Keep internal favorites in sync with props
   useEffect(() => {
-    console.log("LeftPanel: favoriteLocations prop changed:", favoriteLocations.length);
-    setInternalFavorites(favoriteLocations);
-  }, [favoriteLocations]);
+    console.log("LeftPanel: favoriteLocations prop changed:", safeFavoriteLocations.length);
+    setInternalFavorites(safeFavoriteLocations);
+  }, [safeFavoriteLocations]);
   
   // Debug output for favorites changes
   useEffect(() => {
@@ -49,14 +53,14 @@ const LeftPanel = ({
   // Check for newly added favorites
   useEffect(() => {
     // Skip first render
-    if (prevFavoritesRef.current.length === 0 && favoriteLocations.length > 0) {
-      prevFavoritesRef.current = favoriteLocations.map(fav => fav.id);
+    if (prevFavoritesRef.current.length === 0 && safeFavoriteLocations.length > 0) {
+      prevFavoritesRef.current = safeFavoriteLocations.map(fav => fav.id);
       return;
     }
     
     // Find favorites that weren't in the previous list
     const prevIds = new Set(prevFavoritesRef.current);
-    const newFavorites = favoriteLocations.filter(fav => !prevIds.has(fav.id));
+    const newFavorites = safeFavoriteLocations.filter(fav => !prevIds.has(fav.id));
     
     // If we found new favorites, highlight them
     if (newFavorites.length > 0) {
@@ -84,20 +88,20 @@ const LeftPanel = ({
     }
     
     // Update reference to current favorites
-    prevFavoritesRef.current = favoriteLocations.map(fav => fav.id);
-  }, [favoriteLocations]);
+    prevFavoritesRef.current = safeFavoriteLocations.map(fav => fav.id);
+  }, [safeFavoriteLocations]);
   
   // Check for newly added waypoints by comparing current and previous lists by ID
   useEffect(() => {
     // Skip first render
-    if (prevWaypointsRef.current.length === 0 && waypoints.length > 0) {
-      prevWaypointsRef.current = waypoints.map(wp => wp.id);
+    if (prevWaypointsRef.current.length === 0 && safeWaypoints.length > 0) {
+      prevWaypointsRef.current = safeWaypoints.map(wp => wp.id);
       return;
     }
     
     // Find waypoints that weren't in the previous list
     const prevIds = new Set(prevWaypointsRef.current);
-    const newWaypoints = waypoints.filter(wp => !prevIds.has(wp.id));
+    const newWaypoints = safeWaypoints.filter(wp => !prevIds.has(wp.id));
     
     // If we found new waypoints, highlight them
     if (newWaypoints.length > 0) {
@@ -125,8 +129,8 @@ const LeftPanel = ({
     }
     
     // Update reference to current waypoints
-    prevWaypointsRef.current = waypoints.map(wp => wp.id);
-  }, [waypoints]);
+    prevWaypointsRef.current = safeWaypoints.map(wp => wp.id);
+  }, [safeWaypoints]);
   
   // Check if a waypoint was recently added and should be highlighted
   const isRecentlyAdded = (waypointId) => {
@@ -163,13 +167,13 @@ const LeftPanel = ({
     
     if (draggedId !== targetId) {
       // Find source index
-      const sourceIndex = waypoints.findIndex(wp => wp.id === draggedId);
+      const sourceIndex = safeWaypoints.findIndex(wp => wp.id === draggedId);
       
       console.log(`LeftPanel: Reordering waypoint from index ${sourceIndex} to ${targetIndex}`);
       
       // In our waypoint manager, we need source and target waypoint IDs, not just indices
       const sourceId = draggedId;
-      const targetId = waypoints[targetIndex]?.id;
+      const targetId = safeWaypoints[targetIndex]?.id;
       
       // If the parent component provided a reorder function, call it
       if (onReorderWaypoints && sourceId && targetId) {
@@ -181,7 +185,7 @@ const LeftPanel = ({
         // Fallback: try to simulate reordering by removing and adding at new index
         if (onRemoveWaypoint && onAddWaypoint && sourceIndex !== -1) {
           // Get the waypoint's data before removing
-          const movedWaypoint = waypoints[sourceIndex];
+          const movedWaypoint = safeWaypoints[sourceIndex];
           
           // Remove from original position
           onRemoveWaypoint(sourceId, sourceIndex);
@@ -235,129 +239,137 @@ const LeftPanel = ({
         </p>
         
         <div id="stops-container">
-          {waypoints.map((waypoint, index) => (
-            <div 
-              className={`stop-entry ${isRecentlyAdded(waypoint.id) ? 'highlight-new' : ''}`}
-              key={waypoint.id} 
-              data-id={waypoint.id} 
-              data-waypoint={waypoint.isWaypoint === true || waypoint.type === 'WAYPOINT' ? 'true' : 'false'}
-              data-lat={waypoint.coords ? waypoint.coords[1].toFixed(2) : ''}
-              data-lon={waypoint.coords ? waypoint.coords[0].toFixed(2) : ''}
-              draggable={true}
-              onDragStart={(e) => handleDragStart(e, waypoint.id)}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, waypoint.id, index)}
-            >
-              <input 
-                type="text" 
-                value={waypoint.name || `${waypoint.isWaypoint || waypoint.type === 'WAYPOINT' ? 'WP' : 'Stop'} ${index + 1}`}
-                onChange={(e) => {
-                  if (onWaypointNameChange) {
-                    onWaypointNameChange(waypoint.id, e.target.value);
-                  }
-                }}
-              />
-              <div className="coordinates">
-                Lat: {waypoint.coords[1].toFixed(5)}, Lon: {waypoint.coords[0].toFixed(5)}
-              </div>
-              <div className="stop-controls">
-                <div 
-                  className="favorite-button" 
-                  title="Add to favorites"
-                  onClick={() => {
-                    if (onAddFavoriteLocation) {
-                      const locationName = waypoint.name || `Stop ${index + 1}`;
-                      const newLocation = { 
-                        name: locationName, 
-                        coords: waypoint.coords 
-                      };
-                      
-                      // Add directly to internal state for immediate UI update
-                      // Generate a temporary ID for display purposes
-                      const tempId = `${locationName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
-                      const tempLocation = {
-                        ...newLocation,
-                        id: tempId
-                      };
-                      
-                      // Update internal state immediately
-                      setInternalFavorites(prev => [...prev, tempLocation]);
-                      
-                      // Also call the parent handler
+          {safeWaypoints.map((waypoint, index) => {
+            // Extract all needed properties from the waypoint object
+            const waypointId = waypoint.id || `waypoint-${index}`;
+            const waypointName = waypoint.name || `${waypoint.isWaypoint || waypoint.type === 'WAYPOINT' ? 'WP' : 'Stop'} ${index + 1}`;
+            const isWaypointType = waypoint.isWaypoint === true || waypoint.type === 'WAYPOINT' ? true : false;
+            const coords = waypoint.coords || [0, 0];
+            const lat = coords[1];
+            const lon = coords[0];
+            
+            return (
+              <div 
+                className={`stop-entry ${isRecentlyAdded(waypointId) ? 'highlight-new' : ''}`}
+                key={waypointId} 
+                data-id={waypointId} 
+                data-waypoint={isWaypointType ? 'true' : 'false'}
+                draggable={true}
+                onDragStart={(e) => handleDragStart(e, waypointId)}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, waypointId, index)}
+              >
+                <input 
+                  type="text" 
+                  value={waypointName}
+                  onChange={(e) => {
+                    if (onWaypointNameChange) {
+                      onWaypointNameChange(waypointId, e.target.value);
+                    }
+                  }}
+                />
+                <div className="coordinates">
+                  Lat: {lat.toFixed(5)}, Lon: {lon.toFixed(5)}
+                </div>
+                <div className="stop-controls">
+                  <div 
+                    className="favorite-button" 
+                    title="Add to favorites"
+                    onClick={() => {
                       if (onAddFavoriteLocation) {
-                        onAddFavoriteLocation(newLocation);
-                      }
-                      
-                      // Show success message
-                      const message = `Added ${locationName} to favorites`;
-                      // Create a toast-style notification instead of using the loading overlay
-                      const toast = document.createElement('div');
-                      toast.style.position = 'fixed';
-                      toast.style.bottom = '20px';
-                      toast.style.left = '50%';
-                      toast.style.transform = 'translateX(-50%)';
-                      toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
-                      toast.style.color = 'white';
-                      toast.style.padding = '10px 20px';
-                      toast.style.borderRadius = '5px';
-                      toast.style.zIndex = '1000';
-                      toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                      toast.textContent = message;
-                      document.body.appendChild(toast);
-                      
-                      // Remove after 1.5 seconds
-                      setTimeout(() => {
-                        document.body.removeChild(toast);
-                      }, 1500);
-                    }
-                  }}
-                  style={{ 
-                    color: "#ff5e85", 
-                    fontSize: "16px",
-                    padding: "3px 6px",
-                    borderRadius: "4px",
-                    transition: "all 0.2s ease"
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(255,94,133,0.15)";
-                    e.currentTarget.style.transform = "scale(1.2)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >❤️</div>
-                <div className="drag-handle">☰</div>
-                <div 
-                  className="remove-stop" 
-                  onClick={() => {
-                    if (onRemoveWaypoint) {
-                      console.log(`LeftPanel: Removing waypoint at index ${index} with ID ${waypoint.id}`);
-                      
-                      // Immediately update local UI for better responsiveness
-                      const wpElement = document.querySelector(`[data-id="${waypoint.id}"]`);
-                      if (wpElement) {
-                        wpElement.style.opacity = '0.5';
-                        wpElement.style.height = wpElement.offsetHeight + 'px';
+                        const locationName = waypointName;
+                        const newLocation = { 
+                          name: locationName, 
+                          coords: [lon, lat]  // Use extracted values
+                        };
+                        
+                        // Add directly to internal state for immediate UI update
+                        // Generate a temporary ID for display purposes
+                        const tempId = `${locationName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+                        const tempLocation = {
+                          ...newLocation,
+                          id: tempId
+                        };
+                        
+                        // Update internal state immediately
+                        setInternalFavorites(prev => [...prev, tempLocation]);
+                        
+                        // Also call the parent handler
+                        if (onAddFavoriteLocation) {
+                          onAddFavoriteLocation(newLocation);
+                        }
+                        
+                        // Show success message
+                        const message = `Added ${locationName} to favorites`;
+                        // Create a toast-style notification instead of using the loading overlay
+                        const toast = document.createElement('div');
+                        toast.style.position = 'fixed';
+                        toast.style.bottom = '20px';
+                        toast.style.left = '50%';
+                        toast.style.transform = 'translateX(-50%)';
+                        toast.style.backgroundColor = 'rgba(0, 200, 83, 0.9)';
+                        toast.style.color = 'white';
+                        toast.style.padding = '10px 20px';
+                        toast.style.borderRadius = '5px';
+                        toast.style.zIndex = '1000';
+                        toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        
+                        // Remove after 1.5 seconds
                         setTimeout(() => {
-                          wpElement.style.height = '0';
-                          wpElement.style.margin = '0';
-                          wpElement.style.padding = '0';
-                          wpElement.style.overflow = 'hidden';
-                        }, 50);
+                          document.body.removeChild(toast);
+                        }, 1500);
                       }
-                      
-                      // Call the actual removal function
-                      onRemoveWaypoint(waypoint.id, index);
-                    }
-                  }}
-                >✖</div>
+                    }}
+                    style={{ 
+                      color: "#ff5e85", 
+                      fontSize: "16px",
+                      padding: "3px 6px",
+                      borderRadius: "4px",
+                      transition: "all 0.2s ease"
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(255,94,133,0.15)";
+                      e.currentTarget.style.transform = "scale(1.2)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >❤️</div>
+                  <div className="drag-handle">☰</div>
+                  <div 
+                    className="remove-stop" 
+                    onClick={() => {
+                      if (onRemoveWaypoint) {
+                        console.log(`LeftPanel: Removing waypoint at index ${index} with ID ${waypointId}`);
+                        
+                        // Immediately update local UI for better responsiveness
+                        const wpElement = document.querySelector(`[data-id="${waypointId}"]`);
+                        if (wpElement) {
+                          wpElement.style.opacity = '0.5';
+                          wpElement.style.height = wpElement.offsetHeight + 'px';
+                          setTimeout(() => {
+                            wpElement.style.height = '0';
+                            wpElement.style.margin = '0';
+                            wpElement.style.padding = '0';
+                            wpElement.style.overflow = 'hidden';
+                          }, 50);
+                        }
+                        
+                        // Call the actual removal function
+                        onRemoveWaypoint(waypointId, index);
+                      }
+                    }}
+                  >✖</div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         
         {/* Add Stop by Name Input */}
@@ -535,14 +547,21 @@ const LeftPanel = ({
               }}
             >
               <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Debug Info:</div>
-              {favoriteLocations.map((loc, index) => (
-                <div key={index} style={{ marginBottom: '5px', borderBottom: '1px dotted #333' }}>
-                  <div>Index: {index}</div>
-                  <div>ID: {loc.id || 'undefined'}</div>
-                  <div>Name: {loc.name || 'unnamed'}</div>
-                  <div>Coords: {loc.coords ? `[${loc.coords.join(', ')}]` : 'invalid'}</div>
-                </div>
-              ))}
+              {safeFavoriteLocations && safeFavoriteLocations.map((loc, index) => {
+                const id = loc && loc.id ? loc.id : 'undefined';
+                const name = loc && loc.name ? loc.name : 'unnamed';
+                const hasCoords = loc && loc.coords && Array.isArray(loc.coords);
+                const coordsString = hasCoords ? `[${loc.coords.join(', ')}]` : 'invalid';
+                
+                return (
+                  <div key={index} style={{ marginBottom: '5px', borderBottom: '1px dotted #333' }}>
+                    <div>Index: {index}</div>
+                    <div>ID: {id}</div>
+                    <div>Name: {name}</div>
+                    <div>Coords: {coordsString}</div>
+                  </div>
+                );
+              })}
               <button 
                 style={{
                   padding: '3px 8px',
@@ -696,9 +715,17 @@ const LeftPanel = ({
             </div>
           </div>
           <div style={{ fontSize: "0.85em" }}>
-            {favoriteLocations.map((location, index) => {
+            {safeFavoriteLocations.map((location, index) => {
               // Ensure each location has an ID (use index as fallback)
               const locationId = location.id || `favorite-${index}`;
+              const locationName = location.name || `Location ${index + 1}`;
+              // Ensure coordinates are valid or provide defaults
+              const coords = location.coords && Array.isArray(location.coords) && location.coords.length === 2 
+                ? location.coords 
+                : [0, 0];
+              const lat = coords[1];
+              const lon = coords[0];
+              const hasValidCoords = location.coords && Array.isArray(location.coords) && location.coords.length === 2;
               
               return (
                 <div
@@ -718,15 +745,15 @@ const LeftPanel = ({
                 >
                   <span
                     onClick={() => {
-                      if (onAddWaypoint && location.coords && location.coords.length === 2) {
+                      if (onAddWaypoint && hasValidCoords) {
                         // Pass location object format compatible with addWaypoint
                         onAddWaypoint({
-                          coordinates: location.coords,
-                          name: location.name
+                          coordinates: [lon, lat],
+                          name: locationName
                         });
                         
                         // Show a success message with a toast instead of overlay
-                        const message = `Added ${location.name} to route`;
+                        const message = `Added ${locationName} to route`;
                         const toast = document.createElement('div');
                         toast.style.position = 'fixed';
                         toast.style.bottom = '20px';
@@ -766,15 +793,15 @@ const LeftPanel = ({
                       overflow: "hidden",
                       textOverflow: "ellipsis"
                     }}>
-                      <strong style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{location.name}</strong>
-                      {location.coords && location.coords.length === 2 ? (
+                      <strong style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{locationName}</strong>
+                      {hasValidCoords ? (
                         <span style={{ 
                           fontSize: "11px", 
                           color: "var(--label-color)", 
                           marginLeft: "5px",
                           whiteSpace: "nowrap" 
                         }}>
-                          ({location.coords[1].toFixed(3)}, {location.coords[0].toFixed(3)})
+                          ({lat.toFixed(3)}, {lon.toFixed(3)})
                         </span>
                       ) : (
                         <span style={{ 
@@ -814,7 +841,7 @@ const LeftPanel = ({
                 </div>
               );
             })}
-            {favoriteLocations.length === 0 && (
+            {safeFavoriteLocations.length === 0 && (
               <div style={{ 
                 padding: "10px", 
                 textAlign: "center", 

@@ -22,6 +22,18 @@ class PassengerCalculator {
       return 0;
     }
 
+    // CRITICAL: Add default values for aircraft properties if they're missing
+    // This ensures calculations proceed even with incomplete data
+    if (!aircraft.emptyWeight) {
+      console.warn('PassengerCalculator: Aircraft missing emptyWeight, using default 12500 lbs');
+      aircraft.emptyWeight = 12500;
+    }
+    
+    if (!aircraft.maxTakeoffWeight) {
+      console.warn('PassengerCalculator: Aircraft missing maxTakeoffWeight, using default 17500 lbs');
+      aircraft.maxTakeoffWeight = 17500;
+    }
+
     // Ensure numeric inputs
     const fuelWeightNum = Number(fuelWeight) || 0;
     const passengerWeightNum = Number(passengerWeight) || 0;
@@ -132,26 +144,65 @@ class PassengerCalculator {
     // Process each stop card
     updatedCards.forEach((card, index) => {
       // Get fuel for this stop (either directly or from fuel components)
-      const fuelRequired = card.totalFuel || 
-        (card.fuelComponentsObject ? 
-          (card.fuelComponentsObject.tripFuel + 
-           card.fuelComponentsObject.contingencyFuel + 
-           card.fuelComponentsObject.taxiFuel + 
-           card.fuelComponentsObject.deckFuel + 
-           card.fuelComponentsObject.reserveFuel) : 0);
+      let fuelRequired;
+      
+      if (card.fuelComponentsObject) {
+        try {
+          // Calculate from fuelComponentsObject for consistency
+          // Ensure all values are valid numbers
+          const safeComponentValues = Object.entries(card.fuelComponentsObject).map(([key, value]) => {
+            return [key, typeof value === 'number' ? value : Number(value) || 0];
+          });
+          
+          // Create a map of safe values
+          const safeComponents = Object.fromEntries(safeComponentValues);
+          
+          // Sum the components
+          fuelRequired = Object.values(safeComponents).reduce((sum, value) => sum + (Number(value) || 0), 0);
+          
+          // If there's a mismatch between calculated sum and totalFuel, log and fix it
+          if (Math.abs(fuelRequired - card.totalFuel) > 1) { // Allow 1 lb difference for rounding
+            console.warn(`PassengerCalculator: Found fuel mismatch in card ${index}`, {
+              cardTotalFuel: card.totalFuel,
+              calculatedSum: fuelRequired,
+              difference: fuelRequired - card.totalFuel,
+              components: { ...safeComponents }
+            });
+            
+            // Update totalFuel to match the calculated sum
+            card.totalFuel = fuelRequired;
+          }
+        } catch (error) {
+          console.error(`PassengerCalculator: Error calculating fuel from components for card ${index}`, error);
+          // Fallback to using totalFuel directly
+          fuelRequired = typeof card.totalFuel === 'number' ? card.totalFuel : Number(card.totalFuel) || 0;
+        }
+      } else {
+        // If no components object, use totalFuel directly
+        fuelRequired = typeof card.totalFuel === 'number' ? card.totalFuel : Number(card.totalFuel) || 0;
+      }
       
       // Calculate max passengers
-      const maxPassengers = this.calculateMaxPassengers(
-        aircraft,
-        fuelRequired,
-        passengerWeight
-      );
-      
-      // Update the card with passenger info
-      card.maxPassengers = maxPassengers;
-      card.maxPassengersDisplay = maxPassengers.toString();
-      
-      console.log(`PassengerCalculator: Stop ${index + 1} (${card.stopName || 'Unknown'}) can carry ${maxPassengers} passengers`);
+      try {
+        const maxPassengers = this.calculateMaxPassengers(
+          aircraft,
+          fuelRequired,
+          passengerWeight
+        );
+        
+        // Update the card with passenger info - with extra safety checks
+        card.maxPassengers = isNaN(maxPassengers) ? 0 : maxPassengers;
+        card.maxPassengersDisplay = card.isDestination ? "Final Stop" : (isNaN(maxPassengers) ? "0" : maxPassengers.toString());
+        card.maxPassengersWeight = isNaN(maxPassengers) ? 0 : (maxPassengers * passengerWeight);
+        
+        console.log(`PassengerCalculator: Stop ${index + 1} (${card.stopName || 'Unknown'}) can carry ${maxPassengers} passengers with ${fuelRequired} lbs fuel`);
+      } catch (error) {
+        console.error(`PassengerCalculator: Error calculating passengers for card ${index}`, error);
+        // Set safe defaults
+        card.maxPassengers = 0;
+        card.maxPassengersDisplay = card.isDestination ? "Final Stop" : "0";
+        card.maxPassengersWeight = 0;
+      }
     });
     
     return updatedCards;
