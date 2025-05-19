@@ -14,15 +14,24 @@ import PassengerCalculator from '../passengers/PassengerCalculator';
 /**
  * Calculate stop cards data for a route
  * Shows the fuel required to continue from each waypoint
+ * This function now uses routeStats data when available for consistency
  * 
  * @param {Array} waypoints - Waypoints array
- * @param {Object} routeStats - Route statistics
+ * @param {Object} routeStats - Route statistics from RouteCalculator
  * @param {Object} selectedAircraft - Selected aircraft with performance data
  * @param {Object} weather - Weather data (windSpeed, windDirection)
  * @param {Object} options - Optional calculation parameters
  * @returns {Array} Array of stop card objects
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
+  console.log('⭐ StopCardCalculator: Starting with routeStats?', !!routeStats);
+  
+  // First, verify we have the necessary input data
+  if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
+    console.error('StopCardCalculator: Missing required input data');
+    return [];
+  }
+  
   // IMPROVED FIX: Filter out navigation waypoints ONLY for stop cards.
   // This doesn't affect route distance/time calculations.
   const landingStopsOnly = waypoints.filter(wp => {
@@ -45,6 +54,19 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     if (waypoints.length > 1) {
       landingStopsOnly.push(waypoints[waypoints.length - 1]);
     }
+  }
+  
+  // Log routeStats data if available
+  if (routeStats) {
+    console.log('⭐ StopCardCalculator using routeStats:', {
+      totalDistance: routeStats.totalDistance,
+      timeHours: routeStats.timeHours,
+      estimatedTime: routeStats.estimatedTime,
+      tripFuel: routeStats.tripFuel,
+      fuelRequired: routeStats.fuelRequired,
+      hasLegs: routeStats.legs ? routeStats.legs.length : 0,
+      windAdjusted: routeStats.windAdjusted || false
+    });
   }
   
   // IMPORTANT: Use only landing stops for stop cards, but keep route stats using all waypoints
@@ -88,13 +110,38 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     deckFuelFlowValue
   });
 
-  // Validate input data
+  // Validate inputs
   if (!stopsToProcess || stopsToProcess.length < 2 || !selectedAircraft) {
     console.log('StopCardCalculator: Missing required data', {
       hasWaypoints: stopsToProcess ? stopsToProcess.length : 0,
       hasAircraft: !!selectedAircraft
     });
     return [];
+  }
+  
+  // CRITICAL: Ensure aircraft has all required properties
+  if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
+    console.error('StopCardCalculator: Aircraft missing critical cruiseSpeed or fuelBurn property');
+    return [];
+  }
+  
+  // CRITICAL: Check for weight properties needed for passenger calculations
+  // Log a warning but continue with calculation
+  if (!selectedAircraft.emptyWeight || !selectedAircraft.maxTakeoffWeight) {
+    console.warn('StopCardCalculator: Aircraft missing weight properties (emptyWeight or maxTakeoffWeight)');
+    console.warn('Aircraft data:', selectedAircraft);
+    
+    // Add default values to allow calculation to proceed
+    // This is safer than returning nothing
+    if (!selectedAircraft.emptyWeight) {
+      console.warn('StopCardCalculator: Adding default emptyWeight of 12500 lbs');
+      selectedAircraft.emptyWeight = 12500;
+    }
+    
+    if (!selectedAircraft.maxTakeoffWeight) {
+      console.warn('StopCardCalculator: Adding default maxTakeoffWeight of 17500 lbs');
+      selectedAircraft.maxTakeoffWeight = 17500;
+    }
   }
   
   // Validate calculation parameters - Log warnings but don't fail
@@ -134,146 +181,205 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   let totalDistance = 0;
   let totalTripFuel = 0;
   const legDetails = [];
-
-  // First, pre-calculate all leg details and total values for LANDING STOPS ONLY
-  // but include all waypoints between landing stops
-  for (let i = 0; i < stopsToProcess.length - 1; i++) {
-    const fromWaypoint = stopsToProcess[i];
-    const toWaypoint = stopsToProcess[i + 1];
+  
+  // IMPORTANT: First check if we can use RouteCalculator's results directly
+  // This helps ensure a single source of truth for calculations
+  let useRouteStatsDirectly = false;
+  
+  if (routeStats && routeStats.legs && routeStats.legs.length > 0) {
+    console.log('⭐ StopCardCalculator: Using route stats legs data directly:', routeStats.legs.length);
+    useRouteStatsDirectly = true;
     
-    // Find the indices of these waypoints in the full waypoints array
-    const fromIndex = waypoints.findIndex(wp => wp.id === fromWaypoint.id);
-    const toIndex = waypoints.findIndex(wp => wp.id === toWaypoint.id);
+    // Use routeStats totalDistance and tripFuel directly
+    totalDistance = parseFloat(routeStats.totalDistance) || 0;
+    totalTripFuel = routeStats.tripFuel || 0;
     
-    // Get all waypoints between these two landing stops (inclusive)
-    const legWaypoints = [];
-    if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
-      // Extract all waypoints in this leg
-      for (let j = fromIndex; j <= toIndex; j++) {
-        legWaypoints.push(waypoints[j]);
+    console.log('⭐ StopCardCalculator: Using route stats values:', {
+      totalDistance, 
+      totalTripFuel,
+      timeHours: routeStats.timeHours
+    });
+    
+    // Map route stats legs to our internal format
+    for (let i = 0; i < routeStats.legs.length; i++) {
+      const leg = routeStats.legs[i];
+      
+      // Find waypoints corresponding to this leg
+      const fromIndex = i;
+      const toIndex = i + 1;
+      
+      // Ensure we have valid waypoints
+      if (fromIndex >= stopsToProcess.length || toIndex >= stopsToProcess.length) {
+        console.warn(`StopCardCalculator: Leg ${i} indices (${fromIndex}, ${toIndex}) out of range for stopsToProcess (${stopsToProcess.length})`);
+        continue;
       }
-    } else {
-      // Fallback if we can't find the waypoints in the array
-      legWaypoints.push(fromWaypoint, toWaypoint);
+      
+      const fromWaypoint = stopsToProcess[fromIndex];
+      const toWaypoint = stopsToProcess[toIndex];
+      
+      // Map the leg data
+      legDetails.push({
+        fromWaypoint,
+        toWaypoint,
+        distance: parseFloat(leg.distance),
+        timeHours: leg.time || (leg.distance / aircraft.cruiseSpeed),
+        fuel: leg.fuel || Math.round((leg.distance / aircraft.cruiseSpeed) * aircraft.fuelBurn),
+        groundSpeed: leg.groundSpeed || aircraft.cruiseSpeed,
+        headwind: leg.headwind || 0
+      });
+      
+      console.log(`⭐ StopCardCalculator: Mapped leg ${i} from route stats:`, {
+        distance: legDetails[legDetails.length-1].distance.toFixed(1),
+        time: legDetails[legDetails.length-1].timeHours.toFixed(2),
+        fuel: legDetails[legDetails.length-1].fuel
+      });
     }
+  }
+  
+  // If not using route stats directly, calculate leg details ourselves
+  if (!useRouteStatsDirectly) {
+    console.log('⭐ StopCardCalculator: Calculating leg details directly (not using route stats)');
     
-    console.log(`StopCardCalculator: Processing leg ${i+1} with ${legWaypoints.length} waypoints (including navigation waypoints)`);
-    
-    // Calculate the total leg distance by summing all segments
-    let legDistance = 0;
-    let legTimeHours = 0;
-    let legFuel = 0;
-    let totalLegGroundSpeed = 0;
-    let totalLegHeadwind = 0;
-    let segmentCount = 0;
-    
-    // Process each segment in the leg
-    for (let j = 0; j < legWaypoints.length - 1; j++) {
-      const segmentFrom = legWaypoints[j];
-      const segmentTo = legWaypoints[j + 1];
+    // First, pre-calculate all leg details and total values for LANDING STOPS ONLY
+    // but include all waypoints between landing stops
+    for (let i = 0; i < stopsToProcess.length - 1; i++) {
+      const fromWaypoint = stopsToProcess[i];
+      const toWaypoint = stopsToProcess[i + 1];
       
-      // Check for coordinates
-      const fromHasCoords = (segmentFrom.lat && segmentFrom.lon) ||
-                          (segmentFrom.coords && segmentFrom.coords.length === 2);
-      const toHasCoords = (segmentTo.lat && segmentTo.lon) ||
-                        (segmentTo.coords && segmentTo.coords.length === 2);
+      // Find the indices of these waypoints in the full waypoints array
+      const fromIndex = waypoints.findIndex(wp => wp.id === fromWaypoint.id);
+      const toIndex = waypoints.findIndex(wp => wp.id === toWaypoint.id);
       
-      if (!fromHasCoords || !toHasCoords) {
-        console.error(`StopCardCalculator: Missing coordinates for segment in leg ${i+1}`);
-        continue;
+      // Get all waypoints between these two landing stops (inclusive)
+      const legWaypoints = [];
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex < toIndex) {
+        // Extract all waypoints in this leg
+        for (let j = fromIndex; j <= toIndex; j++) {
+          legWaypoints.push(waypoints[j]);
+        }
+      } else {
+        // Fallback if we can't find the waypoints in the array
+        legWaypoints.push(fromWaypoint, toWaypoint);
       }
       
-      // Get segment coordinates
-      const fromCoords = {
-        lat: segmentFrom.lat || segmentFrom.coords[1],
-        lon: segmentFrom.lon || segmentFrom.coords[0]
-      };
+      console.log(`StopCardCalculator: Processing leg ${i+1} with ${legWaypoints.length} waypoints (including navigation waypoints)`);
       
-      const toCoords = {
-        lat: segmentTo.lat || segmentTo.coords[1],
-        lon: segmentTo.lon || segmentTo.coords[0]
-      };
+      // Calculate the total leg distance by summing all segments
+      let legDistance = 0;
+      let legTimeHours = 0;
+      let legFuel = 0;
+      let totalLegGroundSpeed = 0;
+      let totalLegHeadwind = 0;
+      let segmentCount = 0;
       
-      // Calculate segment distance
-      let segmentDistance = 0;
-      try {
-        // Calculate using turf
-        const from = window.turf.point([fromCoords.lon, fromCoords.lat]);
-        const to = window.turf.point([toCoords.lon, toCoords.lat]);
-        segmentDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
-      } catch (error) {
-        console.error(`StopCardCalculator: Error calculating segment distance in leg ${i+1}:`, error);
-        continue;
-      }
-      
-      // Calculate segment time and fuel with wind adjustments
-      let segmentTimeHours = 0;
-      let segmentFuel = 0;
-      let segmentGroundSpeed = aircraft.cruiseSpeed;
-      let segmentHeadwind = 0;
-      
-      // Calculate with wind if available
-      if (window.WindCalculations) {
+      // Process each segment in the leg
+      for (let j = 0; j < legWaypoints.length - 1; j++) {
+        const segmentFrom = legWaypoints[j];
+        const segmentTo = legWaypoints[j + 1];
+        
+        // Check for coordinates
+        const fromHasCoords = (segmentFrom.lat && segmentFrom.lon) ||
+                            (segmentFrom.coords && segmentFrom.coords.length === 2);
+        const toHasCoords = (segmentTo.lat && segmentTo.lon) ||
+                          (segmentTo.coords && segmentTo.coords.length === 2);
+        
+        if (!fromHasCoords || !toHasCoords) {
+          console.error(`StopCardCalculator: Missing coordinates for segment in leg ${i+1}`);
+          continue;
+        }
+        
+        // Get segment coordinates
+        const fromCoords = {
+          lat: segmentFrom.lat || segmentFrom.coords[1],
+          lon: segmentFrom.lon || segmentFrom.coords[0]
+        };
+        
+        const toCoords = {
+          lat: segmentTo.lat || segmentTo.coords[1],
+          lon: segmentTo.lon || segmentTo.coords[0]
+        };
+        
+        // Calculate segment distance
+        let segmentDistance = 0;
         try {
-          const segmentDetails = window.WindCalculations.calculateLegWithWind(
-            fromCoords,
-            toCoords,
-            segmentDistance,
-            aircraft,
-            weather
-          );
-          
-          segmentTimeHours = segmentDetails.time;
-          segmentFuel = Math.round(segmentDetails.fuel);
-          segmentGroundSpeed = Math.round(segmentDetails.groundSpeed);
-          segmentHeadwind = Math.round(segmentDetails.headwindComponent);
-          
-          console.log(`StopCardCalculator: Segment ${j+1} in leg ${i+1}: distance=${segmentDistance.toFixed(1)}nm, time=${segmentTimeHours.toFixed(2)}h, fuel=${segmentFuel}lbs`);
+          // Calculate using turf
+          const from = window.turf.point([fromCoords.lon, fromCoords.lat]);
+          const to = window.turf.point([toCoords.lon, toCoords.lat]);
+          segmentDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
         } catch (error) {
-          // Fallback to basic calculation
-          console.error(`StopCardCalculator: Error calculating wind adjustments for segment in leg ${i+1}:`, error);
+          console.error(`StopCardCalculator: Error calculating segment distance in leg ${i+1}:`, error);
+          continue;
+        }
+        
+        // Calculate segment time and fuel with wind adjustments
+        let segmentTimeHours = 0;
+        let segmentFuel = 0;
+        let segmentGroundSpeed = aircraft.cruiseSpeed;
+        let segmentHeadwind = 0;
+        
+        // Calculate with wind if available
+        if (window.WindCalculations) {
+          try {
+            const segmentDetails = window.WindCalculations.calculateLegWithWind(
+              fromCoords,
+              toCoords,
+              segmentDistance,
+              aircraft,
+              weather
+            );
+            
+            segmentTimeHours = segmentDetails.time;
+            segmentFuel = Math.round(segmentDetails.fuel);
+            segmentGroundSpeed = Math.round(segmentDetails.groundSpeed);
+            segmentHeadwind = Math.round(segmentDetails.headwindComponent);
+            
+            console.log(`StopCardCalculator: Segment ${j+1} in leg ${i+1}: distance=${segmentDistance.toFixed(1)}nm, time=${segmentTimeHours.toFixed(2)}h, fuel=${segmentFuel}lbs`);
+          } catch (error) {
+            // Fallback to basic calculation
+            console.error(`StopCardCalculator: Error calculating wind adjustments for segment in leg ${i+1}:`, error);
+            segmentTimeHours = segmentDistance / aircraft.cruiseSpeed;
+            segmentFuel = Math.round(segmentTimeHours * aircraft.fuelBurn);
+            segmentGroundSpeed = aircraft.cruiseSpeed;
+            segmentHeadwind = 0;
+          }
+        } else {
+          // Basic calculation without wind
           segmentTimeHours = segmentDistance / aircraft.cruiseSpeed;
           segmentFuel = Math.round(segmentTimeHours * aircraft.fuelBurn);
           segmentGroundSpeed = aircraft.cruiseSpeed;
           segmentHeadwind = 0;
         }
-      } else {
-        // Basic calculation without wind
-        segmentTimeHours = segmentDistance / aircraft.cruiseSpeed;
-        segmentFuel = Math.round(segmentTimeHours * aircraft.fuelBurn);
-        segmentGroundSpeed = aircraft.cruiseSpeed;
-        segmentHeadwind = 0;
+        
+        // Add segment values to leg totals
+        legDistance += segmentDistance;
+        legTimeHours += segmentTimeHours;
+        legFuel += segmentFuel;
+        totalLegGroundSpeed += segmentGroundSpeed;
+        totalLegHeadwind += segmentHeadwind;
+        segmentCount++;
       }
       
-      // Add segment values to leg totals
-      legDistance += segmentDistance;
-      legTimeHours += segmentTimeHours;
-      legFuel += segmentFuel;
-      totalLegGroundSpeed += segmentGroundSpeed;
-      totalLegHeadwind += segmentHeadwind;
-      segmentCount++;
+      // Calculate average ground speed and headwind for the leg
+      const legGroundSpeed = segmentCount > 0 ? Math.round(totalLegGroundSpeed / segmentCount) : aircraft.cruiseSpeed;
+      const headwindComponent = segmentCount > 0 ? Math.round(totalLegHeadwind / segmentCount) : 0;
+      
+      console.log(`StopCardCalculator: Leg ${i+1} totals: distance=${legDistance.toFixed(1)}nm, time=${legTimeHours.toFixed(2)}h, fuel=${legFuel}lbs`);
+      
+      // Update route totals
+      totalDistance += legDistance;
+      totalTripFuel += legFuel;
+      
+      // Store leg details for later use
+      legDetails.push({
+        fromWaypoint,
+        toWaypoint,
+        distance: legDistance,
+        timeHours: legTimeHours,
+        fuel: legFuel,
+        groundSpeed: legGroundSpeed,
+        headwind: headwindComponent
+      });
     }
-    
-    // Calculate average ground speed and headwind for the leg
-    const legGroundSpeed = segmentCount > 0 ? Math.round(totalLegGroundSpeed / segmentCount) : aircraft.cruiseSpeed;
-    const headwindComponent = segmentCount > 0 ? Math.round(totalLegHeadwind / segmentCount) : 0;
-    
-    console.log(`StopCardCalculator: Leg ${i+1} totals: distance=${legDistance.toFixed(1)}nm, time=${legTimeHours.toFixed(2)}h, fuel=${legFuel}lbs`);
-    
-    // Update route totals
-    totalDistance += legDistance;
-    totalTripFuel += legFuel;
-    
-    // Store leg details for later use
-    legDetails.push({
-      fromWaypoint,
-      toWaypoint,
-      distance: legDistance,
-      timeHours: legTimeHours,
-      fuel: legFuel,
-      groundSpeed: legGroundSpeed,
-      headwind: headwindComponent
-    });
   }
 
   // Calculate auxiliary fuel values
@@ -374,7 +480,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       deckFuel: deckFuelValue,
       reserveFuel: reserveFuelValue,
       totalFuel: departureFuelNeeded,
-      componentText: departureFuelComponentsText
+      componentText: departureFuelComponentsText,
+      sum: totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue
     });
     
     const departureCard = {
@@ -465,7 +572,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       fuelComponents = {
         reserveFuel: reserveFuelValue,
         contingencyFuel: remainingContingencyFuel,
-        extraFuel: 0 // Can be used for alternate or holding fuel
+        extraFuel: 0, // Can be used for alternate or holding fuel
+        // Add remaining fuel components with zero values for consistency
+        tripFuel: 0,
+        taxiFuel: 0,
+        deckFuel: 0
       };
 
       // Get the original full contingency amount (from departure)
@@ -480,13 +591,17 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       const potentialLandingFuel = reserveFuelValue + fullContingencyFuel;
       fuelComponentsText = `Reserve:${reserveFuelValue} Extra:0 FullCont:${remainingContingencyFuel} (${reserveFuelValue}+${fullContingencyFuel}=${potentialLandingFuel})`;
       
+      // Recalculate fuelNeeded as the sum of all components to ensure consistency
+      fuelNeeded = Object.values(fuelComponents).reduce((sum, value) => sum + value, 0);
+      
       // Log the destination fuel components
       console.log('🔚 DESTINATION CARD FUEL COMPONENTS:', {
         reserveFuel: reserveFuelValue,
         fullContingencyFuel,
         remainingContingencyFuel,
         potentialLandingFuel,
-        componentText: fuelComponentsText
+        componentText: fuelComponentsText,
+        finalFuelNeeded: fuelNeeded
       });
     } else {
       // At intermediate stops, you need fuel for remaining legs, plus reserve
@@ -511,7 +626,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         remainingDeckFuel,
         reserveFuel: reserveFuelValue,
         fuelNeeded,
-        componentText: fuelComponentsText
+        componentText: fuelComponentsText,
+        sum: remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue
       });
     }
 
@@ -535,35 +651,184 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const isDeparture = false; // We already added the departure card
     const isDestination = isFinalDestination;
 
-    // Create the card data
-    const cardData = {
-      index: isFinalDestination ? 'F' : (i + 1),
-      id: stopId,
-      stopName: toWaypoint.name,
-      legDistance: legDetail.distance.toFixed(1),
-      totalDistance: cumulativeDistance.toFixed(1),
-      legTime: Number(legDetail.timeHours),
-      totalTime: Number(cumulativeTime),
-      legFuel: Number(legDetail.fuel),
-      // The fuel shown is what's needed to continue from this point
-      totalFuel: Number(fuelNeeded),
-      maxPassengers: maxPassengersValue,
-      maxPassengersDisplay: displayMaxPassengers,
-      maxPassengersWeight: maxPassengersWeight,
-      groundSpeed: Number(legDetail.groundSpeed),
-      headwind: Number(legDetail.headwind),
-      deckTime: Number(remainingDeckTimeHours * 60), // Convert back to minutes for display
-      deckFuel: Number(remainingDeckFuel),
-      fuelComponents: fuelComponentsText,
-      fuelComponentsObject: fuelComponents,
-      isDeparture: isDeparture,
-      isDestination: isDestination
-    };
+    // Initialize cardData before conditional assignment
+    let cardData;
+    
+    if (isFinalDestination) {
+      // CRITICAL FIX: Special handling for destination cards
+      // Always include all fuel component fields, even if they're zero
+      cardData = {
+        index: isFinalDestination ? 'F' : (i + 1),
+        id: stopId,
+        stopName: toWaypoint.name,
+        legDistance: legDetail.distance.toFixed(1),
+        totalDistance: cumulativeDistance.toFixed(1),
+        legTime: Number(legDetail.timeHours),
+        totalTime: Number(cumulativeTime),
+        legFuel: Number(legDetail.fuel),
+        // The fuel shown is what's needed to continue from this point
+        totalFuel: Number(fuelNeeded),
+        maxPassengers: maxPassengersValue,
+        maxPassengersDisplay: displayMaxPassengers,
+        maxPassengersWeight: maxPassengersWeight,
+        groundSpeed: Number(legDetail.groundSpeed),
+        headwind: Number(legDetail.headwind),
+        deckTime: Number(remainingDeckTimeHours * 60), // Convert back to minutes for display
+        deckFuel: Number(remainingDeckFuel),
+        fuelComponents: fuelComponentsText,
+        // For destination cards, ensure all component fields exist
+        fuelComponentsObject: {
+          reserveFuel: reserveFuelValue,
+          contingencyFuel: remainingContingencyFuel,
+          extraFuel: 0,
+          // Always include these with zero values for consistency
+          tripFuel: 0,
+          taxiFuel: 0,
+          deckFuel: 0
+        },
+        isDeparture: isDeparture,
+        isDestination: isDestination
+      };
+    } else {
+      // Normal case for all non-destination cards
+      cardData = {
+        index: isFinalDestination ? 'F' : (i + 1),
+        id: stopId,
+        stopName: toWaypoint.name,
+        legDistance: legDetail.distance.toFixed(1),
+        totalDistance: cumulativeDistance.toFixed(1),
+        legTime: Number(legDetail.timeHours),
+        totalTime: Number(cumulativeTime),
+        legFuel: Number(legDetail.fuel),
+        // The fuel shown is what's needed to continue from this point
+        totalFuel: Number(fuelNeeded),
+        maxPassengers: maxPassengersValue,
+        maxPassengersDisplay: displayMaxPassengers,
+        maxPassengersWeight: maxPassengersWeight,
+        groundSpeed: Number(legDetail.groundSpeed),
+        headwind: Number(legDetail.headwind),
+        deckTime: Number(remainingDeckTimeHours * 60), // Convert back to minutes for display
+        deckFuel: Number(remainingDeckFuel),
+        fuelComponents: fuelComponentsText,
+        fuelComponentsObject: fuelComponents,
+        isDeparture: isDeparture,
+        isDestination: isDestination
+      };
+    }
 
     cards.push(cardData);
   }
 
-  return cards;
+  // Double-check destination card for correctness
+  const destinationCard = cards.find(card => card.isDestination);
+  if (destinationCard) {
+    console.log('🔍 FINAL CHECK - DESTINATION CARD:', {
+      totalFuel: destinationCard.totalFuel,
+      componentSum: Object.values(destinationCard.fuelComponentsObject).reduce((sum, val) => sum + (Number(val) || 0), 0),
+      components: destinationCard.fuelComponentsObject
+    });
+    
+    // Fix any discrepancy between totalFuel and component sum for destination card
+    const componentSum = Object.values(destinationCard.fuelComponentsObject).reduce((sum, val) => sum + (Number(val) || 0), 0);
+    if (Math.abs(destinationCard.totalFuel - componentSum) > 1) {
+      console.log(`⚠️ Fixing destination card totalFuel mismatch (${destinationCard.totalFuel} vs ${componentSum})`);
+      destinationCard.totalFuel = componentSum;
+    }
+  }
+
+    // Validate fuel components on each card to prevent crashes
+    const finalCards = cards.map(card => {
+      // Ensure all cards have a fuelComponentsObject with valid numerical values
+      if (!card.fuelComponentsObject) {
+        // Create appropriate default fuelComponentsObject based on card type
+        if (card.isDestination) {
+          card.fuelComponentsObject = {
+            reserveFuel: reserveFuelValue,
+            contingencyFuel: 0,
+            extraFuel: 0,
+            tripFuel: 0,
+            taxiFuel: 0,
+            deckFuel: 0
+          };
+        } else if (card.isDeparture) {
+          card.fuelComponentsObject = {
+            tripFuel: totalTripFuel,
+            contingencyFuel: contingencyFuelValue,
+            taxiFuel: taxiFuelValue,
+            deckFuel: deckFuelValue,
+            reserveFuel: reserveFuelValue
+          };
+        } else {
+          // Default for intermediate stops
+          card.fuelComponentsObject = {
+            tripFuel: 0,
+            contingencyFuel: 0,
+            taxiFuel: 0,
+            deckFuel: 0,
+            reserveFuel: 0
+          };
+        }
+      } else {
+        // Ensure all standard component fields exist with valid numeric values
+        const standardComponents = ['tripFuel', 'contingencyFuel', 'taxiFuel', 'deckFuel', 'reserveFuel'];
+        standardComponents.forEach(component => {
+          if (card.fuelComponentsObject[component] === undefined) {
+            card.fuelComponentsObject[component] = 0;
+          } else {
+            card.fuelComponentsObject[component] = Number(card.fuelComponentsObject[component]) || 0;
+          }
+        });
+        
+        // Special handling for destination card's extraFuel
+        if (card.isDestination && card.fuelComponentsObject.extraFuel === undefined) {
+          card.fuelComponentsObject.extraFuel = 0;
+        } else if (card.isDestination) {
+          card.fuelComponentsObject.extraFuel = Number(card.fuelComponentsObject.extraFuel) || 0;
+        }
+      }
+      
+      // Ensure totalFuel is a valid number
+      if (isNaN(card.totalFuel)) {
+        // Recompute from components
+        card.totalFuel = Object.values(card.fuelComponentsObject).reduce((sum, val) => sum + (Number(val) || 0), 0);
+      } else {
+        card.totalFuel = Number(card.totalFuel) || 0;
+      }
+      
+      // Ensure other numerical fields are valid
+      card.deckFuel = Number(card.deckFuel) || 0;
+      card.legFuel = Number(card.legFuel) || 0;
+      
+      return card;
+    });
+  
+    // Verify fuel consistency in all cards before returning them
+    console.log('StopCardCalculator: Verifying fuel consistency in all cards');
+    for (let i = 0; i < finalCards.length; i++) {
+      const card = finalCards[i];
+      if (card.fuelComponentsObject) {
+        // Calculate the sum of all fuel components
+        const componentSum = Object.values(card.fuelComponentsObject).reduce((sum, value) => sum + value, 0);
+        
+        // Check if there's a significant discrepancy
+        const difference = Math.abs(componentSum - card.totalFuel);
+        
+        if (difference > 1) { // Allow 1 lb for rounding errors
+          console.warn(`⚠️ Card ${i} (${card.isDeparture ? 'Departure' : card.isDestination ? 'Destination' : 'Intermediate'}) fuel mismatch detected:`, {
+            totalFuel: card.totalFuel,
+            componentSum,
+            difference: componentSum - card.totalFuel,
+            components: { ...card.fuelComponentsObject }
+          });
+          
+          // Correct the total fuel to match components
+          card.totalFuel = componentSum;
+          console.log(`✅ Card ${i} totalFuel corrected to ${componentSum}`);
+        }
+      }
+    }
+
+    return finalCards;
 };
 
 export default {

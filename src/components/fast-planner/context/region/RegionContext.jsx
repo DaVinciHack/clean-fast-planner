@@ -33,6 +33,10 @@ export const RegionProvider = ({
   const [currentRegion, setCurrentRegion] = useState(null);
   const [regionLoading, setRegionLoading] = useState(false);
   const [regionChangeInProgress, setRegionChangeInProgress] = useState(false);
+  
+  // Add a flag to track if initial region setup is complete
+  const initialRegionSetupDone = useRef(false);
+  
   useEffect(() => { // Effect to keep window.isRegionLoading in sync
     window.isRegionLoading = regionLoading;
   }, [regionLoading]);
@@ -261,6 +265,11 @@ export const RegionProvider = ({
     if (currentRegion) {
       return;
     }
+    
+    // Skip if we're done with initial setup and this is a subsequent region change
+    if (initialRegionSetupDone.current) {
+      return;
+    }
 
     console.log('RegionContext: Initializing default region');
     
@@ -274,6 +283,9 @@ export const RegionProvider = ({
         console.log(`RegionContext: Found saved region: ${savedRegionId}`);
       }
     }
+    
+    // Mark initialization as done to prevent this effect from running again on subsequent region changes
+    initialRegionSetupDone.current = true;
     
     // First set the Gulf of Mexico as the initial region
     const gulfRegion = regions.find(r => r.id === 'gulf-of-mexico');
@@ -612,6 +624,9 @@ export const RegionProvider = ({
       return;
     }
     
+    // DIAGNOSTIC: Add state logging
+    console.log(`%c REGION DIAGNOSTIC: Current region is ${currentRegion?.name || 'null'}, changing to ${regionObject.name}`, 'background: #ffcc00; color: black; font-weight: bold');
+    
     // Capture the current map state before making any changes
     let fromRegion = currentRegion;
     let initialCenter = null;
@@ -639,43 +654,50 @@ export const RegionProvider = ({
     window.regionState = window.regionState || {};
     window.regionState.isChangingRegion = true;
     
-    // Set the current region first - this is essential
+    // CRITICAL: Set a global diagnostic flag to trace region changes
+    window.REGION_CHANGE_IN_PROGRESS = true;
+    window.REGION_CHANGE_FROM = currentRegion?.name || 'null';
+    window.REGION_CHANGE_TO = regionObject.name;
+    window.REGION_CHANGE_TIME = new Date().toISOString();
+    
+    // Since we've already set initialRegionSetupDone to true,
+    // we can safely set the current region and it won't trigger the Gulf of Mexico initialization
     setCurrentRegion(regionObject);
     
     // If the map is ready, directly fly to the region as well
     if (mapReady) {
-      // Add a slight delay to allow state to update
-      setTimeout(() => {
-        // If we managed to capture the current position, fly from there
-        // This prevents the map from resetting to Gulf of Mexico first
-        try {
-          const map = mapManagerRef?.current?.getMap();
-          if (map && typeof map.fitBounds === 'function' && initialCenter) {
-            console.log(`RegionContext: Flying directly from current position to ${regionObject.name}`);
-            // Skip any intermediate positions and go directly to target
-            map.fitBounds(regionObject.bounds, { 
-              padding: 50, 
-              maxZoom: regionObject.zoom || 6,
-              animate: true,
-              duration: 3000,
-              essential: true
-            });
-          } else {
-            // Fall back to directFlyToRegion
-            directFlyToRegion(regionObject);
-          }
-        } catch (error) {
-          console.error(`RegionContext: Error flying to region: ${error.message}`);
+      // Immediately fly to the region instead of waiting - reduces chance of flicker
+      try {
+        const map = mapManagerRef?.current?.getMap();
+        if (map && typeof map.fitBounds === 'function' && initialCenter) {
+          console.log(`%c REGION DIAGNOSTIC: Flying directly to ${regionObject.name} bounds`, 'background: #ffcc00; color: black;');
+          // Skip any intermediate positions and go directly to target
+          map.fitBounds(regionObject.bounds, { 
+            padding: 50, 
+            maxZoom: regionObject.zoom || 6,
+            animate: true,
+            duration: 3000,
+            essential: true
+          });
+        } else {
+          // Fall back to directFlyToRegion
+          console.log(`%c REGION DIAGNOSTIC: Using directFlyToRegion fallback`, 'background: #ffcc00; color: black;');
           directFlyToRegion(regionObject);
         }
-      }, 100);
+      } catch (error) {
+        console.error(`RegionContext: Error flying to region: ${error.message}`);
+        directFlyToRegion(regionObject);
+      }
     } else {
       // If map isn't ready, set as pending region
+      console.log(`%c REGION DIAGNOSTIC: Map not ready, storing pending region: ${regionObject.name}`, 'background: #ffcc00; color: black;');
       pendingRegionChangeRef.current = regionObject;
     }
     
     // Schedule cleanup and reset in a separate microtask to avoid blocking
     setTimeout(() => {
+      console.log(`%c REGION DIAGNOSTIC: Starting cleanup after region change`, 'background: #ffcc00; color: black;');
+      
       // Try to clear waypoints and route data
       if (typeof waypointManagerRef !== 'undefined' && waypointManagerRef && waypointManagerRef.current) {
         try {
@@ -704,8 +726,10 @@ export const RegionProvider = ({
       
       // Schedule reset of state flags after a delay
       setTimeout(() => {
+        console.log(`%c REGION DIAGNOSTIC: Final cleanup - reset flags`, 'background: #ffcc00; color: black;');
         setRegionChangeInProgress(false);
         window.regionState.isChangingRegion = false;
+        window.REGION_CHANGE_IN_PROGRESS = false;
         
         // Re-initialize map interaction handler after region is fully loaded
         if (typeof mapInteractionHandlerRef !== 'undefined' && mapInteractionHandlerRef && 

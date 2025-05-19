@@ -79,67 +79,25 @@ class RegionManager {
       return null;
     }
     
-    console.log(`RegionManager: Setting region to ${regionId}`, region);
+    console.log(`RegionManager: Setting region to ${regionId} (DELEGATING COMPLETELY TO REGIONCONTEXT)`);
+    
+    // Only store the region and update the flags - no map operations!
+    // This is critical to avoid duplicate/competing region change operations
+    this.currentRegion = region;
     
     // Clear any static data flags to ensure we load fresh data for the new region
     window.staticDataLoaded = false;
     window.platformsLoaded = false;
     window.aircraftLoaded = false;
-    console.log('Cleared data flags for new region');
     
-    // Store the current region
-    this.currentRegion = region;
+    // Immediately trigger the callback with the region object - don't use onMapLoaded
+    // This prevents the delayed onMapLoaded callback which causes the flickering
+    this.triggerCallback('onRegionChanged', region);
     
-    // Get the map instance
-    const map = this.mapManager.getMap();
-    if (!map) {
-      console.error('Cannot set region: Map is not initialized');
-      this.triggerCallback('onError', 'Map is not initialized');
-      return null;
-    }
-    
-    // Use onMapLoaded to ensure the map is ready for operations
-    this.mapManager.onMapLoaded(() => {
-      try {
-        // Fly to the region - DISABLED: Map view updates are handled by RegionContext.jsx
-        // map.fitBounds(region.bounds, {
-        //   padding: 50,
-        //   maxZoom: region.zoom || 6
-        // });
-        console.log(`RegionManager: (DISABLED) Would call fitBounds for region ${region.name}`);
-        
-        // Trigger the region changed callback
-        this.triggerCallback('onRegionChanged', region);
-        
-        // If platform manager is available, load region-specific platforms
-        // DISABLED: Platform loading is now handled by RegionContext.jsx to avoid conflicts.
-        // if (this.platformManager) {
-        //   console.log(`RegionManager: (DISABLED) Would load platforms for region: ${region.name}`);
-        //   // this.platformManager.loadPlatformsFromFoundry(null, region.osdkRegion)
-        //   //   .then(platforms => {
-        //   //     console.log(`Loaded ${platforms?.length || 0} platforms for ${region.name}`);
-        //   //     this.triggerCallback('onRegionLoaded', {
-        //   //       region: region,
-        //   //       platforms: platforms
-        //   //     });
-        //   //   })
-        //   //   .catch(error => {
-        //   //     console.error(`Error loading platforms for region ${region.name}:`, error);
-        //   //     this.triggerCallback('onError', `Failed to load platforms for ${region.name}: ${error.message}`);
-        //   //   });
-        // } else {
-        //   console.log(`No platform manager available for region: ${region.name}`);
-        // }
-        // Trigger the region loaded callback, but without re-triggering platform load from here.
-        // The actual platform data will come from RegionContext's flow.
-        this.triggerCallback('onRegionLoaded', {
-          region: region,
-          platforms: this.platformManager ? this.platformManager.getPlatforms() : [] // Report current platforms if available
-        });
-      } catch (error) {
-        console.error(`Error setting region ${region.name}:`, error);
-        this.triggerCallback('onError', `Failed to set region ${region.name}: ${error.message}`);
-      }
+    // Report region loaded but without any map operations
+    this.triggerCallback('onRegionLoaded', {
+      region: region,
+      platforms: this.platformManager ? this.platformManager.getPlatforms() : []
     });
     
     return region;

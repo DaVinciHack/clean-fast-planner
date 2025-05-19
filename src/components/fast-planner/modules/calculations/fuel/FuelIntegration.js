@@ -46,37 +46,85 @@ export function calculateFuelRequirements(structuredLegs, aircraft, weather, set
     console.error('FuelIntegration: structuredLegs is not an array.');
     return null;
   }
-  // Allow empty structuredLegs if no valid legs could be formed (e.g. < 2 stops)
-  // EnhancedFuelCalculator should handle this.
+  
+  // Add a debounce/guard to prevent re-triggering if called with similar inputs
+  // Create a hash of the inputs to check if they're the same as last time
+  const inputHash = JSON.stringify({
+    legsLength: structuredLegs.length,
+    aircraftId: aircraft.id || aircraft.registration,
+    weatherHash: weather ? `${weather.windSpeed}-${weather.windDirection}` : 'none',
+    settingsHash: JSON.stringify(settings)
+  });
+  
+  // Static variable to track the last calculation
+  if (!calculateFuelRequirements.lastInputHash) {
+    calculateFuelRequirements.lastInputHash = '';
+    calculateFuelRequirements.calculationInProgress = false;
+    calculateFuelRequirements.lastResult = null;
+    calculateFuelRequirements.lastCalculationTime = 0;
+  }
+  
+  // Check if this is the same calculation called within a short time window (200ms)
+  const now = Date.now();
+  const timeSinceLastCalculation = now - calculateFuelRequirements.lastCalculationTime;
+  
+  if (calculateFuelRequirements.calculationInProgress) {
+    console.warn('⛔ FuelIntegration: Calculation already in progress, returning cached result');
+    return calculateFuelRequirements.lastResult;
+  }
+  
+  if (inputHash === calculateFuelRequirements.lastInputHash && timeSinceLastCalculation < 200) {
+    console.warn('⚠️ FuelIntegration: Duplicate calculation detected within 200ms, returning cached result');
+    return calculateFuelRequirements.lastResult;
+  }
+  
+  // Set calculation in progress flag
+  calculateFuelRequirements.calculationInProgress = true;
+  calculateFuelRequirements.lastInputHash = inputHash;
+  calculateFuelRequirements.lastCalculationTime = now;
   
   // Log the calculation request
-  console.log('FuelIntegration: Calculating fuel requirements:', {
+  console.log('🔄 FuelIntegration: Calculating fuel requirements:', {
     legsCount: structuredLegs.length,
     aircraft: aircraft.registration,
     weather
   });
   
-  // Update calculator settings if provided
-  if (settings) {
-    enhancedFuelCalculator.updateConfig(settings);
-  }
-  
-  // Perform the calculation
-  const results = enhancedFuelCalculator.calculateFuelRequirements({
-    legs: structuredLegs, // Pass structuredLegs as 'legs'
-    aircraft,
-    weather,
-    cargoWeight: settings.cargoWeight || 0
-  });
-  
-  // Log if calculation failed
-  if (!results) {
-    console.error('FuelIntegration: Calculation failed, no results returned');
+  try {
+    // Update calculator settings if provided
+    if (settings) {
+      enhancedFuelCalculator.updateConfig(settings);
+    }
+    
+    // Perform the calculation
+    const results = enhancedFuelCalculator.calculateFuelRequirements({
+      legs: structuredLegs, // Pass structuredLegs as 'legs'
+      aircraft,
+      weather,
+      cargoWeight: settings.cargoWeight || 0
+    });
+    
+    // Log if calculation failed
+    if (!results) {
+      console.error('FuelIntegration: Calculation failed, no results returned');
+      calculateFuelRequirements.lastResult = null;
+      calculateFuelRequirements.calculationInProgress = false;
+      return null;
+    }
+    
+    // Convert the enhanced results to the format expected by the existing code
+    const convertedResults = convertToExistingFormat(results, structuredLegs, aircraft);
+    
+    // Store the result and clear the in-progress flag
+    calculateFuelRequirements.lastResult = convertedResults;
+    calculateFuelRequirements.calculationInProgress = false;
+    
+    return convertedResults;
+  } catch (error) {
+    console.error('FuelIntegration: Error during calculation:', error);
+    calculateFuelRequirements.calculationInProgress = false;
     return null;
   }
-  
-  // Convert the enhanced results to the format expected by the existing code
-  return convertToExistingFormat(results, structuredLegs, aircraft); // Pass structuredLegs
 }
 
 /**

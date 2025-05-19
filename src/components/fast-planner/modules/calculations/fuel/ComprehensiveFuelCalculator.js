@@ -19,9 +19,19 @@ import StopCardCalculator from '../flight/StopCardCalculator';
  * @returns {Object} An object containing enhanced fuel results and stop card data.
  */
 const calculateAllFuelData = (waypoints, selectedAircraft, flightSettings, weather, routeStats) => {
+  // Guard against recursive calls
+  if (calculateAllFuelData.inProgress) {
+    console.warn('⚠️ ComprehensiveFuelCalculator: Calculation already in progress, returning last result');
+    return calculateAllFuelData.lastResult || { enhancedResults: null, stopCards: [] };
+  }
+  
+  // Set in-progress flag
+  calculateAllFuelData.inProgress = true;
+  
   // Ensure required inputs are available
   if (!waypoints || waypoints.length < 2 || !selectedAircraft || !flightSettings) {
     console.warn('ComprehensiveFuelCalculator: Missing required inputs for calculation.');
+    calculateAllFuelData.inProgress = false;
     return { enhancedResults: null, stopCards: [] };
   }
 
@@ -138,12 +148,25 @@ const calculateAllFuelData = (waypoints, selectedAircraft, flightSettings, weath
     stopCardCount: stopCards.length
   });
 
-  // Return both sets of results
-  return {
+  // Prepare the result object
+  const result = {
     enhancedResults: enhancedResults,
     stopCards: stopCards
   };
+  
+  // Cache the result for potential recursive calls
+  calculateAllFuelData.lastResult = result;
+  
+  // Clear in-progress flag
+  calculateAllFuelData.inProgress = false;
+  
+  // Return both sets of results
+  return result;
 };
+
+// Initialize static properties to prevent the loop
+calculateAllFuelData.inProgress = false;
+calculateAllFuelData.lastResult = null;
 
 export default {
   calculateAllFuelData,
