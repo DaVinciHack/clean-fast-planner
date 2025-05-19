@@ -30,104 +30,196 @@ const RouteStatsCard = ({
   // Optional stopCards prop to get data from StopCardsContainer
   stopCards = []
 }) => {
-  // Log received values for debugging
-  console.log('📊 RouteStatsCard received values:', {
-    taxiFuel,
-    passengerWeight,
-    contingencyFuelPercent,
-    reserveFuel,
-    deckTimePerStop,
-    deckFuelFlow,
-    rawContingencyValue: contingencyFuelPercent,
-    rawContingencyType: typeof contingencyFuelPercent
-  });
-  
-  // Force rerendering when routeStats or waypoints change
-  const [forceRerender, setForceRerender] = useState(0);
-  
-  // Removed error handling code to fix React hooks errors
-  // Log received values for debugging
-  console.log('📊 RouteStatsCard received values:', {
-    taxiFuel,
-    passengerWeight,
-    contingencyFuelPercent,
-    reserveFuel,
-    deckTimePerStop,
-    deckFuelFlow,
-    rawContingencyValue: contingencyFuelPercent,
-    rawContingencyType: typeof contingencyFuelPercent
-  });
-  // Use StopCardCalculator directly for consistent fuel calculations
-  const [localStopCards, setLocalStopCards] = useState([]);
-  
+  // Log received values for debugging once
+  const loggedValues = useRef(false);
   useEffect(() => {
-    // First try to use passed stop cards
-    if (stopCards && stopCards.length > 0) {
-      console.log('Using existing stop cards:', stopCards.length);
-      setLocalStopCards(stopCards);
-    } 
-    // Otherwise calculate cards directly with StopCardCalculator
-    else if (waypoints && waypoints.length >= 2 && selectedAircraft && routeStats) {
-      console.log('Generating stop cards directly from StopCardCalculator');
-      console.log('🚨 PASSING SETTINGS TO STOPCARDCALCULATOR:', {
+    if (!loggedValues.current) {
+      console.log('📊 RouteStatsCard received values:', {
         taxiFuel,
         passengerWeight,
         contingencyFuelPercent,
         reserveFuel,
         deckTimePerStop,
-        deckFuelFlow
+        deckFuelFlow,
+        rawContingencyValue: contingencyFuelPercent,
+        rawContingencyType: typeof contingencyFuelPercent
       });
-      
-      const calculatedCards = StopCardCalculator.calculateStopCards(
-        waypoints, 
-        routeStats, 
-        selectedAircraft, 
-        weather, 
-        {
-          passengerWeight,
-          taxiFuel,
-          contingencyFuelPercent,
-          reserveFuel,
-          deckTimePerStop,
-          deckFuelFlow
-        }
-      );
-      
-      setLocalStopCards(calculatedCards);
+      loggedValues.current = true;
     }
-  }, [stopCards, waypoints, selectedAircraft, routeStats, weather, passengerWeight, taxiFuel, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow]);
+  }, [taxiFuel, passengerWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow]);
   
-  // Debug log for stop cards and force update when they change
+  // Force rerendering when routeStats or waypoints change
+  const [forceRerender, setForceRerender] = useState(0);
+  
+  // REMOVED: No longer calculating local stop cards, using single source of truth from StopCardsContainer
+  
+  // ENHANCEMENT: Setup update listener to force refresh when window.currentRouteStats changes
   useEffect(() => {
-    console.log('🚨 STOP CARDS CHANGED:', {
-      count: stopCards?.length || 0,
-      firstCard: stopCards && stopCards.length > 0 ? {
-        isDeparture: stopCards[0].isDeparture || false,
-        totalFuel: stopCards[0].totalFuel || 0,
-        deckFuel: stopCards[0].deckFuel || 0
-      } : null,
-      departureCard: stopCards?.find(card => card.isDeparture) ? {
-        totalFuel: stopCards.find(card => card.isDeparture).totalFuel || 0,
-        deckFuel: stopCards.find(card => card.isDeparture).deckFuel || 0,
-        components: stopCards.find(card => card.isDeparture).fuelComponents || ''
-      } : 'No departure card found'
-    });
+    // Register a global update function to allow external components to trigger updates
+    window.triggerRouteStatsUpdate = () => {
+      console.log('🔄 RouteStatsCard: Update triggered by external component');
+      setForceRerender(prev => prev + 1);
+    };
     
-    // The component will re-render if stopCards prop changes.
-    // Forcing a rerender here with setForceRerender can lead to loops if stopCards is a new reference on every parent render.
-    // setForceRerender(prev => prev + 1); // REMOVED to prevent potential loop
+    return () => {
+      // Clean up the global function when component unmounts
+      window.triggerRouteStatsUpdate = undefined;
+    };
+  }, []);
+  
+  // NEW APPROACH: Get route data directly from stop cards
+  // This simplifies the data flow and eliminates timing issues
+  const getRouteDataFromStopCards = () => {
+    // Directly use the stopCards prop if available
+    if (stopCards && stopCards.length > 0) {
+      console.log('📊 Getting route data directly from stopCards prop:', stopCards.length);
+      
+      // Find the departure card for fuel data
+      const departureCard = stopCards.find(card => card.isDeparture);
+      
+      // Find the destination card for final distance and time
+      const destinationCard = stopCards.find(card => card.isDestination);
+      
+      if (departureCard && destinationCard) {
+        // Extract fuel data from departure card
+        let fuelData = {
+          totalFuel: Number(departureCard.totalFuel) || 0,
+          deckFuel: Number(departureCard.deckFuel) || 0
+        };
+        
+        // Extract fuel components if available
+        if (departureCard.fuelComponentsObject) {
+          fuelData = {
+            ...fuelData,
+            tripFuel: Number(departureCard.fuelComponentsObject.tripFuel) || 0,
+            contingencyFuel: Number(departureCard.fuelComponentsObject.contingencyFuel) || 0,
+            taxiFuel: Number(departureCard.fuelComponentsObject.taxiFuel) || 0,
+            reserveFuel: Number(departureCard.fuelComponentsObject.reserveFuel) || 0
+          };
+        }
+        
+        // Extract distance and time from destination card
+        const totalDistance = destinationCard.totalDistance || '0';
+        
+        // Extract time from destination card
+        let totalTime = 0;
+        if (destinationCard.totalTime) {
+          totalTime = Number(destinationCard.totalTime) || 0;
+        }
+        
+        // Get passenger data from all non-destination cards
+        const passengerData = stopCards
+          .filter(card => !card.isDestination)
+          .map(card => ({
+            id: card.id,
+            stopName: card.stopName,
+            isDeparture: card.isDeparture,
+            maxPassengers: card.maxPassengers
+          }));
+        
+        console.log('📊 Extracted data directly from stop cards:', {
+          totalDistance,
+          totalTime,
+          totalFuel: fuelData.totalFuel,
+          tripFuel: fuelData.tripFuel,
+          passengerCount: passengerData.length
+        });
+        
+        return {
+          fuelData,
+          totalDistance,
+          totalTime,
+          passengerData
+        };
+      }
+    }
+    
+    // If we reach here, we couldn't get data from stop cards
+    return null;
+  };
+  
+  // Debug log for stop cards - use a ref to only log once when they change
+  const loggedStopCards = useRef(false);
+  useEffect(() => {
+    if (stopCards && stopCards.length > 0 && !loggedStopCards.current) {
+      console.log('🚨 STOP CARDS CHANGED:', {
+        count: stopCards.length,
+        firstCard: stopCards[0] ? {
+          isDeparture: stopCards[0].isDeparture || false,
+          totalFuel: stopCards[0].totalFuel || 0,
+          deckFuel: stopCards[0].deckFuel || 0
+        } : null,
+        departureCard: stopCards.find(card => card.isDeparture) ? {
+          totalFuel: stopCards.find(card => card.isDeparture).totalFuel || 0,
+          deckFuel: stopCards.find(card => card.isDeparture).deckFuel || 0,
+          components: stopCards.find(card => card.isDeparture).fuelComponents || ''
+        } : 'No departure card found',
+        destinationCard: stopCards.find(card => card.isDestination) ? {
+          totalFuel: stopCards.find(card => card.isDestination).totalFuel || 0,
+          components: stopCards.find(card => card.isDestination).fuelComponentsObject || {}
+        } : 'No destination card found'
+      });
+      loggedStopCards.current = true;
+    }
   }, [stopCards]);
   
-  // Always fetch the currentRouteStats from window for the latest data
+  // Add special handling for the destination card specifically
   useEffect(() => {
-    // Check if window.currentRouteStats exists and has newer data than our local routeStats
-    if (window.currentRouteStats && (!routeStats || !routeStats.timeHours || routeStats.timeHours === 0)) {
-      console.log('⚠️ Found window.currentRouteStats with time data, using for display');
-      
-      // Force a rerender to use the window.currentRouteStats data
-      setForceRerender(prev => prev + 1);
+    try {
+      if (window.currentRouteStats?.stopCards && window.currentRouteStats.stopCards.length > 0) {
+        const destinationCard = window.currentRouteStats.stopCards.find(card => card.isDestination);
+        
+        if (destinationCard) {
+          // Validate the destination card's components
+          console.log('🛡️ RouteStatsCard: Validating destination card:', {
+            totalFuel: destinationCard.totalFuel,
+            fuelComponentsObject: destinationCard.fuelComponentsObject
+          });
+          
+          // Ensure all component fields exist with valid numbers
+          if (destinationCard.fuelComponentsObject) {
+            const requiredFields = ['reserveFuel', 'contingencyFuel', 'extraFuel', 'tripFuel', 'taxiFuel', 'deckFuel'];
+            let modified = false;
+            
+            // Ensure all fields exist
+            requiredFields.forEach(field => {
+              if (destinationCard.fuelComponentsObject[field] === undefined) {
+                destinationCard.fuelComponentsObject[field] = 0;
+                modified = true;
+              } else if (isNaN(destinationCard.fuelComponentsObject[field])) {
+                destinationCard.fuelComponentsObject[field] = 0;
+                modified = true;
+              }
+            });
+            
+            // Recalculate totalFuel if components were modified
+            if (modified) {
+              const sum = Object.values(destinationCard.fuelComponentsObject).reduce((total, val) => total + (Number(val) || 0), 0);
+              destinationCard.totalFuel = sum;
+              console.log('🛡️ RouteStatsCard: Fixed destination card:', {
+                newTotal: sum,
+                components: destinationCard.fuelComponentsObject
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error validating destination card:', error);
     }
-  }, [routeStats, forceRerender]);
+  }, [window.currentRouteStats?.stopCards]);
+  
+  // Log passenger data once
+  const loggedPassengerData = useRef(false);
+  useEffect(() => {
+    if (!loggedPassengerData.current && window.currentRouteStats?.passengerData) {
+      console.log("⭐ PASSENGER DATA DEBUG (Single Source of Truth):", {
+        passengerData: window.currentRouteStats?.passengerData || [],
+        cardsCount: window.currentRouteStats?.passengerData?.length || 0
+      });
+      loggedPassengerData.current = true;
+    }
+  }, [window.currentRouteStats?.passengerData]);
   
   // Force data fetch and calculation immediately before rendering
   useEffect(() => {
@@ -154,29 +246,21 @@ const RouteStatsCard = ({
   const loaderIdRef = useRef(null);
   
   // Force a rerender when routeStats change - added null check to prevent errors
-  useEffect(() => {
-    if (routeStats) {
-      console.log("💥 RouteStatsCard - routeStats changed, forcing rerender");
-      setForceRerender(prev => prev + 1);
-    }
-  }, [routeStats]);
+  // FIXED: Remove this to prevent infinite update loop
+  // This is causing the issue because it forces a rerender whenever routeStats changes
+  // But other effects are also updating routeStats causing a circular dependency
   
-  // Force a rerender when waypoints change
-  useEffect(() => {
-    if (waypoints && waypoints.length >= 2) {
-      console.log("💥 RouteStatsCard - waypoints changed, forcing rerender");
-      setForceRerender(prev => prev + 1);
-    }
-  }, [waypoints]);
+  // FIXED: Remove this useEffect completely as it may be contributing to the update loop
+  // We'll rely on React's natural rendering when props change instead of forcing rerenders
   
-  // Add debug logging to track the routeStats data
-  console.log("💥 RouteStatsCard - received stats:", {
-    forceRerender,
-    timeHours: routeStats?.timeHours,
-    estimatedTime: routeStats?.estimatedTime,
-    totalDistance: routeStats?.totalDistance,
-    legs: routeStats?.legs?.length || 0
-  });
+  // Add debug logging to track the routeStats data - only if needed for debugging
+  // console.log("💥 RouteStatsCard - received stats:", {
+  //   forceRerender,
+  //   timeHours: routeStats?.timeHours,
+  //   estimatedTime: routeStats?.estimatedTime,
+  //   totalDistance: routeStats?.totalDistance,
+  //   legs: routeStats?.legs?.length || 0
+  // });
   
   // Extra validation to catch zero or missing time values
   if (routeStats && 
@@ -329,6 +413,50 @@ const RouteStatsCard = ({
     }
   }, [routeStats, isWindAdjusted]);
   
+  // NEW: Ensure route stats with time data is also in window.currentRouteStats
+  // This is critical for the WaypointManager to show time on the route lines
+  // FIXED: Use a ref to track if we've already done this update to avoid circular loops
+  const routeStatsUpdated = useRef(false);
+  
+  useEffect(() => {
+    // Only update if we have valid data AND haven't already updated with this data
+    if (routeStats && routeStats.timeHours && routeStats.timeHours > 0 && 
+        routeStats.estimatedTime && routeStats.estimatedTime !== '00:00' && 
+        !routeStatsUpdated.current) {
+      
+      console.log("⭐ Updating window.currentRouteStats with time data:", routeStats.estimatedTime);
+      
+      // Mark that we've updated to prevent loops
+      routeStatsUpdated.current = true;
+      
+      // Create new object to avoid reference issues
+      const updatedStats = window.currentRouteStats ? {...window.currentRouteStats} : {};
+      
+      // Update time data
+      updatedStats.timeHours = routeStats.timeHours;
+      updatedStats.estimatedTime = routeStats.estimatedTime;
+      
+      // Update aircraft - crucial for WaypointManager
+      updatedStats.aircraft = selectedAircraft;
+      
+      // Update legs for display on route
+      if (routeStats.legs && routeStats.legs.length > 0) {
+        updatedStats.legs = [...routeStats.legs];
+      }
+      
+      // Update wind data if available
+      if (routeStats.windData) {
+        updatedStats.windAdjusted = routeStats.windAdjusted;
+        updatedStats.windData = {...routeStats.windData};
+      }
+      
+      // Delay the update to break the render cycle
+      setTimeout(() => {
+        window.currentRouteStats = updatedStats;
+      }, 0);
+    }
+  }, [routeStats, selectedAircraft]);
+  
   // Get wind effect direction from actual weather data - with safety check
   const windEffect = isWindAdjusted && routeStats.windData && routeStats.windData.avgHeadwind !== undefined ? 
     routeStats.windData.avgHeadwind : 0;
@@ -403,6 +531,7 @@ const RouteStatsCard = ({
   });
   
   // Use the calculated value or the one from routeStats if available
+  // DIRECT FIX: Use routeStats values if available to ensure consistent display
   const totalDeckFuel = routeStats?.deckFuel || calculatedDeckFuel;
   
   // Always show the card, even without route stats
@@ -420,8 +549,46 @@ const RouteStatsCard = ({
     operationalRadius: '85'
   };
   
+  // CRITICAL FIX: Update routeStats in the window object to ensure consistency
+  // But use a ref to track if we've already updated to prevent infinite loops
+  const hasUpdatedGlobalStats = useRef(false);
+  
+  useEffect(() => {
+    // Only update if we have valid routeStats and haven't already updated for this data
+    if (routeStats && routeStats.timeHours && window.currentRouteStats && !hasUpdatedGlobalStats.current) {
+      console.log("🔄 Updating window.currentRouteStats with latest values from routeStats:", {
+        timeHours: routeStats.timeHours,
+        estimatedTime: routeStats.estimatedTime,
+        fuelRequired: routeStats.fuelRequired,
+        tripFuel: routeStats.tripFuel
+      });
+      
+      // Mark that we've updated to prevent repeated updates with the same data
+      hasUpdatedGlobalStats.current = true;
+      
+      // Update the window.currentRouteStats with the latest values - use a shallow copy
+      // to avoid updating the reference which could trigger more effects
+      const updatedStats = {...window.currentRouteStats};
+      updatedStats.timeHours = routeStats.timeHours;
+      updatedStats.estimatedTime = routeStats.estimatedTime;
+      updatedStats.fuelRequired = routeStats.fuelRequired;
+      updatedStats.tripFuel = routeStats.tripFuel;
+      
+      // Only update after the current render cycle to prevent cascading updates
+      setTimeout(() => {
+        window.currentRouteStats = updatedStats;
+      }, 0);
+    }
+  }, [routeStats]);
+  
   // Calculate total time (flight time + deck time)
   const calculateTotalTime = () => {
+    // SAFETY CHECK: Never calculate time without an aircraft
+    if (!selectedAircraft) {
+      console.warn('⚠️ SAFETY: Attempted to calculate total time without aircraft');
+      return '00:00';
+    }
+    
     // CRITICAL FIX: Get the exact same flight time that's displayed in the UI
     const displayedFlightTime = calculateFlightTime(stats, waypoints, selectedAircraft);
     
@@ -454,403 +621,184 @@ const RouteStatsCard = ({
     return formattedTime;
   };
   
-  // Get fuel data directly from StopCardCalculator for consistency
+  /**
+   * REMOVED: getFuelData() function
+   * We now directly use window.currentRouteStats.fuelData as the single source of truth
+   * All calculations are performed in StopCardCalculator.js
+   */
+  
+  // SIMPLIFIED: Get fuel data directly from stop cards without relying on global state
   const getFuelData = () => {
     try {
-      console.log('🚨 DEBUG FUEL SETTINGS:', {
-        passedSettings: {
-          passengerWeight,
-          taxiFuel,
-          contingencyFuelPercent,
-          reserveFuel,
-          deckTimePerStop,
-          deckFuelFlow
-        },
-        taxiFuel_type: typeof taxiFuel,
-        taxiFuel_value: Number(taxiFuel)
-      });
-  
-      // Option 1: Try to find the departure card in the existing stop cards
-      if (stopCards && stopCards.length > 0) {
-        const departureCard = stopCards.find(card => card.isDeparture);
-        if (departureCard) {
-          console.log('🚨 DEBUG FUEL DATA FROM STOPCARDS:', {
-            totalFuel: departureCard.totalFuel,
-            tripFuel: departureCard.fuelComponentsObject?.tripFuel,
-            deckFuel: departureCard.deckFuel,
-            contingencyFuel: departureCard.fuelComponentsObject?.contingencyFuel,
-            reserveFuel: departureCard.fuelComponentsObject?.reserveFuel,
-            taxiFuel: departureCard.fuelComponentsObject?.taxiFuel,
-            rawFuelComponents: departureCard.fuelComponents,
-            computedSum: (
-              (departureCard.fuelComponentsObject?.tripFuel || 0) +
-              (departureCard.fuelComponentsObject?.contingencyFuel || 0) +
-              (departureCard.fuelComponentsObject?.taxiFuel || 0) +
-              (departureCard.fuelComponentsObject?.deckFuel || 0) +
-              (departureCard.fuelComponentsObject?.reserveFuel || 0)
-            )
-          });
-          
-          const result = {
-            totalFuel: departureCard.totalFuel || 0,
-            tripFuel: departureCard.fuelComponentsObject?.tripFuel || 0,
-            deckFuel: departureCard.deckFuel || 0,
-            contingencyFuel: departureCard.fuelComponentsObject?.contingencyFuel || 0,
-            reserveFuel: departureCard.fuelComponentsObject?.reserveFuel || 0,
-            taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
+      // Get data directly from stop cards first - this is the most direct and reliable approach
+      const directData = getRouteDataFromStopCards();
+      if (directData && directData.fuelData) {
+        console.log('⭐ Using fuel data directly from stop cards');
+        
+        // Calculate sum for verification
+        const sum = (directData.fuelData.tripFuel || 0) + 
+                    (directData.fuelData.contingencyFuel || 0) + 
+                    (directData.fuelData.taxiFuel || 0) + 
+                    (directData.fuelData.deckFuel || 0) + 
+                    (directData.fuelData.reserveFuel || 0);
+        
+        // If totalFuel is inconsistent with the sum, use the sum
+        if (Math.abs((directData.fuelData.totalFuel || 0) - sum) > 1) {
+          console.warn('⚠️ Fixing inconsistent totalFuel in stop card data');
+          return {
+            ...directData.fuelData,
+            totalFuel: sum,
+            sum: sum
           };
-          
-          // Check if total fuel exceeds max fuel capacity
-          if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
-            const fuelNeeded = result.totalFuel;
-            const maxFuel = selectedAircraft.maxFuel;
-            const refuelAmount = fuelNeeded - maxFuel;
-            
-            console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
-            
-            // Set the total fuel to max capacity
-            result.totalFuel = maxFuel;
-            // Add refuel indicator
-            result.refuelNeeded = refuelAmount;
-          }
-          
-          console.log('🚨 RETURNING FUEL DATA:', result);
-          return result;
         }
+        
+        return {
+          ...directData.fuelData,
+          sum: sum
+        };
       }
       
-      // Option 2: Try to find the departure card in local stop cards (if different from stopCards)
-      if (localStopCards && localStopCards.length > 0 && 
-          (!stopCards || localStopCards.length !== stopCards.length)) {
-        const departureCard = localStopCards.find(card => card.isDeparture);
-        if (departureCard) {
-          console.log('RouteStatsCard: Using departure card from localStopCards:', {
-            totalFuel: departureCard.totalFuel,
-            tripFuel: departureCard.fuelComponentsObject?.tripFuel,
-            deckFuel: departureCard.deckFuel
-          });
-          
-          const result = {
-            totalFuel: departureCard.totalFuel || 0,
-            tripFuel: departureCard.fuelComponentsObject?.tripFuel || 0,
-            deckFuel: departureCard.deckFuel || 0,
-            contingencyFuel: departureCard.fuelComponentsObject?.contingencyFuel || 0,
-            reserveFuel: departureCard.fuelComponentsObject?.reserveFuel || 0,
-            taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
-          };
-          
-          // Check if total fuel exceeds max fuel capacity
-          if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
-            const fuelNeeded = result.totalFuel;
-            const maxFuel = selectedAircraft.maxFuel;
-            const refuelAmount = fuelNeeded - maxFuel;
-            
-            console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
-            
-            // Set the total fuel to max capacity
-            result.totalFuel = maxFuel;
-            // Add refuel indicator
-            result.refuelNeeded = refuelAmount;
-          }
-          
-          return result;
-        }
-      }
-      
-    // Option 3: Calculate directly using StopCardCalculator if we have waypoints and aircraft
-      if (waypoints && waypoints.length >= 2 && selectedAircraft && routeStats) {
-        console.log('🚨 DEBUG CALCULATING DIRECTLY FROM STOPCARDCALCULATOR');
-        console.log('🚨 SETTINGS BEING PASSED:', {
-          passengerWeight,
-          taxiFuel,
-          contingencyFuelPercent,
-          reserveFuel,
-          deckTimePerStop,
-          deckFuelFlow,
-          deckTimePerStop_mins: deckTimePerStop,
-          calculatedDeckFuel: Math.round((deckTimePerStop * (waypoints.length - 2) / 60) * deckFuelFlow)
-        });
+      // Fall back to window.currentRouteStats if direct approach fails
+      if (window.currentRouteStats?.fuelData) {
+        console.log('⚠️ Falling back to window.currentRouteStats.fuelData');
         
-        try {
-          // Use StopCardCalculator to calculate stop cards, then extract fuel data from the departure card
-          const calculatedCards = StopCardCalculator.calculateStopCards(
-            waypoints, 
-            routeStats, 
-            selectedAircraft, 
-            weather, 
-            {
-              passengerWeight,
-              taxiFuel,
-              contingencyFuelPercent,
-              reserveFuel,
-              deckTimePerStop,
-              deckFuelFlow
-            }
-          );
-          
-          // Additional debug log to confirm values in this code path
-          console.log('🛫 Values passed to StopCardCalculator (direct fuel calculation):', {
-            taxiFuel,
-            passengerWeight
-          });
-          
-          // Find the departure card
-          const departureCard = calculatedCards.find(card => card.isDeparture);
-          if (departureCard) {
-            console.log('🚨 DEBUG FRESH CALCULATION RESULT:', {
-              departure_card_totalFuel: departureCard.totalFuel,
-              departure_card_components: departureCard.fuelComponentsObject,
-              departure_card_text: departureCard.fuelComponents
-            });
-            
-            const result = {
-              totalFuel: departureCard.totalFuel || 0,
-              tripFuel: departureCard.fuelComponentsObject?.tripFuel || 0,
-              deckFuel: departureCard.deckFuel || 0,
-              contingencyFuel: departureCard.fuelComponentsObject?.contingencyFuel || 0,
-              reserveFuel: departureCard.fuelComponentsObject?.reserveFuel || 0,
-              taxiFuel: departureCard.fuelComponentsObject?.taxiFuel || 0
-            };
-            
-            // Check if total fuel exceeds max fuel capacity
-            if (selectedAircraft && selectedAircraft.maxFuel && result.totalFuel > selectedAircraft.maxFuel) {
-              const fuelNeeded = result.totalFuel;
-              const maxFuel = selectedAircraft.maxFuel;
-              const refuelAmount = fuelNeeded - maxFuel;
-              
-              console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelAmount} lbs)`);
-              
-              // Set the total fuel to max capacity
-              result.totalFuel = maxFuel;
-              // Add refuel indicator
-              result.refuelNeeded = refuelAmount;
-            }
-            
-            return result;
-          }
-        } catch (error) {
-          console.error('Error calculating from StopCardCalculator:', error);
-          // Continue to fallback
-        }
-      }
-      
-    // Option 4: Final fallback to basic calculated values
-      console.log('RouteStatsCard: No departure card found, using fallback calculated values');
-      
-      // Calculate all fuel components properly with simple, direct Number() conversions
-      const calculatedTripFuel = stats?.fuelRequired || 0;
-      
-      try {
-        // Calculate deck fuel simply
-        const calculatedIntermediateStops = Math.max(0, waypoints?.length - 2 || 0);
-        const calculatedDeckTimeHours = (calculatedIntermediateStops * Number(deckTimePerStop)) / 60;
-        const calculatedDeckFuel = Math.round(calculatedDeckTimeHours * Number(deckFuelFlow));
+        // Verify the fuel data is consistent
+        const fuelData = window.currentRouteStats.fuelData;
         
-        // Include ALL fuel components with direct Number conversion
-        const calculatedContingencyFuel = Math.round((calculatedTripFuel * Number(contingencyFuelPercent)) / 100);
-        const calculatedReserveFuel = Number(reserveFuel);
-        const calculatedTaxiFuel = Number(taxiFuel);
-        
-        console.log('⛽ Fallback fuel calculation with direct values:', {
-          taxiFuel,
-          taxiFuel_asNumber: calculatedTaxiFuel,
-          contingencyFuelPercent,
-          reserveFuel,
-          deckTimePerStop,
-          deckFuelFlow
-        });
-        
-        // Calculate total as sum of all components
-        let calculatedTotalFuel = calculatedTripFuel + 
-                                calculatedContingencyFuel + 
-                                calculatedTaxiFuel + 
-                                calculatedDeckFuel + 
-                                calculatedReserveFuel;
-        
-        let refuelNeeded = 0;
-        
-        // Check if total fuel exceeds max fuel capacity
-        if (selectedAircraft && selectedAircraft.maxFuel && calculatedTotalFuel > selectedAircraft.maxFuel) {
-          const fuelNeeded = calculatedTotalFuel;
-          const maxFuel = selectedAircraft.maxFuel;
-          refuelNeeded = fuelNeeded - maxFuel;
-          
-          console.log(`⚠️ WARNING: Required fuel (${fuelNeeded} lbs) exceeds max fuel capacity (${maxFuel} lbs). Need refuel stop (+${refuelNeeded} lbs)`);
-          
-          // Set the total fuel to max capacity
-          calculatedTotalFuel = maxFuel;
-        }
-        
-        console.log('🚨 STRICT NUMBER CONVERSION FALLBACK FUEL CALCULATIONS:', {
-          calculatedTripFuel,
-          calculatedContingencyFuel,
-          contingencyCalc: `${calculatedTripFuel} * ${contingencyFuelPercent} / 100 = ${calculatedContingencyFuel}`,
-          calculatedTaxiFuel,
-          taxiFuel_asNumber: calculatedTaxiFuel,
-          calculatedDeckFuel,
-          deckFuelCalc: `${calculatedIntermediateStops} * ${deckTimePerStop} / 60 * ${deckFuelFlow} = ${calculatedDeckFuel}`,
-          calculatedReserveFuel,
-          calculatedTotalFuel,
-          // Original values
-          taxiFuel_original: taxiFuel,
-          deckTimePerStop_original: deckTimePerStop,
-          deckFuelFlow_original: deckFuelFlow,
-          contingencyFuelPercent_original: contingencyFuelPercent,
-          intermediateStops: calculatedIntermediateStops
-        });
-        
-        const result = {
-          tripFuel: calculatedTripFuel,
-          deckFuel: calculatedDeckFuel,
-          totalFuel: calculatedTotalFuel,
-          contingencyFuel: calculatedContingencyFuel,
-          reserveFuel: calculatedReserveFuel,
-          taxiFuel: calculatedTaxiFuel
+        // Make defensive copies of all values to ensure they're valid numbers
+        const safeValues = {
+          tripFuel: typeof fuelData.tripFuel === 'number' ? fuelData.tripFuel : Number(fuelData.tripFuel) || 0,
+          contingencyFuel: typeof fuelData.contingencyFuel === 'number' ? fuelData.contingencyFuel : Number(fuelData.contingencyFuel) || 0,
+          taxiFuel: typeof fuelData.taxiFuel === 'number' ? fuelData.taxiFuel : Number(fuelData.taxiFuel) || 0,
+          deckFuel: typeof fuelData.deckFuel === 'number' ? fuelData.deckFuel : Number(fuelData.deckFuel) || 0,
+          reserveFuel: typeof fuelData.reserveFuel === 'number' ? fuelData.reserveFuel : Number(fuelData.reserveFuel) || 0,
+          totalFuel: typeof fuelData.totalFuel === 'number' ? fuelData.totalFuel : Number(fuelData.totalFuel) || 0
         };
         
-        if (refuelNeeded > 0) {
-          result.refuelNeeded = refuelNeeded;
+        // Recalculate sum
+        const sum = safeValues.tripFuel + 
+                   safeValues.contingencyFuel + 
+                   safeValues.taxiFuel + 
+                   safeValues.deckFuel + 
+                   safeValues.reserveFuel;
+        
+        // Fix totalFuel if needed
+        if (Math.abs(sum - safeValues.totalFuel) > 1 || isNaN(safeValues.totalFuel)) {
+          return {
+            ...safeValues,
+            totalFuel: sum,
+            sum: sum
+          };
         }
         
-        return result;
-      } catch (error) {
-        console.error('Error in fuel fallback calculation:', error);
-        // Last resort emergency fallback
         return {
-          tripFuel: 0,
-          deckFuel: 0,
-          totalFuel: 0,
-          contingencyFuel: 0,
-          reserveFuel: 0,
-          taxiFuel: 0
+          ...safeValues,
+          sum: sum
+        };
+      }
+      
+      // Try to get data from routeStats as a last resort
+      if (routeStats?.tripFuel) {
+        console.warn('⚠️ Using routeStats for fuel data (last resort)');
+        
+        const tripFuelValue = Number(routeStats.tripFuel) || 0;
+        const contingencyFuelValue = Math.round((tripFuelValue * Number(contingencyFuelPercent)) / 100);
+        const taxiFuelValue = Number(taxiFuel) || 0;
+        const reserveFuelValue = Number(reserveFuel) || 0;
+        
+        // Calculate deck fuel
+        const intermediateStops = landingStopsOnly.length > 2 ? landingStopsOnly.length - 2 : 0;
+        const deckTimeHours = (intermediateStops * Number(deckTimePerStop)) / 60;
+        const deckFuelValue = Math.round(deckTimeHours * Number(deckFuelFlow));
+        
+        // Calculate sum
+        const sum = tripFuelValue + 
+                   contingencyFuelValue + 
+                   taxiFuelValue + 
+                   deckFuelValue + 
+                   reserveFuelValue;
+        
+        return {
+          tripFuel: tripFuelValue,
+          contingencyFuel: contingencyFuelValue,
+          taxiFuel: taxiFuelValue,
+          deckFuel: deckFuelValue,
+          reserveFuel: reserveFuelValue,
+          totalFuel: sum,
+          sum: sum
         };
       }
     } catch (error) {
-      console.error('Critical error in getFuelData:', error);
-      // Emergency fallback with zeros
-      return {
-        tripFuel: 0,
-        deckFuel: 0,
-        totalFuel: 0,
-        contingencyFuel: 0,
-        reserveFuel: 0,
-        taxiFuel: 0
-      };
+      console.error('Error in getFuelData:', error);
     }
+    
+    // Default values if no data available or on error
+    return {
+      tripFuel: 0,
+      deckFuel: 0,
+      totalFuel: 0,
+      contingencyFuel: 0,
+      reserveFuel: 0,
+      taxiFuel: 0,
+      sum: 0
+    };
   };
   
-  // Get the fuel data with a safe default
-  const fuelData = getFuelData() || {
-    tripFuel: 0,
-    deckFuel: 0,
-    totalFuel: 0,
-    contingencyFuel: 0,
-    reserveFuel: 0,
-    taxiFuel: 0
-  };
+  // Get the verified fuel data
+  const fuelData = getFuelData();
   
-  // Debug log what's actually being used in the render
+  // Debug log what's actually being used in the render - but only once to avoid loops
+  const loggedFuelData = useRef(false);
   useEffect(() => {
-    if (fuelData) {
-      console.log('🚨 DEBUG FUEL DATA BEING USED FOR RENDER:', {
-        fuelData,
-        topCardTotalFuel: fuelData.totalFuel,
+    if (window.currentRouteStats?.fuelData && !loggedFuelData.current) {
+      console.log('🚨 USING AUTHORITATIVE FUEL DATA FROM StopCardCalculator:', {
+        fuelData: window.currentRouteStats.fuelData,
+        topCardTotalFuel: window.currentRouteStats.fuelData.totalFuel,
         componentSum: (
-          (fuelData.tripFuel || 0) + 
-          (fuelData.contingencyFuel || 0) + 
-          (fuelData.taxiFuel || 0) + 
-          (fuelData.deckFuel || 0) + 
-          (fuelData.reserveFuel || 0)
+          (window.currentRouteStats.fuelData.tripFuel || 0) + 
+          (window.currentRouteStats.fuelData.contingencyFuel || 0) + 
+          (window.currentRouteStats.fuelData.taxiFuel || 0) + 
+          (window.currentRouteStats.fuelData.deckFuel || 0) + 
+          (window.currentRouteStats.fuelData.reserveFuel || 0)
         ),
-        enhancedResults: routeStats?.enhancedResults ? true : false
+        enhancedResults: routeStats?.enhancedResults ? true : false,
+        updateTrigger: window.currentRouteStats.updateTrigger || 'none'
       });
-    } else {
-      console.error('🚨 CRITICAL: fuelData is null or undefined');
+      loggedFuelData.current = true;
     }
-  }, [fuelData, forceRerender]);
+  }, [window.currentRouteStats?.fuelData]);
   
-  // Calculate maximum passengers based on usable load and passenger weight
-  const calculateMaxPassengers = () => {
-    // If we have calculatedPassengers from the flight calculator, use that
-    if (stats.calculatedPassengers !== undefined) {
-      return stats.calculatedPassengers;
-    }
-    
-    // If routeStats has usableLoad and maxPassengers, use those directly
-    if (stats.usableLoad !== undefined && stats.maxPassengers !== undefined) {
-      console.log('Using maxPassengers directly from route stats:', stats.maxPassengers);
-      return stats.maxPassengers;
-    }
-    
-    // Check if we have stop cards with passenger info - most reliable source
-    if (stopCards && stopCards.length > 0) {
-      const departureCard = stopCards.find(card => card.isDeparture);
-      if (departureCard && departureCard.maxPassengers !== undefined) {
-        console.log('Using maxPassengers from departure card:', departureCard.maxPassengers);
-        return departureCard.maxPassengers;
-      }
-    }
-    
-    // If we have local stop cards but no stopCards from props
-    if (localStopCards && localStopCards.length > 0) {
-      const departureCard = localStopCards.find(card => card.isDeparture);
-      if (departureCard && departureCard.maxPassengers !== undefined) {
-        console.log('Using maxPassengers from local departure card:', departureCard.maxPassengers);
-        return departureCard.maxPassengers;
-      }
-    }
-    
-    // If we have fuelData and selectedAircraft, use PassengerCalculator
-    if (selectedAircraft && fuelData && fuelData.totalFuel) {
-      const maxPax = PassengerCalculator.calculateMaxPassengers(
-        selectedAircraft,
-        fuelData.totalFuel,
-        passengerWeight
-      );
-      console.log('Calculated maxPassengers using PassengerCalculator:', maxPax);
-      return maxPax;
-    }
-    
-    // Last resort fallback - return 0 instead of using partial data
-    return 0;
-  };
-  
-  // Add a direct access to passengers from top card
+  // SIMPLIFIED: Get passenger data directly from stop cards
   const getDisplayPassengers = () => {
-    // First priority: Use the first stop card passenger count if available
-    if (stopCards && stopCards.length > 0) {
-      // Try departure card first
-      const departureCard = stopCards.find(card => card.isDeparture);
-      if (departureCard && departureCard.maxPassengers) {
-        console.log('Using passenger count from departure card:', departureCard.maxPassengers);
+    // Try to get data directly from stop cards
+    const directData = getRouteDataFromStopCards();
+    if (directData && directData.passengerData && directData.passengerData.length > 0) {
+      // For the top card, we usually want the departure card passenger count
+      const departureCard = directData.passengerData.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers !== undefined) {
         return departureCard.maxPassengers;
       }
       
-      // If no specific departure card, use first card
-      if (stopCards[0] && stopCards[0].maxPassengers) {
-        console.log('Using passenger count from first card:', stopCards[0].maxPassengers);
-        return stopCards[0].maxPassengers;
+      // If no specific departure card found, use the first card
+      if (directData.passengerData[0] && directData.passengerData[0].maxPassengers !== undefined) {
+        return directData.passengerData[0].maxPassengers;
       }
     }
     
-    // Second priority: Use localStopCards if available
-    if (localStopCards && localStopCards.length > 0) {
-      const departureCard = localStopCards.find(card => card.isDeparture);
-      if (departureCard && departureCard.maxPassengers) {
-        console.log('Using passenger count from local departure card:', departureCard.maxPassengers);
+    // Fall back to window.currentRouteStats if direct approach fails
+    if (window.currentRouteStats?.passengerData && window.currentRouteStats.passengerData.length > 0) {
+      const departureCard = window.currentRouteStats.passengerData.find(card => card.isDeparture);
+      if (departureCard && departureCard.maxPassengers !== undefined) {
         return departureCard.maxPassengers;
       }
       
-      if (localStopCards[0] && localStopCards[0].maxPassengers) {
-        console.log('Using passenger count from first local card:', localStopCards[0].maxPassengers);
-        return localStopCards[0].maxPassengers;
+      if (window.currentRouteStats.passengerData[0] && window.currentRouteStats.passengerData[0].maxPassengers !== undefined) {
+        return window.currentRouteStats.passengerData[0].maxPassengers;
       }
     }
     
-    // Last priority: Use calculated max passengers
-    const calculated = calculateMaxPassengers();
-    console.log('Using calculated max passengers as last resort:', calculated);
-    return calculated;
+    // Return 0 if no data is available
+    return 0;
   };
   
   // Initialize the route stats loader only once, with a cleanup function to remove any existing loaders first
@@ -952,159 +900,37 @@ const RouteStatsCard = ({
   
   // Calculate flight time - use existing values if valid, otherwise calculate
   const calculateFlightTime = (stats, waypointArray, aircraft) => {
+    // SAFETY CHECK: Never calculate time without an aircraft
+    if (!aircraft) {
+      console.warn('⚠️ SAFETY: Attempted to calculate flight time without aircraft');
+      return '00:00';
+    }
+    
     // First try to use estimatedTime or timeHours from stats
-    if (stats.estimatedTime && stats.estimatedTime !== '00:00') {
-      console.log('Using existing estimatedTime:', stats.estimatedTime);
+    if (stats && stats.estimatedTime && stats.estimatedTime !== '00:00') {
       return stats.estimatedTime;
     }
     
-    if (stats.timeHours && stats.timeHours > 0) {
-      console.log('Formatting existing timeHours:', stats.timeHours);
+    if (stats && stats.timeHours && stats.timeHours > 0) {
       return formatTime(stats.timeHours);
     }
     
     // If we don't have valid time values but have waypoints and aircraft, calculate directly
     if (waypointArray && waypointArray.length >= 2 && aircraft && aircraft.cruiseSpeed && window.turf) {
       try {
-        console.log('⚠️ Calculating flight time manually in RouteStatsCard');
         // Calculate distance
         let totalDistance;
         
         // Use existing distance if available, otherwise calculate
-        if (stats.totalDistance && parseFloat(stats.totalDistance) > 0) {
+        if (stats && stats.totalDistance && parseFloat(stats.totalDistance) > 0) {
           totalDistance = parseFloat(stats.totalDistance);
         } else {
           totalDistance = parseFloat(calculateTotalDistance(waypointArray));
         }
         
-        // Try to use wind calculations if we have weather data
-        let timeHours;
-        const hasWindData = (stats.windData && window.WindCalculations) || (weather && window.WindCalculations);
-        
-        if (hasWindData) {
-          console.log('⚠️ Attempting wind-adjusted flight time calculation');
-          
-          // Get wind data from stats or from weather prop
-          const windData = stats.windData || weather;
-          
-          // Use it only if it actually has non-zero wind
-          if (windData && windData.windSpeed > 0) {
-            // If we have multiple waypoints, calculate average course
-            if (waypointArray.length > 2) {
-              // Calculate total time across all legs
-              let totalTime = 0;
-              
-              for (let i = 0; i < waypointArray.length - 1; i++) {
-                const from = window.turf.point(waypointArray[i].coords);
-                const to = window.turf.point(waypointArray[i + 1].coords);
-                const options = { units: 'nauticalmiles' };
-                
-                const legDistance = window.turf.distance(from, to, options);
-                
-                // Calculate course for this leg
-                const fromPoint = {
-                  lat: waypointArray[i].coords[1],
-                  lon: waypointArray[i].coords[0]
-                };
-                
-                const toPoint = {
-                  lat: waypointArray[i + 1].coords[1],
-                  lon: waypointArray[i + 1].coords[0]
-                };
-                
-                const course = window.WindCalculations.calculateCourse(fromPoint, toPoint);
-                
-                // Calculate time with wind for this leg
-                const legTime = window.WindCalculations.calculateWindAdjustedTime(
-                  legDistance,
-                  aircraft.cruiseSpeed,
-                  course,
-                  windData.windSpeed,
-                  windData.windDirection
-                );
-                
-                totalTime += legTime;
-              }
-              
-              timeHours = totalTime;
-              console.log(`⚠️ Multi-leg wind-adjusted flight time: ${timeHours.toFixed(2)} hours`);
-            } else {
-              // Single leg - calculate course
-              const from = {
-                lat: waypointArray[0].coords[1],
-                lon: waypointArray[0].coords[0]
-              };
-              
-              const to = {
-                lat: waypointArray[1].coords[1],
-                lon: waypointArray[1].coords[0]
-              };
-              
-              const course = window.WindCalculations.calculateCourse(from, to);
-              
-              // Calculate time with wind
-              timeHours = window.WindCalculations.calculateWindAdjustedTime(
-                totalDistance,
-                aircraft.cruiseSpeed,
-                course,
-                windData.windSpeed,
-                windData.windDirection
-              );
-              
-              console.log(`⚠️ Single-leg wind-adjusted flight time: ${timeHours.toFixed(2)} hours`);
-            }
-            
-            // Mark as wind-adjusted
-            if (routeStats) {
-              routeStats.windAdjusted = true;
-              
-              // Set/update wind data
-              if (!routeStats.windData) {
-                routeStats.windData = {
-                  windSpeed: windData.windSpeed,
-                  windDirection: windData.windDirection
-                };
-              }
-            }
-          } else {
-            // No wind or zero speed, fallback to basic calculation
-            timeHours = totalDistance / aircraft.cruiseSpeed;
-            console.log(`⚠️ Basic flight time (no wind): ${timeHours.toFixed(2)} hours`);
-          }
-        } else {
-          // Basic calculation without wind
-          timeHours = totalDistance / aircraft.cruiseSpeed;
-          console.log(`⚠️ Basic flight time: ${timeHours.toFixed(2)} hours`);
-        }
-        
-        // Format time and update stats for future use
+        // Basic calculation without wind (simplify to avoid complex calculations that could cause issues)
+        const timeHours = totalDistance / aircraft.cruiseSpeed;
         const formattedTime = formatTime(timeHours);
-        
-        console.log('⚠️ Manual flight time calculation:', {
-          distance: totalDistance,
-          cruiseSpeed: aircraft.cruiseSpeed,
-          timeHours,
-          formattedTime,
-          windAdjusted: hasWindData
-        });
-        
-        // Update routeStats object if it exists
-        if (routeStats) {
-          routeStats.timeHours = timeHours;
-          routeStats.estimatedTime = formattedTime;
-        }
-        
-        // Also update window.currentRouteStats if it exists
-        if (window.currentRouteStats) {
-          window.currentRouteStats.timeHours = timeHours;
-          window.currentRouteStats.estimatedTime = formattedTime;
-          
-          // Also sync wind data
-          if (routeStats && routeStats.windAdjusted) {
-            window.currentRouteStats.windAdjusted = true;
-            window.currentRouteStats.windData = { ...routeStats.windData };
-          }
-        }
         
         return formattedTime;
       } catch (error) {
@@ -1178,11 +1004,27 @@ const RouteStatsCard = ({
             <div className="route-stat-item">
               <div className="route-stat-label">Total Distance:</div>
               <div className="route-stat-value">
-                {stats.totalDistance && stats.totalDistance !== '0' ? 
-                  `${stats.totalDistance} NM` : 
-                  (waypoints && waypoints.length >= 2 ? 
-                    `${calculateTotalDistance(waypoints)} NM` : 
-                    '0 NM')}
+                {(() => {
+                  // First, try to get distance from destination card in stopCards
+                  if (stopCards && stopCards.length > 0) {
+                    const destinationCard = stopCards.find(card => card.isDestination);
+                    if (destinationCard && destinationCard.totalDistance) {
+                      return `${destinationCard.totalDistance} NM`;
+                    }
+                  }
+                  
+                  // Then, try from routeStats
+                  if (stats.totalDistance && stats.totalDistance !== '0') {
+                    return `${stats.totalDistance} NM`;
+                  }
+                  
+                  // Last resort: calculate from waypoints
+                  if (waypoints && waypoints.length >= 2) {
+                    return `${calculateTotalDistance(waypoints)} NM`;
+                  }
+                  
+                  return '0 NM';
+                })()}
               </div>
             </div>
             
@@ -1211,8 +1053,18 @@ const RouteStatsCard = ({
                 )}
               </div>
               <div className="route-stat-value">
-                {/* EMERGENCY FIX: Calculate time if needed */}
-                {calculateFlightTime(stats, waypoints, selectedAircraft)}
+                {(() => {
+                  // First, try to get time directly from destination card in stopCards
+                  if (stopCards && stopCards.length > 0) {
+                    const destinationCard = stopCards.find(card => card.isDestination);
+                    if (destinationCard && destinationCard.totalTime) {
+                      return formatTime(destinationCard.totalTime);
+                    }
+                  }
+                  
+                  // Then, fall back to calculating from stats
+                  return calculateFlightTime(stats, waypoints, selectedAircraft);
+                })()}
               </div>
             </div>
             
@@ -1258,19 +1110,17 @@ const RouteStatsCard = ({
               <div className="route-stat-value">{calculateTotalTime()}</div>
             </div>
             
-            {/* Column 4: Passengers (below Total Fuel) */}
+                {/* Column 4: Passengers (below Total Fuel) */}
             <div className="route-stat-item">
               <div className="route-stat-label">Passengers:</div>
               <div className="route-stat-value" style={{ display: 'flex', alignItems: 'center' }}>
-                {/* Try stopCards first, then fallback to localStopCards if needed */}
-                {(stopCards && stopCards.length > 0) || (localStopCards && localStopCards.length > 0) ? (
+                {stopCards && stopCards.length > 0 ? (
                   <>
                     {(() => {
-                      // Choose which cards to use - stopCards if available, otherwise localStopCards
-                      const cardsToUse = (stopCards && stopCards.length > 0) ? stopCards : localStopCards;
-                      
-                      // Filter cards to get non-destination cards for passenger display
-                      const cardsWithPassengers = cardsToUse.filter(card => !card.isDestination && card.maxPassengers !== undefined);
+                      // Get the non-destination cards for passenger display directly from stopCards
+                      const cardsWithPassengers = stopCards.filter(
+                        card => !card.isDestination && card.maxPassengers !== undefined
+                      );
                       
                       // Return early if no valid cards
                       if (cardsWithPassengers.length === 0) {
@@ -1325,19 +1175,6 @@ const RouteStatsCard = ({
                     <span>{getDisplayPassengers()}</span>
                   </div>
                 )}
-                
-                {/* Log passenger data for debugging */}
-                {console.log("⭐ PASSENGER DATA DEBUG:", {
-                  stopCardsCount: stopCards?.length || 0,
-                  localStopCardsCount: localStopCards?.length || 0,
-                  stopCards: stopCards?.map(c => ({
-                    id: c.id,
-                    index: c.index, 
-                    isDeparture: c.isDeparture, 
-                    isDestination: c.isDestination, 
-                    maxPax: c.maxPassengers
-                  }))
-                })}
               </div>
             </div>
           </div>
@@ -1392,147 +1229,7 @@ const RouteStatsCard = ({
         </div>
       )}
       
-      {/* Local stop cards display */}
-      {localStopCards && localStopCards.length > 0 && (
-        <div className="route-stops" style={{ margin: '5px 0', padding: '8px 10px' }}>
-          <h4 className="route-stops-title" style={{ 
-            margin: '0 0 8px 0', 
-            color: '#3498db', 
-            fontSize: '0.85em', 
-            fontWeight: '600', 
-            textTransform: 'uppercase' 
-          }}>ROUTE STOPS</h4>
-          
-          <div className="stop-cards-stack" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {localStopCards.map((card, index) => {
-              // Determine styling based on stop type
-              const borderColor = card.isDeparture ? '#2ecc71' : 
-                                card.isDestination ? '#e74c3c' : 
-                                '#3498db';
-              const bgColor = card.isDeparture ? 'rgba(45, 55, 45, 0.95)' : 
-                             card.isDestination ? 'rgba(55, 45, 45, 0.95)' : 
-                             'rgba(45, 45, 55, 0.95)';
-              
-              // Format time as HH:MM
-              const formatTime = (timeHours) => {
-                if (!timeHours && timeHours !== 0) return '00:00';
-                const hours = Math.floor(timeHours);
-                const minutes = Math.floor((timeHours - hours) * 60);
-                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-              };
-              
-              // Determine stop number display
-              const stopNumberDisplay = card.isDeparture ? 'D' : 
-                                       card.isDestination ? 'F' : 
-                                       card.index;
-                                       
-              return (
-                <div key={`stop-${index}`} className={`stop-card ${card.isDeparture ? 'departure-card' : ''} ${card.isDestination ? 'destination-card' : ''}`} style={{
-                  backgroundColor: bgColor,
-                  borderLeft: `3px solid ${borderColor}`,
-                  borderRadius: '3px',
-                  padding: '8px 10px',
-                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.25)',
-                  cursor: 'pointer',
-                  marginBottom: '5px'
-                }}>
-                  {/* Stop header with number and name */}
-                  <div className="stop-header" style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-                    <div className="stop-number" style={{ 
-                      backgroundColor: borderColor,
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '18px',
-                      height: '18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75em',
-                      fontWeight: 'bold',
-                      marginRight: '8px',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.25)'
-                    }}>
-                      {stopNumberDisplay}
-                    </div>
-                    <div className="stop-name" style={{
-                      fontWeight: '600',
-                      fontSize: '0.85em',
-                      color: 'white',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      maxWidth: '180px',
-                      textShadow: '0 1px 1px rgba(0, 0, 0, 0.3)'
-                    }}>
-                      {card.stopName || `Stop ${index + 1}`}
-                    </div>
-                  </div>
-                  
-                  {/* Stop details */}
-                  <div className="stop-details" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    {/* Distance */}
-                    <div className="stop-metric">
-                      <span className="icon" style={{ color: borderColor }}>📍</span>
-                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
-                        {card.totalDistance || '0'} nm
-                      </div>
-                    </div>
-                    
-                    {/* Time */}
-                    <div className="stop-metric">
-                      <span className="icon" style={{ color: borderColor }}>⏱️</span>
-                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
-                        {formatTime(card.totalTime)}
-                      </div>
-                    </div>
-                    
-                    {/* Fuel */}
-                    <div className="stop-metric">
-                      <span className="icon" style={{ color: borderColor }}>⛽</span>
-                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
-                        {card.totalFuel || '0'} lbs
-                      </div>
-                    </div>
-                    
-                    {/* Passengers */}
-                    <div className="stop-metric">
-                      <span className="icon" style={{ color: borderColor }}>👥</span>
-                      <div className="metric-value" style={{ fontSize: '0.75em', color: '#f5f5f5' }}>
-                        {card.maxPassengersDisplay || card.maxPassengers || '0'}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Fuel Components */}
-                  <div className="fuel-components" style={{ 
-                    marginTop: '6px', 
-                    paddingTop: '4px', 
-                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                    fontSize: '0.7em',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    <div className="fuel-components-text">
-                      {/* Display fuel components using the prettier format for debugging */}
-                      Trip: {card.fuelComponentsObject?.tripFuel || 0} • 
-                      Cont: {card.fuelComponentsObject?.contingencyFuel || 0} • 
-                      Taxi: {card.fuelComponentsObject?.taxiFuel || 0} • 
-                      Deck: {card.fuelComponentsObject?.deckFuel || 0} • 
-                      Res: {card.fuelComponentsObject?.reserveFuel || 0}
-                    </div>
-                    <div className="fuel-components-text" style={{ marginTop: '3px', color: '#999' }}>
-                      {/* Show original string if available */}
-                      {card.fuelComponents ? `Original: ${card.fuelComponents}` : ''}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* REMOVED: Local stop cards display (redundant, now using StopCardsContainer as single source of truth) */}
     </div>
   );
 };

@@ -261,7 +261,7 @@ class EnhancedFuelCalculator {
       overallTotalTime += legTotalTimeHours;
       overallTotalTripFuel += legTotalFuelRequired;
       
-      // Store details for this STOP-TO-STOP leg
+      // Store leg details for this STOP-TO-STOP leg
       legDetails.push({
         from: departureStop.name || `Stop ${legIndex}`,
         to: arrivalStop.name || `Stop ${legIndex + 1}`,
@@ -346,14 +346,14 @@ class EnhancedFuelCalculator {
           lon: toCoords[0]
         };
         
-        // Calculate heading between points
-        const heading = window.WindCalculations.calculateHeading(from, to);
+        // Calculate heading between points (using calculateCourse which is the correct function name)
+        const heading = window.WindCalculations.calculateCourse(from, to);
         
-        // Calculate wind effect
-        const windEffect = window.WindCalculations.calculateWindComponent(
+        // Calculate wind effect (using calculateHeadwindComponent which is the correct function name)
+        const windEffect = window.WindCalculations.calculateHeadwindComponent(
+          weather.windSpeed,
           heading,
-          weather.windDirection,
-          weather.windSpeed
+          weather.windDirection
         );
         
         // Calculate ground speed
@@ -494,7 +494,7 @@ class EnhancedFuelCalculator {
       // Store stop details
       fuelByStop.push({
         index: i,
-        waypoint: currentStopWaypoint.name || `Stop ${i}`,
+        waypointName: currentStopWaypoint.name || `Stop ${i}`,
         isFirstStop,
         isLastStop,
         requiredFuel: Math.round(requiredFuel),

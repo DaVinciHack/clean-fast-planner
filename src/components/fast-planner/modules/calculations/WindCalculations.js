@@ -309,6 +309,21 @@ const calculateLegWithWind = (from, to, distance, aircraft, weather) => {
   };
 };
 
+// ENHANCEMENT: Expose this module globally for consistent access across all components
+if (typeof window !== 'undefined') {
+  window.WindCalculations = {
+    calculateWindAngle,
+    calculateHeadwindComponent,
+    calculateCrosswindComponent,
+    calculateGroundSpeed,
+    calculateCourse,
+    calculateWindAdjustedTime,
+    calculateWindAdjustedFuel,
+    calculateLegWithWind,
+    calculateDriftAngle
+  };
+}
+
 export {
   calculateWindAngle,
   calculateHeadwindComponent,

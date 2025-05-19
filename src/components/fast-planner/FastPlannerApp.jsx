@@ -12,7 +12,7 @@ import {
   LeftPanel,
   RightPanel,
   MapComponent,
-  RouteStatsCard
+  SimpleRouteStatsCard
 } from './components';
 
 // Import MapZoomHandler for waypoint display
@@ -213,12 +213,13 @@ const FastPlannerCore = ({
           <div className="loading-spinner"></div>
           <div className="loading-message">Loading...</div>
         </div>
-        <RouteStatsCard
-          routeStats={routeStats} selectedAircraft={selectedAircraft} waypoints={waypoints}
-          deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
-          passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
-          taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
-          reserveFuel={flightSettings.reserveFuel} weather={weather} stopCards={stopCards}
+        <SimpleRouteStatsCard
+          selectedAircraft={selectedAircraft}
+          stopCards={stopCards}
+          taxiFuel={flightSettings.taxiFuel}
+          reserveFuel={flightSettings.reserveFuel}
+          contingencyFuelPercent={flightSettings.contingencyFuelPercent}
+          deckTimePerStop={flightSettings.deckTimePerStop}
         />
         <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReadyImpl} className="fast-planner-map" />
         <MapZoomHandler mapManagerRef={mapManagerRef} />

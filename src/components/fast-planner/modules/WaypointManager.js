@@ -618,42 +618,78 @@ class WaypointManager {
   }
   
   createArrowsAlongLine(allWaypointsCoordinates, routeStats = null) {
-    if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) return { type: 'FeatureCollection', features: [] };
+    // TEMPORARY FIX: Simple distance-only labels implementation that avoids the issues with legs
+    console.log("⭐ Using robust distance-only labels implementation");
+    
+    if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    
     const features = []; 
     const turf = window.turf; 
+    
     if (!turf) { 
       console.error("Turf.js is not available."); 
       return { type: 'FeatureCollection', features: [] }; 
     }
     
-    const currentDisplayStats = routeStats || window.currentRouteStats;
-    console.log("⭐ createArrowsAlongLine - waypoints", this.waypoints.length, "coordinates", allWaypointsCoordinates.length);
+    // Robust validation of coordinates
+    const validCoordinates = allWaypointsCoordinates.filter(coords => {
+      return Array.isArray(coords) && 
+             coords.length === 2 && 
+             typeof coords[0] === 'number' && 
+             typeof coords[1] === 'number' &&
+             !isNaN(coords[0]) && 
+             !isNaN(coords[1]);
+    });
     
-    // Use the currentDisplayStats if it has legs data
-    if (currentDisplayStats && currentDisplayStats.legs && currentDisplayStats.legs.length > 0) {
-      console.log("⭐ Using currentDisplayStats legs", currentDisplayStats.legs.length);
-      currentDisplayStats.legs.forEach((leg, index) => {
-        if (!leg.departureCoords || !leg.arrivalCoords) {
-          console.log("⭐ Missing coords for leg", index);
-          return;
-        }
-        const startPointCoords = leg.departureCoords;
-        const endPointCoords = leg.arrivalCoords;
-        const legDistanceNm = parseFloat(leg.distance);
-        const legBearing = turf.bearing(turf.point(startPointCoords), turf.point(endPointCoords));
-        const midPoint = turf.along(turf.lineString([startPointCoords, endPointCoords]), legDistanceNm * 0.5, { units: 'nauticalmiles' });
-        const distanceText = `${legDistanceNm.toFixed(1)} nm`;
-        let timeText = leg.timeFormatted || '00:00';
-        if (currentDisplayStats.windAdjusted && typeof leg.windEffect === 'number' && Math.abs(leg.windEffect) > 1) {
-          timeText += '*';
-        }
+    if (validCoordinates.length < 2) {
+      console.error("Not enough valid coordinates for route labels");
+      return { type: 'FeatureCollection', features: [] };
+    }
+    
+    // Process each segment
+    for (let i = 0; i < validCoordinates.length - 1; i++) {
+      try {
+        const startPointCoords = validCoordinates[i];
+        const endPointCoords = validCoordinates[i + 1];
+        
+        // Create point objects
+        const fromPoint = turf.point(startPointCoords);
+        const toPoint = turf.point(endPointCoords);
+        
+        // Calculate distance
+        const legDistance = turf.distance(
+          fromPoint, 
+          toPoint,
+          { units: 'nauticalmiles' }
+        );
+        
+        // Calculate bearing for alignment
+        const legBearing = turf.bearing(fromPoint, toPoint);
+        
+        // Create linestring for midpoint calculation
+        const line = turf.lineString([startPointCoords, endPointCoords]);
+        
+        // Find midpoint for label placement
+        const midPoint = turf.along(
+          line, 
+          legDistance * 0.5, 
+          { units: 'nauticalmiles' }
+        );
+        
+        // Create simple distance label
+        const distanceText = `${legDistance.toFixed(1)} nm`;
         const goingLeftToRight = endPointCoords[0] > startPointCoords[0];
-        let labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${timeText ? ` • ${timeText}` : ''}${goingLeftToRight ? ' →' : ''}`;
+        const labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${goingLeftToRight ? ' →' : ''}`;
+        
+        // Calculate adjusted bearing for text readability
         let adjustedBearing = legBearing + 90;
         if (adjustedBearing > 90 && adjustedBearing < 270) {
           adjustedBearing = (adjustedBearing + 180) % 360;
         }
-        console.log("⭐ Adding label for leg", index, labelText);
+        
+        // Add feature
         features.push({
           type: 'Feature',
           geometry: midPoint.geometry,
@@ -662,95 +698,15 @@ class WaypointManager {
             bearing: legBearing,
             textBearing: adjustedBearing,
             text: labelText,
-            legIndex: index
+            legIndex: i
           }
         });
-      });
-    } else {
-      // No structured leg data, create our own from landing stops
-      console.log("⭐ No leg data in routeStats, creating from landing stops");
-      
-      // Filter waypoints to get only landing stops
-      const landingStopsOnly = this.waypoints.filter(wp => {
-        // Check if this is a navigation waypoint
-        const isWaypoint = 
-          wp.pointType === 'NAVIGATION_WAYPOINT' || // Explicit type
-          wp.isWaypoint === true || // Legacy flag
-          wp.type === 'WAYPOINT'; // Legacy type value
-        
-        // Keep only landing stops
-        return !isWaypoint;
-      });
-      
-      console.log("⭐ Found", landingStopsOnly.length, "landing stops");
-      
-      // If we have at least 2 landing stops, create labels for legs between landing stops
-      if (landingStopsOnly.length >= 2) {
-        // Process each leg between landing stops
-        for (let i = 0; i < landingStopsOnly.length - 1; i++) {
-          const fromStop = landingStopsOnly[i];
-          const toStop = landingStopsOnly[i + 1];
-          
-          // Get coordinates of the stops
-          const fromStopCoords = fromStop.coords;
-          const toStopCoords = toStop.coords;
-          
-          // Create direct line between stops
-          const from = turf.point(fromStopCoords);
-          const to = turf.point(toStopCoords);
-          const legDistance = turf.distance(from, to, { units: 'nauticalmiles' });
-          const legBearing = turf.bearing(from, to);
-          
-          // Create a line for the leg
-          const legLine = turf.lineString([fromStopCoords, toStopCoords]);
-          
-          // Place the label at the midpoint
-          const midPoint = turf.along(legLine, legDistance * 0.5, { units: 'nauticalmiles' });
-          
-          // Format the time for this leg (if available)
-          let timeText = '00:00';
-          
-          // Calculate time based on distance and cruise speed
-          const cruiseSpeed = currentDisplayStats?.aircraft?.cruiseSpeed || 135;
-          const timeHours = legDistance / cruiseSpeed;
-          const hours = Math.floor(timeHours);
-          const minutes = Math.floor((timeHours - hours) * 60);
-          timeText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          
-          // Format distance text
-          const distanceText = `${legDistance.toFixed(1)} nm`;
-          
-          // Check direction for arrow placement
-          const goingLeftToRight = toStopCoords[0] > fromStopCoords[0];
-          
-          // Create the label text with direction arrows if needed
-          let labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${timeText ? ` • ${timeText}` : ''}${goingLeftToRight ? ' →' : ''}`;
-          
-          // Adjust text rotation for readability
-          let textBearing = legBearing + 90;
-          if (textBearing > 90 && textBearing < 270) {
-            textBearing = (textBearing + 180) % 360;
-          }
-          
-          console.log("⭐ Adding manual label for leg", i, labelText);
-          
-          // Add the feature for this label
-          features.push({
-            type: 'Feature',
-            geometry: midPoint.geometry,
-            properties: {
-              isLabel: true,
-              bearing: legBearing,
-              textBearing: textBearing,
-              text: labelText,
-              legIndex: i
-            }
-          });
-        }
+      } catch (err) {
+        console.error(`Error creating label for segment ${i}:`, err);
       }
     }
     
-    console.log("⭐ Created", features.length, "label features");
+    console.log(`⭐ Created ${features.length} simple distance labels`);
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -817,23 +773,84 @@ class WaypointManager {
       return;
     }
 
-    // Ensure routeStats are available or fall back to global
+    // CRITICAL SAFETY FIX: Never use any routeStats object that has time or fuel values without an aircraft
     if (routeStats) {
-      // Simplified time calculation logic (can be expanded if needed)
-      if ((!routeStats.timeHours || routeStats.timeHours === 0) && routeStats.totalDistance) {
-        const cruiseSpeed = routeStats.aircraft?.cruiseSpeed || window.currentSelectedAircraft?.cruiseSpeed || 135;
-        const totalDistanceNum = parseFloat(routeStats.totalDistance);
-        if (totalDistanceNum > 0 && cruiseSpeed > 0) {
-          const timeHours = totalDistanceNum / cruiseSpeed;
-          const hours = Math.floor(timeHours);
-          const minutes = Math.floor((timeHours - hours) * 60);
-          routeStats.timeHours = timeHours;
-          routeStats.estimatedTime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-        }
+      // If using routeStats directly, log that fact
+      console.log("⭐ WaypointManager.updateRoute called with routeStats:", {
+        hasAircraft: routeStats.aircraft ? true : false,
+        timeHours: routeStats.timeHours,
+        estimatedTime: routeStats.estimatedTime,
+        hasLegs: routeStats.legs ? routeStats.legs.length : 0
+      });
+      
+      // Check if routeStats has non-zero values for time or fuel without an aircraft 
+      if ((!routeStats.distanceOnly && !routeStats.aircraft) && 
+          (routeStats.timeHours || routeStats.estimatedTime !== '00:00' || 
+           routeStats.fuelRequired || routeStats.tripFuel)) {
+        console.error('⚠️ SAFETY ALERT: RouteStats contains time or fuel values without an aircraft!');
+        
+        // Force correct the routeStats
+        routeStats.timeHours = 0;
+        routeStats.estimatedTime = '00:00';
+        routeStats.fuelRequired = 0;
+        routeStats.tripFuel = 0;
       }
-      window.currentRouteStats = {...(window.currentRouteStats || {}), ...routeStats};
+      
+      // Update global state - Make a proper deep copy to ensure data is preserved
+      // But use setTimeout to prevent causing a React update cycle
+      if (!window.currentRouteStats) {
+        window.currentRouteStats = {};
+      }
+      
+      // Create a new object to avoid reference issues
+      const updatedStats = {...window.currentRouteStats};
+      
+      // Add important properties from routeStats
+      if (routeStats.timeHours) updatedStats.timeHours = routeStats.timeHours;
+      if (routeStats.estimatedTime) updatedStats.estimatedTime = routeStats.estimatedTime;
+      if (routeStats.tripFuel) updatedStats.tripFuel = routeStats.tripFuel;
+      if (routeStats.totalFuel) updatedStats.totalFuel = routeStats.totalFuel;
+      if (routeStats.aircraft) updatedStats.aircraft = routeStats.aircraft;
+      if (routeStats.legs) updatedStats.legs = [...routeStats.legs];
+      
+      // Use setTimeout to break the React update cycle
+      setTimeout(() => {
+        window.currentRouteStats = updatedStats;
+        
+        // Log the updated window.currentRouteStats for debugging
+        console.log("⭐ window.currentRouteStats updated:", {
+          timeHours: window.currentRouteStats.timeHours,
+          estimatedTime: window.currentRouteStats.estimatedTime,
+          tripFuel: window.currentRouteStats.tripFuel,
+          totalFuel: window.currentRouteStats.totalFuel,
+          hasAircraft: window.currentRouteStats.aircraft ? true : false,
+          hasLegs: window.currentRouteStats.legs ? window.currentRouteStats.legs.length : 0
+        });
+      }, 0);
     } else if (window.currentRouteStats) {
+      // If using global state, ensure this also has zeros for safety
+      if (!window.currentRouteStats.aircraft) {
+        const updatedStats = {...window.currentRouteStats};
+        updatedStats.timeHours = 0;
+        updatedStats.estimatedTime = '00:00';
+        updatedStats.fuelRequired = 0;
+        updatedStats.tripFuel = 0;
+        
+        // Use setTimeout to avoid update cycles
+        setTimeout(() => {
+          window.currentRouteStats = updatedStats;
+        }, 0);
+      }
+      
       routeStats = window.currentRouteStats;
+      
+      // Log that we're using global state
+      console.log("⭐ WaypointManager.updateRoute using window.currentRouteStats:", {
+        hasAircraft: routeStats.aircraft ? true : false,
+        timeHours: routeStats.timeHours,
+        estimatedTime: routeStats.estimatedTime,
+        hasLegs: routeStats.legs ? routeStats.legs.length : 0
+      });
     }
 
     const routeSourceId = 'route';

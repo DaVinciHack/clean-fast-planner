@@ -84,23 +84,26 @@ const StopCardsContainer = ({
       return;
     }
     
+    // Create numeric parameter object
+    const numericParams = {
+      passengerWeight: Number(passengerWeight) || 0,
+      reserveFuel: Number(reserveFuel) || 0,
+      contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
+      deckTimePerStop: Number(deckTimePerStop) || 0,
+      deckFuelFlow: Number(deckFuelFlow) || 0,
+      taxiFuel: Number(taxiFuel) || 0
+    };
+    
     // Use the StopCardCalculator to calculate the stop cards
     // Log input values to debug
-    console.log('🧮 StopCardsContainer calculating with taxiFuel directly from props:', taxiFuel);
+    console.log('🧮 StopCardsContainer calculating with numeric parameters:', numericParams);
     
     const newCards = StopCardCalculator.calculateStopCards(
       waypoints, 
       routeStats, 
       selectedAircraft, 
       weather, 
-      {
-        passengerWeight,
-        reserveFuel,
-        contingencyFuelPercent, // Fixed: use the correct parameter name
-        deckTimePerStop,
-        deckFuelFlow,
-        taxiFuel // Pass the original value directly
-      }
+      numericParams
     );
     
     // Mark new cards
@@ -114,6 +117,153 @@ const StopCardsContainer = ({
     
     // Update previous waypoints
     prevWaypointsRef.current = [...waypoints];
+    
+    // IMPORTANT: Make the calculated stop cards available globally
+    // This ensures the RouteStatsCard can access the latest stop cards as the single source of truth
+    if (updatedCards && updatedCards.length > 0) {
+      console.log('⭐ StopCardsContainer: Publishing calculated stop cards as SINGLE SOURCE OF TRUTH');
+      
+      // Initialize window.currentRouteStats if needed
+      if (!window.currentRouteStats) window.currentRouteStats = {};
+      
+      // IMPORTANT: Update immediately without setTimeout to ensure data is available right away
+      try {
+        // Deep clone to prevent reference issues
+        const sanitizedCards = updatedCards.map(card => {
+          // Make a deep copy of the card
+          const cleanCard = JSON.parse(JSON.stringify(card));
+          
+          // Ensure all numerical fields are valid numbers
+          if (cleanCard.fuelComponentsObject) {
+            Object.keys(cleanCard.fuelComponentsObject).forEach(key => {
+              cleanCard.fuelComponentsObject[key] = Number(cleanCard.fuelComponentsObject[key]) || 0;
+            });
+          } else {
+            // Create default fuelComponentsObject if missing
+            cleanCard.fuelComponentsObject = {
+              tripFuel: 0,
+              contingencyFuel: 0,
+              taxiFuel: 0,
+              deckFuel: 0,
+              reserveFuel: 0
+            };
+            
+            // Add extraFuel for destination cards
+            if (cleanCard.isDestination) {
+              cleanCard.fuelComponentsObject.extraFuel = 0;
+            }
+          }
+          
+          // Ensure critical numeric fields
+          cleanCard.totalFuel = Number(cleanCard.totalFuel) || 0;
+          cleanCard.deckFuel = Number(cleanCard.deckFuel) || 0;
+          
+          return cleanCard;
+        });
+        
+        window.currentRouteStats.stopCards = sanitizedCards;
+        
+        // Specifically log the destination card if it exists
+        const destinationCard = sanitizedCards.find(card => card.isDestination);
+        if (destinationCard) {
+          console.log('🔎 DESTINATION CARD VALIDATION:', {
+            totalFuel: destinationCard.totalFuel,
+            componentSum: Object.values(destinationCard.fuelComponentsObject).reduce((sum, val) => sum + val, 0),
+            components: destinationCard.fuelComponentsObject
+          });
+        }
+      } catch (error) {
+        console.error('Error sanitizing stop cards:', error);
+        window.currentRouteStats.stopCards = [];
+      }
+      
+      // CRITICAL: Extract and publish the departure card fuel information as the authoritative source
+      const departureCard = updatedCards.find(card => card.isDeparture);
+      if (departureCard) {
+        console.log('🔍 Departure card fuel breakdown:', {
+          totalFuel: departureCard.totalFuel,
+          fuelComponentsObject: departureCard.fuelComponentsObject,
+          fuelComponents: departureCard.fuelComponents
+        });
+        
+        // Ensure all fuel component values are valid numbers
+        const safeComponents = {
+          tripFuel: typeof departureCard.fuelComponentsObject?.tripFuel === 'number' 
+            ? departureCard.fuelComponentsObject.tripFuel 
+            : Number(departureCard.fuelComponentsObject?.tripFuel) || 0,
+            
+          contingencyFuel: typeof departureCard.fuelComponentsObject?.contingencyFuel === 'number'
+            ? departureCard.fuelComponentsObject.contingencyFuel
+            : Number(departureCard.fuelComponentsObject?.contingencyFuel) || 0,
+            
+          taxiFuel: typeof departureCard.fuelComponentsObject?.taxiFuel === 'number'
+            ? departureCard.fuelComponentsObject.taxiFuel
+            : Number(departureCard.fuelComponentsObject?.taxiFuel) || 0,
+            
+          deckFuel: typeof departureCard.deckFuel === 'number'
+            ? departureCard.deckFuel
+            : Number(departureCard.deckFuel) || 0,
+            
+          reserveFuel: typeof departureCard.fuelComponentsObject?.reserveFuel === 'number'
+            ? departureCard.fuelComponentsObject.reserveFuel
+            : Number(departureCard.fuelComponentsObject?.reserveFuel) || 0
+        };
+        
+        // Calculate the sum to verify consistency
+        const sum = safeComponents.tripFuel +
+                   safeComponents.contingencyFuel +
+                   safeComponents.taxiFuel +
+                   safeComponents.deckFuel +
+                   safeComponents.reserveFuel;
+        
+        // Create a clean, complete fuel data object from the departure card
+        window.currentRouteStats.fuelData = {
+          totalFuel: sum, // Always use the calculated sum for consistency
+          tripFuel: safeComponents.tripFuel,
+          contingencyFuel: safeComponents.contingencyFuel,
+          taxiFuel: safeComponents.taxiFuel,
+          deckFuel: safeComponents.deckFuel,
+          reserveFuel: safeComponents.reserveFuel,
+          sum: sum, // Include the sum for verification
+          // Include parameters used in calculation for reference/debugging
+          calculationParams: {
+            passengerWeight: Number(passengerWeight) || 0,
+            taxiFuel: Number(taxiFuel) || 0,
+            contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
+            deckTimePerStop: Number(deckTimePerStop) || 0,
+            deckFuelFlow: Number(deckFuelFlow) || 0,
+            reserveFuel: Number(reserveFuel) || 0
+          }
+        };
+        
+        // Log the published data
+        console.log('⛽ Published authoritative fuel data:', window.currentRouteStats.fuelData);
+      }
+      
+      // Also publish the passenger information from all cards
+      window.currentRouteStats.passengerData = updatedCards
+        .filter(card => !card.isDestination) // Exclude destination cards
+        .map(card => ({
+          index: card.index,
+          id: card.id,
+          stopName: card.stopName,
+          isDeparture: card.isDeparture,
+          maxPassengers: card.maxPassengers,
+          maxPassengersDisplay: card.maxPassengersDisplay
+        }));
+      console.log('👥 Published authoritative passenger data:', window.currentRouteStats.passengerData);
+      
+      // ENHANCEMENT: Force a route stats update by setting a trigger flag
+      // This helps ensure the top card gets updated immediately
+      window.currentRouteStats.updateTrigger = Date.now();
+      
+      // Call any registered update functions with a short delay to ensure data is available
+      setTimeout(() => {
+        if (typeof window.triggerRouteStatsUpdate === 'function') {
+          window.triggerRouteStatsUpdate();
+        }
+      }, 50);
+    }
   }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather]);
   
   // Apply FLIP animation after cards update
