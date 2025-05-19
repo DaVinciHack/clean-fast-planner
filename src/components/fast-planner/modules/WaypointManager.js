@@ -618,8 +618,7 @@ class WaypointManager {
   }
   
   createArrowsAlongLine(allWaypointsCoordinates, routeStats = null) {
-    // TEMPORARY FIX: Simple distance-only labels implementation that avoids the issues with legs
-    console.log("⭐ Using robust distance-only labels implementation");
+    console.log("⭐ Creating route labels with distance and time information");
     
     if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) {
       return { type: 'FeatureCollection', features: [] };
@@ -648,65 +647,335 @@ class WaypointManager {
       return { type: 'FeatureCollection', features: [] };
     }
     
-    // Process each segment
-    for (let i = 0; i < validCoordinates.length - 1; i++) {
-      try {
-        const startPointCoords = validCoordinates[i];
-        const endPointCoords = validCoordinates[i + 1];
+    // Find landing stops (non-waypoints) if we have waypoint information
+    // This helps us identify leg boundaries (stop to stop)
+    let legBoundaries = [];
+    
+    if (this.waypoints && this.waypoints.length > 0) {
+      // Find waypoints that are landing stops
+      const landingStops = this.waypoints.filter(wp => 
+        wp.pointType === 'LANDING_STOP' || 
+        (!wp.pointType && !wp.isWaypoint && wp.type !== 'WAYPOINT')
+      );
+      
+      // Map these to indices in the coordinates array
+      if (landingStops.length > 0) {
+        legBoundaries = landingStops.map(stop => {
+          // Find the index of this stop's coordinates in the validCoordinates array
+          const coordStr = JSON.stringify(stop.coords);
+          return validCoordinates.findIndex(coord => 
+            JSON.stringify(coord) === coordStr
+          );
+        }).filter(idx => idx !== -1); // Remove any not found (-1)
         
-        // Create point objects
-        const fromPoint = turf.point(startPointCoords);
-        const toPoint = turf.point(endPointCoords);
-        
-        // Calculate distance
-        const legDistance = turf.distance(
-          fromPoint, 
-          toPoint,
-          { units: 'nauticalmiles' }
-        );
-        
-        // Calculate bearing for alignment
-        const legBearing = turf.bearing(fromPoint, toPoint);
-        
-        // Create linestring for midpoint calculation
-        const line = turf.lineString([startPointCoords, endPointCoords]);
-        
-        // Find midpoint for label placement
-        const midPoint = turf.along(
-          line, 
-          legDistance * 0.5, 
-          { units: 'nauticalmiles' }
-        );
-        
-        // Create simple distance label
-        const distanceText = `${legDistance.toFixed(1)} nm`;
-        const goingLeftToRight = endPointCoords[0] > startPointCoords[0];
-        const labelText = `${!goingLeftToRight ? '← ' : ''}${distanceText}${goingLeftToRight ? ' →' : ''}`;
-        
-        // Calculate adjusted bearing for text readability
-        let adjustedBearing = legBearing + 90;
-        if (adjustedBearing > 90 && adjustedBearing < 270) {
-          adjustedBearing = (adjustedBearing + 180) % 360;
+        // Ensure the first waypoint is included if it's not already
+        if (legBoundaries.length > 0 && legBoundaries[0] !== 0) {
+          legBoundaries.unshift(0);
         }
         
-        // Add feature
-        features.push({
-          type: 'Feature',
-          geometry: midPoint.geometry,
-          properties: {
-            isLabel: true,
-            bearing: legBearing,
-            textBearing: adjustedBearing,
-            text: labelText,
-            legIndex: i
-          }
-        });
-      } catch (err) {
-        console.error(`Error creating label for segment ${i}:`, err);
+        // Ensure the last waypoint is included if it's not already
+        const lastIndex = validCoordinates.length - 1;
+        if (legBoundaries.length > 0 && legBoundaries[legBoundaries.length - 1] !== lastIndex) {
+          legBoundaries.push(lastIndex);
+        }
+        
+        console.log(`⭐ Found ${legBoundaries.length} leg boundaries at indices:`, legBoundaries);
       }
     }
     
-    console.log(`⭐ Created ${features.length} simple distance labels`);
+    // If no leg boundaries found or invalid, treat each waypoint as a boundary
+    if (legBoundaries.length < 2) {
+      console.log("⭐ No leg boundaries found, using individual segments");
+      
+      // Process each segment as its own leg
+      for (let i = 0; i < validCoordinates.length - 1; i++) {
+        try {
+          const startPointCoords = validCoordinates[i];
+          const endPointCoords = validCoordinates[i + 1];
+          
+          // Create point objects
+          const fromPoint = turf.point(startPointCoords);
+          const toPoint = turf.point(endPointCoords);
+          
+          // Calculate distance
+          const legDistance = turf.distance(
+            fromPoint, 
+            toPoint,
+            { units: 'nauticalmiles' }
+          );
+          
+          // Calculate time if we have routeStats with legs
+          let legTime = null;
+          if (routeStats && routeStats.legs && i < routeStats.legs.length) {
+            legTime = routeStats.legs[i].time;
+            console.log(`Found time for segment ${i} from routeStats: ${legTime}`);
+          } 
+          else if (window.currentRouteStats && window.currentRouteStats.legs && i < window.currentRouteStats.legs.length) {
+            legTime = window.currentRouteStats.legs[i].time;
+            console.log(`Found time for segment ${i} from window.currentRouteStats: ${legTime}`);
+          }
+          // As a last resort, calculate time based on aircraft speed
+          else if (window.currentRouteStats && window.currentRouteStats.aircraft && window.currentRouteStats.aircraft.cruiseSpeed) {
+            legTime = legDistance / window.currentRouteStats.aircraft.cruiseSpeed;
+            console.log(`Estimated time for segment ${i} based on aircraft speed: ${legTime}`);
+          }
+          
+          // Create label with distance and time (if available)
+          const distanceText = `${legDistance.toFixed(1)} nm`;
+          
+          let labelText;
+          if (legTime !== null) {
+            // Format the time
+            const hours = Math.floor(legTime);
+            const minutes = Math.floor((legTime - hours) * 60);
+            const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
+            
+            // Combine distance and time on same line with dash separator
+            labelText = `${distanceText} - ${timeText}`;
+          } else {
+            // Distance only
+            labelText = distanceText;
+          }
+          
+          // Add directional arrows based on segment direction (with larger arrows)
+          const goingLeftToRight = endPointCoords[0] > startPointCoords[0];
+          if (goingLeftToRight) {
+            labelText = `${labelText} ➔`; // Using a larger arrow character
+          } else {
+            labelText = `⟸ ${labelText}`; // Using a larger arrow character
+          }
+          
+          // Calculate bearing for alignment
+          const legBearing = turf.bearing(fromPoint, toPoint);
+          
+          // Create linestring for midpoint calculation
+          const line = turf.lineString([startPointCoords, endPointCoords]);
+          
+          // Find midpoint for label placement
+          const midPoint = turf.along(
+            line, 
+            legDistance * 0.5, 
+            { units: 'nauticalmiles' }
+          );
+          
+          // Calculate adjusted bearing for text readability
+          let adjustedBearing = legBearing + 90;
+          if (adjustedBearing > 90 && adjustedBearing < 270) {
+            adjustedBearing = (adjustedBearing + 180) % 360;
+          }
+          
+          // Add feature
+          features.push({
+            type: 'Feature',
+            geometry: midPoint.geometry,
+            properties: {
+              isLabel: true,
+              bearing: legBearing,
+              textBearing: adjustedBearing,
+              text: labelText,
+              segmentDistance: legDistance,
+              legIndex: i
+            }
+          });
+        } catch (err) {
+          console.error(`Error creating label for segment ${i}:`, err);
+        }
+      }
+    } 
+    // Process by legs (stop to stop)
+    else {
+      console.log("⭐ Processing labels by legs (stop to stop)");
+      
+      // Process each leg (between consecutive leg boundaries)
+      for (let legIdx = 0; legIdx < legBoundaries.length - 1; legIdx++) {
+        try {
+          const startIdx = legBoundaries[legIdx];
+          const endIdx = legBoundaries[legIdx + 1];
+          
+          // Skip invalid legs
+          if (startIdx < 0 || endIdx >= validCoordinates.length || startIdx >= endIdx) {
+            console.warn(`Skipping invalid leg: ${startIdx} to ${endIdx}`);
+            continue;
+          }
+          
+          // Get the coordinates for the start and end of this leg
+          const legStartCoords = validCoordinates[startIdx];
+          const legEndCoords = validCoordinates[endIdx];
+          
+          // Find all segments in this leg
+          const legSegments = [];
+          let totalLegDistance = 0;
+          let longestSegmentIdx = -1;
+          let longestSegmentLength = 0;
+          
+          // Calculate each segment in this leg and find the longest one
+          for (let i = startIdx; i < endIdx; i++) {
+            const segStartCoords = validCoordinates[i];
+            const segEndCoords = validCoordinates[i + 1];
+            
+            // Calculate segment distance
+            const segFrom = turf.point(segStartCoords);
+            const segTo = turf.point(segEndCoords);
+            const segDistance = turf.distance(segFrom, segTo, { units: 'nauticalmiles' });
+            
+            // Calculate segment bearing
+            const segBearing = turf.bearing(segFrom, segTo);
+            
+            // Track this segment
+            legSegments.push({
+              startIdx: i,
+              endIdx: i + 1,
+              startCoords: segStartCoords,
+              endCoords: segEndCoords,
+              distance: segDistance,
+              bearing: segBearing
+            });
+            
+            // Update total leg distance
+            totalLegDistance += segDistance;
+            
+            // Check if this is the longest segment
+            if (segDistance > longestSegmentLength) {
+              longestSegmentLength = segDistance;
+              longestSegmentIdx = legSegments.length - 1;
+            }
+          }
+          
+          // Skip legs with no segments
+          if (legSegments.length === 0) {
+            console.warn(`Leg ${legIdx} has no valid segments`);
+            continue;
+          }
+          
+          // If we couldn't find a longest segment, use the first one
+          if (longestSegmentIdx === -1) {
+            longestSegmentIdx = 0;
+          }
+          
+          // Get the longest segment for label placement
+          const longestSegment = legSegments[longestSegmentIdx];
+          
+          // Calculate time for this leg
+          let legTime = null;
+          
+          // Try to get time from routeStats if available
+          if (routeStats && routeStats.legs) {
+            // First try direct match by index
+            if (legIdx < routeStats.legs.length) {
+              legTime = routeStats.legs[legIdx].time;
+              console.log(`Found time for leg ${legIdx} directly from routeStats: ${legTime}`);
+            }
+            // If that fails, try to match by coordinates
+            else {
+              // Look for a matching leg in routeStats
+              for (let i = 0; i < routeStats.legs.length; i++) {
+                const leg = routeStats.legs[i];
+                if (JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
+                    JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
+                  legTime = leg.time;
+                  console.log(`Found time for leg ${legIdx} by coordinate match in routeStats: ${legTime}`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Try from window.currentRouteStats as fallback
+          if (legTime === null && window.currentRouteStats && window.currentRouteStats.legs) {
+            // First check direct index match
+            if (legIdx < window.currentRouteStats.legs.length) {
+              legTime = window.currentRouteStats.legs[legIdx].time;
+              console.log(`Found time for leg ${legIdx} from window.currentRouteStats: ${legTime}`);
+            }
+            // Then try coordinate matching
+            else {
+              for (let i = 0; i < window.currentRouteStats.legs.length; i++) {
+                const leg = window.currentRouteStats.legs[i];
+                if (JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
+                    JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
+                  legTime = leg.time;
+                  console.log(`Found time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // As a last resort, calculate time directly based on aircraft speed if available
+          if (legTime === null && window.currentRouteStats && window.currentRouteStats.aircraft) {
+            const aircraft = window.currentRouteStats.aircraft;
+            if (aircraft.cruiseSpeed) {
+              // Estimate time based on distance and aircraft speed
+              legTime = totalLegDistance / aircraft.cruiseSpeed;
+              console.log(`Estimated time for leg ${legIdx} based on aircraft speed: ${legTime}`);
+            }
+          }
+          
+          console.log(`Leg ${legIdx} final time value: ${legTime}`);
+          
+          // Create a line for the longest segment
+          const line = turf.lineString([longestSegment.startCoords, longestSegment.endCoords]);
+          
+          // Find midpoint of the longest segment for label placement
+          const midPoint = turf.along(
+            line, 
+            longestSegment.distance * 0.5, 
+            { units: 'nauticalmiles' }
+          );
+          
+          // Create label with leg distance and time
+          const distanceText = `${totalLegDistance.toFixed(1)} nm`;
+          
+          let labelText;
+          if (legTime !== null) {
+            // Format the time
+            const hours = Math.floor(legTime);
+            const minutes = Math.floor((legTime - hours) * 60);
+            const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
+            
+            // Combine distance and time on same line with dash separator
+            labelText = `${distanceText} - ${timeText}`;
+          } else {
+            // Distance only
+            labelText = distanceText;
+          }
+          
+          // Add directional arrows based on segment direction (with larger arrows)
+          const goingLeftToRight = longestSegment.endCoords[0] > longestSegment.startCoords[0];
+          if (goingLeftToRight) {
+            labelText = `${labelText} ➔`; // Using a larger arrow character
+          } else {
+            labelText = `⟸ ${labelText}`; // Using a larger arrow character
+          }
+          
+          // Calculate adjusted bearing for text readability
+          let adjustedBearing = longestSegment.bearing + 90;
+          if (adjustedBearing > 90 && adjustedBearing < 270) {
+            adjustedBearing = (adjustedBearing + 180) % 360;
+          }
+          
+          // Add feature for the leg label
+          features.push({
+            type: 'Feature',
+            geometry: midPoint.geometry,
+            properties: {
+              isLabel: true,
+              bearing: longestSegment.bearing,
+              textBearing: adjustedBearing,
+              text: labelText,
+              legDistance: totalLegDistance,
+              legTime: legTime,
+              legIndex: legIdx,
+              isLeg: true // Flag to distinguish leg labels from segment labels
+            }
+          });
+        } catch (err) {
+          console.error(`Error creating label for leg ${legIdx}:`, err);
+        }
+      }
+    }
+    
+    console.log(`⭐ Created ${features.length} route labels`);
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -892,26 +1161,55 @@ class WaypointManager {
             layout: {
               'symbol-placement': 'point',
               'text-field': ['get', 'text'],
-              'text-size': 11,
+              'text-size': 12, // Slightly larger text size
               'text-font': ['Arial Unicode MS Bold'],
               'text-offset': [0, -0.5],
               'text-anchor': 'center',
               'text-rotate': ['get', 'textBearing'],
               'text-rotation-alignment': 'map',
-              'text-allow-overlap': true,
-              'text-ignore-placement': true,
+              'text-allow-overlap': false,
+              'text-ignore-placement': false,
               'text-max-width': 30,
               'text-line-height': 1.0,
               'symbol-sort-key': 3,
-              // Make label opacity zoom-dependent for short segments
-              'symbol-sort-key': 3,
+              // Make label visibility dependent on zoom level and segment length
+              'visibility': 'visible'
             },
             paint: {
               'text-color': '#ffffff',
               'text-halo-color': '#000000',
               'text-halo-width': 3,
-              // Simple static opacity value instead of complex expression
-              'text-opacity': 0.9
+              // More aggressive hiding for short segments to prevent text hanging off edges
+              'text-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                // At low zoom levels, only show larger segments
+                6, ['case', 
+                    ['>', ['get', 'legDistance'], 25], 0.9,  // Show segments > 25nm
+                    ['>', ['get', 'legDistance'], 15], 0.7,  // Show segments > 15nm
+                    0  // Hide smaller segments
+                   ],
+                // At medium zoom, show more segments
+                8, ['case',
+                    ['>', ['get', 'legDistance'], 15], 0.9,  // Show segments > 15nm clearly
+                    ['>', ['get', 'legDistance'], 7], 0.8,   // Show segments > 7nm
+                    ['>', ['get', 'legDistance'], 3], 0.7,   // Show segments > 3nm
+                    0  // Hide smaller segments
+                   ],
+                // At high zoom, show more but still hide very short segments
+                10, ['case',
+                     ['>', ['get', 'legDistance'], 2], 0.9,  // Show segments > 2nm clearly
+                     ['>', ['get', 'legDistance'], 1], 0.8,  // Show segments > 1nm
+                     0  // Hide very small segments
+                    ],
+                // At very high zoom, show small segments too
+                12, ['case',
+                     ['>', ['get', 'legDistance'], 0.5], 0.9,  // Show segments > 0.5nm
+                     ['>', ['get', 'legDistance'], 0.2], 0.8,  // Show segments > 0.2nm
+                     0.7  // Show all other segments with slight transparency
+                    ]
+              ]
             },
             filter: ['has', 'isLabel']
           });
