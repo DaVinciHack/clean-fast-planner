@@ -749,10 +749,8 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows consistently to always show flight direction
-          // Simply add the arrow at the end regardless of coordinate direction
-          // This ensures arrows always point in the direction of travel (next waypoint)
-          labelText = `${labelText} ➔`; // Always add right-pointing arrow at the end to show direction of travel
+          // Add directional arrows based on text orientation
+          // Don't add arrows here - we'll add them after determining text orientation
           
           // Calculate bearing for alignment
           const legBearing = turf.bearing(fromPoint, toPoint);
@@ -778,14 +776,11 @@ class WaypointManager {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // When text is flipped, we need to handle arrow placement too
-            // Extract the arrow from the end
-            if (labelText.endsWith(' ➔')) {
-              // Remove the arrow from the end
-              labelText = labelText.substring(0, labelText.length - 2);
-              // Add a reversed arrow to the beginning (flipped direction)
-              labelText = `⟸ ${labelText}`;
-            }
+            // When text is flipped, add arrow at the beginning pointing left
+            labelText = `⟸ ${labelText}`;
+          } else {
+            // When text is not flipped, add arrow at the end pointing right
+            labelText = `${labelText} ➔`;
           }
             
           // Add feature with bearings for both pill and text
@@ -967,10 +962,8 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows consistently to always show flight direction
-          // Simply add the arrow at the end regardless of coordinate direction
-          // This ensures arrows always point in the direction of travel (next waypoint)
-          labelText = `${labelText} ➔`; // Always add right-pointing arrow at the end to show direction of travel
+          // Add directional arrows based on text orientation
+          // Don't add arrows here - we'll add them after determining text orientation
           
           // Calculate text orientation based on bearing
           let textBearing = longestSegment.bearing;
@@ -982,14 +975,11 @@ class WaypointManager {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // When text is flipped, we need to handle arrow placement too
-            // Extract the arrow from the end
-            if (labelText.endsWith(' ➔')) {
-              // Remove the arrow from the end
-              labelText = labelText.substring(0, labelText.length - 2);
-              // Add a reversed arrow to the beginning (flipped direction)
-              labelText = `⟸ ${labelText}`;
-            }
+            // When text is flipped, add arrow at the beginning pointing left
+            labelText = `⟸ ${labelText}`;
+          } else {
+            // When text is not flipped, add arrow at the end pointing right
+            labelText = `${labelText} ➔`;
           }
           
           // Add feature for the leg label
