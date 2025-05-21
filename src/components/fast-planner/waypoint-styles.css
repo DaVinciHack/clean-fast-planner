@@ -2,7 +2,7 @@
 
 /* Style for navigation waypoints markers */
 .mapboxgl-marker[data-marker-type="waypoint"] {
-  filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.9));
+  filter: drop-shadow(0 0 2px rgba(255, 0, 221, 0.9));
 }
 
 /* Style for landing stop markers */
@@ -55,7 +55,7 @@ button[data-waypoint-mode-button].active,
 
 /* Full app waypoint mode indicator */
 body[data-waypoint-mode="active"] .route-stats-card {
-  border-top: 2px solid #FFCC00;
+  border-top: 2px solid #7744a0;
 }
 
 body[data-waypoint-mode="active"] .route-stats-header::after {
@@ -64,7 +64,7 @@ body[data-waypoint-mode="active"] .route-stats-header::after {
   top: 5px;
   right: 10px;
   font-size: 10px;
-  background-color: #FFCC00;
+  background-color: #4f10ad;
   color: #333;
   padding: 2px 5px;
   border-radius: 3px;

@@ -378,7 +378,7 @@ const LeftPanel = ({
             <input 
               type="text" 
               className="route-input"
-              placeholder="Enter rig name or waypoint"
+              placeholder="Enter rig name or platform"
               style={{ 
                 flex: 1, 
                 marginRight: "5px", 

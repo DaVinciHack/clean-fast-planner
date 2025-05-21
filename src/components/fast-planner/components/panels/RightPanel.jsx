@@ -8,7 +8,8 @@ import {
   FinanceCard,
   EvacuationCard,
   SaveFlightCard,
-  LoadFlightsCard
+  LoadFlightsCard,
+  MapLayersCard
 } from './cards';
 import '../../FastPlannerStyles.css';
 import { PanelProvider } from '../../context/PanelContext';
@@ -23,6 +24,10 @@ import { PanelProvider } from '../../context/PanelContext';
  */
 const RightPanel = ({
   visible,
+  mapManagerRef,
+  gulfCoastMapRef,
+  weatherLayerRef,
+  vfrChartsRef,
   onToggleVisibility,
   onClearRoute,
   onLoadRigData,
@@ -215,6 +220,15 @@ const RightPanel = ({
       
       {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
+      
+      {/* Map Layers Card */}
+      <MapLayersCard
+        id="maplayers"
+        mapManagerRef={mapManagerRef}
+        gulfCoastMapRef={gulfCoastMapRef}
+        weatherLayerRef={weatherLayerRef}
+        vfrChartsRef={vfrChartsRef}
+      />
       
       {/* Save Flight Card */}
       <SaveFlightCard

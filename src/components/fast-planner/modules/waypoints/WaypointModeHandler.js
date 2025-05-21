@@ -383,7 +383,7 @@ class WaypointModeHandler {
             'line-cap': 'round'
           },
           'paint': {
-            'line-color': '#FFCC00', // Yellow for waypoint mode
+            'line-color': '#BA55D3', // Medium purple for waypoint mode
             'line-width': 4,
             'line-dasharray': [2, 1] // Dashed line for visual distinction
           }

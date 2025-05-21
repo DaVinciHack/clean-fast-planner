@@ -1,3 +1,64 @@
+/* Route line and label styling enhancements */
+.mapboxgl-canvas {
+  filter: drop-shadow(0 0 3px rgba(30, 143, 254, 0.3)); /* Subtle glow for the entire map */
+}
+
+/* Custom pill styling for route labels */
+.route-label-pill {
+  background-color: #1e8ffe; /* Blue background matching the route line */
+  padding: 6px 12px;
+  border-radius: 20px; /* Fully rounded ends for pill effect */
+  position: relative;
+  display: inline-block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin: 0 2px;
+}
+
+.route-label-pill::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  background-color: #1e1e2a; /* Dark inner background */
+  border-radius: 18px;
+  z-index: -1;
+}
+
+.route-label-pill-text {
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  z-index: 1;
+}
+
+/* Style the mapbox popup for route information */
+.mapboxgl-popup-content {
+  background-color: rgba(30, 45, 60, 0.9) !important; 
+  color: white !important;
+  border: 1px solid #1e8ffe !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: #1e8ffe !important;
+  border-bottom-color: #1e8ffe !important;
+}
+
+/* Enhanced stop markers */
+.mapboxgl-marker[data-marker-type="stop"] {
+  filter: drop-shadow(0 1px 3px rgba(255, 65, 54, 0.7));
+}
+
+/* Enhanced waypoint markers */
+.mapboxgl-marker[data-marker-type="waypoint"] {
+  filter: drop-shadow(0 1px 3px rgba(186, 85, 211, 0.7));
+}
+
 /* DIRECT FIX: Add styles for waypoint mode */
 .waypoint-mode-active body {
   cursor: crosshair !important;
