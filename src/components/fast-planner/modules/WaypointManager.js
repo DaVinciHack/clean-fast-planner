@@ -737,21 +737,26 @@ class WaypointManager {
           
           let labelText;
           if (legTime !== null) {
-            // Format the time with a color tag (light blue)
+            // Format the time
             const hours = Math.floor(legTime);
             const minutes = Math.floor((legTime - hours) * 60);
             const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
             
-            // Combine distance and time with a dash separator
-            // Add custom formatting for distance vs time
+            // Combine distance and time on same line with dash separator
             labelText = `${distanceText} - ${timeText}`;
           } else {
             // Distance only
             labelText = distanceText;
           }
           
-          // Add directional arrows based on text orientation
-          // Don't add arrows here - we'll add them after determining text orientation
+          // Add directional arrows consistently based on segment direction
+          // Force arrows to always be present and in the right direction
+          const goingLeftToRight = startPointCoords[0] < endPointCoords[0];
+          if (goingLeftToRight) {
+            labelText = `${labelText} →`; // Simple right-pointing arrow for left-to-right segments
+          } else {
+            labelText = `← ${labelText}`; // Simple left-pointing arrow for right-to-left segments
+          }
           
           // Calculate bearing for alignment
           const legBearing = turf.bearing(fromPoint, toPoint);
@@ -772,27 +777,21 @@ class WaypointManager {
           while (textBearing < 0) textBearing += 360;
           textBearing = textBearing % 360;
           
-          // Debugging to see if the flip is triggered
-          console.log(`Segment bearing: ${textBearing}, Will flip: ${textBearing > 180 && textBearing <= 360}`);
-          
-          // We need to handle each segment's arrow placement based on its bearing
+          // Flip text if it would be upside down (bearings > 180 degrees)
           if (textBearing > 180 && textBearing <= 360) {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // When text is flipped, add arrow at the beginning pointing left
-            // Use double arrow to make it more visible
-            labelText = `⟸⟸ ${labelText}`;
-            
-            // Debug log for flipped text
-            console.log(`Flipped text with left arrow: ${labelText}`);
-          } else {
-            // When text is not flipped, add arrow at the end pointing right
-            // Use double arrow to make it more visible
-            labelText = `${labelText} ➔➔`;
-            
-            // Debug log for normal text
-            console.log(`Normal text with right arrow: ${labelText}`);
+            // Also flip the arrow direction for consistency
+            // DISABLED: Don't flip arrows, as this makes them inconsistent with direction
+            // Arrows should always point in the direction of travel
+            // if (labelText.includes('→')) {
+            //   labelText = labelText.replace(' →', '');
+            //   labelText = `← ${labelText}`;
+            // } else if (labelText.includes('←')) {
+            //   labelText = labelText.replace('← ', '');
+            //   labelText = `${labelText} →`;
+            // }
           }
             
           // Add feature with bearings for both pill and text
@@ -962,48 +961,46 @@ class WaypointManager {
           
           let labelText;
           if (legTime !== null) {
-            // Format the time with a color tag (light blue)
+            // Format the time
             const hours = Math.floor(legTime);
             const minutes = Math.floor((legTime - hours) * 60);
             const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
             
-            // Combine distance and time with a dash separator
-            // Add custom formatting for distance vs time
+            // Combine distance and time on same line with dash separator
             labelText = `${distanceText} - ${timeText}`;
           } else {
             // Distance only
             labelText = distanceText;
           }
           
-          // Add directional arrows based on text orientation
-          // Don't add arrows here - we'll add them after determining text orientation
+          // Arrow direction always follows the route order
+          const goingLeftToRight = longestSegment.startCoords[0] < longestSegment.endCoords[0];
+          if (goingLeftToRight) {
+            labelText = `${labelText} →`; // Simple right-pointing arrow
+          } else {
+            labelText = `← ${labelText}`; // Simple left-pointing arrow
+          }
           
           // Calculate text orientation based on bearing
           let textBearing = longestSegment.bearing;
           while (textBearing < 0) textBearing += 360;
           textBearing = textBearing % 360;
           
-          // Debugging to see if the flip is triggered
-          console.log(`Segment bearing: ${textBearing}, Will flip: ${textBearing > 180 && textBearing <= 360}`);
-          
-          // We need to handle each segment's arrow placement based on its bearing
+          // Flip text if it would be upside down (bearings > 180 degrees)
           if (textBearing > 180 && textBearing <= 360) {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // When text is flipped, add arrow at the beginning pointing left
-            // Use double arrow to make it more visible
-            labelText = `⟸⟸ ${labelText}`;
-            
-            // Debug log for flipped text
-            console.log(`Flipped text with left arrow: ${labelText}`);
-          } else {
-            // When text is not flipped, add arrow at the end pointing right
-            // Use double arrow to make it more visible
-            labelText = `${labelText} ➔➔`;
-            
-            // Debug log for normal text
-            console.log(`Normal text with right arrow: ${labelText}`);
+            // Also flip the arrow direction for consistency
+            // DISABLED: Don't flip arrows, as this makes them inconsistent with direction
+            // Arrows should always point in the direction of travel
+            // if (labelText.includes('→')) {
+            //   labelText = labelText.replace(' →', '');
+            //   labelText = `← ${labelText}`;
+            // } else if (labelText.includes('←')) {
+            //   labelText = labelText.replace('← ', '');
+            //   labelText = `${labelText} →`;
+            // }
           }
           
           // Add feature for the leg label
@@ -1341,7 +1338,7 @@ class WaypointManager {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
             'text-size': 12,
-            'text-font': ['Segoe UI Bold', 'SF Pro Display Bold', 'Arial Unicode MS Bold'], // Modern sans-serif fonts
+            'text-font': ['Arial Unicode MS Bold'],
             // Adjust rotation by -90 degrees to align correctly with the pill
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
@@ -1354,8 +1351,6 @@ class WaypointManager {
           },
           paint: {
             'text-color': '#ffffff',
-            'text-halo-color': '#000000',
-            'text-halo-width': 2,
             'text-opacity': 1.0
           },
           filter: ['has', 'isLabel']
