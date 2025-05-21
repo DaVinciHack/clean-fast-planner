@@ -206,14 +206,9 @@ function showError(message, duration = 5000) {
   return showNotification(message, NotificationType.ERROR, duration);
 }
 
-// Detect when the page is loaded and show a startup notification
+// Startup notification removed - no longer showing debug messages
 window.addEventListener('load', () => {
-  // Check if we're using the clean implementation
-  if (window.interactionController) {
-    setTimeout(() => {
-      showSuccess('Clean implementation active - Enjoy a smoother experience!', 8000);
-    }, 2000);
-  }
+  // No notifications on load - clean UI
 });
 
 // Make notifications globally available

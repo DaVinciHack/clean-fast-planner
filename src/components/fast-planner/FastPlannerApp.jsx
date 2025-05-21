@@ -59,7 +59,9 @@ const FastPlannerCore = ({
       const debugSelectors = [
         '.debug-popup', 
         '.fix-applied-popup',
-        '#status-indicator-container'
+        '#status-indicator-container',
+        '.clean-notification',
+        '#clean-notifications-container'
       ];
       debugSelectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
