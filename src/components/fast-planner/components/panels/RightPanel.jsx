@@ -221,14 +221,38 @@ const RightPanel = ({
       {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
       
-      {/* Map Layers Card */}
-      <MapLayersCard
-        id="maplayers"
-        mapManagerRef={mapManagerRef}
-        gulfCoastMapRef={gulfCoastMapRef}
-        weatherLayerRef={weatherLayerRef}
-        vfrChartsRef={vfrChartsRef}
-      />
+      // Map Layers Card
+  <MapLayersCard
+    id="maplayers"
+    mapManagerRef={mapManagerRef}
+    gulfCoastMapRef={gulfCoastMapRef}
+    weatherLayerRef={weatherLayerRef}
+    vfrChartsRef={vfrChartsRef}
+    platformManagerRef={window.platformManagerRef}
+    platformsVisible={chartsVisible}
+    airfieldsVisible={window.platformManagerRef?.current?.airfieldsVisible || true}
+    fixedPlatformsVisible={window.platformManagerRef?.current?.fixedPlatformsVisible || true}
+    movablePlatformsVisible={window.platformManagerRef?.current?.movablePlatformsVisible || true}
+    togglePlatformsVisibility={onToggleChart}
+    toggleAirfieldsVisibility={() => {
+      if (window.platformManagerRef?.current) {
+        return window.platformManagerRef.current.toggleAirfieldsVisibility();
+      }
+      return false;
+    }}
+    toggleFixedPlatformsVisibility={() => {
+      if (window.platformManagerRef?.current) {
+        return window.platformManagerRef.current.toggleFixedPlatformsVisibility();
+      }
+      return false;
+    }}
+    toggleMovablePlatformsVisibility={() => {
+      if (window.platformManagerRef?.current) {
+        return window.platformManagerRef.current.toggleMovablePlatformsVisibility();
+      }
+      return false;
+    }}
+  />
       
       {/* Save Flight Card */}
       <SaveFlightCard

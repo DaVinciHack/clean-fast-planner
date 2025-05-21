@@ -12,7 +12,17 @@ const MapLayersCard = ({
   mapManagerRef,
   gulfCoastMapRef,
   weatherLayerRef,
-  vfrChartsRef
+  vfrChartsRef,
+  // New props for separate platform toggles
+  platformManagerRef,
+  platformsVisible,
+  airfieldsVisible,
+  fixedPlatformsVisible,
+  movablePlatformsVisible,
+  togglePlatformsVisibility,
+  toggleAirfieldsVisibility,
+  toggleFixedPlatformsVisibility,
+  toggleMovablePlatformsVisibility
 }) => {
   const { currentRegion } = useRegion();
   const [layers, setLayers] = useState({
@@ -20,10 +30,24 @@ const MapLayersCard = ({
     weather: false,
     vfrCharts: false,
     grid: true,
-    platforms: true
+    platforms: true, // Combined platforms toggle (legacy)
+    airfields: true, // New separate toggles
+    fixedPlatforms: true,
+    movablePlatforms: true
   });
   
-  // Update layer states when references change
+  // Update layer states when references or visibility props change
+  useEffect(() => {
+    setLayers(prev => ({
+      ...prev,
+      platforms: platformsVisible,
+      airfields: airfieldsVisible,
+      fixedPlatforms: fixedPlatformsVisible,
+      movablePlatforms: movablePlatformsVisible
+    }));
+  }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible]);
+  
+  // Update layer states for map layers when references change
   useEffect(() => {
     if (gulfCoastMapRef?.current) {
       setLayers(prev => ({
@@ -141,27 +165,21 @@ const MapLayersCard = ({
           }
           break;
           
+        // Handle all platform-related toggles using the new functions
         case 'platforms':
-          if (mapManagerRef?.current) {
-            // Toggle platform visibility
-            const map = mapManagerRef.current.getMap();
-            if (map) {
-              const platformsVisible = !layers.platforms;
-              
-              // Toggle visibility of platform layers
-              ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].forEach(layerId => {
-                if (map.getLayer(layerId)) {
-                  map.setLayoutProperty(
-                    layerId,
-                    'visibility',
-                    platformsVisible ? 'visible' : 'none'
-                  );
-                }
-              });
-              
-              setLayers(prev => ({ ...prev, platforms: platformsVisible }));
-            }
-          }
+          togglePlatformsVisibility();
+          break;
+          
+        case 'airfields':
+          toggleAirfieldsVisibility();
+          break;
+          
+        case 'fixedPlatforms':
+          toggleFixedPlatformsVisibility();
+          break;
+          
+        case 'movablePlatforms':
+          toggleMovablePlatformsVisibility();
           break;
           
         default:
@@ -200,7 +218,13 @@ const MapLayersCard = ({
         <div className="layer-section">
           <h4>Base Layers</h4>
           {renderLayerToggle('grid', 'Coordinate Grid')}
-          {renderLayerToggle('platforms', 'Platforms & Airfields')}
+        </div>
+        
+        <div className="layer-section">
+          <h4>Platforms & Airfields</h4>
+          {renderLayerToggle('airfields', 'Airfields')}
+          {renderLayerToggle('fixedPlatforms', 'Fixed Platforms')}
+          {renderLayerToggle('movablePlatforms', 'Movable Platforms')}
         </div>
         
         <div className="layer-section">
