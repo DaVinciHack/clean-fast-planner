@@ -737,12 +737,13 @@ class WaypointManager {
           
           let labelText;
           if (legTime !== null) {
-            // Format the time
+            // Format the time with a color tag (light blue)
             const hours = Math.floor(legTime);
             const minutes = Math.floor((legTime - hours) * 60);
             const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
             
-            // Combine distance and time on same line with dash separator
+            // Combine distance and time with a dash separator
+            // Add custom formatting for distance vs time
             labelText = `${distanceText} - ${timeText}`;
           } else {
             // Distance only
@@ -771,16 +772,27 @@ class WaypointManager {
           while (textBearing < 0) textBearing += 360;
           textBearing = textBearing % 360;
           
-          // Flip text if it would be upside down (bearings > 180 degrees)
+          // Debugging to see if the flip is triggered
+          console.log(`Segment bearing: ${textBearing}, Will flip: ${textBearing > 180 && textBearing <= 360}`);
+          
+          // We need to handle each segment's arrow placement based on its bearing
           if (textBearing > 180 && textBearing <= 360) {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
             // When text is flipped, add arrow at the beginning pointing left
-            labelText = `⟸ ${labelText}`;
+            // Use double arrow to make it more visible
+            labelText = `⟸⟸ ${labelText}`;
+            
+            // Debug log for flipped text
+            console.log(`Flipped text with left arrow: ${labelText}`);
           } else {
             // When text is not flipped, add arrow at the end pointing right
-            labelText = `${labelText} ➔`;
+            // Use double arrow to make it more visible
+            labelText = `${labelText} ➔➔`;
+            
+            // Debug log for normal text
+            console.log(`Normal text with right arrow: ${labelText}`);
           }
             
           // Add feature with bearings for both pill and text
@@ -950,12 +962,13 @@ class WaypointManager {
           
           let labelText;
           if (legTime !== null) {
-            // Format the time
+            // Format the time with a color tag (light blue)
             const hours = Math.floor(legTime);
             const minutes = Math.floor((legTime - hours) * 60);
             const timeText = `${hours > 0 ? hours + 'h' : ''}${minutes > 0 ? ' ' + minutes + 'm' : (hours > 0 ? '' : '0m')}`;
             
-            // Combine distance and time on same line with dash separator
+            // Combine distance and time with a dash separator
+            // Add custom formatting for distance vs time
             labelText = `${distanceText} - ${timeText}`;
           } else {
             // Distance only
@@ -970,16 +983,27 @@ class WaypointManager {
           while (textBearing < 0) textBearing += 360;
           textBearing = textBearing % 360;
           
-          // Flip text if it would be upside down (bearings > 180 degrees)
+          // Debugging to see if the flip is triggered
+          console.log(`Segment bearing: ${textBearing}, Will flip: ${textBearing > 180 && textBearing <= 360}`);
+          
+          // We need to handle each segment's arrow placement based on its bearing
           if (textBearing > 180 && textBearing <= 360) {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
             // When text is flipped, add arrow at the beginning pointing left
-            labelText = `⟸ ${labelText}`;
+            // Use double arrow to make it more visible
+            labelText = `⟸⟸ ${labelText}`;
+            
+            // Debug log for flipped text
+            console.log(`Flipped text with left arrow: ${labelText}`);
           } else {
             // When text is not flipped, add arrow at the end pointing right
-            labelText = `${labelText} ➔`;
+            // Use double arrow to make it more visible
+            labelText = `${labelText} ➔➔`;
+            
+            // Debug log for normal text
+            console.log(`Normal text with right arrow: ${labelText}`);
           }
           
           // Add feature for the leg label
@@ -1317,7 +1341,7 @@ class WaypointManager {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
             'text-size': 12,
-            'text-font': ['Arial Unicode MS Bold'],
+            'text-font': ['Segoe UI Bold', 'SF Pro Display Bold', 'Arial Unicode MS Bold'], // Modern sans-serif fonts
             // Adjust rotation by -90 degrees to align correctly with the pill
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
@@ -1330,6 +1354,8 @@ class WaypointManager {
           },
           paint: {
             'text-color': '#ffffff',
+            'text-halo-color': '#000000',
+            'text-halo-width': 2,
             'text-opacity': 1.0
           },
           filter: ['has', 'isLabel']
