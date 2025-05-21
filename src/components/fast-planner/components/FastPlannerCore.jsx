@@ -354,6 +354,13 @@ const FastPlannerCore = () => {
         onPayloadWeightChange={setPayloadWeight}
         reserveFuel={flightSettings.reserveFuel}
         onReserveFuelChange={setReserveFuel}
+        // Map and platform manager refs
+        mapManagerRef={{ current: mapManager }}
+        platformManagerRef={{ current: platformManager }}
+        // Map layer refs
+        gulfCoastMapRef={gulfCoastMapRef}
+        weatherLayerRef={weatherLayerRef}
+        vfrChartsRef={vfrChartsRef}
       />
       
       {/* Debug Panel */}

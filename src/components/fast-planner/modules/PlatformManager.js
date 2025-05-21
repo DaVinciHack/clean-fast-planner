@@ -61,6 +61,9 @@ class PlatformManager {
     this.mapManager = mapManager;
     this.platforms = [];
     this.isVisible = true;
+    this.airfieldsVisible = true;
+    this.fixedPlatformsVisible = true;
+    this.movablePlatformsVisible = true;
     this.callbacks = {
       onPlatformsLoaded: null,
       onVisibilityChanged: null,
@@ -1151,7 +1154,7 @@ class PlatformManager {
   }
   
   /**
-   * Toggle visibility of platforms
+   * Toggle visibility of all platforms and airfields
    * @returns {boolean} - The new visibility state
    */
   toggleVisibility() {
@@ -1184,6 +1187,112 @@ class PlatformManager {
     
     this.triggerCallback('onVisibilityChanged', this.isVisible);
     return this.isVisible;
+  }
+  
+  /**
+   * Toggle visibility of airfields only
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for airfields
+   */
+  toggleAirfieldsVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store airfields visibility state
+    this.airfieldsVisible = visible !== undefined ? visible : !this.airfieldsVisible;
+    
+    try {
+      // Airfield-specific layers
+      const airfieldLayers = [
+        'airfields-layer',    // Airfield markers
+        'airfields-labels'    // Airfield labels
+      ];
+      
+      const visibility = this.airfieldsVisible ? 'visible' : 'none';
+      
+      airfieldLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Airfields visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling airfield visibility:', error);
+    }
+    
+    return this.airfieldsVisible;
+  }
+  
+  /**
+   * Toggle visibility of fixed platforms only
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for fixed platforms
+   */
+  toggleFixedPlatformsVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store fixed platforms visibility state
+    this.fixedPlatformsVisible = visible !== undefined ? visible : !this.fixedPlatformsVisible;
+    
+    try {
+      // Fixed platform-specific layers
+      const fixedPlatformLayers = [
+        'platforms-layer',         // Legacy layer name
+        'platforms-fixed-layer',   // Fixed platform markers
+        'platforms-fixed-labels'   // Fixed platform labels
+      ];
+      
+      const visibility = this.fixedPlatformsVisible ? 'visible' : 'none';
+      
+      fixedPlatformLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Fixed platforms visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling fixed platform visibility:', error);
+    }
+    
+    return this.fixedPlatformsVisible;
+  }
+  
+  /**
+   * Toggle visibility of movable platforms only
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for movable platforms
+   */
+  toggleMovablePlatformsVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store movable platforms visibility state
+    this.movablePlatformsVisible = visible !== undefined ? visible : !this.movablePlatformsVisible;
+    
+    try {
+      // Movable platform-specific layers
+      const movablePlatformLayers = [
+        'platforms-movable-layer',    // Movable platform markers
+        'platforms-movable-labels'    // Movable platform labels
+      ];
+      
+      const visibility = this.movablePlatformsVisible ? 'visible' : 'none';
+      
+      movablePlatformLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Movable platforms visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling movable platform visibility:', error);
+    }
+    
+    return this.movablePlatformsVisible;
   }
 
   /**
