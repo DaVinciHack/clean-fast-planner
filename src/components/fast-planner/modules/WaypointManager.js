@@ -781,10 +781,10 @@ class WaypointManager {
             // When text is flipped, we need to handle arrow placement too
             // Extract the arrow from the end
             if (labelText.endsWith(' ➔')) {
-              // Remove the arrow
+              // Remove the arrow from the end
               labelText = labelText.substring(0, labelText.length - 2);
-              // Add it to the beginning
-              labelText = `➔ ${labelText}`;
+              // Add a reversed arrow to the beginning (flipped direction)
+              labelText = `⟸ ${labelText}`;
             }
           }
             
@@ -985,10 +985,10 @@ class WaypointManager {
             // When text is flipped, we need to handle arrow placement too
             // Extract the arrow from the end
             if (labelText.endsWith(' ➔')) {
-              // Remove the arrow
+              // Remove the arrow from the end
               labelText = labelText.substring(0, labelText.length - 2);
-              // Add it to the beginning
-              labelText = `➔ ${labelText}`;
+              // Add a reversed arrow to the beginning (flipped direction)
+              labelText = `⟸ ${labelText}`;
             }
           }
           
