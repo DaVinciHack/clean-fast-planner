@@ -1165,7 +1165,7 @@ class WaypointManager {
               'text-font': ['Arial Unicode MS Bold'],
               'text-offset': [0, -0.5],
               'text-anchor': 'center',
-              'text-rotate': ['get', 'textBearing'],
+              'text-rotate': ['-', ['get', 'bearing'], 90], // Adjust rotation to align text with pill
               'text-rotation-alignment': 'map',
               'text-allow-overlap': false,
               'text-ignore-placement': false,
