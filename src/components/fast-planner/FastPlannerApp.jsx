@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../client';
 import './FastPlannerStyles.css';
-import './modules/waypoints/waypoint-styles.css';
-import './fixes/route-stats-card-fix.css'; // Keep CSS fixes
-import './fixes/panel-interaction-fix.css'; // Keep CSS fixes
+import './waypoint-markers.css'; // Clean waypoint marker styles
+import './fixes/route-stats-card-fix.css';
+import './fixes/panel-interaction-fix.css';
 
 // Import UI components
 import {
@@ -31,6 +31,7 @@ import useAircraft from './hooks/useAircraft';
 import useWaypoints from './hooks/useWaypoints';
 import useRouteCalculation from './hooks/useRouteCalculation';
 import useUIControls from './hooks/useUIControls';
+import useMapLayers from './hooks/useMapLayers';
 
 /**
  * FastPlannerCore Component
@@ -125,6 +126,15 @@ const FastPlannerCore = ({
     rigsLoading, rigsError, toggleLeftPanel, toggleRightPanel,
     togglePlatformsVisibility, reloadPlatformData, handleRouteInputChange
   } = useUIControls({ appSettingsManagerRef, platformManagerRef, client, routeInput, setRouteInput });
+  
+  // Initialize map layers
+  const {
+    gulfCoastMapRef,
+    weatherLayerRef,
+    vfrChartsRef,
+    layerStates,
+    toggleLayer
+  } = useMapLayers({ mapManagerRef });
 
   const {
     waypointModeActive, addWaypoint: hookAddWaypoint, removeWaypoint, updateWaypointName,
@@ -254,6 +264,10 @@ const FastPlannerCore = ({
           onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
           onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
           forceUpdate={forceUpdate} weather={weather} onWeatherUpdate={updateWeatherSettings}
+          mapManagerRef={mapManagerRef}
+          gulfCoastMapRef={gulfCoastMapRef}
+          weatherLayerRef={weatherLayerRef}
+          vfrChartsRef={vfrChartsRef}
         />
       </div>
     </>
@@ -375,6 +389,9 @@ const FastPlannerApp = () => {
   useEffect(() => {
     if (appManagers.waypointManagerRef && appManagers.platformManagerRef) {
         addWaypointDirectRef.current.implementation = addWaypointDirectImpl;
+        // Ensure the addWaypointDirectImpl function is available globally for the input handlers
+        window.addWaypointClean = addWaypointDirectImpl;
+        console.log('🔧 Setting up global addWaypointClean function for input handlers');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appManagers.waypointManagerRef, appManagers.platformManagerRef]); 

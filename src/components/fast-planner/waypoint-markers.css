@@ -1,0 +1,67 @@
+/* 
+ * waypoint-markers.css
+ * 
+ * Clean, focused styling for waypoint markers in the Fast Planner application.
+ * This file specifically addresses the issue of waypoint markers appearing
+ * in the top-left corner instead of at their proper position.
+ */
+
+/* Reset any problematic styling that may have been applied to markers */
+.mapboxgl-marker {
+  /* Important: DO NOT use transform:none or position:absolute here as it breaks positioning */
+  /* Removed will-change: unset !important; - this can cause positioning issues */
+  transition: unset !important;
+  animation: unset !important;
+}
+
+/* Style for waypoint markers */
+.mapboxgl-marker[data-marker-type="waypoint"] {
+  /* IMPORTANT: DO NOT override transform here as it breaks positioning */
+  filter: drop-shadow(0 0 2px rgba(64, 224, 208, 0.7)) !important;
+  /* Ensure proper appearance while keeping positioning intact */
+  width: 5px !important;
+  height: 5px !important;
+  background-color: turquoise !important;
+  border-radius: 50% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Style for waypoint marker SVG fill */
+.mapboxgl-marker[data-marker-type="waypoint"] svg {
+  fill: white !important;
+  stroke: turquoise !important;
+  stroke-width: 1px !important;
+  display: block !important; /* Ensure SVG is visible */
+}
+
+/* Add a white dot in the center of waypoint markers */
+.mapboxgl-marker[data-marker-type="waypoint"]::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background-color: rgb(178, 73, 220);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Style for stop markers */
+.mapboxgl-marker[data-marker-type="stop"] {
+  filter: drop-shadow(0 0 2px rgba(255, 65, 54, 0.7)) !important;
+}
+
+/* Enhanced popups */
+.waypoint-popup .mapboxgl-popup-content {
+  border-left: 3px solid #FFCC00;
+  background-color: rgba(255, 250, 230, 0.95);
+}
+
+.stop-popup .mapboxgl-popup-content {
+  border-left: 3px solid #FF4136;
+  background-color: rgba(255, 240, 240, 0.95);
+}

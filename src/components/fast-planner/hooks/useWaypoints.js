@@ -49,10 +49,16 @@ const useWaypoints = ({
     // Try to use the clean implementation first
     if (window.addWaypointClean && typeof window.addWaypointClean === 'function') {
       console.log('🌐 Using clean implementation for addWaypoint');
-      const waypoint = window.addWaypointClean(waypointData);
-      
-      // The clean implementation will handle state updates through the registered function
-      return waypoint;
+      try {
+        // Make sure to properly await the call since the implementation might be async
+        const waypoint = await window.addWaypointClean(waypointData);
+        
+        // The clean implementation will handle state updates through the registered function
+        return waypoint;
+      } catch (error) {
+        console.error('Error using clean implementation:', error);
+        // Continue to fallback if the clean implementation fails
+      }
     }
     
     // Fall back to the original implementation if clean one isn't available

@@ -1,85 +1,82 @@
-/* Card animation system */
-.cards-container {
-  position: relative;
+/* Map Layers Card Styles */
+
+/* Layer section styles */
+.layer-section {
+  margin-bottom: 15px;
+}
+
+.layer-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 5px;
+}
+
+/* Layer toggle styles */
+.layer-toggle-container {
+  margin-bottom: 8px;
+}
+
+.layer-toggle-button {
+  display: flex;
+  align-items: center;
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  background: rgba(40, 40, 40, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
 }
 
-.card-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+.layer-toggle-button:hover:not(:disabled) {
+  background: rgba(60, 60, 60, 0.5);
 }
 
-/* Animation classes for card transitions */
-.card-wrapper.exiting {
-  position: absolute;
-  z-index: 1;
+.layer-toggle-button.active {
+  background: rgba(29, 85, 136, 0.6);
+  border-color: rgba(100, 170, 255, 0.3);
 }
 
-/* Exit animations */
-@keyframes slideOutToLeft {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
+.layer-toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-@keyframes slideOutToRight {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
+.toggle-indicator {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-right: 12px;
+  background: #666;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
 }
 
-/* Entry animations */
-@keyframes slideInFromRight {
-  0% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.layer-toggle-button.active .toggle-indicator {
+  background: #4CAF50;
+  box-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
 }
 
-@keyframes slideInFromLeft {
-  0% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.toggle-label {
+  flex: 1;
+  font-size: 13px;
 }
 
-.card-wrapper.exit-left {
-  animation: slideOutToLeft 0.4s ease-out forwards;
+.unavailable-indicator {
+  color: #ff6b6b;
+  margin-left: 5px;
 }
 
-.card-wrapper.exit-right {
-  animation: slideOutToRight 0.4s ease-out forwards;
-}
-
-.card-wrapper.enter-right {
-  animation: slideInFromRight 0.4s ease-out forwards;
-}
-
-.card-wrapper.enter-left {
-  animation: slideInFromLeft 0.4s ease-out forwards;
+.layer-info {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+  margin-top: 10px;
 }

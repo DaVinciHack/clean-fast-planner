@@ -38,6 +38,7 @@ const RightPanelContainer = React.forwardRef(({
     { id: 'weather', name: 'Weather' },
     { id: 'finance', name: 'Finance' },
     { id: 'evacuation', name: 'Evacuation' },
+    { id: 'maplayers', name: 'Map Layers' }, // Added Map Layers tab
     { id: 'saveflight', name: 'Save Flight', hidden: true }, // Hidden card for Save Flight
     { id: 'loadflights', name: 'Load Flights', hidden: true } // Hidden card for Load Flights
   ];
