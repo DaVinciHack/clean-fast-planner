@@ -749,14 +749,10 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows consistently based on segment direction
-          // Force arrows to always be present and in the right direction
-          const goingLeftToRight = startPointCoords[0] < endPointCoords[0];
-          if (goingLeftToRight) {
-            labelText = `${labelText} ➔`; // Right-pointing arrow for left-to-right segments
-          } else {
-            labelText = `⟸ ${labelText}`; // Left-pointing arrow for right-to-left segments
-          }
+          // Add directional arrows consistently to always show flight direction
+          // Simply add the arrow at the end regardless of coordinate direction
+          // This ensures arrows always point in the direction of travel (next waypoint)
+          labelText = `${labelText} ➔`; // Always add right-pointing arrow at the end to show direction of travel
           
           // Calculate bearing for alignment
           const legBearing = turf.bearing(fromPoint, toPoint);
@@ -782,13 +778,13 @@ class WaypointManager {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // Also flip the arrow direction for consistency
-            if (labelText.includes('➔')) {
-              labelText = labelText.replace(' ➔', '');
-              labelText = `⟸ ${labelText}`;
-            } else if (labelText.includes('⟸')) {
-              labelText = labelText.replace('⟸ ', '');
-              labelText = `${labelText} ➔`;
+            // When text is flipped, we need to handle arrow placement too
+            // Extract the arrow from the end
+            if (labelText.endsWith(' ➔')) {
+              // Remove the arrow
+              labelText = labelText.substring(0, labelText.length - 2);
+              // Add it to the beginning
+              labelText = `➔ ${labelText}`;
             }
           }
             
@@ -971,13 +967,10 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Arrow direction always follows the route order
-          const goingLeftToRight = longestSegment.startCoords[0] < longestSegment.endCoords[0];
-          if (goingLeftToRight) {
-            labelText = `${labelText} ➔`; // Right-pointing arrow
-          } else {
-            labelText = `⟸ ${labelText}`; // Left-pointing arrow
-          }
+          // Add directional arrows consistently to always show flight direction
+          // Simply add the arrow at the end regardless of coordinate direction
+          // This ensures arrows always point in the direction of travel (next waypoint)
+          labelText = `${labelText} ➔`; // Always add right-pointing arrow at the end to show direction of travel
           
           // Calculate text orientation based on bearing
           let textBearing = longestSegment.bearing;
@@ -989,13 +982,13 @@ class WaypointManager {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
             
-            // Also flip the arrow direction for consistency
-            if (labelText.includes('➔')) {
-              labelText = labelText.replace(' ➔', '');
-              labelText = `⟸ ${labelText}`;
-            } else if (labelText.includes('⟸')) {
-              labelText = labelText.replace('⟸ ', '');
-              labelText = `${labelText} ➔`;
+            // When text is flipped, we need to handle arrow placement too
+            // Extract the arrow from the end
+            if (labelText.endsWith(' ➔')) {
+              // Remove the arrow
+              labelText = labelText.substring(0, labelText.length - 2);
+              // Add it to the beginning
+              labelText = `➔ ${labelText}`;
             }
           }
           
