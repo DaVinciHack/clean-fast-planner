@@ -552,9 +552,10 @@ class WaypointManager {
       
       // Create marker with appropriate styling based on type
       const marker = new window.mapboxgl.Marker({ 
-        color: isWaypoint ? "turquoise" : "#FF4136", // Turquoise for waypoints, red for stops
+        color: isWaypoint ? "#BA55D3" : "#FF4136", // Medium purple for waypoints, red for stops
         draggable: true,
-        scale: 0.5 // Make them small (50% of normal size) for better visibility
+        scale: isWaypoint ? 0.4 : 0.5, // Make waypoints slightly smaller than stops but still visible
+        anchor: 'center' // Explicitly set the anchor to center
       })
       .setLngLat(coords)
       .addTo(map);
@@ -573,13 +574,17 @@ class WaypointManager {
       
       // Create enhanced popup content with clear styling differences
       const popupContent = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-          <strong style="color: ${isWaypoint ? '#825500' : '#333333'}">${displayName}</strong>
-          <span class="favorite-button" title="Add to favorites" style="cursor: pointer; font-size: 18px;" onclick="window.addToFavorites('${displayName}', [${coords[0]}, ${coords[1]}])">❤️</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="color: ${isWaypoint ? '#e0e0e0' : '#e0e0e0'}; font-size: 13px;">${displayName}</strong>
+          <span class="favorite-button" title="Add to favorites" style="cursor: pointer; font-size: 16px;" onclick="window.addToFavorites('${displayName}', [${coords[0]}, ${coords[1]}])">❤️</span>
         </div>
-        <span class="coord-label">Lat:</span> <span class="coord-value">${coords[1].toFixed(5)}</span><br>
-        <span class="coord-label">Lon:</span> <span class="coord-value">${coords[0].toFixed(5)}</span>
-        <div style="margin-top: 5px; font-size: 10px; padding: 1px 4px; background-color: ${isWaypoint ? '#FFCC00' : '#FF4136'}; color: #333; display: inline-block; border-radius: 3px;">
+        <div style="margin-bottom: 4px;">
+          <span style="color: ${isWaypoint ? '#e0e0e0' : '#e0e0e0'}; opacity: 0.8;">Lat: ${coords[1].toFixed(5)}</span>
+        </div>
+        <div style="margin-bottom: 6px;">
+          <span style="color: ${isWaypoint ? '#e0e0e0' : '#e0e0e0'}; opacity: 0.8;">Lon: ${coords[0].toFixed(5)}</span>
+        </div>
+        <div style="display: inline-block; margin-top: 2px; font-size: 9px; color: ${isWaypoint ? '#e0e0e0' : '#e0e0e0'}; opacity: 0.7;">
           ${isWaypoint ? 'NAVIGATION WAYPOINT' : 'LANDING STOP'}
         </div>
       `;
@@ -593,19 +598,26 @@ class WaypointManager {
         // Add clear CSS class for styling
         markerElement.setAttribute('data-marker-type', isWaypoint ? 'waypoint' : 'stop');
         
-        // Show popup on mouseenter (hover)
-        markerElement.addEventListener('mouseenter', () => {
-          // Only show popup if zoom level is sufficient (avoid cluttering the map)
-          const currentZoom = map.getZoom();
-          if (currentZoom >= 9) { // Only show labels when zoomed in enough
+        if (isWaypoint) {
+          // Use click instead of hover for waypoints
+          markerElement.addEventListener('click', () => {
             popup.setLngLat(marker.getLngLat()).addTo(map);
-          }
-        });
-        
-        // Hide popup on mouseleave
-        markerElement.addEventListener('mouseleave', () => {
-          popup.remove();
-        });
+          });
+        } else {
+          // Normal hover behavior for stops
+          markerElement.addEventListener('mouseenter', () => {
+            // Only show popup if zoom level is sufficient (avoid cluttering the map)
+            const currentZoom = map.getZoom();
+            if (currentZoom >= 9) { // Only show labels when zoomed in enough
+              popup.setLngLat(marker.getLngLat()).addTo(map);
+            }
+          });
+          
+          // Hide popup on mouseleave
+          markerElement.addEventListener('mouseleave', () => {
+            popup.remove();
+          });
+        }
       }
       
       // Return the created marker
@@ -737,12 +749,13 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows based on segment direction (with larger arrows)
-          const goingLeftToRight = endPointCoords[0] > startPointCoords[0];
+          // Add directional arrows consistently based on segment direction
+          // Force arrows to always be present and in the right direction
+          const goingLeftToRight = startPointCoords[0] < endPointCoords[0];
           if (goingLeftToRight) {
-            labelText = `${labelText} ➔`; // Using a larger arrow character
+            labelText = `${labelText} ➔`; // Right-pointing arrow for left-to-right segments
           } else {
-            labelText = `⟸ ${labelText}`; // Using a larger arrow character
+            labelText = `⟸ ${labelText}`; // Left-pointing arrow for right-to-left segments
           }
           
           // Calculate bearing for alignment
@@ -758,21 +771,36 @@ class WaypointManager {
             { units: 'nauticalmiles' }
           );
           
-          // Calculate adjusted bearing for text readability
-          let adjustedBearing = legBearing + 90;
-          if (adjustedBearing > 90 && adjustedBearing < 270) {
-            adjustedBearing = (adjustedBearing + 180) % 360;
-          }
+          // Calculate text orientation based on bearing
+          // Normalize bearing to 0-359 range
+          let textBearing = legBearing;
+          while (textBearing < 0) textBearing += 360;
+          textBearing = textBearing % 360;
           
-          // Add feature
+          // Flip text if it would be upside down (bearings > 180 degrees)
+          if (textBearing > 180 && textBearing <= 360) {
+            // Flip the bearing 180 degrees to make text right-side up
+            textBearing = (textBearing + 180) % 360;
+            
+            // Also flip the arrow direction for consistency
+            if (labelText.includes('➔')) {
+              labelText = labelText.replace(' ➔', '');
+              labelText = `⟸ ${labelText}`;
+            } else if (labelText.includes('⟸')) {
+              labelText = labelText.replace('⟸ ', '');
+              labelText = `${labelText} ➔`;
+            }
+          }
+            
+          // Add feature with bearings for both pill and text
           features.push({
             type: 'Feature',
             geometry: midPoint.geometry,
             properties: {
               isLabel: true,
-              bearing: legBearing,
-              textBearing: adjustedBearing,
               text: labelText,
+              // Use the adjusted bearing that ensures text is never upside down
+              bearing: textBearing,
               segmentDistance: legDistance,
               legIndex: i
             }
@@ -923,7 +951,10 @@ class WaypointManager {
             { units: 'nauticalmiles' }
           );
           
-          // Create label with leg distance and time
+          // Calculate time for this leg
+          // ... (existing time calculation code)
+          
+          // Create label with distance and time
           const distanceText = `${totalLegDistance.toFixed(1)} nm`;
           
           let labelText;
@@ -940,18 +971,32 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows based on segment direction (with larger arrows)
-          const goingLeftToRight = longestSegment.endCoords[0] > longestSegment.startCoords[0];
+          // Arrow direction always follows the route order
+          const goingLeftToRight = longestSegment.startCoords[0] < longestSegment.endCoords[0];
           if (goingLeftToRight) {
-            labelText = `${labelText} ➔`; // Using a larger arrow character
+            labelText = `${labelText} ➔`; // Right-pointing arrow
           } else {
-            labelText = `⟸ ${labelText}`; // Using a larger arrow character
+            labelText = `⟸ ${labelText}`; // Left-pointing arrow
           }
           
-          // Calculate adjusted bearing for text readability
-          let adjustedBearing = longestSegment.bearing + 90;
-          if (adjustedBearing > 90 && adjustedBearing < 270) {
-            adjustedBearing = (adjustedBearing + 180) % 360;
+          // Calculate text orientation based on bearing
+          let textBearing = longestSegment.bearing;
+          while (textBearing < 0) textBearing += 360;
+          textBearing = textBearing % 360;
+          
+          // Flip text if it would be upside down (bearings > 180 degrees)
+          if (textBearing > 180 && textBearing <= 360) {
+            // Flip the bearing 180 degrees to make text right-side up
+            textBearing = (textBearing + 180) % 360;
+            
+            // Also flip the arrow direction for consistency
+            if (labelText.includes('➔')) {
+              labelText = labelText.replace(' ➔', '');
+              labelText = `⟸ ${labelText}`;
+            } else if (labelText.includes('⟸')) {
+              labelText = labelText.replace('⟸ ', '');
+              labelText = `${labelText} ➔`;
+            }
           }
           
           // Add feature for the leg label
@@ -960,13 +1005,13 @@ class WaypointManager {
             geometry: midPoint.geometry,
             properties: {
               isLabel: true,
-              bearing: longestSegment.bearing,
-              textBearing: adjustedBearing,
               text: labelText,
+              bearing: textBearing, // Use adjusted bearing to keep text right-side up
+              segmentDistance: totalLegDistance,
               legDistance: totalLegDistance,
               legTime: legTime,
               legIndex: legIdx,
-              isLeg: true // Flag to distinguish leg labels from segment labels
+              isLeg: true
             }
           });
         } catch (err) {
@@ -976,6 +1021,7 @@ class WaypointManager {
     }
     
     console.log(`⭐ Created ${features.length} route labels`);
+    console.log("Sample feature:", features.length > 0 ? JSON.stringify(features[0].properties) : "No features created");
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -1128,19 +1174,66 @@ class WaypointManager {
     const routeGlowLayerId = 'route-glow';
     const routeArrowsLayerId = 'route-arrows';
     const legLabelsLayerId = 'leg-labels';
+    
+    console.log("DEBUG: Updating route with", routeStats, "and", this.waypoints.length, "waypoints");
 
     if (this.waypoints.length >= 2) {
       const coordinates = this.waypoints.map(wp => wp.coords);
       const routeGeoJson = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }};
+      
+      // Add debugging logs
+      console.log("⭐ Creating route with coordinates:", coordinates.length);
+      
       const arrowsData = this.createArrowsAlongLine(coordinates, routeStats);
+      
+      // Debug the arrows data
+      console.log("⭐ Arrow data features:", arrowsData.features ? arrowsData.features.length : 0);
+      if (arrowsData.features && arrowsData.features.length > 0) {
+        console.log("⭐ Sample feature:", JSON.stringify(arrowsData.features[0].properties));
+      }
 
       // Update or add route source and layers
       if (map.getSource(routeSourceId)) {
         map.getSource(routeSourceId).setData(routeGeoJson);
       } else {
         map.addSource(routeSourceId, { type: 'geojson', data: routeGeoJson });
-        map.addLayer({ id: routeLayerId, type: 'line', source: routeSourceId, layout: { 'line-join': 'round', 'line-cap': 'round', 'line-sort-key': 1 }, paint: { 'line-color': '#007bff', 'line-width': 6, 'line-opacity': 0.8 }});
-        map.addLayer({ id: routeGlowLayerId, type: 'line', source: routeSourceId, layout: { 'line-join': 'round', 'line-cap': 'round', 'visibility': 'visible', 'line-sort-key': 0 }, paint: { 'line-color': '#ffffff', 'line-width': 10, 'line-opacity': 0.15, 'line-blur': 3 }, filter: ['==', '$type', 'LineString']}, routeLayerId);
+        
+        // Enhanced route line styling: brighter blue, thicker line, increased opacity
+        map.addLayer({ 
+          id: routeLayerId, 
+          type: 'line', 
+          source: routeSourceId, 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round', 
+            'line-sort-key': 1 
+          }, 
+          paint: { 
+            'line-color': '#1e8ffe', // Bright blue color
+            'line-width': 8, // Thicker line
+            'line-opacity': 1.0 // Full opacity
+          }
+        });
+        
+        // Enhanced glow effect
+        map.addLayer({ 
+          id: routeGlowLayerId, 
+          type: 'line', 
+          source: routeSourceId, 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round', 
+            'visibility': 'visible', 
+            'line-sort-key': 0 
+          }, 
+          paint: { 
+            'line-color': '#ffffff',
+            'line-width': 14, 
+            'line-opacity': 0.2, 
+            'line-blur': 5
+          }, 
+          filter: ['==', '$type', 'LineString']
+        }, routeLayerId);
       }
 
       // Update or add arrows source and layers
@@ -1148,71 +1241,116 @@ class WaypointManager {
         map.getSource(routeArrowsSourceId).setData(arrowsData);
       } else {
         map.addSource(routeArrowsSourceId, { type: 'geojson', data: arrowsData });
-        if (!map.hasImage('arrow-icon')) {
-          const size = 24; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, size, size); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(size/2, 0); ctx.lineTo(size, size); ctx.lineTo(size/2, size*0.7); ctx.lineTo(0, size); ctx.closePath(); ctx.fill();
-          map.addImage('arrow-icon', { data: ctx.getImageData(0, 0, size, size).data, width: size, height: size });
-        }
-        map.addLayer({ id: routeArrowsLayerId, type: 'symbol', source: routeArrowsSourceId, layout: { 'symbol-placement': 'point', 'icon-image': 'arrow-icon', 'icon-size': 0.5, 'icon-rotate': ['get', 'bearing'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': 2, 'visibility': 'none' }, paint: { 'icon-opacity': 0 }, filter: ['!', ['has', 'isLabel']]}); // Initially hidden, controlled by zoom/logic
-          map.addLayer({
-            id: legLabelsLayerId,
-            type: 'symbol',
-            source: routeArrowsSourceId,
-            layout: {
-              'symbol-placement': 'point',
-              'text-field': ['get', 'text'],
-              'text-size': 12, // Slightly larger text size
-              'text-font': ['Arial Unicode MS Bold'],
-              'text-offset': [0, -0.5],
-              'text-anchor': 'center',
-              'text-rotate': ['get', 'textBearing'],
-              'text-rotation-alignment': 'map',
-              'text-allow-overlap': false,
-              'text-ignore-placement': false,
-              'text-max-width': 30,
-              'text-line-height': 1.0,
-              'symbol-sort-key': 3,
-              // Make label visibility dependent on zoom level and segment length
-              'visibility': 'visible'
-            },
-            paint: {
-              'text-color': '#ffffff',
-              'text-halo-color': '#000000',
-              'text-halo-width': 3,
-              // More aggressive hiding for short segments to prevent text hanging off edges
-              'text-opacity': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                // At low zoom levels, only show larger segments
-                6, ['case', 
-                    ['>', ['get', 'legDistance'], 25], 0.9,  // Show segments > 25nm
-                    ['>', ['get', 'legDistance'], 15], 0.7,  // Show segments > 15nm
-                    0  // Hide smaller segments
-                   ],
-                // At medium zoom, show more segments
-                8, ['case',
-                    ['>', ['get', 'legDistance'], 15], 0.9,  // Show segments > 15nm clearly
-                    ['>', ['get', 'legDistance'], 7], 0.8,   // Show segments > 7nm
-                    ['>', ['get', 'legDistance'], 3], 0.7,   // Show segments > 3nm
-                    0  // Hide smaller segments
-                   ],
-                // At high zoom, show more but still hide very short segments
-                10, ['case',
-                     ['>', ['get', 'legDistance'], 2], 0.9,  // Show segments > 2nm clearly
-                     ['>', ['get', 'legDistance'], 1], 0.8,  // Show segments > 1nm
-                     0  // Hide very small segments
-                    ],
-                // At very high zoom, show small segments too
-                12, ['case',
-                     ['>', ['get', 'legDistance'], 0.5], 0.9,  // Show segments > 0.5nm
-                     ['>', ['get', 'legDistance'], 0.2], 0.8,  // Show segments > 0.2nm
-                     0.7  // Show all other segments with slight transparency
-                    ]
-              ]
-            },
-            filter: ['has', 'isLabel']
+        
+        // Create custom pill shapes for distance labels
+        if (!map.hasImage('pill-image')) {
+          // Create the pill in vertical orientation (90 degrees rotated)
+          const pillHeight = 120; // Longer dimension (will be along the line)
+          const pillWidth = 28;   // Shorter dimension
+          const canvas = document.createElement('canvas');
+          canvas.width = pillWidth;
+          canvas.height = pillHeight;
+          const ctx = canvas.getContext('2d');
+          
+          // Clear any existing content
+          ctx.clearRect(0, 0, pillWidth, pillHeight);
+          
+          // Draw the pill shape with vertical orientation
+          const radius = pillWidth / 2;
+          
+          // Blue outline (same color as the route)
+          ctx.fillStyle = '#1e8ffe';
+          ctx.beginPath();
+          // Top half-circle
+          ctx.arc(radius, radius, radius, Math.PI, 0);
+          // Right line
+          ctx.lineTo(pillWidth, pillHeight - radius);
+          // Bottom half-circle
+          ctx.arc(radius, pillHeight - radius, radius, 0, Math.PI);
+          // Left line
+          ctx.lineTo(0, radius);
+          ctx.closePath();
+          ctx.fill();
+          
+          // Draw the inner black area
+          ctx.fillStyle = '#000000';
+          const innerPadding = 2;
+          ctx.beginPath();
+          // Top half-circle (inner)
+          ctx.arc(radius, radius, radius - innerPadding, Math.PI, 0);
+          // Right line (inner)
+          ctx.lineTo(pillWidth - innerPadding, pillHeight - radius);
+          // Bottom half-circle (inner)
+          ctx.arc(radius, pillHeight - radius, radius - innerPadding, 0, Math.PI);
+          // Left line (inner)
+          ctx.lineTo(innerPadding, radius);
+          ctx.closePath();
+          ctx.fill();
+          
+          // Add the image to the map
+          const imageData = ctx.getImageData(0, 0, pillWidth, pillHeight);
+          console.log("⭐ Adding pill image. Width:", pillWidth, "Height:", pillHeight);
+          
+          // Remove existing image if there is one
+          if (map.hasImage('pill-image')) {
+            map.removeImage('pill-image');
+          }
+          
+          map.addImage('pill-image', { 
+            data: imageData.data, 
+            width: pillWidth, 
+            height: pillHeight,
+            sdf: false // Not an SDF image
           });
+        }
+        
+        // Add the pill icon layer first (so it appears behind the text)
+        map.addLayer({
+          id: 'route-pills',
+          type: 'symbol',
+          source: routeArrowsSourceId,
+          layout: {
+            'symbol-placement': 'point',
+            'icon-image': 'pill-image',
+            'icon-size': 1.0,
+            'icon-rotate': ['get', 'bearing'], // Rotate pill to follow the line direction
+            'icon-rotation-alignment': 'map', // Ensure pill aligns with the map for proper angle
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'symbol-sort-key': 1
+          },
+          paint: {
+            'icon-opacity': 1.0
+          },
+          filter: ['has', 'isLabel']
+        });
+        
+        // Add the text on top of the pill - aligned with the pill
+        map.addLayer({
+          id: legLabelsLayerId,
+          type: 'symbol',
+          source: routeArrowsSourceId,
+          layout: {
+            'symbol-placement': 'point',
+            'text-field': ['get', 'text'],
+            'text-size': 12,
+            'text-font': ['Arial Unicode MS Bold'],
+            // Adjust rotation by -90 degrees to align correctly with the pill
+            'text-rotate': ['-', ['get', 'bearing'], 90],
+            'text-rotation-alignment': 'map',
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+            'symbol-sort-key': 2,
+            'text-anchor': 'center', 
+            'text-justify': 'center',
+            'visibility': 'visible'
+          },
+          paint: {
+            'text-color': '#ffffff',
+            'text-opacity': 1.0
+          },
+          filter: ['has', 'isLabel']
+        });
       }
       
       // Ensure layers exist before trying to set visibility (e.g. for arrows)
@@ -1232,7 +1370,7 @@ class WaypointManager {
       }
     } else {
       // No waypoints or only one, remove route display
-      [routeGlowLayerId, routeLayerId, routeArrowsLayerId, legLabelsLayerId].forEach(layerId => {
+      [routeGlowLayerId, routeLayerId, routeArrowsLayerId, legLabelsLayerId, 'route-pills'].forEach(layerId => {
         if (map.getLayer(layerId)) map.removeLayer(layerId);
       });
       [routeSourceId, routeArrowsSourceId].forEach(sourceId => {
@@ -1272,7 +1410,7 @@ class WaypointManager {
       return;
     }
 
-    const layerIds = ['route-glow', 'route', 'route-arrows', 'leg-labels'];
+    const layerIds = ['route-glow', 'route', 'route-arrows', 'leg-labels', 'route-pills'];
     const sourceIds = ['route', 'route-arrows'];
 
     // Try to remove layers first
@@ -1576,7 +1714,7 @@ class WaypointManager {
             'line-cap': 'round' 
           }, 
           paint: { 
-            'line-color': isWaypointMode ? '#FFCC00' : '#FF4136', // Yellow for waypoints, red for stops
+            'line-color': isWaypointMode ? '#BA55D3' : '#FF4136', // Medium purple for waypoints, red for stops
             'line-width': 4,
             'line-dasharray': [2, 1] // Dashed line
           }
