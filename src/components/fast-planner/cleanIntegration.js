@@ -68,8 +68,7 @@ function integrateCleanModules() {
       );
     }
     
-    // Show our custom notification
-    showSuccess('Clean interaction modules active', 5000);
+    // Custom notification removed - no longer showing debug messages
   };
   
   // Start checking for managers
