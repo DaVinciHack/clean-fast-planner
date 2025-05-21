@@ -126,7 +126,10 @@ const FastPlannerCore = ({
   const {
     leftPanelVisible, rightPanelVisible, platformsVisible, platformsLoaded,
     rigsLoading, rigsError, toggleLeftPanel, toggleRightPanel,
-    togglePlatformsVisibility, reloadPlatformData, handleRouteInputChange
+    togglePlatformsVisibility, reloadPlatformData, handleRouteInputChange,
+    // Add the new platform visibility state and toggles
+    airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible,
+    toggleAirfieldsVisibility, toggleFixedPlatformsVisibility, toggleMovablePlatformsVisibility
   } = useUIControls({ appSettingsManagerRef, platformManagerRef, client, routeInput, setRouteInput });
   
   // Initialize map layers
@@ -270,6 +273,13 @@ const FastPlannerCore = ({
           gulfCoastMapRef={gulfCoastMapRef}
           weatherLayerRef={weatherLayerRef}
           vfrChartsRef={vfrChartsRef}
+          platformManagerRef={platformManagerRef}
+          airfieldsVisible={airfieldsVisible}
+          fixedPlatformsVisible={fixedPlatformsVisible}
+          movablePlatformsVisible={movablePlatformsVisible}
+          toggleAirfieldsVisibility={toggleAirfieldsVisibility}
+          toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility}
+          toggleMovablePlatformsVisibility={toggleMovablePlatformsVisibility}
         />
       </div>
     </>

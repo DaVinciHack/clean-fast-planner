@@ -28,6 +28,13 @@ const RightPanel = ({
   gulfCoastMapRef,
   weatherLayerRef,
   vfrChartsRef,
+  platformManagerRef,
+  airfieldsVisible,
+  fixedPlatformsVisible,
+  movablePlatformsVisible,
+  toggleAirfieldsVisibility,
+  toggleFixedPlatformsVisibility,
+  toggleMovablePlatformsVisibility,
   onToggleVisibility,
   onClearRoute,
   onLoadRigData,
@@ -221,38 +228,23 @@ const RightPanel = ({
       {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
       
-      // Map Layers Card
-  <MapLayersCard
-    id="maplayers"
-    mapManagerRef={mapManagerRef}
-    gulfCoastMapRef={gulfCoastMapRef}
-    weatherLayerRef={weatherLayerRef}
-    vfrChartsRef={vfrChartsRef}
-    platformManagerRef={window.platformManagerRef}
-    platformsVisible={chartsVisible}
-    airfieldsVisible={window.platformManagerRef?.current?.airfieldsVisible || true}
-    fixedPlatformsVisible={window.platformManagerRef?.current?.fixedPlatformsVisible || true}
-    movablePlatformsVisible={window.platformManagerRef?.current?.movablePlatformsVisible || true}
-    togglePlatformsVisibility={onToggleChart}
-    toggleAirfieldsVisibility={() => {
-      if (window.platformManagerRef?.current) {
-        return window.platformManagerRef.current.toggleAirfieldsVisibility();
-      }
-      return false;
-    }}
-    toggleFixedPlatformsVisibility={() => {
-      if (window.platformManagerRef?.current) {
-        return window.platformManagerRef.current.toggleFixedPlatformsVisibility();
-      }
-      return false;
-    }}
-    toggleMovablePlatformsVisibility={() => {
-      if (window.platformManagerRef?.current) {
-        return window.platformManagerRef.current.toggleMovablePlatformsVisibility();
-      }
-      return false;
-    }}
-  />
+      {/* Map Layers Card */}
+      <MapLayersCard
+        id="maplayers"
+        mapManagerRef={mapManagerRef}
+        gulfCoastMapRef={gulfCoastMapRef}
+        weatherLayerRef={weatherLayerRef}
+        vfrChartsRef={vfrChartsRef}
+        platformManagerRef={platformManagerRef}
+        platformsVisible={chartsVisible}
+        airfieldsVisible={airfieldsVisible}
+        fixedPlatformsVisible={fixedPlatformsVisible}
+        movablePlatformsVisible={movablePlatformsVisible}
+        togglePlatformsVisibility={onToggleChart}
+        toggleAirfieldsVisibility={toggleAirfieldsVisibility}
+        toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility}
+        toggleMovablePlatformsVisibility={toggleMovablePlatformsVisibility}
+      />
       
       {/* Save Flight Card */}
       <SaveFlightCard

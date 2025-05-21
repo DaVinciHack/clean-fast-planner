@@ -46,14 +46,16 @@ const RightPanelContainer = React.forwardRef(({
   // Filter children to get the current active card
   const getActiveChild = () => {
     const childrenArray = React.Children.toArray(children);
-    return childrenArray.find(child => child.props.id === currentCard) || null;
+    // Add a null check for child.props to prevent TypeError
+    return childrenArray.find(child => child && child.props && child.props.id === currentCard) || null;
   };
   
   // Filter children to get the next card (when animating)
   const getNextChild = () => {
     if (!nextCard) return null;
     const childrenArray = React.Children.toArray(children);
-    return childrenArray.find(child => child.props.id === nextCard) || null;
+    // Add a null check for child.props to prevent TypeError
+    return childrenArray.find(child => child && child.props && child.props.id === nextCard) || null;
   };
   
   // Handle card change with animation
