@@ -64,6 +64,8 @@ class PlatformManager {
     this.airfieldsVisible = true;
     this.fixedPlatformsVisible = true;
     this.movablePlatformsVisible = true;
+    this.blocksVisible = true; // New visibility state for blocks
+    this.fuelAvailableVisible = false; // New visibility state for fuel available overlay
     this.callbacks = {
       onPlatformsLoaded: null,
       onVisibilityChanged: null,
@@ -858,9 +860,13 @@ class PlatformManager {
       'platforms-fixed-labels',
       'platforms-movable-labels',
       'airfields-labels',
+      'blocks-labels',           // New blocks labels
+      'fuel-available-labels',   // New fuel available labels
       'platforms-fixed-layer',
       'platforms-movable-layer',
       'airfields-layer',
+      'blocks-layer',            // New blocks layer
+      'fuel-available-layer',    // New fuel available layer
       'platforms-layer' // Generic layer name, just in case it was used previously
     ];
     const sourceId = 'major-platforms';
@@ -1181,6 +1187,109 @@ class PlatformManager {
               'text-halo-width': 0.5
             }
           });
+
+          // Layer for Blocks (new category)
+          map.addLayer({
+            id: 'blocks-layer',
+            type: 'circle',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'blocks']],
+            paint: { 
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 2,      // Small dots at low zoom
+                10, 3,     // Medium dots at medium zoom 
+                13, 4,     // Larger dots at high zoom
+                16, 6      // Very large dots at very high zoom
+              ],
+              'circle-color': '#8B4513',       // Brown color for blocks
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#D2691E', // Lighter brown ring
+              'circle-opacity': 1
+            },
+            layout: {
+                'visibility': this.blocksVisible ? 'visible' : 'none'
+            }
+          });
+
+          // Labels for Blocks
+          map.addLayer({
+            id: 'blocks-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'blocks']],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 9,      // Small text at low zoom
+                10, 11,    // Medium text at medium zoom 
+                13, 13,    // Larger text at high zoom
+                16, 15     // Very large text at very high zoom
+              ],
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top',
+              'visibility': this.blocksVisible ? 'visible' : 'none'
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 0.5
+            }
+          });
+
+          // Layer for Fuel Available Overlay (ring around platforms with fuel)
+          map.addLayer({
+            id: 'fuel-available-layer',
+            type: 'circle',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'hasFuel'], true]],
+            paint: { 
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 4,      // Larger ring to surround existing markers
+                10, 6,     // Medium ring
+                13, 8,     // Larger ring
+                16, 12     // Very large ring
+              ],
+              'circle-color': 'rgba(255, 215, 0, 0.1)',  // Transparent gold fill
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#FFD700',          // Gold ring
+              'circle-opacity': 0.7
+            },
+            layout: {
+                'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
+            }
+          });
+
+          // Labels for Fuel Available (show "FUEL" text)
+          map.addLayer({
+            id: 'fuel-available-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'hasFuel'], true]],
+            layout: {
+              'text-field': 'FUEL',
+              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 8,      // Small text at low zoom
+                10, 10,    // Medium text at medium zoom 
+                13, 12,    // Larger text at high zoom
+                16, 14     // Very large text at very high zoom
+              ],
+              'text-offset': [0, -1.5],  // Position above the marker
+              'text-anchor': 'bottom',
+              'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
+            },
+            paint: {
+              'text-color': '#FFD700',    // Gold text
+              'text-halo-color': '#000000',
+              'text-halo-width': 1
+            }
+          });
+          
           console.log('PlatformManager: Platform layers added/updated.');
           this.triggerCallback('onPlatformsLoaded', platforms);
         } catch (error) {
@@ -1361,6 +1470,76 @@ class PlatformManager {
   }
 
   /**
+   * Toggle visibility of blocks only
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for blocks
+   */
+  toggleBlocksVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store blocks visibility state
+    this.blocksVisible = visible !== undefined ? visible : !this.blocksVisible;
+    
+    try {
+      // Blocks-specific layers
+      const blocksLayers = [
+        'blocks-layer',        // Blocks markers
+        'blocks-labels'        // Blocks labels
+      ];
+      
+      const visibility = this.blocksVisible ? 'visible' : 'none';
+      
+      blocksLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Blocks visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling blocks visibility:', error);
+    }
+    
+    return this.blocksVisible;
+  }
+
+  /**
+   * Toggle visibility of fuel available locations overlay
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for fuel available overlay
+   */
+  toggleFuelAvailableVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store fuel available visibility state
+    this.fuelAvailableVisible = visible !== undefined ? visible : !this.fuelAvailableVisible;
+    
+    try {
+      // Fuel available overlay layers
+      const fuelAvailableLayers = [
+        'fuel-available-layer',        // Fuel available markers/rings
+        'fuel-available-labels'        // Fuel available labels
+      ];
+      
+      const visibility = this.fuelAvailableVisible ? 'visible' : 'none';
+      
+      fuelAvailableLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Fuel available overlay visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling fuel available visibility:', error);
+    }
+    
+    return this.fuelAvailableVisible;
+  }
+
+  /**
    * Helper to set visibility of main platform/airport layers
    * @param {boolean} visible - True to show, false to hide
    */
@@ -1376,7 +1555,11 @@ class PlatformManager {
       'platforms-fixed-labels',
       'platforms-movable-labels',
       'airfields-layer',
-      'airfields-labels'
+      'airfields-labels',
+      'blocks-layer',           // New blocks layer
+      'blocks-labels',          // New blocks labels
+      'fuel-available-layer',   // New fuel available overlay
+      'fuel-available-labels'   // New fuel available labels
     ];
     
     // Just set visibility property instead of removing layers
