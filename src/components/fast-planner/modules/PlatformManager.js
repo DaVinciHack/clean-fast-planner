@@ -1163,7 +1163,7 @@ class PlatformManager {
               ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
-              'visibility': this.isVisible ? 'visible' : 'none',
+              'visibility': this.fixedPlatformsVisible ? 'visible' : 'none',
               'min-zoom': 11  // Only show platform labels at zoom 11+
             },
             paint: {
@@ -1267,9 +1267,8 @@ class PlatformManager {
               ],
               'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
-              'visibility': this.blocksVisible ? 'visible' : 'none'
-              // Temporarily remove min-zoom to debug
-              // 'min-zoom': 13  // Simple approach: only show at zoom 13+
+              'visibility': this.blocksVisible ? 'visible' : 'none',
+              'min-zoom': 13  // Only show blocks labels at zoom 13+
             },
             paint: {
               'text-color': '#888888',    // Grey color for block labels
