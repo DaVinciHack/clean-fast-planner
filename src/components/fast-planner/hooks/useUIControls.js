@@ -18,11 +18,13 @@ const useUIControls = ({
   const [leftPanelVisible, setLeftPanelVisible] = useState(false);
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
   
-  // Platform visibility states
+  // Platform visibility states (enhanced categories)
   const [platformsVisible, setPlatformsVisible] = useState(true);
   const [airfieldsVisible, setAirfieldsVisible] = useState(true);
-  const [fixedPlatformsVisible, setFixedPlatformsVisible] = useState(true);
+  const [fixedPlatformsVisible, setFixedPlatformsVisible] = useState(true); // Legacy
   const [movablePlatformsVisible, setMovablePlatformsVisible] = useState(true);
+  const [blocksVisible, setBlocksVisible] = useState(true); // New category
+  const [fuelAvailableVisible, setFuelAvailableVisible] = useState(false); // New category
   
   // Platform loading state
   const [platformsLoaded, setPlatformsLoaded] = useState(false);
@@ -199,11 +201,56 @@ const useUIControls = ({
   };
   
   /**
+   * Toggles only blocks visibility on the map
+   */
+  const toggleBlocksVisibility = () => {
+    const newState = !blocksVisible;
+    setBlocksVisible(newState);
+    
+    if (platformManagerRef && platformManagerRef.current) {
+      platformManagerRef.current.toggleBlocksVisibility(newState);
+      
+      // Update combined visibility state
+      updateCombinedVisibilityState();
+    }
+    
+    // Save to settings
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        blocksVisible: newState
+      });
+    }
+  };
+  
+  /**
+   * Toggles fuel available locations visibility on the map
+   */
+  const toggleFuelAvailableVisibility = () => {
+    const newState = !fuelAvailableVisible;
+    setFuelAvailableVisible(newState);
+    
+    if (platformManagerRef && platformManagerRef.current) {
+      platformManagerRef.current.toggleFuelAvailableVisibility(newState);
+      
+      // Update combined visibility state (fuel available is overlay, doesn't affect main state)
+      // updateCombinedVisibilityState(); // Don't include fuel in combined state
+    }
+    
+    // Save to settings
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        fuelAvailableVisible: newState
+      });
+    }
+  };
+  
+  /**
    * Updates the combined platformsVisible state based on individual visibility states
    */
   const updateCombinedVisibilityState = () => {
     // If any of the platform types are visible, consider platforms visible
-    const anyVisible = airfieldsVisible || fixedPlatformsVisible || movablePlatformsVisible;
+    // Note: fuelAvailable is an overlay and doesn't affect the main platform visibility state
+    const anyVisible = airfieldsVisible || fixedPlatformsVisible || movablePlatformsVisible || blocksVisible;
     setPlatformsVisible(anyVisible);
     
     // Save to settings
@@ -258,8 +305,10 @@ const useUIControls = ({
     rightPanelVisible,
     platformsVisible,
     airfieldsVisible,
-    fixedPlatformsVisible,
+    fixedPlatformsVisible, // Legacy
     movablePlatformsVisible,
+    blocksVisible, // New state
+    fuelAvailableVisible, // New state
     platformsLoaded,
     rigsLoading,
     rigsError,
@@ -267,8 +316,10 @@ const useUIControls = ({
     toggleRightPanel,
     togglePlatformsVisibility,
     toggleAirfieldsVisibility,
-    toggleFixedPlatformsVisibility,
+    toggleFixedPlatformsVisibility, // Legacy
     toggleMovablePlatformsVisibility,
+    toggleBlocksVisibility, // New function
+    toggleFuelAvailableVisibility, // New function
     reloadPlatformData,
     handleRouteInputChange
   };
