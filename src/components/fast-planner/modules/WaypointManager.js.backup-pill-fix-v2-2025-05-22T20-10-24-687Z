@@ -820,78 +820,7 @@ class WaypointManager {
             // }
           }
             
-          // Calculate if pill should be shown based on segment length
-          const shouldShowPill = (() => {
-            // Get current zoom level
-            const zoom = map.getZoom();
-            
-            // For segments, calculate the actual distance
-            if (legSegment && legSegment.geometry && legSegment.geometry.coordinates) {
-              const coords = legSegment.geometry.coordinates;
-              if (coords.length >= 2) {
-                // Project the coordinates to screen pixels
-                const p1 = map.project(coords[0]);
-                const p2 = map.project(coords[coords.length - 1]);
-                
-                // Calculate pixel distance
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-                
-                // Only show pill if segment is longer than 150 pixels
-                // and zoom is above 9
-                return pixelDistance > 150 && zoom > 9;
-              }
-            }
-            
-            // For simple two-point segments
-            try {
-              const p1 = map.project(segmentCoordinates[0]);
-              const p2 = map.project(segmentCoordinates[1]);
-              const dx = p2.x - p1.x;
-              const dy = p2.y - p1.y;
-              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-              
-              // Only show if line is longer than pill (150px) and zoom > 9
-              return pixelDistance > 150 && zoom > 9;
-            } catch (e) {
-              return zoom > 10; // Fallback to zoom-based
-            }
-          })();
-          
-          if (shouldShowPill) {
-            // Add feature with bearings for both pill and text
-          
-          // Calculate pixel distance for this segment
-          const shouldShowPill = (() => {
-            try {
-              if (!map) return false;
-              
-              // Get the segment endpoints
-              let p1, p2;
-              if (segmentCoordinates && segmentCoordinates.length >= 2) {
-                p1 = map.project(segmentCoordinates[0]);
-                p2 = map.project(segmentCoordinates[segmentCoordinates.length - 1]);
-              } else {
-                return false;
-              }
-              
-              // Calculate pixel distance between endpoints
-              const dx = p2.x - p1.x;
-              const dy = p2.y - p1.y;
-              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-              
-              // Pill is about 120 pixels long, only show if line is longer
-              return pixelDistance > 120;
-            } catch (e) {
-              return false;
-            }
-          })();
-          
-          if (!shouldShowPill) {
-            continue; // Skip this pill
-          }
-
+          // Add feature with bearings for both pill and text
           features.push({
             type: 'Feature',
             geometry: midPoint.geometry,
@@ -904,7 +833,6 @@ class WaypointManager {
               legIndex: i
             }
           });
-          }
         } catch (err) {
           console.error(`Error creating label for segment ${i}:`, err);
         }

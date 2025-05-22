@@ -1780,6 +1780,40 @@ class WaypointManager {
     const waypoint = this.getWaypointById(id);
     if (waypoint) { waypoint.name = name; this.triggerCallback('onChange', this.waypoints); }
   }
+  
+  /**
+   * Refresh the route display and labels - useful when layer visibility changes
+   * This ensures route labels are restored after platform layer toggles
+   */
+  refreshRouteDisplay() {
+    console.log('WaypointManager.refreshRouteDisplay: Refreshing route display and labels');
+    
+    const map = this.mapManager.getMap();
+    if (!map || !this.mapManager.isMapLoaded()) {
+      console.log('WaypointManager.refreshRouteDisplay: Map not ready, skipping refresh');
+      return;
+    }
+    
+    // If we have waypoints, trigger a route update to restore labels
+    if (this.waypoints && this.waypoints.length >= 2) {
+      console.log(`WaypointManager.refreshRouteDisplay: Refreshing route with ${this.waypoints.length} waypoints`);
+      
+      // Force update the route which will recreate all labels and sources
+      this.updateRoute();
+      
+      // Ensure route and label layers are visible
+      const layersToShow = ['route', 'route-glow', 'route-pills', 'leg-labels', 'route-arrows'];
+      layersToShow.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'visible');
+        }
+      });
+      
+      console.log('WaypointManager.refreshRouteDisplay: Route display refreshed successfully');
+    } else {
+      console.log('WaypointManager.refreshRouteDisplay: No route to refresh (less than 2 waypoints)');
+    }
+  }
 
   setupRouteDragging(onRoutePointAdded) {
     const map = this.mapManager.getMap();

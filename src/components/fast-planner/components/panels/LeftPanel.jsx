@@ -378,7 +378,7 @@ const LeftPanel = ({
             <input 
               type="text" 
               className="route-input"
-              placeholder="Enter rig name or platform"
+              placeholder="Enter rig name, platform, or coordinates"
               style={{ 
                 flex: 1, 
                 marginRight: "5px", 
@@ -404,18 +404,45 @@ const LeftPanel = ({
                 justifyContent: "center"
               }}
               onClick={() => {
+                console.log('=== LeftPanel: Add button clicked ===');
+                console.log('onAddWaypoint function available:', !!onAddWaypoint);
+                console.log('routeInput value:', JSON.stringify(routeInput));
+                console.log('routeInput trimmed:', JSON.stringify(routeInput.trim()));
+                console.log('routeInput length:', routeInput.trim().length);
+                
                 if (onAddWaypoint && routeInput.trim()) {
-                  console.log('LeftPanel: Add button clicked with input:', routeInput.trim());
-                  onAddWaypoint(routeInput.trim());
+                  console.log('LeftPanel: Calling onAddWaypoint with input:', routeInput.trim());
+                  try {
+                    onAddWaypoint(routeInput.trim());
+                    console.log('LeftPanel: onAddWaypoint call completed successfully');
+                  } catch (error) {
+                    console.error('LeftPanel: Error calling onAddWaypoint:', error);
+                  }
+                  
                   // Clear the input field after adding
                   if (onRouteInputChange) {
+                    console.log('LeftPanel: Clearing input field');
                     onRouteInputChange('');
                   }
+                } else {
+                  console.log('LeftPanel: Cannot add waypoint - missing function or empty input');
+                  console.log('  - onAddWaypoint available:', !!onAddWaypoint);
+                  console.log('  - routeInput has content:', !!routeInput.trim());
                 }
               }}
             >
               Add
             </button>
+          </div>
+          
+          {/* Coordinate format help text */}
+          <div style={{ 
+            fontSize: "11px", 
+            color: "#888", 
+            marginTop: "3px",
+            lineHeight: "1.3"
+          }}>
+            Examples: STAVANGER, 60.7917,5.3417, 60° 47.502' N, 5° 20.502' E
           </div>
         </div>
         

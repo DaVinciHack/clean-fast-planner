@@ -1,0 +1,236 @@
+/* Finance Calculator Enhanced Styles */
+
+/* Main container sections */
+.finance-calculator-section {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.finance-calculator-section h4 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #3B82F6;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-calculator-section h4::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background-color: #3B82F6;
+  border-radius: 2px;
+}
+
+/* Grid layouts for form fields */
+.finance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.finance-grid-full {
+  grid-column: 1 / -1;
+}
+
+/* Compact input groups */
+.finance-input-group {
+  margin-bottom: 12px;
+}
+
+.finance-input-group label {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.finance-input-group input,
+.finance-input-group select {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.finance-input-group input:focus,
+.finance-input-group select:focus {
+  outline: none;
+  border-color: #3B82F6;
+  background-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Checkbox groups */
+.finance-checkbox-group {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.finance-checkbox-group:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.finance-checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.finance-checkbox-group label {
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+}
+
+/* Collapsible sections */
+.finance-collapsible {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Cost breakdown improvements */
+.cost-breakdown-section {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.4);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.cost-breakdown-section h4 {
+  color: #60A5FA;
+  margin-bottom: 16px;
+}
+
+.finance-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.finance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.finance-item:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.finance-label {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.finance-value {
+  font-weight: 600;
+  color: #60A5FA;
+}
+
+/* Total row styling */
+.finance-item.finance-total {
+  margin-top: 8px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  font-size: 12px;
+}
+
+.finance-total .finance-label {
+  color: white;
+  font-weight: 600;
+}
+
+.finance-total .finance-value {
+  color: #60A5FA;
+  font-weight: 700;
+  font-size: 20px;
+  font-style: italic;
+}
+
+/* Subtle info text */
+.finance-info {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Time type toggle - improved */
+.time-type-toggle {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 4px;
+  margin-bottom: 12px;
+}
+
+.time-type-option {
+  flex: 1;
+  padding: 8px;
+  text-align: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.time-type-option.active {
+  background-color: #3B82F6;
+  color: white;
+  font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .finance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Additional refinements */
+.finance-label {
+  font-size: 12px;
+}
+
+.finance-value {
+  font-size: 13px;
+}
+
+.finance-total .finance-label {
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Keep input labels readable */
+.finance-input-group label {
+  font-size: 12px;
+}
