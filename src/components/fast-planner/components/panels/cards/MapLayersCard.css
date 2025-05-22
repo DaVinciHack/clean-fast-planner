@@ -13,6 +13,18 @@
   padding-bottom: 5px;
 }
 
+/* Two-column button layout */
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.button-row .layer-toggle-container {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .layer-toggle-container {
   margin-bottom: 8px;
 }
@@ -24,11 +36,12 @@
   background: rgba(40, 40, 40, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  padding: 8px 12px;
+  padding: 6px 10px; /* Smaller padding for compact buttons */
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
+  font-size: 12px; /* Smaller font for compact buttons */
 }
 
 .layer-toggle-button:hover:not(:disabled) {
@@ -47,10 +60,10 @@
 
 .toggle-indicator {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 12px; /* Smaller indicator for compact buttons */
+  height: 12px;
   border-radius: 50%;
-  margin-right: 12px;
+  margin-right: 8px; /* Smaller margin for compact buttons */
   background: #666;
   border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.2s ease;
@@ -63,7 +76,7 @@
 
 .toggle-label {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px; /* Smaller font for compact buttons */
 }
 
 .unavailable-indicator {

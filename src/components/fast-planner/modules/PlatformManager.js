@@ -485,9 +485,12 @@ class PlatformManager {
         LoadingIndicator.updateText(loaderId, `Processing ${result.data ? result.data.length : 0} locations...`);
         
         // Debug counters
-        let fixedPlatformCount = 0;
+        let fixedPlatformCount = 0; // Legacy counter (will be removed)
         let movablePlatformCount = 0;
-        let airportsCount = 0; // Changed name to avoid duplicate declaration
+        let airportsCount = 0;
+        let platformsCount = 0; // New counter for fixed platforms
+        let blocksCount = 0; // New counter for blocks
+        let fuelAvailableCount = 0; // New counter for fuel available locations
         
         // First, log what types are available in the data
         const typeCount = {};
@@ -517,6 +520,9 @@ class PlatformManager {
           let type = '';
           let isAirfield = false;
           let isMovable = false; // New property to track if this is a movable platform
+          let isPlatform = false; // New property for fixed platforms
+          let isBlocks = false; // New property for blocks
+          let hasFuel = false; // New property for fuel availability
           
           // Try to extract name
           if (item.locName) name = item.locName;
@@ -611,15 +617,50 @@ class PlatformManager {
                 upperType.includes('HELIPORT')) {
               isAirfield = true;
               isMovable = false;
+              isPlatform = false;
+              isBlocks = false;
             }
-            // Check for platform types
+            // Check for Blocks (specific category)
+            else if (upperType.includes('BLOCKS')) {
+              isBlocks = true;
+              isAirfield = false;
+              isMovable = false;
+              isPlatform = false;
+            }
+            // Check for Movable platforms (your specific requirements)
+            else if (upperType.includes('JACK-UP RIG') ||
+                    upperType.includes('MOVEABLE') ||
+                    upperType.includes('SEMI-SUBMERSIBLE') ||
+                    upperType.includes('SHIP') ||
+                    upperType.includes('TENSION LEG PLATFORM') ||
+                    // Legacy support for existing movable types
+                    upperType.includes('MOVABLE') ||
+                    upperType.includes('VESSEL') ||
+                    upperType.includes('JACK-UP') ||
+                    upperType.includes('JACKUP') ||
+                    upperType.includes('DRILL SHIP')) {
+              isMovable = true;
+              isAirfield = false;
+              isPlatform = false;
+              isBlocks = false;
+            }
+            // Check for Fixed Platforms (your specific requirements)
+            else if (upperType.includes('FIXED PLATFORM') ||
+                    upperType === 'FIXED PLATFORM' ||
+                    upperType.includes('PLATFORMS') ||
+                    upperType.includes('RIGS') ||
+                    upperType.includes('FPSO') ||
+                    // Legacy support for existing fixed platform types
+                    (upperType.includes('FIXED') && upperType.includes('PLATFORM')) ||
+                    upperType.includes('STATIC')) {
+              isPlatform = true;
+              isAirfield = false;
+              isMovable = false;
+              isBlocks = false;
+            }
+            // Legacy platform type detection (for backward compatibility)
             else if (upperType.includes('PLATFORM') || 
                     upperType.includes('RIG') ||
-                    upperType.includes('VESSEL') ||
-                    upperType.includes('SHIP') ||
-                    upperType.includes('BLOCKS') ||
-                    upperType.includes('JACKUP') ||
-                    upperType.includes('FPSO') ||
                     upperType.includes('TLP') ||
                     upperType.includes('SPAR') ||
                     upperType.includes('DRILL') ||
@@ -629,33 +670,19 @@ class PlatformManager {
                     upperType.includes('JACKET') ||
                     (upperType.includes('OFFSHORE') && !upperType.includes('REPORTING'))) {
               
+              // Default to fixed platform for legacy types
+              isPlatform = true;
               isAirfield = false;
-              
-              // Check if it's a movable platform
-              if (upperType.includes('MOVABLE') || 
-                  upperType.includes('MOVEABLE') || 
-                  upperType.includes('SHIP') || 
-                  upperType.includes('VESSEL') ||
-                  upperType.includes('JACK-UP') ||
-                  upperType.includes('JACKUP') ||
-                  upperType.includes('DRILL SHIP') ||
-                  upperType.includes('SEMI-SUBMERSIBLE')) {
-                isMovable = true;
-              } 
-              // Fixed platform detection
-              else if (upperType.includes('FIXED') || upperType.includes('STATIC')) {
-                isMovable = false;
-              }
-              // Default case for other platforms - treat as fixed
-              else {
-                isMovable = false;
-              }
+              isMovable = false;
+              isBlocks = false;
             }
             // Gulf of Mexico special case - X prefixed platforms
             else if (item.region === "GULF OF MEXICO" && 
                     (name.startsWith('X') || name.startsWith('K'))) {
+              isPlatform = true; // Default Gulf of Mexico platforms to fixed platforms
               isAirfield = false;
               isMovable = false;
+              isBlocks = false;
             }
             // Skip other types
             else {
@@ -663,9 +690,22 @@ class PlatformManager {
             }
           }
           
+          // Check for fuel availability (applies to all platform types)
+          if (item.fuelAvailable === 'Y' || 
+              item.fuelAvailable === 'Yes' || 
+              item.fuelAvailable === 'YES' ||
+              item.fuel_available === 'Y' ||
+              item.fuel_available === 'Yes' ||
+              item.fuel_available === 'YES') {
+            hasFuel = true;
+          }
+          
           // Special handling for specific key locations (without excessive logging)
           if (name === 'ENZV' || name === 'SVG' || name.includes('STAVANGER') || name.includes('SOLA')) {
             isAirfield = true;
+            isPlatform = false;
+            isMovable = false;
+            isBlocks = false;
             
             // Ensure ENZV has correct coordinates if found
             if (name === 'ENZV' && (!coords || coords[0] === 0 || coords[1] === 0)) {
@@ -675,6 +715,9 @@ class PlatformManager {
           
           if (name === 'KHUM' || name.includes('HOUMA')) {
             isAirfield = true;
+            isPlatform = false;
+            isMovable = false;
+            isBlocks = false;
             
             // Ensure KHUM has correct coordinates if found
             if (name === 'KHUM' && (!coords || coords[0] === 0 || coords[1] === 0)) {
@@ -684,28 +727,43 @@ class PlatformManager {
           
           // Count by type for debugging
           if (isAirfield) {
-            airportsCount++; // Updated variable name
+            airportsCount++;
+          } else if (isPlatform) {
+            platformsCount++;
+            fixedPlatformCount++; // Keep legacy counter for now
           } else if (isMovable) {
             movablePlatformCount++;
-          } else {
-            fixedPlatformCount++;
+          } else if (isBlocks) {
+            blocksCount++;
           }
           
-          // Add the processed location
+          if (hasFuel) {
+            fuelAvailableCount++;
+          }
+          
+          // Add the processed location with new categorization
           locations.push({
             name: name,
             coordinates: coords,
             operator: type || 'Unknown',
             isAirfield: isAirfield,
-            isMovable: isMovable
+            isMovable: isMovable,
+            isPlatform: isPlatform,
+            isBlocks: isBlocks,
+            hasFuel: hasFuel
           });
           
           // Mark as processed
           processedNames.add(name);
         }
         
-        // Simplified logging - just show summary
-        console.log(`Processed ${locations.length} locations (${airportsCount} airports, ${fixedPlatformCount} fixed platforms, ${movablePlatformCount} movable platforms)`);
+        // Enhanced logging - show summary with new categories
+        console.log(`Processed ${locations.length} locations:`);
+        console.log(`  - ${airportsCount} airfields`);
+        console.log(`  - ${platformsCount} platforms (fixed)`);
+        console.log(`  - ${movablePlatformCount} movable platforms`);
+        console.log(`  - ${blocksCount} blocks`);
+        console.log(`  - ${fuelAvailableCount} locations with fuel available`);
         
         // Update loading indicator
         LoadingIndicator.updateText(loaderId, `Adding ${locations.length} locations to map...`);
@@ -899,7 +957,7 @@ class PlatformManager {
 
       const sourceId = 'major-platforms';
 
-      // Prepare features for GeoJSON source
+      // Prepare features for GeoJSON source with enhanced categorization
       const features = platforms.map(p => ({
         type: 'Feature',
         geometry: {
@@ -911,7 +969,14 @@ class PlatformManager {
           operator: p.operator,
           isAirfield: p.isAirfield || false,
           isMovable: p.isMovable || false,
-          platformType: p.isAirfield ? 'airfield' : (p.isMovable ? 'movable' : 'fixed')
+          isPlatform: p.isPlatform || false,
+          isBlocks: p.isBlocks || false,
+          hasFuel: p.hasFuel || false,
+          // Enhanced platform type categorization
+          platformType: p.isAirfield ? 'airfield' : 
+                       p.isPlatform ? 'platform' :
+                       p.isMovable ? 'movable' :
+                       p.isBlocks ? 'blocks' : 'fixed'
         }
       }));
 
