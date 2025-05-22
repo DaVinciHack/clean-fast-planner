@@ -614,30 +614,23 @@ class PlatformManager {
             
             // Don't skip reporting points anymore
               
-            // First check for Bases (specific category - takes priority over airfields)
-            if (upperType.includes('BASE') || 
-                upperType.includes('BRISTOW BASE') ||
-                upperType.includes('OTHER_BASES')) {
-              // Exclude "NON BASE AIRFIELD" from bases - it should go to airfields
-              if (!upperType.includes('NON BASE AIRFIELD')) {
-                isBases = true;
-                isAirfield = false;
-                isMovable = false;
-                isPlatform = false;
-                isBlocks = false;
-              } else {
-                // "NON BASE AIRFIELD" goes to airfields instead
-                isAirfield = true;
-                isBases = false;
-                isMovable = false;
-                isPlatform = false;
-                isBlocks = false;
-              }
+            // First check for Bases using the isBase field (much cleaner!)
+            if (item.isBase === 'Y' || 
+                item.isBase === 'Yes' || 
+                item.isBase === 'YES' ||
+                item.is_base === 'Y' ||
+                item.is_base === 'Yes' ||
+                item.is_base === 'YES') {
+              isBases = true;
+              isAirfield = false;
+              isMovable = false;
+              isPlatform = false;
+              isBlocks = false;
             }
-            // Then check for airfields (including NON BASE AIRFIELD and BASE AIRFIELD)
+            // Then check for airfields (including all airfield types)
             else if (item.ISAIRPORT === 'Yes' || item.isAirport === 'Yes' || 
                 upperType.includes('AIRPORT') || 
-                upperType.includes('AIRFIELD') ||  // This catches NON BASE AIRFIELD and BASE AIRFIELD
+                upperType.includes('AIRFIELD') ||  // This catches all AIRFIELD types
                 upperType.includes('HELIPORT')) {
               isAirfield = true;
               isMovable = false;
@@ -775,10 +768,9 @@ class PlatformManager {
             console.log(`Block found: "${name}" with type: "${type}"`);
           } else if (isBases) {
             basesCount++;
-            // Debug: Log bases found
-            if (basesCount <= 3) { // Only log first few to avoid spam
-              console.log(`Base found: "${name}" with type: "${type}"`);
-            }
+            // Debug: Log ALL bases found with their isBase field value
+            const baseField = item.isBase || item.is_base || 'not found';
+            console.log(`Base found: "${name}" with isBase field: "${baseField}" and type: "${type}"`);
           }
           
           if (hasFuel) {
