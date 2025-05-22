@@ -65,6 +65,7 @@ class PlatformManager {
     this.fixedPlatformsVisible = true;
     this.movablePlatformsVisible = true;
     this.blocksVisible = true; // New visibility state for blocks
+    this.basesVisible = true; // New visibility state for bases
     this.fuelAvailableVisible = false; // New visibility state for fuel available overlay
     this.callbacks = {
       onPlatformsLoaded: null,
@@ -492,6 +493,7 @@ class PlatformManager {
         let airportsCount = 0;
         let platformsCount = 0; // New counter for fixed platforms
         let blocksCount = 0; // New counter for blocks
+        let basesCount = 0; // New counter for bases
         let fuelAvailableCount = 0; // New counter for fuel available locations
         
         // First, log what types are available in the data
@@ -525,6 +527,7 @@ class PlatformManager {
           let isPlatform = false; // New property for fixed platforms
           let isBlocks = false; // New property for blocks
           let hasFuel = false; // New property for fuel availability
+          let isBases = false; // New property for bases
           
           // Try to extract name
           if (item.locName) name = item.locName;
@@ -611,16 +614,27 @@ class PlatformManager {
             
             // Don't skip reporting points anymore
               
-            // First check for airfields (take priority over platform detection)
-            if (item.ISAIRPORT === 'Yes' || item.isAirport === 'Yes' || 
+            // First check for Bases (specific category - takes priority over airfields)
+            if (upperType.includes('BASE') || 
+                upperType.includes('BASE AIRFIELD') ||
+                upperType.includes('BRISTOW BASE') ||
+                upperType.includes('OTHER_BASES')) {
+              isBases = true;
+              isAirfield = false;
+              isMovable = false;
+              isPlatform = false;
+              isBlocks = false;
+            }
+            // Then check for airfields (but not if already identified as base)
+            else if (item.ISAIRPORT === 'Yes' || item.isAirport === 'Yes' || 
                 upperType.includes('AIRPORT') || 
                 upperType.includes('AIRFIELD') || 
-                upperType.includes('BASE') || 
                 upperType.includes('HELIPORT')) {
               isAirfield = true;
               isMovable = false;
               isPlatform = false;
               isBlocks = false;
+              isBases = false;
             }
             // Check for Blocks (specific category)
             else if (upperType.includes('BLOCKS')) {
@@ -628,6 +642,7 @@ class PlatformManager {
               isAirfield = false;
               isMovable = false;
               isPlatform = false;
+              isBases = false;
             }
             // Check for Movable platforms (your specific requirements)
             else if (upperType.includes('JACK-UP RIG') ||
@@ -645,6 +660,7 @@ class PlatformManager {
               isAirfield = false;
               isPlatform = false;
               isBlocks = false;
+              isBases = false;
             }
             // Check for Fixed Platforms (your specific requirements)
             else if (upperType.includes('FIXED PLATFORM') ||
@@ -659,6 +675,7 @@ class PlatformManager {
               isAirfield = false;
               isMovable = false;
               isBlocks = false;
+              isBases = false;
             }
             // Legacy platform type detection (for backward compatibility)
             else if (upperType.includes('PLATFORM') || 
@@ -677,6 +694,7 @@ class PlatformManager {
               isAirfield = false;
               isMovable = false;
               isBlocks = false;
+              isBases = false;
             }
             // Gulf of Mexico special case - X prefixed platforms
             else if (item.region === "GULF OF MEXICO" && 
@@ -685,6 +703,7 @@ class PlatformManager {
               isAirfield = false;
               isMovable = false;
               isBlocks = false;
+              isBases = false;
             }
             // Skip other types
             else {
@@ -708,6 +727,7 @@ class PlatformManager {
             isPlatform = false;
             isMovable = false;
             isBlocks = false;
+            isBases = false;
             
             // Ensure ENZV has correct coordinates if found
             if (name === 'ENZV' && (!coords || coords[0] === 0 || coords[1] === 0)) {
@@ -720,6 +740,7 @@ class PlatformManager {
             isPlatform = false;
             isMovable = false;
             isBlocks = false;
+            isBases = false;
             
             // Ensure KHUM has correct coordinates if found
             if (name === 'KHUM' && (!coords || coords[0] === 0 || coords[1] === 0)) {
@@ -741,6 +762,12 @@ class PlatformManager {
             movablePlatformCount++;
           } else if (isBlocks) {
             blocksCount++;
+          } else if (isBases) {
+            basesCount++;
+            // Debug: Log bases found
+            if (basesCount <= 3) { // Only log first few to avoid spam
+              console.log(`Base found: "${name}" with type: "${type}"`);
+            }
           }
           
           if (hasFuel) {
@@ -756,6 +783,7 @@ class PlatformManager {
             isMovable: isMovable,
             isPlatform: isPlatform,
             isBlocks: isBlocks,
+            isBases: isBases,
             hasFuel: hasFuel
           });
           
@@ -769,6 +797,7 @@ class PlatformManager {
         console.log(`  - ${platformsCount} platforms (fixed)`);
         console.log(`  - ${movablePlatformCount} movable platforms`);
         console.log(`  - ${blocksCount} blocks`);
+        console.log(`  - ${basesCount} bases`);
         console.log(`  - ${fuelAvailableCount} locations with fuel available`);
         
         // Update loading indicator
@@ -865,11 +894,13 @@ class PlatformManager {
       'platforms-movable-labels',
       'airfields-labels',
       'blocks-labels',           // New blocks labels
+      'bases-labels',            // New bases labels
       'fuel-available-labels',   // New fuel available labels
       'platforms-fixed-layer',
       'platforms-movable-layer',
       'airfields-layer',
       'blocks-layer',            // New blocks layer
+      'bases-layer',             // New bases layer
       'fuel-available-layer',    // New fuel available layer
       'platforms-layer' // Generic layer name, just in case it was used previously
     ];
@@ -981,12 +1012,14 @@ class PlatformManager {
           isMovable: p.isMovable || false,
           isPlatform: p.isPlatform || false,
           isBlocks: p.isBlocks || false,
+          isBases: p.isBases || false,
           hasFuel: p.hasFuel || false,
           // Enhanced platform type categorization
           platformType: p.isAirfield ? 'airfield' : 
                        p.isPlatform ? 'fixed' :    // Fixed: use 'fixed' not 'platform'
                        p.isMovable ? 'movable' :
-                       p.isBlocks ? 'blocks' : 'fixed'
+                       p.isBlocks ? 'blocks' :
+                       p.isBases ? 'bases' : 'fixed'
         }
       }));
 
@@ -1239,6 +1272,57 @@ class PlatformManager {
               'text-color': '#888888',    // Grey color for block labels
               'text-halo-color': '#000000',
               'text-halo-width': 0.5
+            }
+          });
+
+          // Layer for Bases (new category) - bright purple/magenta rings
+          map.addLayer({
+            id: 'bases-layer',
+            type: 'circle',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'bases']],
+            paint: { 
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                7, 5,      // Larger ring to go over airport rings
+                10, 7,     // Medium ring
+                13, 10,    // Larger ring
+                16, 14     // Large ring at high zoom
+              ],
+              'circle-color': 'rgba(255, 0, 255, 0.1)',  // Transparent magenta fill
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#FF00FF',          // Bright magenta ring
+              'circle-opacity': 0.6
+            },
+            layout: {
+                'visibility': this.basesVisible ? 'visible' : 'none'
+            }
+          });
+
+          // Labels for Bases
+          map.addLayer({
+            id: 'bases-labels',
+            type: 'symbol',
+            source: sourceId,
+            filter: ['all', ['==', ['get', 'platformType'], 'bases']],
+            layout: {
+              'text-field': ['get', 'name'],
+              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+              'text-size': [
+                'interpolate', ['linear'], ['zoom'],
+                11, 11,    // Start at zoom 11
+                13, 13,    // Medium text
+                16, 15     // Larger text at high zoom
+              ],
+              'text-offset': [0, 1.5],  // Position below the ring
+              'text-anchor': 'top',
+              'visibility': this.basesVisible ? 'visible' : 'none',
+              'min-zoom': 11  // Show bases labels at zoom 11+
+            },
+            paint: {
+              'text-color': '#FF00FF',    // Bright magenta text
+              'text-halo-color': '#000000',
+              'text-halo-width': 1
             }
           });
 
@@ -1541,6 +1625,41 @@ class PlatformManager {
   }
 
   /**
+   * Toggle visibility of bases only
+   * @param {boolean} [visible] - If provided, set to this value instead of toggling
+   * @returns {boolean} - The new visibility state for bases
+   */
+  toggleBasesVisibility(visible) {
+    const map = this.mapManager.getMap();
+    if (!map) return false;
+    
+    // Store bases visibility state
+    this.basesVisible = visible !== undefined ? visible : !this.basesVisible;
+    
+    try {
+      // Bases-specific layers
+      const basesLayers = [
+        'bases-layer',        // Bases markers
+        'bases-labels'        // Bases labels
+      ];
+      
+      const visibility = this.basesVisible ? 'visible' : 'none';
+      
+      basesLayers.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visibility);
+        }
+      });
+      
+      console.log(`Bases visibility set to: ${visibility}`);
+    } catch (error) {
+      console.warn('Error toggling bases visibility:', error);
+    }
+    
+    return this.basesVisible;
+  }
+
+  /**
    * Helper to set visibility of main platform/airport layers
    * @param {boolean} visible - True to show, false to hide
    */
@@ -1559,6 +1678,8 @@ class PlatformManager {
       'airfields-labels',
       'blocks-layer',           // New blocks layer
       'blocks-labels',          // New blocks labels
+      'bases-layer',            // New bases layer
+      'bases-labels',           // New bases labels
       'fuel-available-layer',   // New fuel available overlay
       'fuel-available-labels'   // New fuel available labels
     ];
