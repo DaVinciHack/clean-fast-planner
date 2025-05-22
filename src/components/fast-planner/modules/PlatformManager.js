@@ -1163,8 +1163,7 @@ class PlatformManager {
               ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
-              'visibility': this.fixedPlatformsVisible ? 'visible' : 'none',
-              'min-zoom': 11  // Only show platform labels at zoom 11+
+              'visibility': 'visible'  // Always visible when layer is on
             },
             paint: {
               'text-color': '#ffffff',
@@ -1267,8 +1266,7 @@ class PlatformManager {
               ],
               'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
-              'visibility': this.blocksVisible ? 'visible' : 'none',
-              'min-zoom': 13  // Only show blocks labels at zoom 13+
+              'visibility': 'visible'  // Always visible when layer is on
             },
             paint: {
               'text-color': '#888888',    // Grey color for block labels
@@ -1498,20 +1496,35 @@ class PlatformManager {
     this.fixedPlatformsVisible = visible !== undefined ? visible : !this.fixedPlatformsVisible;
     
     try {
-      // Fixed platform-specific layers
-      const fixedPlatformLayers = [
+      // Fixed platform markers (always follow visibility setting)
+      const fixedPlatformMarkers = [
         'platforms-layer',         // Legacy layer name
-        'platforms-fixed-layer',   // Fixed platform markers
-        'platforms-fixed-labels'   // Fixed platform labels
+        'platforms-fixed-layer'    // Fixed platform markers
       ];
       
       const visibility = this.fixedPlatformsVisible ? 'visible' : 'none';
       
-      fixedPlatformLayers.forEach(layerId => {
+      fixedPlatformMarkers.forEach(layerId => {
         if (map.getLayer(layerId)) {
           map.setLayoutProperty(layerId, 'visibility', visibility);
         }
       });
+      
+      // Fixed platform labels (zoom-dependent visibility)
+      if (map.getLayer('platforms-fixed-labels')) {
+        if (!this.fixedPlatformsVisible) {
+          // If platforms are off, hide labels completely
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', 'none');
+        } else {
+          // If platforms are on, show labels only at zoom 11+
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 11],
+            'visible',
+            'none'
+          ]);
+        }
+      }
       
       console.log(`Fixed platforms visibility set to: ${visibility}`);
     } catch (error) {
@@ -1569,21 +1582,29 @@ class PlatformManager {
     this.blocksVisible = visible !== undefined ? visible : !this.blocksVisible;
     
     try {
-      // Blocks-specific layers
-      const blocksLayers = [
-        'blocks-layer',        // Blocks markers
-        'blocks-labels'        // Blocks labels
-      ];
+      // Blocks markers (always follow visibility setting)
+      if (map.getLayer('blocks-layer')) {
+        const visibility = this.blocksVisible ? 'visible' : 'none';
+        map.setLayoutProperty('blocks-layer', 'visibility', visibility);
+      }
       
-      const visibility = this.blocksVisible ? 'visible' : 'none';
-      
-      blocksLayers.forEach(layerId => {
-        if (map.getLayer(layerId)) {
-          map.setLayoutProperty(layerId, 'visibility', visibility);
+      // Blocks labels (zoom-dependent visibility)
+      if (map.getLayer('blocks-labels')) {
+        if (!this.blocksVisible) {
+          // If blocks are off, hide labels completely
+          map.setLayoutProperty('blocks-labels', 'visibility', 'none');
+        } else {
+          // If blocks are on, show labels only at zoom 13+
+          map.setLayoutProperty('blocks-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 13],
+            'visible',
+            'none'
+          ]);
         }
-      });
+      }
       
-      console.log(`Blocks visibility set to: ${visibility}`);
+      console.log(`Blocks visibility set to: ${this.blocksVisible ? 'visible' : 'none'}`);
     } catch (error) {
       console.warn('Error toggling blocks visibility:', error);
     }
