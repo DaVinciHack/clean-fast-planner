@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { interactionController } from '../cleanIntegration';
-import { parseCoordinates, looksLikeCoordinates } from '../utils/coordinateParser';
 
 /**
  * Custom hook for managing waypoints and route data
@@ -45,14 +44,10 @@ const useWaypoints = ({
    * Uses the clean implementation if available, falls back to original
    */
   const addWaypoint = useCallback(async (waypointData) => {
-    console.log('=== 🌐 useWaypoints: addWaypoint called ===');
-    console.log('🌐 Input data:', waypointData);
-    console.log('🌐 Input type:', typeof waypointData);
-    console.log('🌐 waypointManagerRef.current available:', !!waypointManagerRef.current);
-    console.log('🌐 platformManagerRef.current available:', !!platformManagerRef.current);
+    console.log('🌐 Adding waypoint with data:', waypointData);
     
-    // Try to use the clean implementation first - TEMPORARILY DISABLED FOR COORDINATE TESTING
-    if (false && window.addWaypointClean && typeof window.addWaypointClean === 'function') {
+    // Try to use the clean implementation first
+    if (window.addWaypointClean && typeof window.addWaypointClean === 'function') {
       console.log('🌐 Using clean implementation for addWaypoint');
       try {
         // Make sure to properly await the call since the implementation might be async
@@ -121,63 +116,21 @@ const useWaypoints = ({
           }
         }
       } else if (typeof waypointData === 'string') {
-        console.log('🌐 Processing string input:', waypointData);
         name = waypointData;
         
-        // NEW: Check if the string looks like coordinates
-        console.log('🌐 Checking if input looks like coordinates...');
-        const looksLike = looksLikeCoordinates(waypointData);
-        console.log('🌐 looksLikeCoordinates result:', looksLike);
-        
-        if (looksLike) {
-          console.log('🌐 Input looks like coordinates, parsing:', waypointData);
-          const parseResult = parseCoordinates(waypointData);
-          
-          if (parseResult.isValid) {
-            coords = parseResult.coordinates;
-            console.log(`🌐 Successfully parsed coordinates: ${parseResult.format} -> [${coords}]`);
-            
-            // Show feedback to user about successful parsing
-            if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
-              window.LoadingIndicator.updateStatusIndicator(
-                `Coordinates parsed: ${parseResult.format}`,
-                'success',
-                2000
-              );
-            }
-            
-            // Generate a name based on the coordinates
-            name = `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`;
+        if (platformManagerRef.current) {
+          const platform = platformManagerRef.current.findPlatformByName(waypointData);
+          if (platform) {
+            coords = platform.coordinates;
+            name = platform.name;
           } else {
-            console.log('🌐 Failed to parse coordinates:', parseResult.error);
-            if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
-              window.LoadingIndicator.updateStatusIndicator(
-                `Invalid coordinate format: ${parseResult.error}`,
-                'error',
-                3000
-              );
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(`Platform "${waypointData}" not found.`, 'error');
             }
             return;
           }
         } else {
-          // Original logic: try to find platform by name
-          if (platformManagerRef.current) {
-            const platform = platformManagerRef.current.findPlatformByName(waypointData);
-            if (platform) {
-              coords = platform.coordinates;
-              name = platform.name;
-              console.log(`🌐 Found platform by name: ${name} at [${coords}]`);
-            } else {
-              console.log(`🌐 Platform "${waypointData}" not found`);
-              if (window.LoadingIndicator) {
-                window.LoadingIndicator.updateStatusIndicator(`Platform "${waypointData}" not found.`, 'error');
-              }
-              return;
-            }
-          } else {
-            console.log('🌐 PlatformManager not available');
-            return;
-          }
+          return;
         }
       } else if (waypointData && typeof waypointData === 'object') {
         if (waypointData.isWaypoint === true) {

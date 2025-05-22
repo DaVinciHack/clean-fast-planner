@@ -78,6 +78,18 @@ class PlatformManager {
     this.osdkWaypoints = []; // To store loaded OSDK navigation waypoints
     this.osdkWaypointsVisible = false; // To track visibility of OSDK waypoints layer
     this.waypointModeActive = false; // To track if waypoint mode is active
+    
+    // Reference to WaypointManager for route label refresh
+    this.waypointManager = null;
+  }
+  
+  /**
+   * Set the WaypointManager reference for route label refresh
+   * @param {WaypointManager} waypointManager - The waypoint manager instance
+   */
+  setWaypointManager(waypointManager) {
+    this.waypointManager = waypointManager;
+    console.log('PlatformManager: WaypointManager reference set for route label refresh');
   }
   
   /**
@@ -1543,12 +1555,32 @@ class PlatformManager {
       
       // Fixed platform labels (zoom-dependent visibility)
       if (map.getLayer('platforms-fixed-labels')) {
-        const visibility = this.fixedPlatformsVisible ? 'visible' : 'none';
-        map.setLayoutProperty('platforms-fixed-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Platform labels visibility set to: ${visibility}`);
+        if (!this.fixedPlatformsVisible) {
+          // If platforms are off, hide labels completely
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', 'none');
+        } else {
+          // If platforms are on, show labels only at zoom 11+
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 11],
+            'visible',
+            'none'
+          ]);
+        }
       }
       
       console.log(`Fixed platforms visibility set to: ${visibility}`);
+      
+      // IMPORTANT: Refresh route labels when platforms are turned back on
+      // This fixes the issue where route labels disappear after toggling platforms off and on
+      if (this.fixedPlatformsVisible && this.waypointManager) {
+        console.log('PlatformManager: Refreshing route display after platforms turned on');
+        try {
+          this.waypointManager.refreshRouteDisplay();
+        } catch (error) {
+          console.warn('PlatformManager: Error refreshing route display:', error);
+        }
+      }
     } catch (error) {
       console.warn('Error toggling fixed platform visibility:', error);
     }
@@ -1612,9 +1644,18 @@ class PlatformManager {
       
       // Blocks labels (zoom-dependent visibility)
       if (map.getLayer('blocks-labels')) {
-        const visibility = this.blocksVisible ? 'visible' : 'none';
-        map.setLayoutProperty('blocks-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Block labels visibility set to: ${visibility}`);
+        if (!this.blocksVisible) {
+          // If blocks are off, hide labels completely
+          map.setLayoutProperty('blocks-labels', 'visibility', 'none');
+        } else {
+          // If blocks are on, show labels only at zoom 13+
+          map.setLayoutProperty('blocks-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 13],
+            'visible',
+            'none'
+          ]);
+        }
       }
       
       console.log(`Blocks visibility set to: ${this.blocksVisible ? 'visible' : 'none'}`);
@@ -1732,31 +1773,6 @@ class PlatformManager {
     if (map.getLayer('fuel-available-layer')) {
       map.setLayoutProperty('fuel-available-layer', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
     }
-    
-    // CRITICAL FIX: Also sync the LABEL layers to match their parent layer states
-    // This fixes the issue where labels don't reappear after layer recreation
-    if (map.getLayer('platforms-fixed-labels')) {
-      map.setLayoutProperty('platforms-fixed-labels', 'visibility', this.fixedPlatformsVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Platform labels visibility synced to: ${this.fixedPlatformsVisible ? 'visible' : 'none'}`);
-    }
-    if (map.getLayer('platforms-movable-labels')) {
-      map.setLayoutProperty('platforms-movable-labels', 'visibility', this.movablePlatformsVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('blocks-labels')) {
-      map.setLayoutProperty('blocks-labels', 'visibility', this.blocksVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Block labels visibility synced to: ${this.blocksVisible ? 'visible' : 'none'}`);
-    }
-    if (map.getLayer('airfields-labels')) {
-      map.setLayoutProperty('airfields-labels', 'visibility', this.airfieldsVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('bases-labels')) {
-      map.setLayoutProperty('bases-labels', 'visibility', this.basesVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('fuel-available-labels')) {
-      map.setLayoutProperty('fuel-available-labels', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
-    }
-    
-    console.log('PlatformManager: Layer visibility sync completed');
   }
 
   /**

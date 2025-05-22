@@ -1086,12 +1086,12 @@ class PlatformManager {
               // Responsive size based on zoom level
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                6, 1,      // Smaller at low zoom
-                9, 2,     // Smaller at medium zoom 
-                12, 3,     // Smaller at high zoom
-                15, 5      // Very large dots at very high zoom
+                7, 2,      // Small dots at low zoom
+                10, 3,     // Medium dots at medium zoom 
+                13, 4,     // Larger dots at high zoom
+                16, 6      // Very large dots at very high zoom
               ],
-              'circle-color': '#0F172A',       // Darker blue center
+              'circle-color': '#1E3A8A',       // Darker blue center
               'circle-stroke-width': 2,
               'circle-stroke-color': '#3B82F6', // Teal ring
               'circle-opacity': 1
@@ -1113,10 +1113,10 @@ class PlatformManager {
               // Responsive size based on zoom level
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                8, 3,      // Bigger at low zoom
-                11, 4,     // Bigger at medium zoom 
-                14, 5,     // Bigger at high zoom
-                17, 7      // Very large dots at very high zoom
+                7, 2,      // Small dots at low zoom
+                10, 3,     // Medium dots at medium zoom 
+                13, 4,     // Larger dots at high zoom
+                16, 6      // Very large dots at very high zoom
               ],
               'circle-color': '#ad0303',       // Dark red center
               'circle-stroke-width': 1,
@@ -1177,9 +1177,8 @@ class PlatformManager {
               'text-opacity': [
                 'interpolate', ['linear'], ['zoom'],
                 7, 0,      // Hidden at zoom 7 and below
-                7.5, 0.3,  // Start fading in at zoom 7.5
-                8, 0.7,    // More visible at zoom 8
-                8.5, 1     // Fully visible at zoom 8.5+       // Fully visible at zoom 9+      // Fully visible at zoom 10+      // Fully visible at zoom 12+
+                8, 0.5,    // Half visible at zoom 8
+                9, 1       // Fully visible at zoom 9+      // Fully visible at zoom 10+      // Fully visible at zoom 12+
               ]
             }
           });
@@ -1210,9 +1209,8 @@ class PlatformManager {
               'text-opacity': [
                 'interpolate', ['linear'], ['zoom'],
                 7, 0,      // Hidden at zoom 7 and below
-                7.5, 0.3,  // Start fading in at zoom 7.5
-                8, 0.7,    // More visible at zoom 8
-                8.5, 1     // Fully visible at zoom 8.5+       // Fully visible at zoom 9+      // Fully visible at zoom 10+      // Fully visible at zoom 12+
+                8, 0.5,    // Half visible at zoom 8
+                9, 1       // Fully visible at zoom 9+      // Fully visible at zoom 10+      // Fully visible at zoom 12+
               ]
             }
           });
@@ -1295,9 +1293,8 @@ class PlatformManager {
               'text-opacity': [
                 'interpolate', ['linear'], ['zoom'],
                 7, 0,      // Hidden at zoom 7 and below
-                7.5, 0.3,  // Start fading in at zoom 7.5
-                8, 0.7,    // More visible at zoom 8
-                8.5, 1     // Fully visible at zoom 8.5+       // Fully visible at zoom 9+      // Fully visible at zoom 11+      // Fully visible at zoom 13+
+                8, 0.5,    // Half visible at zoom 8
+                9, 1       // Fully visible at zoom 9+      // Fully visible at zoom 11+      // Fully visible at zoom 13+
               ]
             }
           });
@@ -1543,9 +1540,18 @@ class PlatformManager {
       
       // Fixed platform labels (zoom-dependent visibility)
       if (map.getLayer('platforms-fixed-labels')) {
-        const visibility = this.fixedPlatformsVisible ? 'visible' : 'none';
-        map.setLayoutProperty('platforms-fixed-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Platform labels visibility set to: ${visibility}`);
+        if (!this.fixedPlatformsVisible) {
+          // If platforms are off, hide labels completely
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', 'none');
+        } else {
+          // If platforms are on, show labels only at zoom 11+
+          map.setLayoutProperty('platforms-fixed-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 11],
+            'visible',
+            'none'
+          ]);
+        }
       }
       
       console.log(`Fixed platforms visibility set to: ${visibility}`);
@@ -1612,9 +1618,18 @@ class PlatformManager {
       
       // Blocks labels (zoom-dependent visibility)
       if (map.getLayer('blocks-labels')) {
-        const visibility = this.blocksVisible ? 'visible' : 'none';
-        map.setLayoutProperty('blocks-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Block labels visibility set to: ${visibility}`);
+        if (!this.blocksVisible) {
+          // If blocks are off, hide labels completely
+          map.setLayoutProperty('blocks-labels', 'visibility', 'none');
+        } else {
+          // If blocks are on, show labels only at zoom 13+
+          map.setLayoutProperty('blocks-labels', 'visibility', [
+            'case',
+            ['>=', ['zoom'], 13],
+            'visible',
+            'none'
+          ]);
+        }
       }
       
       console.log(`Blocks visibility set to: ${this.blocksVisible ? 'visible' : 'none'}`);
@@ -1732,31 +1747,6 @@ class PlatformManager {
     if (map.getLayer('fuel-available-layer')) {
       map.setLayoutProperty('fuel-available-layer', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
     }
-    
-    // CRITICAL FIX: Also sync the LABEL layers to match their parent layer states
-    // This fixes the issue where labels don't reappear after layer recreation
-    if (map.getLayer('platforms-fixed-labels')) {
-      map.setLayoutProperty('platforms-fixed-labels', 'visibility', this.fixedPlatformsVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Platform labels visibility synced to: ${this.fixedPlatformsVisible ? 'visible' : 'none'}`);
-    }
-    if (map.getLayer('platforms-movable-labels')) {
-      map.setLayoutProperty('platforms-movable-labels', 'visibility', this.movablePlatformsVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('blocks-labels')) {
-      map.setLayoutProperty('blocks-labels', 'visibility', this.blocksVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Block labels visibility synced to: ${this.blocksVisible ? 'visible' : 'none'}`);
-    }
-    if (map.getLayer('airfields-labels')) {
-      map.setLayoutProperty('airfields-labels', 'visibility', this.airfieldsVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('bases-labels')) {
-      map.setLayoutProperty('bases-labels', 'visibility', this.basesVisible ? 'visible' : 'none');
-    }
-    if (map.getLayer('fuel-available-labels')) {
-      map.setLayoutProperty('fuel-available-labels', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
-    }
-    
-    console.log('PlatformManager: Layer visibility sync completed');
   }
 
   /**
