@@ -24,6 +24,7 @@ const useUIControls = ({
   const [fixedPlatformsVisible, setFixedPlatformsVisible] = useState(true); // Legacy
   const [movablePlatformsVisible, setMovablePlatformsVisible] = useState(true);
   const [blocksVisible, setBlocksVisible] = useState(true); // New category
+  const [basesVisible, setBasesVisible] = useState(true); // New category for bases
   const [fuelAvailableVisible, setFuelAvailableVisible] = useState(false); // New category
   
   // Platform loading state
@@ -205,8 +206,23 @@ const useUIControls = ({
   };
   
   /**
-   * Toggles fuel available locations visibility on the map
+   * Toggles bases visibility on the map
    */
+  const toggleBasesVisibility = () => {
+    const newState = !basesVisible;
+    setBasesVisible(newState);
+    
+    if (platformManagerRef && platformManagerRef.current) {
+      platformManagerRef.current.toggleBasesVisibility(newState);
+    }
+    
+    // Save to settings
+    if (appSettingsManagerRef && appSettingsManagerRef.current) {
+      appSettingsManagerRef.current.updateUISettings({
+        basesVisible: newState
+      });
+    }
+  };
   const toggleFuelAvailableVisibility = () => {
     const newState = !fuelAvailableVisible;
     setFuelAvailableVisible(newState);
@@ -290,6 +306,7 @@ const useUIControls = ({
     fixedPlatformsVisible, // Legacy
     movablePlatformsVisible,
     blocksVisible, // New state
+    basesVisible, // New state for bases
     fuelAvailableVisible, // New state
     platformsLoaded,
     rigsLoading,
@@ -301,6 +318,7 @@ const useUIControls = ({
     toggleFixedPlatformsVisibility, // Legacy
     toggleMovablePlatformsVisibility,
     toggleBlocksVisibility, // New function
+    toggleBasesVisibility, // New function for bases
     toggleFuelAvailableVisibility, // New function
     reloadPlatformData,
     handleRouteInputChange

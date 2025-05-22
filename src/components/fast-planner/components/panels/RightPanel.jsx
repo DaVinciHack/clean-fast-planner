@@ -33,11 +33,13 @@ const RightPanel = ({
   fixedPlatformsVisible, // Legacy
   movablePlatformsVisible,
   blocksVisible, // New prop
+  basesVisible, // New prop for bases
   fuelAvailableVisible, // New prop
   toggleAirfieldsVisibility,
   toggleFixedPlatformsVisibility, // Legacy
   toggleMovablePlatformsVisibility,
   toggleBlocksVisibility, // New prop
+  toggleBasesVisibility, // New prop for bases
   toggleFuelAvailableVisibility, // New prop
   onToggleVisibility,
   onClearRoute,
@@ -245,12 +247,14 @@ const RightPanel = ({
         fixedPlatformsVisible={fixedPlatformsVisible} // Legacy
         movablePlatformsVisible={movablePlatformsVisible}
         blocksVisible={blocksVisible} // New prop
+        basesVisible={basesVisible} // New prop for bases
         fuelAvailableVisible={fuelAvailableVisible} // New prop
         togglePlatformsVisibility={onToggleChart}
         toggleAirfieldsVisibility={toggleAirfieldsVisibility}
         toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility} // Legacy
         toggleMovablePlatformsVisibility={toggleMovablePlatformsVisibility}
         toggleBlocksVisibility={toggleBlocksVisibility} // New prop
+        toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
         toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
       />
       

@@ -20,12 +20,14 @@ const MapLayersCard = ({
   fixedPlatformsVisible, // Legacy prop (can be removed later)
   movablePlatformsVisible,
   blocksVisible, // New prop for blocks
+  basesVisible, // New prop for bases
   fuelAvailableVisible, // New prop for fuel available
   togglePlatformsVisibility,
   toggleAirfieldsVisibility,
   toggleFixedPlatformsVisibility, // Legacy function (can be removed later)
   toggleMovablePlatformsVisibility,
   toggleBlocksVisibility, // New function for blocks
+  toggleBasesVisibility, // New function for bases
   toggleFuelAvailableVisibility // New function for fuel available
 }) => {
   const { currentRegion } = useRegion();
@@ -39,6 +41,7 @@ const MapLayersCard = ({
     fixedPlatforms: true, // Legacy (can be removed later)
     movablePlatforms: true,
     blocks: true, // New category for blocks
+    bases: true, // New category for bases
     fuelAvailable: false // New category for fuel available (default off)
   });
   
@@ -51,9 +54,10 @@ const MapLayersCard = ({
       fixedPlatforms: fixedPlatformsVisible, // Legacy
       movablePlatforms: movablePlatformsVisible,
       blocks: blocksVisible,
+      bases: basesVisible,
       fuelAvailable: fuelAvailableVisible
     }));
-  }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible, blocksVisible, fuelAvailableVisible]);
+  }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible, blocksVisible, basesVisible, fuelAvailableVisible]);
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -194,6 +198,10 @@ const MapLayersCard = ({
           toggleBlocksVisibility();
           break;
           
+        case 'bases':
+          toggleBasesVisibility();
+          break;
+          
         case 'fuelAvailable':
           toggleFuelAvailableVisibility();
           break;
@@ -247,6 +255,7 @@ const MapLayersCard = ({
             {renderLayerToggle('blocks', 'Blocks')}
           </div>
           <div className="button-row">
+            {renderLayerToggle('bases', 'Bases')}
             {renderLayerToggle('fuelAvailable', 'Fuel Available')}
           </div>
         </div>

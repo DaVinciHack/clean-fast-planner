@@ -129,9 +129,9 @@ const FastPlannerCore = ({
     togglePlatformsVisibility, reloadPlatformData, handleRouteInputChange,
     // Enhanced platform visibility state and toggles
     airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible,
-    blocksVisible, fuelAvailableVisible, // New state variables
+    blocksVisible, basesVisible, fuelAvailableVisible, // New state variables
     toggleAirfieldsVisibility, toggleFixedPlatformsVisibility, toggleMovablePlatformsVisibility,
-    toggleBlocksVisibility, toggleFuelAvailableVisibility // New toggle functions
+    toggleBlocksVisibility, toggleBasesVisibility, toggleFuelAvailableVisibility // New toggle functions
   } = useUIControls({ appSettingsManagerRef, platformManagerRef, client, routeInput, setRouteInput });
   
   // Initialize map layers
@@ -280,11 +280,13 @@ const FastPlannerCore = ({
           fixedPlatformsVisible={fixedPlatformsVisible} // Legacy
           movablePlatformsVisible={movablePlatformsVisible}
           blocksVisible={blocksVisible} // New prop
+          basesVisible={basesVisible} // New prop for bases
           fuelAvailableVisible={fuelAvailableVisible} // New prop
           toggleAirfieldsVisibility={toggleAirfieldsVisibility}
           toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility} // Legacy
           toggleMovablePlatformsVisibility={toggleMovablePlatformsVisibility}
           toggleBlocksVisibility={toggleBlocksVisibility} // New prop
+          toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
         />
       </div>
