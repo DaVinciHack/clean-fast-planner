@@ -30,11 +30,15 @@ const RightPanel = ({
   vfrChartsRef,
   platformManagerRef,
   airfieldsVisible,
-  fixedPlatformsVisible,
+  fixedPlatformsVisible, // Legacy
   movablePlatformsVisible,
+  blocksVisible, // New prop
+  fuelAvailableVisible, // New prop
   toggleAirfieldsVisibility,
-  toggleFixedPlatformsVisibility,
+  toggleFixedPlatformsVisibility, // Legacy
   toggleMovablePlatformsVisibility,
+  toggleBlocksVisibility, // New prop
+  toggleFuelAvailableVisibility, // New prop
   onToggleVisibility,
   onClearRoute,
   onLoadRigData,
@@ -238,12 +242,16 @@ const RightPanel = ({
         platformManagerRef={platformManagerRef}
         platformsVisible={chartsVisible}
         airfieldsVisible={airfieldsVisible}
-        fixedPlatformsVisible={fixedPlatformsVisible}
+        fixedPlatformsVisible={fixedPlatformsVisible} // Legacy
         movablePlatformsVisible={movablePlatformsVisible}
+        blocksVisible={blocksVisible} // New prop
+        fuelAvailableVisible={fuelAvailableVisible} // New prop
         togglePlatformsVisibility={onToggleChart}
         toggleAirfieldsVisibility={toggleAirfieldsVisibility}
-        toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility}
+        toggleFixedPlatformsVisibility={toggleFixedPlatformsVisibility} // Legacy
         toggleMovablePlatformsVisibility={toggleMovablePlatformsVisibility}
+        toggleBlocksVisibility={toggleBlocksVisibility} // New prop
+        toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
       />
       
       {/* Save Flight Card */}
