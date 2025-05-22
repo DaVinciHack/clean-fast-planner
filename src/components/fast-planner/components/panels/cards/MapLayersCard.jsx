@@ -13,16 +13,20 @@ const MapLayersCard = ({
   gulfCoastMapRef,
   weatherLayerRef,
   vfrChartsRef,
-  // New props for separate platform toggles
+  // Props for platform toggles (enhanced categories)
   platformManagerRef,
   platformsVisible,
   airfieldsVisible,
-  fixedPlatformsVisible,
+  fixedPlatformsVisible, // Legacy prop (can be removed later)
   movablePlatformsVisible,
+  blocksVisible, // New prop for blocks
+  fuelAvailableVisible, // New prop for fuel available
   togglePlatformsVisibility,
   toggleAirfieldsVisibility,
-  toggleFixedPlatformsVisibility,
-  toggleMovablePlatformsVisibility
+  toggleFixedPlatformsVisibility, // Legacy function (can be removed later)
+  toggleMovablePlatformsVisibility,
+  toggleBlocksVisibility, // New function for blocks
+  toggleFuelAvailableVisibility // New function for fuel available
 }) => {
   const { currentRegion } = useRegion();
   const [layers, setLayers] = useState({
@@ -30,10 +34,12 @@ const MapLayersCard = ({
     weather: false,
     vfrCharts: false,
     grid: true,
-    platforms: true, // Combined platforms toggle (legacy)
-    airfields: true, // New separate toggles
-    fixedPlatforms: true,
-    movablePlatforms: true
+    platforms: true, // Fixed platforms (enhanced category)
+    airfields: true, 
+    fixedPlatforms: true, // Legacy (can be removed later)
+    movablePlatforms: true,
+    blocks: true, // New category for blocks
+    fuelAvailable: false // New category for fuel available (default off)
   });
   
   // Update layer states when references or visibility props change
@@ -42,10 +48,12 @@ const MapLayersCard = ({
       ...prev,
       platforms: platformsVisible,
       airfields: airfieldsVisible,
-      fixedPlatforms: fixedPlatformsVisible,
-      movablePlatforms: movablePlatformsVisible
+      fixedPlatforms: fixedPlatformsVisible, // Legacy
+      movablePlatforms: movablePlatformsVisible,
+      blocks: blocksVisible,
+      fuelAvailable: fuelAvailableVisible
     }));
-  }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible]);
+  }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible, blocksVisible, fuelAvailableVisible]);
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -182,6 +190,14 @@ const MapLayersCard = ({
           toggleMovablePlatformsVisibility();
           break;
           
+        case 'blocks':
+          toggleBlocksVisibility();
+          break;
+          
+        case 'fuelAvailable':
+          toggleFuelAvailableVisibility();
+          break;
+          
         default:
           console.warn(`Unknown layer: ${layerName}`);
       }
@@ -222,9 +238,17 @@ const MapLayersCard = ({
         
         <div className="layer-section">
           <h4>Platforms & Airfields</h4>
-          {renderLayerToggle('airfields', 'Airfields')}
-          {renderLayerToggle('fixedPlatforms', 'Fixed Platforms')}
-          {renderLayerToggle('movablePlatforms', 'Movable Platforms')}
+          <div className="button-row">
+            {renderLayerToggle('airfields', 'Airfields')}
+            {renderLayerToggle('platforms', 'Platforms')}
+          </div>
+          <div className="button-row">
+            {renderLayerToggle('movablePlatforms', 'Movable')}
+            {renderLayerToggle('blocks', 'Blocks')}
+          </div>
+          <div className="button-row">
+            {renderLayerToggle('fuelAvailable', 'Fuel Available')}
+          </div>
         </div>
         
         <div className="layer-section">
