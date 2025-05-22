@@ -108,28 +108,22 @@ const useUIControls = ({
   };
 
   /**
-   * Toggles all platforms and airfields visibility on the map (legacy function)
+   * Toggles only fixed platforms visibility on the map (updated for new design)
+   * This function now controls only the "Platforms" button which represents fixed platforms
    */
   const togglePlatformsVisibility = () => {
     const newState = !platformsVisible;
     setPlatformsVisible(newState);
 
     if (platformManagerRef && platformManagerRef.current) {
-      platformManagerRef.current.toggleVisibility(newState);
-      
-      // Also update individual visibility states
-      setAirfieldsVisible(newState);
-      setFixedPlatformsVisible(newState);
-      setMovablePlatformsVisible(newState);
+      // Only toggle fixed platforms, not all platforms
+      platformManagerRef.current.toggleFixedPlatformsVisibility(newState);
     }
 
     // Save to settings
     if (appSettingsManagerRef && appSettingsManagerRef.current) {
       appSettingsManagerRef.current.updateUISettings({
-        platformsVisible: newState,
-        airfieldsVisible: newState,
-        fixedPlatformsVisible: newState,
-        movablePlatformsVisible: newState
+        platformsVisible: newState
       });
     }
   };
@@ -143,9 +137,6 @@ const useUIControls = ({
     
     if (platformManagerRef && platformManagerRef.current) {
       platformManagerRef.current.toggleAirfieldsVisibility(newState);
-      
-      // Update combined visibility state
-      updateCombinedVisibilityState();
     }
     
     // Save to settings
@@ -165,9 +156,6 @@ const useUIControls = ({
     
     if (platformManagerRef && platformManagerRef.current) {
       platformManagerRef.current.toggleFixedPlatformsVisibility(newState);
-      
-      // Update combined visibility state
-      updateCombinedVisibilityState();
     }
     
     // Save to settings
@@ -187,9 +175,6 @@ const useUIControls = ({
     
     if (platformManagerRef && platformManagerRef.current) {
       platformManagerRef.current.toggleMovablePlatformsVisibility(newState);
-      
-      // Update combined visibility state
-      updateCombinedVisibilityState();
     }
     
     // Save to settings
@@ -209,9 +194,6 @@ const useUIControls = ({
     
     if (platformManagerRef && platformManagerRef.current) {
       platformManagerRef.current.toggleBlocksVisibility(newState);
-      
-      // Update combined visibility state
-      updateCombinedVisibilityState();
     }
     
     // Save to settings
@@ -246,19 +228,19 @@ const useUIControls = ({
   
   /**
    * Updates the combined platformsVisible state based on individual visibility states
+   * Note: This function is kept for backwards compatibility but no longer affects individual toggles
    */
   const updateCombinedVisibilityState = () => {
-    // If any of the platform types are visible, consider platforms visible
-    // Note: fuelAvailable is an overlay and doesn't affect the main platform visibility state
-    const anyVisible = airfieldsVisible || fixedPlatformsVisible || movablePlatformsVisible || blocksVisible;
-    setPlatformsVisible(anyVisible);
-    
-    // Save to settings
-    if (appSettingsManagerRef && appSettingsManagerRef.current) {
-      appSettingsManagerRef.current.updateUISettings({
-        platformsVisible: anyVisible
-      });
-    }
+    // Note: In the new design, each button controls only its own layer
+    // This function no longer needs to set a combined state that affects other buttons
+    // Each category (airfields, platforms, movable, blocks) is independent
+    console.log('Platform visibility states:', {
+      airfields: airfieldsVisible,
+      platforms: platformsVisible,
+      movable: movablePlatformsVisible,
+      blocks: blocksVisible,
+      fuelAvailable: fuelAvailableVisible
+    });
   };
 
   /**
