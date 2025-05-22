@@ -616,19 +616,28 @@ class PlatformManager {
               
             // First check for Bases (specific category - takes priority over airfields)
             if (upperType.includes('BASE') || 
-                upperType.includes('BASE AIRFIELD') ||
                 upperType.includes('BRISTOW BASE') ||
                 upperType.includes('OTHER_BASES')) {
-              isBases = true;
-              isAirfield = false;
-              isMovable = false;
-              isPlatform = false;
-              isBlocks = false;
+              // Exclude "NON BASE AIRFIELD" from bases - it should go to airfields
+              if (!upperType.includes('NON BASE AIRFIELD')) {
+                isBases = true;
+                isAirfield = false;
+                isMovable = false;
+                isPlatform = false;
+                isBlocks = false;
+              } else {
+                // "NON BASE AIRFIELD" goes to airfields instead
+                isAirfield = true;
+                isBases = false;
+                isMovable = false;
+                isPlatform = false;
+                isBlocks = false;
+              }
             }
-            // Then check for airfields (but not if already identified as base)
+            // Then check for airfields (including NON BASE AIRFIELD and BASE AIRFIELD)
             else if (item.ISAIRPORT === 'Yes' || item.isAirport === 'Yes' || 
                 upperType.includes('AIRPORT') || 
-                upperType.includes('AIRFIELD') || 
+                upperType.includes('AIRFIELD') ||  // This catches NON BASE AIRFIELD and BASE AIRFIELD
                 upperType.includes('HELIPORT')) {
               isAirfield = true;
               isMovable = false;
@@ -1093,7 +1102,7 @@ class PlatformManager {
               'circle-opacity': 1
             },
             layout: { // Add visibility toggle
-                'visibility': this.isVisible ? 'visible' : 'none'
+                'visibility': this.fixedPlatformsVisible ? 'visible' : 'none'
             }
           });
 
@@ -1120,7 +1129,7 @@ class PlatformManager {
               'circle-opacity': 1
             },
             layout: { // Add visibility toggle
-                'visibility': this.isVisible ? 'visible' : 'none'
+                'visibility': this.movablePlatformsVisible ? 'visible' : 'none'
             }
           });
 
@@ -1142,7 +1151,7 @@ class PlatformManager {
               'icon-allow-overlap': true,
               'icon-anchor': 'bottom', // From backup for pin-style
               'icon-offset': [0, -5],  // From backup
-              'visibility': this.isVisible ? 'visible' : 'none'
+              'visibility': this.airfieldsVisible ? 'visible' : 'none'
             }
           });
           
