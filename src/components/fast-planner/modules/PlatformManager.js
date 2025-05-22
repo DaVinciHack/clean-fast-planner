@@ -1122,14 +1122,14 @@ class PlatformManager {
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 9,      // Small text at low zoom
-                10, 11,    // Medium text at medium zoom 
-                13, 13,    // Larger text at high zoom
-                16, 15     // Very large text at very high zoom
+                11, 10,    // Start at zoom 11
+                13, 12,    // Medium text at medium zoom 
+                16, 14     // Larger text at high zoom
               ],
               'text-offset': [0, 1.2],
               'text-anchor': 'top',
-              'visibility': this.isVisible ? 'visible' : 'none'
+              'visibility': this.isVisible ? 'visible' : 'none',
+              'min-zoom': 11  // Only show platform labels at zoom 11+
             },
             paint: {
               'text-color': '#ffffff',
@@ -1232,12 +1232,8 @@ class PlatformManager {
               ],
               'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
-              'visibility': [
-                'case',
-                ['>=', ['zoom'], 13], // Only show labels at zoom 13 and above
-                this.blocksVisible ? 'visible' : 'none',
-                'none'
-              ]
+              'visibility': this.blocksVisible ? 'visible' : 'none',
+              'min-zoom': 13  // Simple approach: only show at zoom 13+
             },
             paint: {
               'text-color': '#888888',    // Grey color for block labels
@@ -1262,8 +1258,8 @@ class PlatformManager {
               ],
               'circle-color': 'rgba(255, 215, 0, 0.05)', // Much more transparent gold fill
               'circle-stroke-width': 1.5,                // Thinner stroke
-              'circle-stroke-color': '#FFD700',          // Gold ring
-              'circle-opacity': 0.4                      // Much lower opacity
+              'circle-stroke-color': '#FFD700',          // Bright gold ring (restored)
+              'circle-opacity': 0.4                      // Keep lower opacity
             },
             layout: {
                 'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
@@ -1286,12 +1282,7 @@ class PlatformManager {
               ],
               'text-offset': [0, -1.2],  // Position above the marker
               'text-anchor': 'bottom',
-              'visibility': [
-                'case',
-                ['>=', ['zoom'], 13], // Only show labels at zoom 13 and above
-                this.fuelAvailableVisible ? 'visible' : 'none',
-                'none'
-              ]
+              'visibility': 'none'  // Hide fuel labels as requested
             },
             paint: {
               'text-color': '#B8860B',    // Darker gold text (less bright)
