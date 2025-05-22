@@ -92,7 +92,11 @@ class GulfCoastImageOverlay {
           'type': 'raster',
           'source': this.sourceId,
           'paint': {
-            'raster-opacity': 0.7,
+            'raster-opacity': 0.85,             // Slightly reduced opacity for better overlay
+            'raster-contrast': 0.4,             // Higher contrast to enhance visibility
+            'raster-saturation': 0.3,           // Increased saturation for better color distinction  
+            'raster-brightness-min': 0.1,       // Increase minimum brightness to enhance dark areas
+            'raster-brightness-max': 0.9,       // Reduce maximum brightness to make it darker overall
             'raster-fade-duration': 0
           }
         });
@@ -166,5 +170,3 @@ class GulfCoastImageOverlay {
 
 // Export the class with a different name to avoid conflicts
 export default GulfCoastImageOverlay;
-
-export default GulfCoastGeoTIFF;

@@ -122,11 +122,11 @@ class GulfCoastHeliMap {
           'type': 'raster',
           'source': this.sourceId,
           'paint': {
-            'raster-opacity': 1.0,              // Full opacity
-            'raster-contrast': 0,               // Neutral contrast to preserve colors
-            'raster-saturation': 0,             // Neutral saturation to preserve colors
-            'raster-brightness-min': 0,         // Preserve original brightness
-            'raster-brightness-max': 1,         // Preserve original brightness
+            'raster-opacity': 0.85,             // Slightly reduced opacity for better overlay
+            'raster-contrast': 0.4,             // Higher contrast to enhance visibility
+            'raster-saturation': 0.3,           // Increased saturation for better color distinction
+            'raster-brightness-min': 0.1,       // Increase minimum brightness to enhance dark areas
+            'raster-brightness-max': 0.9,       // Reduce maximum brightness to make it darker overall
             'raster-resampling': 'nearest',     // Sharper rendering for aviation charts
             'raster-fade-duration': 0,          // Immediate display without fading
             'raster-hue-rotate': 0              // No color adjustment
@@ -188,8 +188,12 @@ class GulfCoastHeliMap {
           'type': 'raster',
           'source': this.sourceId + '-alt',
           'paint': {
-            'raster-opacity': 1.0,
-            'raster-resampling': 'nearest'
+            'raster-opacity': 0.85,             // Slightly reduced opacity
+            'raster-contrast': 0.4,             // Higher contrast
+            'raster-brightness-min': 0.1,       // Enhance dark areas
+            'raster-brightness-max': 0.9,       // Make it darker overall
+            'raster-saturation': 0.3,           // Increased saturation
+            'raster-resampling': 'nearest'      // Sharper rendering
           }
         };
         

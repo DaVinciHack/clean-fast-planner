@@ -680,9 +680,6 @@ class WaypointManager {
           );
         }).filter(idx => idx !== -1); // Remove any not found (-1)
         
-        // Sort the indices to ensure they're in ascending order
-        legBoundaries.sort((a, b) => a - b);
-        
         // Ensure the first waypoint is included if it's not already
         if (legBoundaries.length > 0 && legBoundaries[0] !== 0) {
           legBoundaries.unshift(0);
@@ -693,9 +690,6 @@ class WaypointManager {
         if (legBoundaries.length > 0 && legBoundaries[legBoundaries.length - 1] !== lastIndex) {
           legBoundaries.push(lastIndex);
         }
-        
-        // Log the complete, sorted leg boundaries for debugging
-        console.log(`⭐ Sorted leg boundaries at indices:`, legBoundaries);
         
         console.log(`⭐ Found ${legBoundaries.length} leg boundaries at indices:`, legBoundaries);
       }
@@ -849,12 +843,6 @@ class WaypointManager {
             const segStartCoords = validCoordinates[i];
             const segEndCoords = validCoordinates[i + 1];
             
-            // Skip if the segment is invalid
-            if (!segStartCoords || !segEndCoords) {
-              console.warn(`Skipping invalid segment in leg ${legIdx}: ${i} to ${i+1}`);
-              continue;
-            }
-            
             // Calculate segment distance
             const segFrom = turf.point(segStartCoords);
             const segTo = turf.point(segEndCoords);
@@ -897,89 +885,76 @@ class WaypointManager {
           // Get the longest segment for label placement
           const longestSegment = legSegments[longestSegmentIdx];
           
-          // Calculate time for this leg from applicable sources
+          // Calculate time for this leg
           let legTime = null;
           
-          // Get time from all potential sources, with careful prioritization
+          // Try to get time from routeStats if available
+          if (routeStats && routeStats.legs) {
+            // First try direct match by index
+            if (legIdx < routeStats.legs.length) {
+              legTime = routeStats.legs[legIdx].time;
+              console.log(`Found time for leg ${legIdx} directly from routeStats: ${legTime}`);
+            }
+            // If that fails, try to match by coordinates
+            else {
+              // Look for a matching leg in routeStats
+              for (let i = 0; i < routeStats.legs.length; i++) {
+                const leg = routeStats.legs[i];
+                if (JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
+                    JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
+                  legTime = leg.time;
+                  console.log(`Found time for leg ${legIdx} by coordinate match in routeStats: ${legTime}`);
+                  break;
+                }
+              }
+            }
+          }
           
-          // FIRST OPTION: Try to get time directly from routeStats legs by index
-          if (routeStats && routeStats.legs && legIdx < routeStats.legs.length) {
-            legTime = routeStats.legs[legIdx].time;
-            console.log(`Found time for leg ${legIdx} directly from routeStats: ${legTime}`);
-          }
-          // SECOND OPTION: Try from window.currentRouteStats by index
-          else if (window.currentRouteStats && window.currentRouteStats.legs && 
-                  legIdx < window.currentRouteStats.legs.length) {
-            legTime = window.currentRouteStats.legs[legIdx].time;
-            console.log(`Found time for leg ${legIdx} from window.currentRouteStats: ${legTime}`);
-          }
-          // THIRD OPTION: Try coordinate matching from routeStats
-          else if (routeStats && routeStats.legs) {
-            // Look for a matching leg by coordinates
-            for (let i = 0; i < routeStats.legs.length; i++) {
-              const leg = routeStats.legs[i];
-              if (leg.from && leg.to &&
-                  JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
-                  JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
-                legTime = leg.time;
-                console.log(`Found time for leg ${legIdx} by coordinate match in routeStats: ${legTime}`);
-                break;
+          // Try from window.currentRouteStats as fallback
+          if (legTime === null && window.currentRouteStats && window.currentRouteStats.legs) {
+            // First check direct index match
+            if (legIdx < window.currentRouteStats.legs.length) {
+              legTime = window.currentRouteStats.legs[legIdx].time;
+              console.log(`Found time for leg ${legIdx} from window.currentRouteStats: ${legTime}`);
+            }
+            // Then try coordinate matching
+            else {
+              for (let i = 0; i < window.currentRouteStats.legs.length; i++) {
+                const leg = window.currentRouteStats.legs[i];
+                if (JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
+                    JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
+                  legTime = leg.time;
+                  console.log(`Found time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
+                  break;
+                }
               }
             }
           }
-          // FOURTH OPTION: Try coordinate matching from window.currentRouteStats
-          else if (window.currentRouteStats && window.currentRouteStats.legs) {
-            // Look for a matching leg by coordinates
-            for (let i = 0; i < window.currentRouteStats.legs.length; i++) {
-              const leg = window.currentRouteStats.legs[i];
-              if (leg.from && leg.to &&
-                  JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
-                  JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
-                legTime = leg.time;
-                console.log(`Found time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
-                break;
-              }
-            }
-          }
-          // LAST RESORT: Calculate time based on aircraft cruise speed
-          else if (window.currentRouteStats && window.currentRouteStats.aircraft && 
-                  window.currentRouteStats.aircraft.cruiseSpeed) {
-            // Make sure we have valid cruise speed
-            const cruiseSpeed = parseFloat(window.currentRouteStats.aircraft.cruiseSpeed);
-            if (!isNaN(cruiseSpeed) && cruiseSpeed > 0) {
+          
+          // As a last resort, calculate time directly based on aircraft speed if available
+          if (legTime === null && window.currentRouteStats && window.currentRouteStats.aircraft) {
+            const aircraft = window.currentRouteStats.aircraft;
+            if (aircraft.cruiseSpeed) {
               // Estimate time based on distance and aircraft speed
-              legTime = totalLegDistance / cruiseSpeed;
+              legTime = totalLegDistance / aircraft.cruiseSpeed;
               console.log(`Estimated time for leg ${legIdx} based on aircraft speed: ${legTime}`);
             }
           }
           
-          console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null'}`);
+          console.log(`Leg ${legIdx} final time value: ${legTime}`);
           
           // Create a line for the longest segment
           const line = turf.lineString([longestSegment.startCoords, longestSegment.endCoords]);
           
           // Find midpoint of the longest segment for label placement
-          // Use an offset for placement position to avoid overlapping with other labels
-          const midpointPosition = 0.5; // Default to center
-          
-          // For multi-leg routes, add a slight offset to prevent label overlap
-          // This makes the first leg's label appear earlier in the segment, and the last leg's later
-          let labelOffset = 0;
-          if (legBoundaries.length > 3) { // If we have 3+ legs (complex route)
-            // Calculate fractional position along the segment, biased by leg index
-            // First leg: 0.35, Middle legs: 0.5, Last leg: 0.65
-            if (legIdx === 0) {
-              labelOffset = -0.15; // First leg
-            } else if (legIdx === legBoundaries.length - 2) {
-              labelOffset = 0.15; // Last leg
-            }
-          }
-          
           const midPoint = turf.along(
             line, 
-            longestSegment.distance * (midpointPosition + labelOffset), 
+            longestSegment.distance * 0.5, 
             { units: 'nauticalmiles' }
           );
+          
+          // Calculate time for this leg
+          // ... (existing time calculation code)
           
           // Create label with distance and time
           const distanceText = `${totalLegDistance.toFixed(1)} nm`;
@@ -1015,11 +990,18 @@ class WaypointManager {
           if (textBearing > 180 && textBearing <= 360) {
             // Flip the bearing 180 degrees to make text right-side up
             textBearing = (textBearing + 180) % 360;
+            
+            // Also flip the arrow direction for consistency
+            // DISABLED: Don't flip arrows, as this makes them inconsistent with direction
+            // Arrows should always point in the direction of travel
+            // if (labelText.includes('→')) {
+            //   labelText = labelText.replace(' →', '');
+            //   labelText = `← ${labelText}`;
+            // } else if (labelText.includes('←')) {
+            //   labelText = labelText.replace('← ', '');
+            //   labelText = `${labelText} →`;
+            // }
           }
-          
-          // Add the leg number as a prefix (without the # symbol)
-          // No leg prefix - removed for cleaner appearance
-          let legPrefix = '';
           
           // Add feature for the leg label
           features.push({
@@ -1027,7 +1009,7 @@ class WaypointManager {
             geometry: midPoint.geometry,
             properties: {
               isLabel: true,
-              text: legPrefix + labelText,
+              text: labelText,
               bearing: textBearing, // Use adjusted bearing to keep text right-side up
               segmentDistance: totalLegDistance,
               legDistance: totalLegDistance,
@@ -1268,7 +1250,7 @@ class WaypointManager {
         if (!map.hasImage('pill-image')) {
           // Create the pill in vertical orientation (90 degrees rotated)
           const pillHeight = 120; // Longer dimension (will be along the line)
-          const pillWidth = 20;   // Shorter dimension - narrower
+          const pillWidth = 28;   // Shorter dimension
           const canvas = document.createElement('canvas');
           canvas.width = pillWidth;
           canvas.height = pillHeight;
@@ -1334,23 +1316,15 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'icon-image': 'pill-image',
-            'icon-size': ['case', 
-              ['has', 'isLeg'], 1.2, // Make leg pills slightly larger
-              1.0               // Default size for segment pills
-            ],
+            'icon-size': 1.0,
             'icon-rotate': ['get', 'bearing'], // Rotate pill to follow the line direction
             'icon-rotation-alignment': 'map', // Ensure pill aligns with the map for proper angle
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
-            'symbol-sort-key': 1,
-            'icon-padding': 1
+            'symbol-sort-key': 1
           },
           paint: {
-            'icon-opacity': 0.9, // Slightly transparent for better text readability
-            'icon-color': ['case', 
-              ['has', 'isLeg'], '#1e8ffe', // Blue for leg pills
-              '#000000'               // Black for segment pills
-            ]
+            'icon-opacity': 1.0
           },
           filter: ['has', 'isLabel']
         });
@@ -1383,24 +1357,12 @@ class WaypointManager {
         });
       }
       
-      // Make all pills and labels visible - no filtering based on length or zoom
-      if (map.getLayer('route-pills')) {
-        map.setLayoutProperty('route-pills', 'visibility', 'visible');
-        // Clear any filters that might be hiding pills
-        map.setFilter('route-pills', ['has', 'isLabel']);
-      }
-      
-      if (map.getLayer(legLabelsLayerId)) {
-        map.setLayoutProperty(legLabelsLayerId, 'visibility', 'visible');
-        // Clear any filters that might be hiding labels
-        map.setFilter(legLabelsLayerId, ['has', 'isLabel']);
-      }
-      
+      // Ensure layers exist before trying to set visibility (e.g. for arrows)
       if (map.getLayer(routeArrowsLayerId)) {
-        map.setLayoutProperty(routeArrowsLayerId, 'visibility', 'visible');
+          // Example: Show arrows only at certain zoom levels (can be expanded)
+          const currentZoom = map.getZoom();
+          map.setLayoutProperty(routeArrowsLayerId, 'visibility', currentZoom > 7 ? 'visible' : 'none');
       }
-      
-      // No need for event handlers - just make everything visible
 
       // Make sure we trigger both callbacks to fully update the UI
       this.triggerCallback('onRouteUpdated', { waypoints: this.waypoints, coordinates: coordinates });
