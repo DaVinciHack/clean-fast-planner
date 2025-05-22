@@ -1201,13 +1201,13 @@ class PlatformManager {
             paint: { 
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 2,      // Small dots at low zoom
-                10, 3,     // Medium dots at medium zoom 
-                13, 4,     // Larger dots at high zoom
-                16, 6      // Very large dots at very high zoom
+                7, 1,      // Tiny dots at low zoom
+                10, 1.5,   // Still tiny at medium zoom 
+                13, 2,     // Small dots at high zoom
+                16, 3      // Medium dots at very high zoom (much smaller than before)
               ],
               'circle-color': '#8B4513',       // Brown color for blocks
-              'circle-stroke-width': 1,
+              'circle-stroke-width': 0.5,     // Thinner stroke for tiny dots
               'circle-stroke-color': '#D2691E', // Lighter brown ring
               'circle-opacity': 1
             },
@@ -1227,17 +1227,20 @@ class PlatformManager {
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 9,      // Small text at low zoom
-                10, 11,    // Medium text at medium zoom 
-                13, 13,    // Larger text at high zoom
-                16, 15     // Very large text at very high zoom
+                13, 9,     // Start showing labels only at zoom 13+
+                16, 11     // Smaller text even at high zoom
               ],
-              'text-offset': [0, 1.2],
+              'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
-              'visibility': this.blocksVisible ? 'visible' : 'none'
+              'visibility': [
+                'case',
+                ['>=', ['zoom'], 13], // Only show labels at zoom 13 and above
+                this.blocksVisible ? 'visible' : 'none',
+                'none'
+              ]
             },
             paint: {
-              'text-color': '#ffffff',
+              'text-color': '#888888',    // Grey color for block labels
               'text-halo-color': '#000000',
               'text-halo-width': 0.5
             }
@@ -1252,15 +1255,15 @@ class PlatformManager {
             paint: { 
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 4,      // Larger ring to surround existing markers
-                10, 6,     // Medium ring
-                13, 8,     // Larger ring
-                16, 12     // Very large ring
+                7, 3,      // Smaller ring to surround existing markers
+                10, 4,     // Smaller ring
+                13, 6,     // Medium ring  
+                16, 8      // Smaller ring even at high zoom
               ],
-              'circle-color': 'rgba(255, 215, 0, 0.1)',  // Transparent gold fill
-              'circle-stroke-width': 2,
+              'circle-color': 'rgba(255, 215, 0, 0.05)', // Much more transparent gold fill
+              'circle-stroke-width': 1.5,                // Thinner stroke
               'circle-stroke-color': '#FFD700',          // Gold ring
-              'circle-opacity': 0.7
+              'circle-opacity': 0.4                      // Much lower opacity
             },
             layout: {
                 'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
@@ -1278,17 +1281,20 @@ class PlatformManager {
               'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 8,      // Small text at low zoom
-                10, 10,    // Medium text at medium zoom 
-                13, 12,    // Larger text at high zoom
-                16, 14     // Very large text at very high zoom
+                13, 8,     // Start showing only at zoom 13+
+                16, 10     // Smaller text even at high zoom
               ],
-              'text-offset': [0, -1.5],  // Position above the marker
+              'text-offset': [0, -1.2],  // Position above the marker
               'text-anchor': 'bottom',
-              'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
+              'visibility': [
+                'case',
+                ['>=', ['zoom'], 13], // Only show labels at zoom 13 and above
+                this.fuelAvailableVisible ? 'visible' : 'none',
+                'none'
+              ]
             },
             paint: {
-              'text-color': '#FFD700',    // Gold text
+              'text-color': '#B8860B',    // Darker gold text (less bright)
               'text-halo-color': '#000000',
               'text-halo-width': 1
             }
