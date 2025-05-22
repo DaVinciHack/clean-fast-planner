@@ -733,6 +733,10 @@ class PlatformManager {
           } else if (isPlatform) {
             platformsCount++;
             fixedPlatformCount++; // Keep legacy counter for now
+            // Debug: Log fixed platform types
+            if (platformsCount <= 3) { // Only log first few to avoid spam
+              console.log(`Fixed Platform found: "${name}" with type: "${type}"`);
+            }
           } else if (isMovable) {
             movablePlatformCount++;
           } else if (isBlocks) {
@@ -980,7 +984,7 @@ class PlatformManager {
           hasFuel: p.hasFuel || false,
           // Enhanced platform type categorization
           platformType: p.isAirfield ? 'airfield' : 
-                       p.isPlatform ? 'platform' :
+                       p.isPlatform ? 'fixed' :    // Fixed: use 'fixed' not 'platform'
                        p.isMovable ? 'movable' :
                        p.isBlocks ? 'blocks' : 'fixed'
         }
