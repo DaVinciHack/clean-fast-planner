@@ -1018,8 +1018,10 @@ class WaypointManager {
           }
           
           // Add the leg number as a prefix (without the # symbol)
-          // No leg prefix - removed for cleaner appearance
           let legPrefix = '';
+          if (legBoundaries.length > 3) { // Only for complex routes
+            legPrefix = `${legIdx+1}: `; // Add leg number for clarity, without the # symbol
+          }
           
           // Add feature for the leg label
           features.push({
@@ -1268,7 +1270,7 @@ class WaypointManager {
         if (!map.hasImage('pill-image')) {
           // Create the pill in vertical orientation (90 degrees rotated)
           const pillHeight = 120; // Longer dimension (will be along the line)
-          const pillWidth = 20;   // Shorter dimension - narrower
+          const pillWidth = 28;   // Shorter dimension
           const canvas = document.createElement('canvas');
           canvas.width = pillWidth;
           canvas.height = pillHeight;
@@ -1364,7 +1366,8 @@ class WaypointManager {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
             'text-size': 12,
-            'text-font': ['Arial Unicode MS Bold'],
+            // Try to use a more cursive font style
+            'text-font': ['DIN Italic', 'Arial Italic', 'Arial Unicode MS Regular'],
             // Adjust rotation by -90 degrees to align correctly with the pill
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
@@ -1383,24 +1386,12 @@ class WaypointManager {
         });
       }
       
-      // Make all pills and labels visible - no filtering based on length or zoom
-      if (map.getLayer('route-pills')) {
-        map.setLayoutProperty('route-pills', 'visibility', 'visible');
-        // Clear any filters that might be hiding pills
-        map.setFilter('route-pills', ['has', 'isLabel']);
-      }
-      
-      if (map.getLayer(legLabelsLayerId)) {
-        map.setLayoutProperty(legLabelsLayerId, 'visibility', 'visible');
-        // Clear any filters that might be hiding labels
-        map.setFilter(legLabelsLayerId, ['has', 'isLabel']);
-      }
-      
+      // Ensure layers exist before trying to set visibility (e.g. for arrows)
       if (map.getLayer(routeArrowsLayerId)) {
-        map.setLayoutProperty(routeArrowsLayerId, 'visibility', 'visible');
+          // Example: Show arrows only at certain zoom levels (can be expanded)
+          const currentZoom = map.getZoom();
+          map.setLayoutProperty(routeArrowsLayerId, 'visibility', currentZoom > 7 ? 'visible' : 'none');
       }
-      
-      // No need for event handlers - just make everything visible
 
       // Make sure we trigger both callbacks to fully update the UI
       this.triggerCallback('onRouteUpdated', { waypoints: this.waypoints, coordinates: coordinates });
