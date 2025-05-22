@@ -762,6 +762,8 @@ class PlatformManager {
             movablePlatformCount++;
           } else if (isBlocks) {
             blocksCount++;
+            // Debug: Log ALL blocks found (temporarily increase limit)
+            console.log(`Block found: "${name}" with type: "${type}"`);
           } else if (isBases) {
             basesCount++;
             // Debug: Log bases found
@@ -1265,8 +1267,9 @@ class PlatformManager {
               ],
               'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
-              'visibility': this.blocksVisible ? 'visible' : 'none',
-              'min-zoom': 13  // Simple approach: only show at zoom 13+
+              'visibility': this.blocksVisible ? 'visible' : 'none'
+              // Temporarily remove min-zoom to debug
+              // 'min-zoom': 13  // Simple approach: only show at zoom 13+
             },
             paint: {
               'text-color': '#888888',    // Grey color for block labels
