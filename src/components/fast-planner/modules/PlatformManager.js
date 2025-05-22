@@ -1385,6 +1385,10 @@ class PlatformManager {
           });
           
           console.log('PlatformManager: Platform layers added/updated.');
+          
+          // Ensure UI is synced with actual layer visibility
+          this._syncUIWithLayers();
+          
           this.triggerCallback('onPlatformsLoaded', platforms);
         } catch (error) {
           console.error('PlatformManager: Error adding platform layers:', error);
@@ -1689,6 +1693,45 @@ class PlatformManager {
     }
     
     return this.basesVisible;
+  }
+  
+  /**
+   * Sync UI button states with actual layer visibility
+   * Called after layers are created to ensure consistency
+   */
+  _syncUIWithLayers() {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    console.log('PlatformManager: Syncing UI with layer visibility states');
+    console.log('Initial states:', {
+      airfields: this.airfieldsVisible,
+      platforms: this.fixedPlatformsVisible, 
+      movable: this.movablePlatformsVisible,
+      blocks: this.blocksVisible,
+      bases: this.basesVisible,
+      fuel: this.fuelAvailableVisible
+    });
+    
+    // Force update all layers to match internal states
+    if (map.getLayer('airfields-layer')) {
+      map.setLayoutProperty('airfields-layer', 'visibility', this.airfieldsVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('platforms-fixed-layer')) {
+      map.setLayoutProperty('platforms-fixed-layer', 'visibility', this.fixedPlatformsVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('platforms-movable-layer')) {
+      map.setLayoutProperty('platforms-movable-layer', 'visibility', this.movablePlatformsVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('blocks-layer')) {
+      map.setLayoutProperty('blocks-layer', 'visibility', this.blocksVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('bases-layer')) {
+      map.setLayoutProperty('bases-layer', 'visibility', this.basesVisible ? 'visible' : 'none');
+    }
+    if (map.getLayer('fuel-available-layer')) {
+      map.setLayoutProperty('fuel-available-layer', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
+    }
   }
 
   /**
