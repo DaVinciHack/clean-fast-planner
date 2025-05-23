@@ -289,6 +289,51 @@ const FastPlannerCore = ({
           toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
         />
+        
+        {/* 3D MAP TEST BUTTON */}
+        <button 
+          onClick={async () => {
+            try {
+              console.log('🗺️ Testing 3D map style switch...');
+              
+              const mapManager = mapManagerRef?.current;
+              if (!mapManager) {
+                alert('Map manager not available');
+                return;
+              }
+              
+              // Toggle between dark and 3D style
+              const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
+              const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+              
+              console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
+              
+              await mapManager.switchMapStyle(newStyle);
+              alert(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : 'Dark'} style!`);
+              
+            } catch (error) {
+              console.error('3D map switch failed:', error);
+              alert('3D map switch failed: ' + error.message);
+            }
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            right: '20px',
+            zIndex: 2000,
+            padding: '12px 16px',
+            backgroundColor: '#2196F3',
+            color: 'white',
+            border: '2px solid #1976D2',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
+          }}
+        >
+          🗺️ Toggle 3D Map
+        </button>
       </div>
     </>
   );
