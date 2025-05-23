@@ -822,74 +822,48 @@ class WaypointManager {
             
           // Calculate if pill should be shown based on segment length
           const shouldShowPill = (() => {
-            // Get current zoom level
-            const zoom = map.getZoom();
-            
-            // For segments, calculate the actual distance
-            if (legSegment && legSegment.geometry && legSegment.geometry.coordinates) {
-              const coords = legSegment.geometry.coordinates;
-              if (coords.length >= 2) {
-                // Project the coordinates to screen pixels
-                const p1 = map.project(coords[0]);
-                const p2 = map.project(coords[coords.length - 1]);
-                
-                // Calculate pixel distance
+            try {
+              if (!map) return false;
+              
+              // For segments, calculate the actual distance
+              if (legSegment && legSegment.geometry && legSegment.geometry.coordinates) {
+                const coords = legSegment.geometry.coordinates;
+                if (coords.length >= 2) {
+                  // Project the coordinates to screen pixels
+                  const p1 = map.project(coords[0]);
+                  const p2 = map.project(coords[coords.length - 1]);
+                  
+                  // Calculate pixel distance
+                  const dx = p2.x - p1.x;
+                  const dy = p2.y - p1.y;
+                  const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+                  
+                  // Only show pill if segment is longer than 135 pixels (refined threshold)
+                  return pixelDistance > 135;
+                }
+              }
+              
+              // For simple two-point segments
+              if (segmentCoordinates && segmentCoordinates.length >= 2) {
+                const p1 = map.project(segmentCoordinates[0]);
+                const p2 = map.project(segmentCoordinates[1]);
                 const dx = p2.x - p1.x;
                 const dy = p2.y - p1.y;
                 const pixelDistance = Math.sqrt(dx * dx + dy * dy);
                 
-                // Only show pill if segment is longer than 150 pixels
-                // and zoom is above 9
-                return pixelDistance > 150 && zoom > 9;
-              }
-            }
-            
-            // For simple two-point segments
-            try {
-              const p1 = map.project(segmentCoordinates[0]);
-              const p2 = map.project(segmentCoordinates[1]);
-              const dx = p2.x - p1.x;
-              const dy = p2.y - p1.y;
-              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-              
-              // Only show if line is longer than pill (150px) and zoom > 9
-              return pixelDistance > 150 && zoom > 9;
-            } catch (e) {
-              return zoom > 10; // Fallback to zoom-based
-            }
-          })();
-          
-          if (shouldShowPill) {
-            // Add feature with bearings for both pill and text
-          
-          // Calculate pixel distance for this segment
-          const shouldShowPill = (() => {
-            try {
-              if (!map) return false;
-              
-              // Get the segment endpoints
-              let p1, p2;
-              if (segmentCoordinates && segmentCoordinates.length >= 2) {
-                p1 = map.project(segmentCoordinates[0]);
-                p2 = map.project(segmentCoordinates[segmentCoordinates.length - 1]);
-              } else {
-                return false;
+                // Only show if line is longer than pill (135px refined threshold)
+                return pixelDistance > 135;
               }
               
-              // Calculate pixel distance between endpoints
-              const dx = p2.x - p1.x;
-              const dy = p2.y - p1.y;
-              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-              
-              // Pill is about 120 pixels long, only show if line is longer
-              return pixelDistance > 120;
+              return false; // Default to hidden if no valid coordinates
             } catch (e) {
-              return false;
+              console.warn('Error calculating pill visibility:', e);
+              return false; // Default to hidden on error
             }
           })();
           
           if (!shouldShowPill) {
-            continue; // Skip this pill
+            continue; // Skip this pill if segment is too short
           }
 
           features.push({
@@ -904,7 +878,6 @@ class WaypointManager {
               legIndex: i
             }
           });
-          }
         } catch (err) {
           console.error(`Error creating label for segment ${i}:`, err);
         }
@@ -1112,6 +1085,45 @@ class WaypointManager {
           // Add the leg number as a prefix (without the # symbol)
           // No leg prefix - removed for cleaner appearance
           let legPrefix = '';
+          
+          // Calculate if leg pill should be shown based on pixel distance
+          const shouldShowLegPill = (() => {
+            try {
+              if (!this.mapManager || !this.mapManager.map) return false;
+              
+              const map = this.mapManager.map;
+              
+              // Use the longest segment coordinates for pixel distance calculation
+              const startCoords = longestSegment.startCoords;
+              const endCoords = longestSegment.endCoords;
+              
+              if (!startCoords || !endCoords) {
+                return false; // No valid coordinates
+              }
+              
+              // Project coordinates to screen pixels
+              const p1 = map.project(startCoords);
+              const p2 = map.project(endCoords);
+              
+              // Calculate pixel distance between endpoints
+              const dx = p2.x - p1.x;
+              const dy = p2.y - p1.y;
+              const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+              
+              // Leg pill visibility threshold: 135px refined threshold
+              // Only show pill if line segment is longer than the pill itself
+              return pixelDistance > 135;
+              
+            } catch (e) {
+              console.warn('Error calculating leg pill visibility:', e);
+              return false; // Default to hidden on error
+            }
+          })();
+          
+          if (!shouldShowLegPill) {
+            console.log(`⭐ Skipping leg ${legIdx} pill - segment too short for display`);
+            continue; // Skip this leg pill if segment is too short
+          }
           
           // Add feature for the leg label
           features.push({
@@ -1779,6 +1791,40 @@ class WaypointManager {
   updateWaypointName(id, name) {
     const waypoint = this.getWaypointById(id);
     if (waypoint) { waypoint.name = name; this.triggerCallback('onChange', this.waypoints); }
+  }
+  
+  /**
+   * Refresh the route display and labels - useful when layer visibility changes
+   * This ensures route labels are restored after platform layer toggles
+   */
+  refreshRouteDisplay() {
+    console.log('WaypointManager.refreshRouteDisplay: Refreshing route display and labels');
+    
+    const map = this.mapManager.getMap();
+    if (!map || !this.mapManager.isMapLoaded()) {
+      console.log('WaypointManager.refreshRouteDisplay: Map not ready, skipping refresh');
+      return;
+    }
+    
+    // If we have waypoints, trigger a route update to restore labels
+    if (this.waypoints && this.waypoints.length >= 2) {
+      console.log(`WaypointManager.refreshRouteDisplay: Refreshing route with ${this.waypoints.length} waypoints`);
+      
+      // Force update the route which will recreate all labels and sources
+      this.updateRoute();
+      
+      // Ensure route and label layers are visible
+      const layersToShow = ['route', 'route-glow', 'route-pills', 'leg-labels', 'route-arrows'];
+      layersToShow.forEach(layerId => {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', 'visible');
+        }
+      });
+      
+      console.log('WaypointManager.refreshRouteDisplay: Route display refreshed successfully');
+    } else {
+      console.log('WaypointManager.refreshRouteDisplay: No route to refresh (less than 2 waypoints)');
+    }
   }
 
   setupRouteDragging(onRoutePointAdded) {
