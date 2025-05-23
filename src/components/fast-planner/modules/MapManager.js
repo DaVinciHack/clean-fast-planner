@@ -867,6 +867,147 @@ class MapManager {
       dragLineSource = null;
     });
   }
+
+  /**
+   * Switch map style to different Mapbox themes
+   * @param {string} styleId - The style identifier ('dark', '3d', 'satellite', etc.)
+   * @returns {Promise} - Resolves when style has loaded
+   */
+  switchMapStyle(styleId) {
+    return new Promise((resolve, reject) => {
+      if (!this.map) {
+        reject(new Error('Map not initialized'));
+        return;
+      }
+
+      // Map of style IDs to Mapbox style URLs
+      const styles = {
+        'dark': 'mapbox://styles/mapbox/dark-v11',
+        '3d': 'mapbox://styles/mapbox/standard',
+        'satellite': 'mapbox://styles/mapbox/satellite-v9',
+        'satellite-streets': 'mapbox://styles/mapbox/satellite-streets-v12',
+        'light': 'mapbox://styles/mapbox/light-v11',
+        'navigation': 'mapbox://styles/mapbox/navigation-day-v1'
+      };
+
+      const styleUrl = styles[styleId];
+      if (!styleUrl) {
+        reject(new Error(`Unknown style ID: ${styleId}`));
+        return;
+      }
+
+      console.log(`🗺️ Switching map style to: ${styleId} (${styleUrl})`);
+
+      // Store references for layer restoration
+      const customLayersToRestore = [];
+      const sourcesToRestore = [];
+
+      // Get list of current custom layers and sources before style change
+      const currentStyle = this.map.getStyle();
+      if (currentStyle && currentStyle.layers) {
+        currentStyle.layers.forEach(layer => {
+          // Identify custom layers (non-Mapbox layers)
+          if (layer.id.includes('platform') || 
+              layer.id.includes('route') || 
+              layer.id.includes('waypoint') ||
+              layer.id.includes('fuel') ||
+              layer.id.includes('bases') ||
+              layer.id.includes('airfield') ||
+              layer.id.includes('osdk') ||
+              layer.id.includes('grid')) {
+            customLayersToRestore.push({
+              id: layer.id,
+              visibility: this.map.getLayoutProperty(layer.id, 'visibility')
+            });
+          }
+        });
+      }
+
+      // Listen for style load completion
+      const onStyleLoad = () => {
+        console.log(`🗺️ Style ${styleId} loaded successfully`);
+
+        // For 3D style, enable terrain if available
+        if (styleId === '3d') {
+          this.enable3DFeatures();
+        }
+
+        // Note: Custom layers will need to be re-added by their respective managers
+        // (PlatformManager, WaypointManager, etc.) after they detect the style change
+        console.log(`🗺️ Custom layers will be restored by their managers`);
+
+        resolve();
+      };
+
+      // Set up one-time listener for style load
+      this.map.once('styledata', onStyleLoad);
+
+      // Switch the style
+      try {
+        this.map.setStyle(styleUrl);
+      } catch (error) {
+        this.map.off('styledata', onStyleLoad);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Enable 3D features for the standard style
+   */
+  enable3DFeatures() {
+    if (!this.map) return;
+
+    try {
+      // Enable 3D terrain if available
+      if (this.map.getSource('mapbox-dem')) {
+        this.map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+        console.log('🏔️ 3D terrain enabled');
+      }
+
+      // Add atmospheric sky layer for enhanced 3D effect
+      if (!this.map.getLayer('sky')) {
+        this.map.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 0.0],
+            'sky-atmosphere-sun-intensity': 15
+          }
+        });
+        console.log('🌅 Atmospheric sky layer added');
+      }
+
+      // Adjust pitch for better 3D viewing
+      this.map.easeTo({
+        pitch: 60,
+        duration: 2000
+      });
+      console.log('📐 Camera pitch adjusted for 3D viewing');
+
+    } catch (error) {
+      console.warn('3D features setup failed:', error);
+    }
+  }
+
+  /**
+   * Get current map style ID
+   * @returns {string} - Current style identifier
+   */
+  getCurrentStyle() {
+    if (!this.map) return null;
+    
+    const styleUrl = this.map.getStyle().sprite;
+    if (styleUrl.includes('dark')) return 'dark';
+    if (styleUrl.includes('standard')) return '3d';
+    if (styleUrl.includes('satellite-streets')) return 'satellite-streets';
+    if (styleUrl.includes('satellite')) return 'satellite';
+    if (styleUrl.includes('light')) return 'light';
+    if (styleUrl.includes('navigation')) return 'navigation';
+    
+    return 'unknown';
+  }
 }
 
 export default MapManager;

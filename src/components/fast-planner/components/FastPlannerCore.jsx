@@ -392,6 +392,49 @@ const FastPlannerCore = () => {
       </button>
       
       {/* Emergency Fix Button */}
+      
+      {/* 3D MAP TEST BUTTON */}
+      <button 
+        onClick={async () => {
+          try {
+            console.log('🗺️ Testing 3D map style switch...');
+            
+            if (!mapManager) {
+              alert('Map manager not available');
+              return;
+            }
+            
+            // Toggle between dark and 3D style
+            const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
+            const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+            
+            console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
+            
+            await mapManager.switchMapStyle(newStyle);
+            alert(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : 'Dark'} style!`);
+            
+          } catch (error) {
+            console.error('3D map switch failed:', error);
+            alert('3D map switch failed: ' + error.message);
+          }
+        }}
+        style={{
+          position: 'absolute',
+          bottom: '210px',
+          right: '10px',
+          zIndex: 1000,
+          padding: '8px 12px',
+          backgroundColor: '#2196F3',
+          color: 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: 'pointer',
+          fontSize: '12px'
+        }}
+      >
+        🗺️ Toggle 3D Map
+      </button>
+      
       <button 
         onClick={() => {
           try {
