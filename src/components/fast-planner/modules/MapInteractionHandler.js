@@ -78,6 +78,12 @@ class MapInteractionHandler {
         this.waypointManager.setupRouteDragging(routeDragHandler);
         window._mapInteractionRouteDragHandler = routeDragHandler; // Consider if this global is necessary
         console.log('MapInteractionHandler: Route drag handler registered/updated.');
+        
+        // Setup style change listener for waypoint layer restoration
+        if (typeof this.waypointManager.setupStyleChangeListener === 'function') {
+          this.waypointManager.setupStyleChangeListener();
+          console.log('MapInteractionHandler: Waypoint style change listener set up.');
+        }
       } else {
         console.error('MapInteractionHandler: waypointManager.setupRouteDragging not available.');
       }

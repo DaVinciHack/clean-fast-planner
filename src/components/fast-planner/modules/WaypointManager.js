@@ -2501,6 +2501,55 @@ class WaypointManager {
     
     console.log('Route dragging functionality set up successfully');
   }
+
+  /**
+   * Restore waypoint layers after a map style change
+   */
+  restoreLayersAfterStyleChange() {
+    console.log('🔄 WaypointManager: Restoring layers after style change...');
+    
+    if (!this.mapManager || !this.mapManager.getMap()) {
+      console.warn('WaypointManager: Cannot restore layers - map not available');
+      return;
+    }
+
+    // Re-add waypoint markers
+    if (this.waypoints && this.waypoints.length > 0) {
+      console.log(`🔄 Restoring ${this.waypoints.length} waypoints`);
+      // Recreate markers
+      this.markers.forEach(marker => {
+        if (marker && marker.getElement()) {
+          marker.addTo(this.mapManager.getMap());
+        }
+      });
+    }
+
+    // Re-add route if we have waypoints
+    if (this.waypoints && this.waypoints.length >= 2) {
+      console.log('🔄 Restoring route visualization');
+      this.updateRoute();
+    }
+
+    console.log('✅ WaypointManager: Layer restoration complete');
+  }
+
+  /**
+   * Set up automatic layer restoration on style change
+   */
+  setupStyleChangeListener() {
+    const map = this.mapManager?.getMap();
+    if (!map) return;
+
+    // Listen for style changes and restore layers
+    map.on('styledata', () => {
+      // Small delay to ensure style is fully loaded
+      setTimeout(() => {
+        this.restoreLayersAfterStyleChange();
+      }, 200); // Slightly longer delay for routes
+    });
+
+    console.log('🎨 WaypointManager: Style change listener set up');
+  }
 }
 
 export default WaypointManager;

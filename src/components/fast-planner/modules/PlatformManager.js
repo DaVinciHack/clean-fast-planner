@@ -1407,6 +1407,9 @@ class PlatformManager {
           // Ensure UI is synced with actual layer visibility
           this._syncUIWithLayers();
           
+          // Set up style change listener for layer restoration
+          this.setupStyleChangeListener();
+          
           this.triggerCallback('onPlatformsLoaded', platforms);
         } catch (error) {
           console.error('PlatformManager: Error adding platform layers:', error);
@@ -2573,6 +2576,51 @@ class PlatformManager {
       console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
       return null;
     }
+  }
+
+  /**
+   * Restore platform layers after a map style change
+   * Called when the map style is switched (e.g., to 3D)
+   */
+  restoreLayersAfterStyleChange() {
+    console.log('🔄 PlatformManager: Restoring layers after style change...');
+    
+    if (!this.mapManager || !this.mapManager.getMap()) {
+      console.warn('PlatformManager: Cannot restore layers - map not available');
+      return;
+    }
+
+    // Re-add platform layers if we have platforms loaded
+    if (this.platforms && this.platforms.length > 0) {
+      console.log(`🔄 Restoring ${this.platforms.length} platforms`);
+      this.addPlatformLayers();
+    }
+
+    // Re-add OSDK waypoints if we have them loaded
+    if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
+      console.log(`🔄 Restoring ${this.osdkWaypoints.length} OSDK waypoints`);
+      this.addOsdkWaypointsToMap();
+    }
+
+    console.log('✅ PlatformManager: Layer restoration complete');
+  }
+
+  /**
+   * Set up automatic layer restoration on style change
+   */
+  setupStyleChangeListener() {
+    const map = this.mapManager?.getMap();
+    if (!map) return;
+
+    // Listen for style changes and restore layers
+    map.on('styledata', () => {
+      // Small delay to ensure style is fully loaded
+      setTimeout(() => {
+        this.restoreLayersAfterStyleChange();
+      }, 100);
+    });
+
+    console.log('🎨 PlatformManager: Style change listener set up');
   }
 }
 
