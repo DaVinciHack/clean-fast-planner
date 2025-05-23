@@ -649,6 +649,7 @@ class WaypointManager {
     }
   }
   
+  
   /**
    * Create 3D flight path with curved routes and drop shadows
    * @param {Array} coordinates - Array of [lng, lat] coordinates
@@ -927,10 +928,10 @@ class WaypointManager {
           // Create linestring for midpoint calculation
           const line = turf.lineString([startPointCoords, endPointCoords]);
           
-          // Find first quarter point for label placement (better attachment to line)
+          // Find center point for label placement (under highest part of 3D curve)
           const midPoint = turf.along(
             line, 
-            legDistance * 0.25, // Position at first quarter instead of middle
+            legDistance * 0.5, // Position at center for optimal curve placement
             { units: 'nauticalmiles' }
           );
           
@@ -1429,7 +1430,8 @@ class WaypointManager {
 
     const routeSourceId = 'route';
     const routeArrowsSourceId = 'route-arrows';
-    const routeLayerId = 'route';
+    const routeLayerId = 'route'; // This will be the invisible drag detection layer
+    const routeVisualLayerId = 'route-visual'; // This will be the visible 3D curved layer
     const routeGlowLayerId = 'route-glow';
     const routeArrowsLayerId = 'route-arrows';
     const legLabelsLayerId = 'leg-labels';
@@ -1444,9 +1446,20 @@ class WaypointManager {
       const routeGeoJson = flightPathData.mainPath;
       const shadowGeoJson = flightPathData.dropShadow;
       
+      // Create simple straight line for drag detection (invisible)
+      const dragDetectionGeoJson = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: coordinates // Use original straight coordinates
+        }
+      };
+      
       // Add debugging logs
       console.log("⭐ Creating route with coordinates:", coordinates.length);
       console.log("⭐ Curved path coordinates:", routeGeoJson.geometry.coordinates.length);
+      console.log("⭐ Drag detection coordinates:", dragDetectionGeoJson.geometry.coordinates.length);
       
       // Pass original waypoint coordinates to pill creation (pills work with waypoint logic)
       // But store curved path for reference
@@ -1461,11 +1474,39 @@ class WaypointManager {
       // Update or add route sources and layers
       const routeShadowSourceId = 'route-shadow-source';
       const routeShadowLayerId = 'route-shadow';
+      const dragDetectionSourceId = 'route-drag-detection';
+      const dragDetectionLayerId = 'route-drag-detection-layer';
       
       if (map.getSource(routeSourceId)) {
         map.getSource(routeSourceId).setData(routeGeoJson);
       } else {
         map.addSource(routeSourceId, { type: 'geojson', data: routeGeoJson });
+      }
+      
+      // Add invisible drag detection layer using straight line segments
+      if (map.getSource(dragDetectionSourceId)) {
+        map.getSource(dragDetectionSourceId).setData(dragDetectionGeoJson);
+      } else {
+        map.addSource(dragDetectionSourceId, { type: 'geojson', data: dragDetectionGeoJson });
+        
+        // Add invisible drag detection layer (wide but transparent)
+        map.addLayer({
+          id: dragDetectionLayerId,
+          type: 'line',
+          source: dragDetectionSourceId,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+            'line-sort-key': 10 // Render on top for interactions
+          },
+          paint: {
+            'line-color': '#ff0000', // Red for debugging (will be transparent)
+            'line-width': 20, // Wide for easy clicking
+            'line-opacity': 0.0 // Completely invisible
+          }
+        });
+        
+        console.log("⭐ Added invisible drag detection layer");
       }
       
       // Add or update drop shadow source
@@ -1543,9 +1584,9 @@ class WaypointManager {
         
         // Create invisible pill for text background blur effect only
         if (!map.hasImage('pill-image')) {
-          // Create a completely transparent pill for text background blur
-          const pillHeight = 120; 
-          const pillWidth = 20;   
+          // Create a smaller, narrower pill for cleaner appearance
+          const pillHeight = 80;  // Reduced from 120 for smaller size
+          const pillWidth = 14;   // Reduced from 20 for narrower shape   
           const canvas = document.createElement('canvas');
           canvas.width = pillWidth;
           canvas.height = pillHeight;
@@ -1553,6 +1594,9 @@ class WaypointManager {
           
           // Clear canvas - make completely transparent
           ctx.clearRect(0, 0, pillWidth, pillHeight);
+          
+          // Add blur filter for softer edges
+          ctx.filter = 'blur(1px)';
           
           // Create a darker semi-transparent background for better text contrast
           const radius = pillWidth / 2;
@@ -1566,6 +1610,9 @@ class WaypointManager {
           ctx.lineTo(0, radius);
           ctx.closePath();
           ctx.fill();
+          
+          // Reset filter
+          ctx.filter = 'none';
           
           // Add the image to the map
           const imageData = ctx.getImageData(0, 0, pillWidth, pillHeight);
@@ -1601,11 +1648,11 @@ class WaypointManager {
             'icon-padding': 1
           },
           paint: {
-            'icon-opacity': 0.9, // More opaque for better text background
+            'icon-opacity': 0.7, // Subtle pill background
             'icon-halo-color': 'rgba(0, 0, 0, 0.8)', // Much darker halo for contrast
             'icon-halo-width': 6, // Wider blur for better text background
             'icon-halo-blur': 8, // Heavy blur for smooth dark background
-            'icon-translate': [0, 0] // Centered perfectly on shadow line
+            'icon-translate': [0, 3] // Align pill background with shadow line
           },
           filter: ['has', 'isLabel']
         });
@@ -1618,8 +1665,8 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
-            'text-size': 15, // Even larger text for better readability
-            'text-font': ['Arial Unicode MS Bold'],
+            'text-size': 10, // Smaller text for cleaner look
+            'text-font': ['Arial Unicode MS Regular'], // Regular font, not italic
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
             'text-allow-overlap': true,
@@ -1627,7 +1674,7 @@ class WaypointManager {
             'symbol-sort-key': 1, // Render above background blur
             'text-anchor': 'center', 
             'text-justify': 'center',
-            'visibility': 'visible'
+            'visibility': 'visible' // Show route line labels
           },
           paint: {
             'text-color': '#ffffff', // White text for maximum contrast
@@ -1635,7 +1682,7 @@ class WaypointManager {
             'text-halo-color': 'rgba(0, 0, 0, 1.0)', // Maximum dark halo for contrast
             'text-halo-width': 3, // Much wider halo for readability on any background
             'text-halo-blur': 1, // Slight blur for smooth halo
-            'text-translate': [0, 0] // Perfectly centered on shadow line
+            'text-translate': [0, 3] // Position directly on the drop shadow
           },
           filter: ['has', 'isLabel']
         });
@@ -2084,12 +2131,19 @@ class WaypointManager {
         const routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: ['route'] });
         const isMouseOverRoute = routeFeatures && routeFeatures.length > 0;
         
-        // Get the route source data
-        const routeSource = map.getSource('route');
-        if (!routeSource || !routeSource._data) return null;
+        // CRITICAL FIX: Use the drag detection source for insertion calculations
+        // This source contains the original straight-line waypoint coordinates,
+        // not the curved 3D path coordinates which have many more points
+        const dragDetectionSource = map.getSource('route-drag-detection');
+        if (!dragDetectionSource || !dragDetectionSource._data) {
+          console.warn('Drag detection source not available, falling back to route source');
+          const routeSource = map.getSource('route');
+          if (!routeSource || !routeSource._data) return null;
+        }
         
-        // Get route coordinates
-        const coordinates = routeSource._data.geometry.coordinates;
+        // Get coordinates from the drag detection source (original waypoint segments)
+        const sourceToUse = dragDetectionSource || map.getSource('route');
+        const coordinates = sourceToUse._data.geometry.coordinates;
         if (!coordinates || coordinates.length < 2) return null;
         
         // Find the closest segment
@@ -2158,17 +2212,29 @@ class WaypointManager {
         if (!routeSource || !routeSource._data) return;
         
         // Start the drag operation
-        originalLineCoordinates = [...routeSource._data.geometry.coordinates];
+        const originalWaypointCoords = this.waypoints.map(wp => wp.coords);
+        originalLineCoordinates = [...originalWaypointCoords]; // Store original waypoint coords
         isDragging = true;
         dragStartPoint = closestInfo.point;
         closestPointIndex = closestInfo.index;
         
-        // Create the modified line coordinates with a new point
-        draggedLineCoordinates = [...originalLineCoordinates];
-        draggedLineCoordinates.splice(closestPointIndex + 1, 0, closestInfo.point);
+        // ENHANCED: Create initial straight-line drag visualization
+        // Show: departure -> drag start point -> destination
+        let initialDragCoords = [];
+        for (let i = 0; i <= closestPointIndex; i++) {
+          initialDragCoords.push(originalWaypointCoords[i]);
+        }
+        initialDragCoords.push(closestInfo.point);
+        for (let i = closestPointIndex + 1; i < originalWaypointCoords.length; i++) {
+          initialDragCoords.push(originalWaypointCoords[i]);
+        }
         
-        // Add the visualization
+        draggedLineCoordinates = initialDragCoords;
+        
+        // Add the visualization with straight lines
         addDragLine(draggedLineCoordinates);
+        
+        console.log(`Started drag at segment ${closestInfo.index}, showing ${initialDragCoords.length} point preview`);
         
         // Hide the original route during dragging
         map.setLayoutProperty('route', 'visibility', 'none');
@@ -2187,20 +2253,57 @@ class WaypointManager {
     // Mouse move handler - update the drag line
     const handleMouseMove = (e) => {
       if (isDragging) {
-        // Update the dragged point position
-        draggedLineCoordinates[closestPointIndex + 1] = [e.lngLat.lng, e.lngLat.lat];
+        // ENHANCED DRAG VISUALIZATION: Show straight lines during drag
+        // This makes it crystal clear where the insertion will happen
+        const currentMousePos = [e.lngLat.lng, e.lngLat.lat];
         
-        // Update the visualization
-        if (dragLineSource) {
+        // Get the original waypoint coordinates (not the curved path)
+        const originalWaypointCoords = this.waypoints.map(wp => wp.coords);
+        
+        // Create straight-line visualization: departure -> mouse -> destination
+        let straightLineDragCoords = [];
+        
+        if (originalWaypointCoords.length >= 2 && closestPointIndex >= 0) {
+          // Add segments from start up to the insertion point
+          for (let i = 0; i <= closestPointIndex; i++) {
+            if (originalWaypointCoords[i]) {
+              straightLineDragCoords.push(originalWaypointCoords[i]);
+            }
+          }
+          
+          // Add the current mouse position
+          straightLineDragCoords.push(currentMousePos);
+          
+          // Add remaining segments from insertion point to end
+          for (let i = closestPointIndex + 1; i < originalWaypointCoords.length; i++) {
+            if (originalWaypointCoords[i]) {
+              straightLineDragCoords.push(originalWaypointCoords[i]);
+            }
+          }
+        } else {
+          // Fallback for edge cases - just show from start to mouse to end
+          if (originalWaypointCoords.length > 0) {
+            straightLineDragCoords.push(originalWaypointCoords[0]);
+          }
+          straightLineDragCoords.push(currentMousePos);
+          if (originalWaypointCoords.length > 1) {
+            straightLineDragCoords.push(originalWaypointCoords[originalWaypointCoords.length - 1]);
+          }
+        }
+        
+        // Update the visualization with straight lines
+        if (dragLineSource && straightLineDragCoords.length >= 2) {
           dragLineSource.setData({
             type: 'Feature',
             properties: {},
             geometry: {
               type: 'LineString',
-              coordinates: draggedLineCoordinates
+              coordinates: straightLineDragCoords
             }
           });
         }
+        
+        console.log(`Drag preview: ${straightLineDragCoords.length} points, inserting at index ${closestPointIndex + 1}`);
       } else {
         // When not dragging, handle cursor style changes on hover
         const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
