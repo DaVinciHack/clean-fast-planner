@@ -1638,10 +1638,10 @@ class PlatformManager {
     this.fuelAvailableVisible = visible !== undefined ? visible : !this.fuelAvailableVisible;
     
     try {
-      // Fuel available overlay layers
+      // FUEL RINGS ONLY - Remove fuel labels from toggle to keep them hidden
       const fuelAvailableLayers = [
-        'fuel-available-layer',        // Fuel available markers/rings
-        'fuel-available-labels'        // Fuel available labels
+        'fuel-available-layer'        // Only the fuel rings, NOT the labels
+        // 'fuel-available-labels' - Removed: Keep fuel labels permanently hidden
       ];
       
       const visibility = this.fuelAvailableVisible ? 'visible' : 'none';
@@ -1652,7 +1652,12 @@ class PlatformManager {
         }
       });
       
-      console.log(`Fuel available overlay visibility set to: ${visibility}`);
+      // ALWAYS keep fuel labels hidden regardless of fuel ring visibility
+      if (map.getLayer('fuel-available-labels')) {
+        map.setLayoutProperty('fuel-available-labels', 'visibility', 'none');
+      }
+      
+      console.log(`Fuel available overlay visibility set to: ${visibility} (labels remain hidden)`);
     } catch (error) {
       console.warn('Error toggling fuel available visibility:', error);
     }

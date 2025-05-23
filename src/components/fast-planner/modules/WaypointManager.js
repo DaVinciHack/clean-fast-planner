@@ -1730,11 +1730,48 @@ class WaypointManager {
       }
     } else {
       // No waypoints or only one, remove route display
-      [routeGlowLayerId, routeLayerId, routeArrowsLayerId, legLabelsLayerId, 'route-pills'].forEach(layerId => {
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
+      // ENHANCED CLEANUP: Remove ALL route-related layers and sources including shadows and drag detection
+      const layersToRemove = [
+        routeGlowLayerId, 
+        routeLayerId, 
+        routeArrowsLayerId, 
+        legLabelsLayerId, 
+        'route-pills',
+        'route-shadow',              // Add missing shadow layer
+        'route-drag-detection-layer' // Add missing drag detection layer
+      ];
+      
+      const sourcesToRemove = [
+        routeSourceId, 
+        routeArrowsSourceId,
+        'route-shadow-source',       // Add missing shadow source
+        'route-drag-detection'       // Add missing drag detection source
+      ];
+      
+      console.log("🧹 Cleaning up route - removing", layersToRemove.length, "layers and", sourcesToRemove.length, "sources");
+      
+      // Remove layers first
+      layersToRemove.forEach(layerId => {
+        try {
+          if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+            console.log("🧹 Removed layer:", layerId);
+          }
+        } catch (error) {
+          console.warn(`Failed to remove layer ${layerId}:`, error);
+        }
       });
-      [routeSourceId, routeArrowsSourceId].forEach(sourceId => {
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      
+      // Then remove sources
+      sourcesToRemove.forEach(sourceId => {
+        try {
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+            console.log("🧹 Removed source:", sourceId);
+          }
+        } catch (error) {
+          console.warn(`Failed to remove source ${sourceId}:`, error);
+        }
       });
       
       // Ensure we trigger callbacks even when removing the route
@@ -1770,8 +1807,21 @@ class WaypointManager {
       return;
     }
 
-    const layerIds = ['route-glow', 'route', 'route-arrows', 'leg-labels', 'route-pills'];
-    const sourceIds = ['route', 'route-arrows'];
+    const layerIds = [
+      'route-glow', 
+      'route', 
+      'route-arrows', 
+      'leg-labels', 
+      'route-pills',
+      'route-shadow',              // Add missing shadow layer
+      'route-drag-detection-layer' // Add missing drag detection layer
+    ];
+    const sourceIds = [
+      'route', 
+      'route-arrows',
+      'route-shadow-source',       // Add missing shadow source
+      'route-drag-detection'       // Add missing drag detection source
+    ];
 
     // Try to remove layers first
     layerIds.forEach(layerId => {
