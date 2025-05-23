@@ -649,8 +649,146 @@ class WaypointManager {
     }
   }
   
-  createArrowsAlongLine(allWaypointsCoordinates, routeStats = null) {
+  /**
+   * Create 3D flight path with curved routes and drop shadows
+   * @param {Array} coordinates - Array of [lng, lat] coordinates
+   * @returns {Object} - { mainPath: GeoJSON, dropShadow: GeoJSON }
+   */
+  create3DFlightPath(coordinates) {
+    if (!coordinates || coordinates.length < 2) {
+      return {
+        mainPath: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }},
+        dropShadow: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }}
+      };
+    }
+
+    const turf = window.turf;
+    if (!turf) {
+      console.warn("Turf.js not available for 3D flight path");
+      return {
+        mainPath: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }},
+        dropShadow: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }}
+      };
+    }
+
+    try {
+      const curvedCoordinates = [];
+      const shadowCoordinates = [];
+
+      // Process each segment to create curved flight paths
+      for (let i = 0; i < coordinates.length - 1; i++) {
+        const start = coordinates[i];
+        const end = coordinates[i + 1];
+        
+        // Calculate distance to determine curve height
+        const startPoint = turf.point(start);
+        const endPoint = turf.point(end);
+        const distance = turf.distance(startPoint, endPoint, { units: 'nauticalmiles' });
+        
+        // Create curved segment for main flight path
+        const curvedSegment = this.createCurvedSegment(start, end, distance);
+        
+        // Add curved points (skip first point if not the first segment to avoid duplication)
+        if (i === 0) {
+          curvedCoordinates.push(...curvedSegment);
+        } else {
+          curvedCoordinates.push(...curvedSegment.slice(1));
+        }
+        
+        // Create straight shadow segment (ground projection)
+        if (i === 0) {
+          shadowCoordinates.push(start, end);
+        } else {
+          shadowCoordinates.push(end);
+        }
+      }
+
+      return {
+        mainPath: {
+          type: 'Feature',
+          properties: { isFlightPath: true },
+          geometry: { type: 'LineString', coordinates: curvedCoordinates }
+        },
+        dropShadow: {
+          type: 'Feature', 
+          properties: { isDropShadow: true },
+          geometry: { type: 'LineString', coordinates: shadowCoordinates }
+        }
+      };
+
+    } catch (error) {
+      console.warn("Error creating 3D flight path, falling back to simple line:", error);
+      return {
+        mainPath: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }},
+        dropShadow: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }}
+      };
+    }
+  }
+
+  /**
+   * Create a curved segment between two points (takeoff/landing arc)
+   * @param {Array} start - [lng, lat] start coordinate
+   * @param {Array} end - [lng, lat] end coordinate  
+   * @param {number} distance - Distance in nautical miles
+   * @returns {Array} - Array of curved coordinates
+   */
+  createCurvedSegment(start, end, distance) {
+    const numPoints = Math.max(15, Math.min(30, Math.floor(distance / 3))); // More points for smoother curves
+    const curvedPoints = [];
+    
+    // IMPROVED: Curve height based on distance with better scaling for short segments
+    // Shorter segments get proportionally less curve
+    let maxCurveOffset;
+    if (distance < 10) {
+      maxCurveOffset = distance * 0.002; // Very subtle for short hops
+    } else if (distance < 50) {
+      maxCurveOffset = distance * 0.004; // Moderate for medium distances
+    } else {
+      maxCurveOffset = Math.min(0.1, distance * 0.006); // Max for long distances
+    }
+    
+    console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
+    
+    for (let i = 0; i <= numPoints; i++) {
+      const t = i / numPoints; // Progress along the segment (0 to 1)
+      
+      // Linear interpolation between start and end points
+      const lng = start[0] + (end[0] - start[0]) * t;
+      const lat = start[1] + (end[1] - start[1]) * t;
+      
+      // Create flight arc: always curves UP (toward top of screen) for consistent 3D camera view
+      // Using sine curve for smooth takeoff/landing feel
+      const curveHeight = Math.sin(t * Math.PI) * maxCurveOffset;
+      
+      // FIXED: Always apply curve in the UP direction (positive latitude offset)
+      // This ensures all curves go "up" toward the top of screen regardless of flight direction
+      curvedPoints.push([lng, lat + curveHeight]); // Simple upward curve
+    }
+    
+    return curvedPoints;
+  }
+
+  /**
+   * Calculate bearing between two points
+   * @param {Array} start - [lng, lat]
+   * @param {Array} end - [lng, lat]
+   * @returns {number} - Bearing in degrees
+   */
+  calculateBearing(start, end) {
+    const turf = window.turf;
+    if (turf) {
+      return turf.bearing(turf.point(start), turf.point(end));
+    }
+    
+    // Fallback calculation if turf not available
+    const dLng = end[0] - start[0];
+    const dLat = end[1] - start[1];
+    return Math.atan2(dLng, dLat) * (180 / Math.PI);
+  }
+
+  createArrowsAlongLine(allWaypointsCoordinates, routeStats = null, flightPathData = null) {
     console.log("⭐ Creating route labels with distance and time information");
+    console.log("⭐ Flight path data available:", !!flightPathData);
     
     if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) {
       return { type: 'FeatureCollection', features: [] };
@@ -790,10 +928,10 @@ class WaypointManager {
           // Create linestring for midpoint calculation
           const line = turf.lineString([startPointCoords, endPointCoords]);
           
-          // Find midpoint for label placement
+          // Find first quarter point for label placement (better attachment to line)
           const midPoint = turf.along(
             line, 
-            legDistance * 0.5, 
+            legDistance * 0.25, // Position at first quarter instead of middle
             { units: 'nauticalmiles' }
           );
           
@@ -1020,29 +1158,25 @@ class WaypointManager {
           
           console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null'}`);
           
-          // Create a line for the longest segment
+          // Create a line for the longest segment for label placement
           const line = turf.lineString([longestSegment.startCoords, longestSegment.endCoords]);
           
-          // Find midpoint of the longest segment for label placement
-          // Use an offset for placement position to avoid overlapping with other labels
-          const midpointPosition = 0.5; // Default to center
+          // Position at first quarter for better line attachment (instead of middle)
+          const labelPosition = 0.25; // First quarter position
           
           // For multi-leg routes, add a slight offset to prevent label overlap
-          // This makes the first leg's label appear earlier in the segment, and the last leg's later
           let labelOffset = 0;
           if (legBoundaries.length > 3) { // If we have 3+ legs (complex route)
-            // Calculate fractional position along the segment, biased by leg index
-            // First leg: 0.35, Middle legs: 0.5, Last leg: 0.65
             if (legIdx === 0) {
-              labelOffset = -0.15; // First leg
+              labelOffset = -0.05; // First leg: slightly earlier
             } else if (legIdx === legBoundaries.length - 2) {
-              labelOffset = 0.15; // Last leg
+              labelOffset = 0.05; // Last leg: slightly later
             }
           }
           
           const midPoint = turf.along(
             line, 
-            longestSegment.distance * (midpointPosition + labelOffset), 
+            longestSegment.distance * (labelPosition + labelOffset), 
             { units: 'nauticalmiles' }
           );
           
@@ -1305,12 +1439,19 @@ class WaypointManager {
 
     if (this.waypoints.length >= 2) {
       const coordinates = this.waypoints.map(wp => wp.coords);
-      const routeGeoJson = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coordinates }};
+      
+      // Create 3D flight path with curves and drop shadows
+      const flightPathData = this.create3DFlightPath(coordinates);
+      const routeGeoJson = flightPathData.mainPath;
+      const shadowGeoJson = flightPathData.dropShadow;
       
       // Add debugging logs
       console.log("⭐ Creating route with coordinates:", coordinates.length);
+      console.log("⭐ Curved path coordinates:", routeGeoJson.geometry.coordinates.length);
       
-      const arrowsData = this.createArrowsAlongLine(coordinates, routeStats);
+      // Pass original waypoint coordinates to pill creation (pills work with waypoint logic)
+      // But store curved path for reference
+      const arrowsData = this.createArrowsAlongLine(coordinates, routeStats, flightPathData);
       
       // Debug the arrows data
       console.log("⭐ Arrow data features:", arrowsData.features ? arrowsData.features.length : 0);
@@ -1318,13 +1459,44 @@ class WaypointManager {
         console.log("⭐ Sample feature:", JSON.stringify(arrowsData.features[0].properties));
       }
 
-      // Update or add route source and layers
+      // Update or add route sources and layers
+      const routeShadowSourceId = 'route-shadow-source';
+      const routeShadowLayerId = 'route-shadow';
+      
       if (map.getSource(routeSourceId)) {
         map.getSource(routeSourceId).setData(routeGeoJson);
       } else {
         map.addSource(routeSourceId, { type: 'geojson', data: routeGeoJson });
+      }
+      
+      // Add or update drop shadow source
+      if (map.getSource(routeShadowSourceId)) {
+        map.getSource(routeShadowSourceId).setData(shadowGeoJson);
+      } else {
+        map.addSource(routeShadowSourceId, { type: 'geojson', data: shadowGeoJson });
         
-        // Enhanced route line styling: brighter blue, thicker line, increased opacity
+        // Enhanced shadow system - wider, blurred base for pills
+        map.addLayer({ 
+          id: routeShadowLayerId, 
+          type: 'line', 
+          source: routeShadowSourceId, 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round', 
+            'line-sort-key': -2 // Render behind everything else
+          }, 
+          paint: { 
+            'line-color': '#000000', // Black shadow
+            'line-width': 12, // Much wider to accommodate pills
+            'line-opacity': 0.3, // Semi-transparent shadow
+            'line-blur': 5, // Heavy blur for shadow base effect
+            'line-translate': [0, 3] // Offset shadow down only
+          }
+        });
+      }
+      
+      if (!map.getLayer(routeLayerId)) {
+        // Clean, narrow flight line: bright blue, clean curves
         map.addLayer({ 
           id: routeLayerId, 
           type: 'line', 
@@ -1332,34 +1504,36 @@ class WaypointManager {
           layout: { 
             'line-join': 'round', 
             'line-cap': 'round', 
-            'line-sort-key': 1 
+            'line-sort-key': 2 // Render above shadow system
           }, 
           paint: { 
             'line-color': '#1e8ffe', // Bright blue color
-            'line-width': 8, // Thicker line
+            'line-width': 5, // Narrower for cleaner look
             'line-opacity': 1.0 // Full opacity
           }
         });
         
-        // Enhanced glow effect
-        map.addLayer({ 
-          id: routeGlowLayerId, 
-          type: 'line', 
-          source: routeSourceId, 
-          layout: { 
-            'line-join': 'round', 
-            'line-cap': 'round', 
-            'visibility': 'visible', 
-            'line-sort-key': 0 
-          }, 
-          paint: { 
-            'line-color': '#ffffff',
-            'line-width': 14, 
-            'line-opacity': 0.2, 
-            'line-blur': 5
-          }, 
-          filter: ['==', '$type', 'LineString']
-        }, routeLayerId);
+        // Subtle glow effect for narrow flight line
+        if (!map.getLayer(routeGlowLayerId)) {
+          map.addLayer({ 
+            id: routeGlowLayerId, 
+            type: 'line', 
+            source: routeSourceId, 
+            layout: { 
+              'line-join': 'round', 
+              'line-cap': 'round', 
+              'visibility': 'visible', 
+              'line-sort-key': 1 // Between shadow and main line
+            }, 
+            paint: { 
+              'line-color': '#ffffff',
+              'line-width': 8, // Wider than main line for glow
+              'line-opacity': 0.15, // Very subtle glow
+              'line-blur': 3 // Soft blur for glow effect
+            }, 
+            filter: ['==', '$type', 'LineString']
+          }, routeLayerId);
+        }
       }
 
       // Update or add arrows source and layers
@@ -1430,7 +1604,7 @@ class WaypointManager {
           });
         }
         
-        // Add the pill icon layer first (so it appears behind the text)
+        // Add the shadow-integrated pill layer (part of shadow system)
         map.addLayer({
           id: 'route-pills',
           type: 'symbol',
@@ -1439,27 +1613,28 @@ class WaypointManager {
             'symbol-placement': 'point',
             'icon-image': 'pill-image',
             'icon-size': ['case', 
-              ['has', 'isLeg'], 1.2, // Make leg pills slightly larger
-              1.0               // Default size for segment pills
+              ['has', 'isLeg'], 1.4, // Bigger pills for shadow integration
+              1.2               // Bigger default size
             ],
             'icon-rotate': ['get', 'bearing'], // Rotate pill to follow the line direction
             'icon-rotation-alignment': 'map', // Ensure pill aligns with the map for proper angle
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
-            'symbol-sort-key': 1,
+            'symbol-sort-key': -1, // Render with shadow system
             'icon-padding': 1
           },
           paint: {
-            'icon-opacity': 0.9, // Slightly transparent for better text readability
-            'icon-color': ['case', 
-              ['has', 'isLeg'], '#1e8ffe', // Blue for leg pills
-              '#000000'               // Black for segment pills
-            ]
+            'icon-opacity': 0.7, // More transparent for shadow integration
+            'icon-color': '#333333', // Dark gray instead of blue (shadow-like)
+            'icon-halo-color': '#000000', // Black halo for blur effect
+            'icon-halo-width': 2, // Blur effect around pill
+            'icon-halo-blur': 3, // Additional blur for shadow integration
+            'icon-translate': [0, 3] // Offset down to sit on shadow line
           },
           filter: ['has', 'isLabel']
         });
         
-        // Add the text on top of the pill - aligned with the pill
+        // Add the text on shadow-integrated pills - high contrast for readability
         map.addLayer({
           id: legLabelsLayerId,
           type: 'symbol',
@@ -1467,21 +1642,24 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
-            'text-size': 12,
+            'text-size': 13, // Slightly larger for better readability on shadow pills
             'text-font': ['Arial Unicode MS Bold'],
             // Adjust rotation by -90 degrees to align correctly with the pill
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
             'text-allow-overlap': true,
             'text-ignore-placement': true,
-            'symbol-sort-key': 2,
+            'symbol-sort-key': 0, // Render above shadow but below flight line
             'text-anchor': 'center', 
             'text-justify': 'center',
             'visibility': 'visible'
           },
           paint: {
-            'text-color': '#ffffff',
-            'text-opacity': 1.0
+            'text-color': '#ffffff', // White text for contrast on dark shadow pills
+            'text-opacity': 1.0,
+            'text-halo-color': '#000000', // Black halo for better contrast
+            'text-halo-width': 1, // Subtle halo for readability
+            'text-translate': [0, 3] // Match pill offset
           },
           filter: ['has', 'isLabel']
         });
