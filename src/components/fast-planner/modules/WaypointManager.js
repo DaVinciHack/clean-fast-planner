@@ -2542,10 +2542,11 @@ class WaypointManager {
 
     // Listen for style changes and restore layers
     map.on('styledata', () => {
-      // Small delay to ensure style is fully loaded
+      // Longer delay to ensure style is fully loaded and platforms are restored first
       setTimeout(() => {
+        console.log('🎨 Style change detected, restoring waypoint layers...');
         this.restoreLayersAfterStyleChange();
-      }, 200); // Slightly longer delay for routes
+      }, 800); // Even longer delay to come after platforms
     });
 
     console.log('🎨 WaypointManager: Style change listener set up');
