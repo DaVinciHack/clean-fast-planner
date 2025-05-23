@@ -2729,20 +2729,48 @@ class PlatformManager {
 
     console.log('🛢️ Adding 3D rig models...');
 
+    // Check if Three.js is available
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded! Cannot create 3D rigs');
+      return;
+    }
+
     // Get platforms that should have 3D models
     const rigsFor3D = this.platforms.filter(p => 
-      p.isPlatform || p.isMovable || (!p.isAirfield && !p.isBases)
+      (p.isPlatform || p.isMovable || (!p.isAirfield && !p.isBases)) && 
+      p.coordinates && p.coordinates.length === 2
     );
 
     console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs`);
 
+    if (rigsFor3D.length === 0) {
+      console.log('ℹ️ No rigs found for 3D modeling');
+      return;
+    }
+
+    // Remove existing 3D layer if it exists
+    if (map.getLayer('3d-rigs-layer')) {
+      map.removeLayer('3d-rigs-layer');
+    }
+
+    // Create modelData for the layer
+    const modelData = rigsFor3D.map(rig => ({
+      coordinates: rig.coordinates,
+      name: rig.name,
+      height: rig.deckHeight || 85,
+      orientation: rig.orientation || 0
+    }));
+
     // Add custom 3D layer for rigs
-    if (!map.getLayer('3d-rigs-layer')) {
-      map.addLayer({
-        id: '3d-rigs-layer',
-        type: 'custom',
-        renderingMode: '3d',
-        onAdd: function(map, gl) {
+    map.addLayer({
+      id: '3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🛢️ Initializing 3D rig layer...');
+        
+        try {
           // Initialize Three.js scene
           this.camera = new THREE.Camera();
           this.scene = new THREE.Scene();
@@ -2753,88 +2781,100 @@ class PlatformManager {
           });
           
           this.renderer.autoClear = false;
+          this.map = map;
 
           // Create 3D rig models
-          rigsFor3D.forEach(rig => {
-            this.createRigModel(rig);
+          modelData.forEach((rig, index) => {
+            try {
+              this.createRigModel(rig, index);
+            } catch (error) {
+              console.error(`❌ Error creating rig model for ${rig.name}:`, error);
+            }
           });
 
-          console.log('🛢️ 3D rig layer initialized');
-        },
+          console.log(`✅ 3D rig layer initialized with ${modelData.length} models`);
+          
+        } catch (error) {
+          console.error('❌ Error initializing 3D rig layer:', error);
+        }
+      },
 
-        render: function(gl, matrix) {
-          const rotationX = new THREE.Matrix4().makeRotationAxis(
-            new THREE.Vector3(1, 0, 0), this.map.transform.pitch
-          );
-          const rotationZ = new THREE.Matrix4().makeRotationAxis(
-            new THREE.Vector3(0, 0, 1), this.map.transform.angle
-          );
+      render: function(gl, matrix) {
+        try {
+          // Set up camera matrix
+          const halfFov = this.map.transform.fov / 2;
+          const cameraToCenterDistance = 0.5 / Math.tan(halfFov) * this.map.transform.height;
+          const cameraTranslateZ = this.map.transform.worldSize * 0.5 + cameraToCenterDistance;
+          
+          this.camera.projectionMatrix = new THREE.Matrix4()
+            .makePerspective(
+              -this.map.transform.width / 2, 
+              this.map.transform.width / 2,
+              this.map.transform.height / 2, 
+              -this.map.transform.height / 2,
+              cameraToCenterDistance, 
+              cameraTranslateZ * 2
+            );
 
+          // Render the scene
           this.renderer.resetState();
           this.renderer.render(this.scene, this.camera);
-        },
+          
+        } catch (error) {
+          console.error('❌ Error rendering 3D rigs:', error);
+        }
+      },
 
-        createRigModel: function(rig) {
+      createRigModel: function(rig, index) {
+        console.log(`🛢️ Creating 3D model for ${rig.name} at [${rig.coordinates}]`);
+        
+        try {
           // Create a simple oil rig structure
           const rigGroup = new THREE.Group();
 
           // Platform deck (main structure)
-          const deckGeometry = new THREE.BoxGeometry(40, 40, 5); // 40m x 40m platform
+          const deckGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.0002); // Much smaller scale for Mapbox
           const deckMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x444444,
             transparent: true,
             opacity: 0.8
           });
           const deck = new THREE.Mesh(deckGeometry, deckMaterial);
-          deck.position.set(0, 0, rig.height || 85);
           rigGroup.add(deck);
 
-          // Support legs (4 corners)
-          const legGeometry = new THREE.CylinderGeometry(1, 2, rig.height || 85, 8);
-          const legMaterial = new THREE.MeshBasicMaterial({ color: 0x666666 });
-          
-          const legPositions = [
-            [-18, -18], [18, -18], [18, 18], [-18, 18]
-          ];
-          
-          legPositions.forEach(([x, y]) => {
-            const leg = new THREE.Mesh(legGeometry, legMaterial);
-            leg.position.set(x, y, (rig.height || 85) / 2);
-            rigGroup.add(leg);
+          // Helipad (bright yellow circle) - most important for pilots!
+          const helipadGeometry = new THREE.CylinderGeometry(0.0003, 0.0003, 0.00005, 8);
+          const helipadMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xFFFF00 // Bright yellow
           });
-
-          // Derrick (drilling tower)
-          const derrickGeometry = new THREE.BoxGeometry(3, 3, 30);
-          const derrickMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-          const derrick = new THREE.Mesh(derrickGeometry, derrickMaterial);
-          derrick.position.set(0, 0, (rig.height || 85) + 15);
-          rigGroup.add(derrick);
-
-          // Helipad (bright yellow circle)
-          const helipadGeometry = new THREE.CylinderGeometry(8, 8, 0.5, 16);
-          const helipadMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFF00 });
           const helipad = new THREE.Mesh(helipadGeometry, helipadMaterial);
-          helipad.position.set(15, 15, rig.height + 3);
+          helipad.position.set(0.0002, 0.0002, 0.0001);
           rigGroup.add(helipad);
 
-          // Position the rig at correct coordinates
+          // Position the rig at correct coordinates using Mapbox's coordinate system
           const [lng, lat] = rig.coordinates;
+          
+          // Convert to Mapbox coordinates
           const mercatorCoord = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
           
           rigGroup.position.x = mercatorCoord.x;
           rigGroup.position.y = mercatorCoord.y;
           rigGroup.position.z = mercatorCoord.z;
 
-          // Apply orientation if available
-          if (rig.orientation) {
-            rigGroup.rotation.z = (rig.orientation * Math.PI) / 180;
-          }
+          // Scale for Mapbox world
+          const scale = mercatorCoord.meterInMercatorCoordinateUnits();
+          rigGroup.scale.set(scale, scale, scale);
 
           this.scene.add(rigGroup);
-          console.log(`🛢️ Added 3D model for ${rig.name} at [${lng}, ${lat}]`);
+          console.log(`✅ Added 3D model ${index + 1} for ${rig.name}`);
+          
+        } catch (error) {
+          console.error(`❌ Error in createRigModel for ${rig.name}:`, error);
         }
-      });
-    }
+      }
+    });
+
+    console.log('🛢️ 3D rig layer added to map');
   }
 
   /**
