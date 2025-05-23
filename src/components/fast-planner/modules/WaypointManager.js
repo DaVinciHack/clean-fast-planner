@@ -1542,48 +1542,29 @@ class WaypointManager {
       } else {
         map.addSource(routeArrowsSourceId, { type: 'geojson', data: arrowsData });
         
-        // Create custom shadow-style pill shapes (no blue outline)
+        // Create invisible pill for text background blur effect only
         if (!map.hasImage('pill-image')) {
-          // Create the pill in vertical orientation (90 degrees rotated)
-          const pillHeight = 120; // Longer dimension (will be along the line)
-          const pillWidth = 20;   // Shorter dimension - narrower
+          // Create a completely transparent pill for text background blur
+          const pillHeight = 120; 
+          const pillWidth = 20;   
           const canvas = document.createElement('canvas');
           canvas.width = pillWidth;
           canvas.height = pillHeight;
           const ctx = canvas.getContext('2d');
           
-          // Clear any existing content
+          // Clear canvas - make completely transparent
           ctx.clearRect(0, 0, pillWidth, pillHeight);
           
-          // Draw the pill shape with vertical orientation - SHADOW STYLE (no blue)
+          // Create a subtle semi-transparent background for text readability
           const radius = pillWidth / 2;
           
-          // Dark shadow-style pill (no blue outline at all)
-          ctx.fillStyle = '#333333'; // Dark gray for shadow integration
+          // Very subtle dark background - barely visible, just for text contrast
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; // Very transparent black
           ctx.beginPath();
-          // Top half-circle
           ctx.arc(radius, radius, radius, Math.PI, 0);
-          // Right line
           ctx.lineTo(pillWidth, pillHeight - radius);
-          // Bottom half-circle
           ctx.arc(radius, pillHeight - radius, radius, 0, Math.PI);
-          // Left line
           ctx.lineTo(0, radius);
-          ctx.closePath();
-          ctx.fill();
-          
-          // Draw the inner black area for text contrast
-          ctx.fillStyle = '#000000';
-          const innerPadding = 2;
-          ctx.beginPath();
-          // Top half-circle (inner)
-          ctx.arc(radius, radius, radius - innerPadding, Math.PI, 0);
-          // Right line (inner)
-          ctx.lineTo(pillWidth - innerPadding, pillHeight - radius);
-          // Bottom half-circle (inner)
-          ctx.arc(radius, pillHeight - radius, radius - innerPadding, 0, Math.PI);
-          // Left line (inner)
-          ctx.lineTo(innerPadding, radius);
           ctx.closePath();
           ctx.fill();
           
@@ -1604,7 +1585,7 @@ class WaypointManager {
           });
         }
         
-        // Add the shadow-integrated pill layer (no blue outline, centered on shadow)
+        // Add invisible text background layer (just for readability, no visible pill)
         map.addLayer({
           id: 'route-pills',
           type: 'symbol',
@@ -1612,29 +1593,25 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'icon-image': 'pill-image',
-            'icon-size': ['case', 
-              ['has', 'isLeg'], 1.4, // Bigger pills for shadow integration
-              1.2               // Bigger default size
-            ],
-            'icon-rotate': ['get', 'bearing'], // Rotate pill to follow the line direction
-            'icon-rotation-alignment': 'map', // Ensure pill aligns with the map for proper angle
+            'icon-size': 1.0, // Normal size for subtle background
+            'icon-rotate': ['get', 'bearing'],
+            'icon-rotation-alignment': 'map',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
-            'symbol-sort-key': -1, // Render with shadow system
+            'symbol-sort-key': -1,
             'icon-padding': 1
           },
           paint: {
-            'icon-opacity': 0.8, // Good visibility on shadow
-            // NO icon-color - use natural dark pill image color
-            'icon-halo-color': '#000000', // Black halo for blur effect
-            'icon-halo-width': 2, // Blur effect around pill
-            'icon-halo-blur': 3, // Additional blur for shadow integration
-            'icon-translate': [0, 0] // NO OFFSET - centered in middle of shadow line
+            'icon-opacity': 0.6, // Subtle background for text readability
+            'icon-halo-color': 'rgba(0, 0, 0, 0.4)', // Very subtle dark halo for blur
+            'icon-halo-width': 4, // Wider blur for text background effect
+            'icon-halo-blur': 6, // Heavy blur for smooth background
+            'icon-translate': [0, 0] // Centered perfectly on shadow line
           },
           filter: ['has', 'isLabel']
         });
         
-        // Add the text centered on shadow-integrated pills
+        // Add text with enhanced readability on blurred background
         map.addLayer({
           id: legLabelsLayerId,
           type: 'symbol',
@@ -1642,24 +1619,24 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
-            'text-size': 13, // Slightly larger for better readability on shadow pills
+            'text-size': 14, // Larger text for better readability
             'text-font': ['Arial Unicode MS Bold'],
-            // Adjust rotation by -90 degrees to align correctly with the pill
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
             'text-allow-overlap': true,
             'text-ignore-placement': true,
-            'symbol-sort-key': 0, // Render above shadow but below flight line
+            'symbol-sort-key': 1, // Render above background blur
             'text-anchor': 'center', 
             'text-justify': 'center',
             'visibility': 'visible'
           },
           paint: {
-            'text-color': '#ffffff', // White text for contrast on dark shadow pills
+            'text-color': '#ffffff', // White text for maximum contrast
             'text-opacity': 1.0,
-            'text-halo-color': '#000000', // Black halo for better contrast
-            'text-halo-width': 1, // Subtle halo for readability
-            'text-translate': [0, 0] // NO OFFSET - centered with pill
+            'text-halo-color': 'rgba(0, 0, 0, 0.8)', // Strong dark halo for contrast
+            'text-halo-width': 2, // Wide halo for readability on any background
+            'text-halo-blur': 1, // Slight blur for smooth halo
+            'text-translate': [0, 0] // Perfectly centered on shadow line
           },
           filter: ['has', 'isLabel']
         });
