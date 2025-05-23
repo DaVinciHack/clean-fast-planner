@@ -1542,7 +1542,7 @@ class WaypointManager {
       } else {
         map.addSource(routeArrowsSourceId, { type: 'geojson', data: arrowsData });
         
-        // Create custom pill shapes for distance labels
+        // Create custom shadow-style pill shapes (no blue outline)
         if (!map.hasImage('pill-image')) {
           // Create the pill in vertical orientation (90 degrees rotated)
           const pillHeight = 120; // Longer dimension (will be along the line)
@@ -1555,11 +1555,11 @@ class WaypointManager {
           // Clear any existing content
           ctx.clearRect(0, 0, pillWidth, pillHeight);
           
-          // Draw the pill shape with vertical orientation
+          // Draw the pill shape with vertical orientation - SHADOW STYLE (no blue)
           const radius = pillWidth / 2;
           
-          // Blue outline (same color as the route)
-          ctx.fillStyle = '#1e8ffe';
+          // Dark shadow-style pill (no blue outline at all)
+          ctx.fillStyle = '#333333'; // Dark gray for shadow integration
           ctx.beginPath();
           // Top half-circle
           ctx.arc(radius, radius, radius, Math.PI, 0);
@@ -1572,7 +1572,7 @@ class WaypointManager {
           ctx.closePath();
           ctx.fill();
           
-          // Draw the inner black area
+          // Draw the inner black area for text contrast
           ctx.fillStyle = '#000000';
           const innerPadding = 2;
           ctx.beginPath();
@@ -1604,7 +1604,7 @@ class WaypointManager {
           });
         }
         
-        // Add the shadow-integrated pill layer (part of shadow system)
+        // Add the shadow-integrated pill layer (no blue outline, centered on shadow)
         map.addLayer({
           id: 'route-pills',
           type: 'symbol',
@@ -1624,17 +1624,17 @@ class WaypointManager {
             'icon-padding': 1
           },
           paint: {
-            'icon-opacity': 0.7, // More transparent for shadow integration
-            'icon-color': '#333333', // Dark gray instead of blue (shadow-like)
+            'icon-opacity': 0.8, // Good visibility on shadow
+            // NO icon-color - use natural dark pill image color
             'icon-halo-color': '#000000', // Black halo for blur effect
             'icon-halo-width': 2, // Blur effect around pill
             'icon-halo-blur': 3, // Additional blur for shadow integration
-            'icon-translate': [0, 3] // Offset down to sit on shadow line
+            'icon-translate': [0, 0] // NO OFFSET - centered in middle of shadow line
           },
           filter: ['has', 'isLabel']
         });
         
-        // Add the text on shadow-integrated pills - high contrast for readability
+        // Add the text centered on shadow-integrated pills
         map.addLayer({
           id: legLabelsLayerId,
           type: 'symbol',
@@ -1659,7 +1659,7 @@ class WaypointManager {
             'text-opacity': 1.0,
             'text-halo-color': '#000000', // Black halo for better contrast
             'text-halo-width': 1, // Subtle halo for readability
-            'text-translate': [0, 3] // Match pill offset
+            'text-translate': [0, 0] // NO OFFSET - centered with pill
           },
           filter: ['has', 'isLabel']
         });
