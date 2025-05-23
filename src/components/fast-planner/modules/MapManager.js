@@ -898,30 +898,9 @@ class MapManager {
 
       console.log(`🗺️ Switching map style to: ${styleId} (${styleUrl})`);
 
-      // Store references for layer restoration
-      const customLayersToRestore = [];
-      const sourcesToRestore = [];
-
-      // Get list of current custom layers and sources before style change
-      const currentStyle = this.map.getStyle();
-      if (currentStyle && currentStyle.layers) {
-        currentStyle.layers.forEach(layer => {
-          // Identify custom layers (non-Mapbox layers)
-          if (layer.id.includes('platform') || 
-              layer.id.includes('route') || 
-              layer.id.includes('waypoint') ||
-              layer.id.includes('fuel') ||
-              layer.id.includes('bases') ||
-              layer.id.includes('airfield') ||
-              layer.id.includes('osdk') ||
-              layer.id.includes('grid')) {
-            customLayersToRestore.push({
-              id: layer.id,
-              visibility: this.map.getLayoutProperty(layer.id, 'visibility')
-            });
-          }
-        });
-      }
+      // Store current style for comparison
+      this._previousStyle = this.getCurrentStyle();
+      this._targetStyle = styleId;
 
       // Listen for style load completion
       const onStyleLoad = () => {
@@ -932,10 +911,10 @@ class MapManager {
           this.enable3DFeatures();
         }
 
-        // Note: Custom layers will need to be re-added by their respective managers
-        // (PlatformManager, WaypointManager, etc.) after they detect the style change
-        console.log(`🗺️ Custom layers will be restored by their managers`);
+        // Store current style info
+        this._currentStyle = styleId;
 
+        console.log(`🗺️ Style change complete from ${this._previousStyle} to ${styleId}`);
         resolve();
       };
 
@@ -998,15 +977,22 @@ class MapManager {
   getCurrentStyle() {
     if (!this.map) return null;
     
-    const styleUrl = this.map.getStyle().sprite;
-    if (styleUrl.includes('dark')) return 'dark';
-    if (styleUrl.includes('standard')) return '3d';
-    if (styleUrl.includes('satellite-streets')) return 'satellite-streets';
-    if (styleUrl.includes('satellite')) return 'satellite';
-    if (styleUrl.includes('light')) return 'light';
-    if (styleUrl.includes('navigation')) return 'navigation';
+    // Use stored style if available
+    if (this._currentStyle) return this._currentStyle;
     
-    return 'unknown';
+    try {
+      const styleUrl = this.map.getStyle()?.sprite || this.map.getStyle()?.glyphs || '';
+      if (styleUrl.includes('dark')) return 'dark';
+      if (styleUrl.includes('standard')) return '3d';
+      if (styleUrl.includes('satellite-streets')) return 'satellite-streets';
+      if (styleUrl.includes('satellite')) return 'satellite';
+      if (styleUrl.includes('light')) return 'light';
+      if (styleUrl.includes('navigation')) return 'navigation';
+    } catch (error) {
+      console.warn('Error detecting current style:', error);
+    }
+    
+    return 'dark'; // Default fallback
   }
 }
 

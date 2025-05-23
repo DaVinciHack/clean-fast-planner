@@ -2590,19 +2590,127 @@ class PlatformManager {
       return;
     }
 
+    const map = this.mapManager.getMap();
+    const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
+    console.log(`🔄 Restoring layers for style: ${currentStyle}`);
+
+    // Clear any existing layers first to avoid conflicts
+    this._removePlatformLayersAndSource();
+
     // Re-add platform layers if we have platforms loaded
     if (this.platforms && this.platforms.length > 0) {
       console.log(`🔄 Restoring ${this.platforms.length} platforms`);
-      this.addPlatformLayers();
+      
+      // Add a small delay to ensure style is fully loaded
+      setTimeout(() => {
+        try {
+          this.addPlatformLayers();
+          console.log('✅ Platform layers restored successfully');
+        } catch (error) {
+          console.error('❌ Error restoring platform layers:', error);
+          // Try again with basic layer setup
+          setTimeout(() => {
+            this.addBasicPlatformLayers();
+          }, 500);
+        }
+      }, 200);
     }
 
     // Re-add OSDK waypoints if we have them loaded
     if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
       console.log(`🔄 Restoring ${this.osdkWaypoints.length} OSDK waypoints`);
-      this.addOsdkWaypointsToMap();
+      setTimeout(() => {
+        try {
+          this.addOsdkWaypointsToMap();
+        } catch (error) {
+          console.error('❌ Error restoring OSDK waypoints:', error);
+        }
+      }, 300);
     }
+  }
 
-    console.log('✅ PlatformManager: Layer restoration complete');
+  /**
+   * Add basic platform layers with style-compatible properties
+   */
+  addBasicPlatformLayers() {
+    const map = this.mapManager.getMap();
+    if (!map || !this.platforms || this.platforms.length === 0) return;
+
+    console.log('🔄 Adding basic platform layers (style-safe)');
+    
+    const sourceId = 'major-platforms';
+    const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
+
+    // Prepare simplified GeoJSON data
+    const features = this.platforms.map(p => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: p.coordinates
+      },
+      properties: {
+        name: p.name,
+        platformType: p.isAirfield ? 'airfield' : 
+                     p.isMovable ? 'movable' : 
+                     p.isBlocks ? 'blocks' :
+                     p.isBases ? 'bases' : 'fixed'
+      }
+    }));
+
+    const geoJsonData = {
+      type: 'FeatureCollection',
+      features: features
+    };
+
+    try {
+      // Add source
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: 'geojson',
+          data: geoJsonData
+        });
+      }
+
+      // Add simple circle layers with basic properties only
+      const layerConfigs = [
+        {
+          id: 'platforms-fixed-layer-basic',
+          filter: ['==', ['get', 'platformType'], 'fixed'],
+          color: '#3B82F6'
+        },
+        {
+          id: 'platforms-movable-layer-basic', 
+          filter: ['==', ['get', 'platformType'], 'movable'],
+          color: '#10B981'
+        },
+        {
+          id: 'platforms-airfield-layer-basic',
+          filter: ['==', ['get', 'platformType'], 'airfield'], 
+          color: '#F59E0B'
+        }
+      ];
+
+      layerConfigs.forEach(config => {
+        if (!map.getLayer(config.id)) {
+          map.addLayer({
+            id: config.id,
+            type: 'circle',
+            source: sourceId,
+            filter: config.filter,
+            paint: {
+              'circle-radius': 4,
+              'circle-color': config.color,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#ffffff'
+            }
+          });
+        }
+      });
+
+      console.log('✅ Basic platform layers added successfully');
+    } catch (error) {
+      console.error('❌ Error adding basic platform layers:', error);
+    }
   }
 
   /**
