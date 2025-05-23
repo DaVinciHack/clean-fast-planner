@@ -420,16 +420,18 @@ const FastPlannerCore = () => {
         }}
         style={{
           position: 'absolute',
-          bottom: '210px',
-          right: '10px',
-          zIndex: 1000,
-          padding: '8px 12px',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 2000,
+          padding: '12px 16px',
           backgroundColor: '#2196F3',
           color: 'white',
-          border: 'none',
-          borderRadius: '4px',
+          border: '2px solid #1976D2',
+          borderRadius: '8px',
           cursor: 'pointer',
-          fontSize: '12px'
+          fontSize: '14px',
+          fontWeight: 'bold',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.3)'
         }}
       >
         🗺️ Toggle 3D Map
