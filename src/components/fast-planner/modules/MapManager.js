@@ -883,7 +883,7 @@ class MapManager {
       // Map of style IDs to Mapbox style URLs
       const styles = {
         'dark': 'mapbox://styles/mapbox/dark-v11',
-        '3d': 'mapbox://styles/mapbox/standard',
+        '3d': 'mapbox://styles/mapbox/satellite-v9', // Use satellite instead of standard for better compatibility
         'satellite': 'mapbox://styles/mapbox/satellite-v9',
         'satellite-streets': 'mapbox://styles/mapbox/satellite-streets-v12',
         'light': 'mapbox://styles/mapbox/light-v11',
@@ -962,24 +962,22 @@ class MapManager {
     if (!this.map) return;
 
     try {
-      // Enable 3D terrain if available
-      if (this.map.getSource('mapbox-dem')) {
-        this.map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
-        console.log('🏔️ 3D terrain enabled');
-      }
-
-      // Add atmospheric sky layer for enhanced 3D effect
+      // Add atmospheric sky layer for enhanced 3D effect (if supported)
       if (!this.map.getLayer('sky')) {
-        this.map.addLayer({
-          id: 'sky',
-          type: 'sky',
-          paint: {
-            'sky-type': 'atmosphere',
-            'sky-atmosphere-sun': [0.0, 0.0],
-            'sky-atmosphere-sun-intensity': 15
-          }
-        });
-        console.log('🌅 Atmospheric sky layer added');
+        try {
+          this.map.addLayer({
+            id: 'sky',
+            type: 'sky',
+            paint: {
+              'sky-type': 'atmosphere',
+              'sky-atmosphere-sun': [0.0, 0.0],
+              'sky-atmosphere-sun-intensity': 15
+            }
+          });
+          console.log('🌅 Atmospheric sky layer added');
+        } catch (skyError) {
+          console.log('ℹ️ Sky layer not supported in this style');
+        }
       }
 
       // Adjust pitch for better 3D viewing
@@ -989,8 +987,18 @@ class MapManager {
       });
       console.log('📐 Camera pitch adjusted for 3D viewing');
 
+      // Try to add terrain if available (may not be supported in all styles)
+      try {
+        if (this.map.getSource('mapbox-dem')) {
+          this.map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+          console.log('🏔️ 3D terrain enabled');
+        }
+      } catch (terrainError) {
+        console.log('ℹ️ 3D terrain not available in this style');
+      }
+
     } catch (error) {
-      console.warn('3D features setup failed:', error);
+      console.log('ℹ️ Some 3D features not supported in this style:', error.message);
     }
   }
 
