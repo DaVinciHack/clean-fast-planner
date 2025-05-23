@@ -2722,10 +2722,11 @@ class PlatformManager {
 
     // Listen for style changes and restore layers
     map.on('styledata', () => {
-      // Small delay to ensure style is fully loaded
+      // Longer delay to ensure style is fully loaded and stable
       setTimeout(() => {
+        console.log('🎨 Style change detected, restoring platform layers...');
         this.restoreLayersAfterStyleChange();
-      }, 100);
+      }, 500); // Increased delay
     });
 
     console.log('🎨 PlatformManager: Style change listener set up');

@@ -902,26 +902,50 @@ class MapManager {
       this._previousStyle = this.getCurrentStyle();
       this._targetStyle = styleId;
 
-      // Listen for style load completion
+      // Save current map state
+      const currentCenter = this.map.getCenter();
+      const currentZoom = this.map.getZoom();
+      const currentBearing = this.map.getBearing();
+      const currentPitch = this.map.getPitch();
+
+      console.log(`🗺️ Saving map state: center=${currentCenter.lng.toFixed(3)},${currentCenter.lat.toFixed(3)} zoom=${currentZoom.toFixed(1)}`);
+
+      // Listen for style load completion  
       const onStyleLoad = () => {
         console.log(`🗺️ Style ${styleId} loaded successfully`);
 
+        // Restore map position
+        this.map.jumpTo({
+          center: currentCenter,
+          zoom: currentZoom,
+          bearing: currentBearing,
+          pitch: styleId === '3d' ? 60 : currentPitch // Set 3D pitch for 3D style
+        });
+
         // For 3D style, enable terrain if available
         if (styleId === '3d') {
-          this.enable3DFeatures();
+          setTimeout(() => {
+            this.enable3DFeatures();
+          }, 100);
         }
 
         // Store current style info
         this._currentStyle = styleId;
 
         console.log(`🗺️ Style change complete from ${this._previousStyle} to ${styleId}`);
+        
+        // Add the grid back
+        setTimeout(() => {
+          this.addGridToMap();
+        }, 200);
+
         resolve();
       };
 
       // Set up one-time listener for style load
       this.map.once('styledata', onStyleLoad);
 
-      // Switch the style
+      // Switch the style (this will automatically clear all custom layers)
       try {
         this.map.setStyle(styleUrl);
       } catch (error) {
