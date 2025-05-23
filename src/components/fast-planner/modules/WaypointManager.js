@@ -913,13 +913,12 @@ class WaypointManager {
             labelText = distanceText;
           }
           
-          // Add directional arrows consistently based on segment direction
-          // Force arrows to always be present and in the right direction
+          // Add much bigger directional arrows for clear flight direction indication
           const goingLeftToRight = startPointCoords[0] < endPointCoords[0];
           if (goingLeftToRight) {
-            labelText = `${labelText} →`; // Simple right-pointing arrow for left-to-right segments
+            labelText = `${labelText} ▶`; // Much bigger right-pointing arrow
           } else {
-            labelText = `← ${labelText}`; // Simple left-pointing arrow for right-to-left segments
+            labelText = `◀ ${labelText}`; // Much bigger left-pointing arrow
           }
           
           // Calculate bearing for alignment
@@ -1200,9 +1199,9 @@ class WaypointManager {
           // Arrow direction always follows the route order
           const goingLeftToRight = longestSegment.startCoords[0] < longestSegment.endCoords[0];
           if (goingLeftToRight) {
-            labelText = `${labelText} →`; // Simple right-pointing arrow
+            labelText = `${labelText} ▶`; // Much bigger right-pointing arrow
           } else {
-            labelText = `← ${labelText}`; // Simple left-pointing arrow
+            labelText = `◀ ${labelText}`; // Much bigger left-pointing arrow
           }
           
           // Calculate text orientation based on bearing
@@ -1475,7 +1474,7 @@ class WaypointManager {
       } else {
         map.addSource(routeShadowSourceId, { type: 'geojson', data: shadowGeoJson });
         
-        // Enhanced shadow system - wider, blurred base for pills
+        // Enhanced shadow system - darker, more prominent base
         map.addLayer({ 
           id: routeShadowLayerId, 
           type: 'line', 
@@ -1487,8 +1486,8 @@ class WaypointManager {
           }, 
           paint: { 
             'line-color': '#000000', // Black shadow
-            'line-width': 12, // Much wider to accommodate pills
-            'line-opacity': 0.3, // Semi-transparent shadow
+            'line-width': 12, // Wide to accommodate pills
+            'line-opacity': 0.6, // Much darker for better contrast
             'line-blur': 5, // Heavy blur for shadow base effect
             'line-translate': [0, 3] // Offset shadow down only
           }
@@ -1555,11 +1554,11 @@ class WaypointManager {
           // Clear canvas - make completely transparent
           ctx.clearRect(0, 0, pillWidth, pillHeight);
           
-          // Create a subtle semi-transparent background for text readability
+          // Create a darker semi-transparent background for better text contrast
           const radius = pillWidth / 2;
           
-          // Very subtle dark background - barely visible, just for text contrast
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'; // Very transparent black
+          // Much darker background for text readability in all situations
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Much darker background
           ctx.beginPath();
           ctx.arc(radius, radius, radius, Math.PI, 0);
           ctx.lineTo(pillWidth, pillHeight - radius);
@@ -1585,7 +1584,7 @@ class WaypointManager {
           });
         }
         
-        // Add invisible text background layer (just for readability, no visible pill)
+        // Add dark text background layer for maximum contrast
         map.addLayer({
           id: 'route-pills',
           type: 'symbol',
@@ -1593,7 +1592,7 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'icon-image': 'pill-image',
-            'icon-size': 1.0, // Normal size for subtle background
+            'icon-size': 1.0, // Normal size for background
             'icon-rotate': ['get', 'bearing'],
             'icon-rotation-alignment': 'map',
             'icon-allow-overlap': true,
@@ -1602,16 +1601,16 @@ class WaypointManager {
             'icon-padding': 1
           },
           paint: {
-            'icon-opacity': 0.6, // Subtle background for text readability
-            'icon-halo-color': 'rgba(0, 0, 0, 0.4)', // Very subtle dark halo for blur
-            'icon-halo-width': 4, // Wider blur for text background effect
-            'icon-halo-blur': 6, // Heavy blur for smooth background
+            'icon-opacity': 0.9, // More opaque for better text background
+            'icon-halo-color': 'rgba(0, 0, 0, 0.8)', // Much darker halo for contrast
+            'icon-halo-width': 6, // Wider blur for better text background
+            'icon-halo-blur': 8, // Heavy blur for smooth dark background
             'icon-translate': [0, 0] // Centered perfectly on shadow line
           },
           filter: ['has', 'isLabel']
         });
         
-        // Add text with enhanced readability on blurred background
+        // Add text with maximum contrast for readability in all situations
         map.addLayer({
           id: legLabelsLayerId,
           type: 'symbol',
@@ -1619,7 +1618,7 @@ class WaypointManager {
           layout: {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
-            'text-size': 14, // Larger text for better readability
+            'text-size': 15, // Even larger text for better readability
             'text-font': ['Arial Unicode MS Bold'],
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
@@ -1633,8 +1632,8 @@ class WaypointManager {
           paint: {
             'text-color': '#ffffff', // White text for maximum contrast
             'text-opacity': 1.0,
-            'text-halo-color': 'rgba(0, 0, 0, 0.8)', // Strong dark halo for contrast
-            'text-halo-width': 2, // Wide halo for readability on any background
+            'text-halo-color': 'rgba(0, 0, 0, 1.0)', // Maximum dark halo for contrast
+            'text-halo-width': 3, // Much wider halo for readability on any background
             'text-halo-blur': 1, // Slight blur for smooth halo
             'text-translate': [0, 0] // Perfectly centered on shadow line
           },
