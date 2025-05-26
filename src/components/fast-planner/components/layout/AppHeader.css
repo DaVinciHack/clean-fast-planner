@@ -18,7 +18,7 @@
 .header-left {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 8px; /* Reduce gap from 15px to 8px */
   flex: 0 0 auto;
 }
 
@@ -98,9 +98,9 @@
 .header-right {
   display: flex;
   align-items: center;
-  flex: 0 0 180px; /* Increase width for more space */
-  max-width: 180px;
-  margin-right: 30px; /* Much more padding from right edge */
+  flex: 0 0 160px; /* Reduce width to decrease padding */
+  max-width: 160px;
+  margin-right: 15px; /* Much less padding from right edge */
   justify-content: center; /* Center the content in the available space */
 }
 
@@ -114,8 +114,8 @@
 }
 
 .username {
-  font-size: 18px; /* Make it bigger again */
-  font-weight: 400;
+  font-size: 24px; /* Make it bigger - 24px */
+  font-weight: 500; /* Slightly bolder */
   color: #ffffff;
   font-family: 'Mrs Saint Delafield', cursive;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -123,7 +123,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px; /* Increase max width too */
+  max-width: 160px; /* Increase max width for larger text */
 }
 
 .connection-dot {
