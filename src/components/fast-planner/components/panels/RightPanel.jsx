@@ -229,7 +229,13 @@ const RightPanel = ({
       />
       
       {/* Finance Card */}
-      <FinanceCard id="finance" />
+      <FinanceCard 
+        id="finance"
+        routeStats={routeStats}
+        stopCards={null} // Will be passed when available
+        selectedAircraft={selectedAircraft}
+        waypoints={waypoints}
+      />
       
       {/* Evacuation Card */}
       <EvacuationCard id="evacuation" />
