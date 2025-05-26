@@ -1,6 +1,6 @@
 /* Route line and label styling enhancements */
 .mapboxgl-canvas {
-  filter: drop-shadow(0 0 3px rgba(30, 143, 254, 0.3)); /* Subtle glow for the entire map */
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4)) drop-shadow(0 2px 6px rgba(30, 143, 254, 0.2)); /* Heavy shadow with blue accent */
 }
 
 /* Custom pill styling for route labels */
@@ -177,15 +177,16 @@
   position: relative;
   width: 100%;
   height: 100vh;
-  background: linear-gradient(135deg, 
-    #1a1a1a 0%,     /* Very dark gray */
-    #2d2d2d 25%,    /* Dark gray */
-    #3a3a3a 50%,    /* Medium gray */
-    #2f2f2f 75%,    /* Dark gray */
-    #1e1e1e 100%    /* Very dark gray */
+  background: radial-gradient(
+    ellipse at center center,
+    #1a3d5f 0%,     /* Darker rich blue at center */
+    #122e4a 30%,    /* Darker medium blue */
+    #0c2138 60%,    /* Much darker blue */
+    #071728 90%,    /* Very dark blue */
+    #0f0a1a 100%    /* Dark purple-black at edges */
   );
-  background-size: 200% 200%;
-  animation: gradientFlow 30s ease-in-out infinite;
+  background-size: 100% 100%;
+  animation: none; /* Remove flashing animation */
   color: var(--text-color);
   overflow: hidden;
   display: flex;
@@ -200,12 +201,9 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(
-    ellipse at 25% 25%, 
-    rgba(60, 60, 60, 0.08) 0%, 
-    rgba(60, 60, 60, 0.03) 40%, 
-    transparent 70%
-  );
+  background: 
+    radial-gradient(ellipse at 30% 70%, rgba(40, 80, 120, 0.06) 0%, transparent 60%);
+  animation: gentleFloat1 80s linear infinite;
   animation: floatingShape1 40s ease-in-out infinite;
   pointer-events: none;
 }
@@ -217,13 +215,74 @@
   right: -30%;
   width: 150%;
   height: 150%;
+  background: 
+    radial-gradient(ellipse at 70% 30%, rgba(50, 90, 130, 0.04) 0%, transparent 70%);
+  animation: gentleFloat2 100s linear infinite;
+  animation: floatingShape2 45s ease-in-out infinite reverse;
+  pointer-events: none;
+}
+
+/* Enhanced floating shapes with richer blue-purple movement */
+.fast-planner-container .floating-shape-1 {
+  position: absolute;
+  top: 10%;
+  left: 15%;
+  width: 300px;
+  height: 200px;
+  background: radial-gradient(ellipse, rgba(60, 40, 120, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: complexFlow1 50s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.fast-planner-container .floating-shape-2 {
+  position: absolute;
+  top: 60%;
+  right: 20%;
+  width: 250px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(80, 60, 160, 0.06) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: complexFlow2 60s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.fast-planner-container .floating-shape-3 {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  width: 400px;
+  height: 150px;
+  background: radial-gradient(ellipse, rgba(40, 70, 140, 0.07) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: complexFlow1 45s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Header glow effect for better definition */
+.app-header {
+  position: relative;
+  z-index: 10;
+}
+
+.app-header::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -30px;
   background: radial-gradient(
-    ellipse at 75% 75%, 
-    rgba(80, 80, 80, 0.06) 0%, 
-    rgba(80, 80, 80, 0.02) 50%, 
+    ellipse at center top,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.04) 40%,
+    rgba(255, 255, 255, 0.02) 60%,
     transparent 80%
   );
-  animation: floatingShape2 45s ease-in-out infinite reverse;
+  z-index: -1;
   pointer-events: none;
 }
 
@@ -264,6 +323,72 @@
   }
   50% {
     transform: rotate(180deg) translate(40px, 40px) scale(1.15);
+  }
+}
+
+@keyframes gentleFloat1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(10px, -5px) scale(1.02);
+  }
+  50% {
+    transform: translate(-5px, 10px) scale(0.98);
+  }
+  75% {
+    transform: translate(-10px, -5px) scale(1.01);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes gentleFloat2 {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-8px, 8px) scale(1.01);
+  }
+  66% {
+    transform: translate(8px, -3px) scale(0.99);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes complexFlow1 {
+  0% {
+    transform: rotate(0deg) scale(1) translate(0, 0);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.1) translate(20px, -10px);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.9) translate(-30px, 15px);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.05) translate(10px, -20px);
+  }
+  100% {
+    transform: rotate(360deg) scale(1) translate(0, 0);
+  }
+}
+
+@keyframes complexFlow2 {
+  0% {
+    transform: rotate(0deg) scale(1.1) translate(0, 0);
+  }
+  33% {
+    transform: rotate(120deg) scale(0.95) translate(-25px, 20px);
+  }
+  66% {
+    transform: rotate(240deg) scale(1.15) translate(30px, -15px);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.1) translate(0, 0);
   }
 }
 
