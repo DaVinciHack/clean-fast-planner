@@ -1,0 +1,277 @@
+/* AppHeader.css - iPad-friendly header styles */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 60px;
+  background: transparent; /* Remove background - let container show through */
+  border-bottom: none; /* Remove border */
+  padding: 0 10px; /* MUCH less padding to prevent cutoff */
+  box-shadow: none; /* Remove shadow - map will have shadow instead */
+  position: relative;
+  z-index: 100;
+}
+
+/* Left Side: Logo + Aircraft Display */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 0 0 auto;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.vtol-logo {
+  height: 40px;
+  width: auto;
+}
+
+.aircraft-display {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aircraft-registration {
+  font-weight: 600;
+  font-size: 16px;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.aircraft-type {
+  font-size: 12px;
+  color: #4285f4;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.no-aircraft {
+  font-size: 14px;
+  color: #8e8e93;
+  font-style: italic;
+}
+/* Center: Flight Details */
+.header-center {
+  flex: 0 1 auto; /* Don't take all available space */
+  display: flex;
+  justify-content: center;
+  padding: 0 5px;
+  max-width: 400px; /* Strict limit on center width */
+  margin: 0 auto; /* Center it */
+}
+
+.flight-summary {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.flight-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 10px;
+  color: #8e8e93;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Right Side: User + Login Status */
+.header-right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 180px; /* Increase width for more space */
+  max-width: 180px;
+  margin-right: 30px; /* Much more padding from right edge */
+  justify-content: center; /* Center the content in the available space */
+}
+
+.user-info {
+  display: flex;
+  flex-direction: row; /* Change to row to put dot next to name */
+  align-items: center;
+  gap: 8px; /* Space between name and dot */
+  width: 100%;
+  justify-content: center; /* Center within the user-info container */
+}
+
+.username {
+  font-size: 18px; /* Make it bigger again */
+  font-weight: 400;
+  color: #ffffff;
+  font-family: 'Mrs Saint Delafield', cursive;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  margin-right: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px; /* Increase max width too */
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.connection-dot.connected {
+  background-color: #32d74b; /* iOS green */
+  box-shadow: 0 0 4px rgba(50, 215, 75, 0.6);
+}
+
+.connection-dot.disconnected {
+  background-color: #ff453a; /* iOS red */
+  box-shadow: 0 0 4px rgba(255, 69, 58, 0.6);
+}
+
+/* iPad-specific responsive adjustments */
+@media (max-width: 1024px) {
+  .app-header {
+    height: 50px;
+    padding: 0 15px;
+  }
+  
+  .flight-summary {
+    gap: 15px;
+  }
+  
+  .detail-value {
+    font-size: 13px;
+  }
+  
+  .detail-label {
+    font-size: 9px;
+  }
+}
+
+/* Compact view for smaller screens */
+@media (max-width: 768px) {
+  .flight-summary {
+    gap: 10px;
+  }
+  
+  .header-left {
+    gap: 10px;
+  }
+  
+  .detail-value {
+    font-size: 12px;
+  }
+  
+  .aircraft-registration {
+    font-size: 14px;
+  }
+}
+
+/* Loading Components */
+.header-loading-text {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(150, 150, 150, 0.95);
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.9;
+  text-align: center;
+  max-width: 80%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 101;
+}
+
+/* Override LoadingIndicator's status-indicator positioning */
+.status-indicator {
+  position: fixed !important;
+  left: 50% !important;
+  top: 52px !important;  /* Move up by 3px more (was 55px, now 52px) */
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  font-size: 11px !important;  /* Slightly bigger font (was 10px, now 11px) */
+  color: rgba(150, 150, 150, 0.95) !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  height: 14px !important;
+  max-width: 400px !important;
+  margin: 0 auto !important;
+  opacity: 0 !important;
+  transition: opacity 0.3s ease !important;
+  font-family: 'Arial Narrow', 'Franklin Gothic Medium', Arial, sans-serif !important;
+  letter-spacing: 0.5px !important;
+  z-index: 2000 !important;
+}
+
+.status-indicator.active {
+  opacity: 1 !important;
+}
+
+#header-status-indicator.active {
+  opacity: 1;
+}
+
+.header-loading-container {
+  position: absolute;
+  width: calc(100% - 30px);  /* Account for map container padding */
+  height: 3px;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: transparent;
+  bottom: -25px;  /* Position it in the gap area, closer to map */
+  left: 10px;     /* Start from where map padding begins */
+  z-index: 102;   /* Above the text */
+}
+
+.header-loading-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;    /* Make it thicker for visibility */
+  background: #00c8ff; /* Solid bright blue for testing */
+  width: 35%;
+  animation: header-elastic-scroll 1.8s infinite cubic-bezier(0.645, 0.045, 0.355, 1);
+  transform-origin: left center;
+  border-radius: 1px;
+}
+
+@keyframes header-elastic-scroll {
+  0% {
+    left: -30%;
+    width: 30%;
+  }
+  35% {
+    width: 33%;
+  }
+  50% {
+    width: 30%;
+  }
+  75% {
+    width: 27%;
+  }
+  100% {
+    left: 100%;
+    width: 30%;
+  }
+}

@@ -225,7 +225,7 @@ const LeftPanel = ({
       {/* Left panel toggle tab - with horizontal > and < markers */}
       <div 
         className="panel-tab left-panel-tab main-toggle tab-selector" 
-        style={{ position: 'fixed', top: '50px', left: '0', zIndex: '20', height: '24px', width: '24px', writingMode: 'horizontal-tb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        style={{ position: 'fixed', top: '130px', left: '0', zIndex: '20', height: '24px', width: '24px', writingMode: 'horizontal-tb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={onToggleVisibility}
       >
         {visible ? '<' : '>'}

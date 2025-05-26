@@ -1,0 +1,40 @@
+/* Route Badge Styles */
+.route-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+  margin-right: 2px;
+}
+
+/* Stop badge style */
+.stop-badge {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: rgb(180, 40, 50);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+/* Waypoint badge style - distinct blue color */
+.waypoint-badge {
+  background-color: rgba(0, 123, 255, 0.1);
+  color: rgb(0, 93, 195);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+}
+
+/* Departure badge style */
+.departure-badge {
+  background-color: rgba(40, 167, 69, 0.1);
+  color: rgb(30, 127, 50);
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+/* Arrival badge style */
+.arrival-badge {
+  background-color: rgba(108, 117, 125, 0.1);
+  color: rgb(78, 87, 95);
+  border: 1px solid rgba(108, 117, 125, 0.3);
+}

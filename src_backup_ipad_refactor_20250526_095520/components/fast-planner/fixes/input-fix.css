@@ -1,0 +1,54 @@
+/* src/components/fast-planner/fixes/input-fix.css */
+
+/* Improve input field focus and visibility */
+.route-input {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  background-color: var(--input-bg, #2a2a2a) !important;
+  color: var(--input-text, white) !important;
+  border: 1px solid var(--input-border, #444) !important;
+  transition: all 0.2s ease !important;
+}
+
+.route-input:focus {
+  background-color: var(--input-focus-bg, #333) !important;
+  border-color: var(--accent-color, #0066cc) !important;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.3) !important;
+  outline: none !important;
+}
+
+/* Ensure caret is visible */
+.route-input::selection {
+  background-color: var(--selection-bg, #0066cc) !important;
+  color: var(--selection-text, white) !important;
+}
+
+/* Fix for any parent elements that might be causing issues */
+.route-input-container,
+.route-input-wrapper,
+div:has(> .route-input) {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Add a subtle indicator that input is receiving focus */
+.route-input:focus::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--accent-color, #0066cc);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.7; }
+}
