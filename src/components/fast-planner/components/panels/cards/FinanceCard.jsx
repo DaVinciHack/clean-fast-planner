@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import BaseCard from './BaseCard';
 import './FinanceCard.css';
+import { PDFButton } from '../../../modules/pdf';
 
 /**
  * Finance Calculator Component with browser persistence
  */
-const FinanceCard = ({ id }) => {
+const FinanceCard = ({ 
+  id,
+  // New props for PDF generation
+  routeStats = null,
+  stopCards = null,
+  selectedAircraft = null,
+  waypoints = null
+}) => {
   // Load settings from localStorage with defaults if not found
   const loadSetting = (key, defaultValue) => {
     try {
@@ -637,6 +645,28 @@ const FinanceCard = ({ id }) => {
             <div className="finance-item total">
               <div className="finance-label">Total Cost:</div>
               <div className="finance-value">{formatCurrency(costs.totalCost)}</div>
+            </div>
+            
+            {/* PDF Report Button */}
+            <div className="finance-pdf-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+              <PDFButton
+                routeStats={routeStats}
+                stopCards={stopCards}
+                selectedAircraft={selectedAircraft}
+                waypoints={waypoints}
+                costData={{
+                  totalCost: costs.totalCost,
+                  flightTimeCost: costs.mainCost,
+                  dayRate: costs.dayRateCost,
+                  fuelCost: costs.fuelCost,
+                  landingFees: costs.landingCost,
+                  additionalCost: costs.extra,
+                  tax: includeTax ? costs.taxAmount : null,
+                  includeTax: includeTax
+                }}
+                buttonText="📄 Download Flight Report"
+                className="finance-pdf-button"
+              />
             </div>
           </div>
         ) : (

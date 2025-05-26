@@ -5,26 +5,33 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- WAYPOINT MODE FIX -->
-    <script type="text/javascript">
-    // Fix waypoint mode functionality by loading a standalone script
-    document.addEventListener('DOMContentLoaded', function() {
-      const script = document.createElement('script');
-      script.src = '/waypoint-fix.js?v=' + Date.now(); // Add cache-busting parameter
-      script.type = 'text/javascript';
-      document.head.appendChild(script);
-      console.log('WAYPOINT FIX: Loaded standalone fix script');
-    });
-    </script>
+    <!-- REMOVED OLD FIX SCRIPTS -->
+    <!-- WAYPOINT MODE FIX (Removed) -->
+    <!-- WAYPOINT VS STOP FIX (Removed) -->
     
     <title>Fast Flight Planner (Clean)</title>
-    <script type="module" crossorigin src="/planner/assets/index-ZjASQi69.js"></script>
+    <script type="module" crossorigin src="/planner/assets/index-cpaczcFY.js"></script>
     <link rel="modulepreload" crossorigin href="/planner/assets/react-vendors-Bh7YcOHL.js">
-    <link rel="modulepreload" crossorigin href="/planner/assets/osdk-vendors-XKstwJj-.js">
-    <link rel="stylesheet" crossorigin href="/planner/assets/index-BqT4LK47.css">
+    <link rel="modulepreload" crossorigin href="/planner/assets/osdk-vendors-Bzm701W8.js">
+    <link rel="stylesheet" crossorigin href="/planner/assets/index-BkA-AioJ.css">
   </head>
   <body>
     <div id="root"></div>
+    
+    <!-- Add Three.js for 3D rig models -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      // Ensure Three.js is loaded globally
+      window.addEventListener('load', function() {
+        if (typeof THREE !== 'undefined') {
+          console.log('✅ Three.js loaded successfully:', THREE.REVISION);
+          window.THREE = THREE; // Ensure global access
+        } else {
+          console.error('❌ Three.js failed to load');
+        }
+      });
+    </script>
+    
     
     <!-- Simple one-time dropdown fix script -->
     <script>

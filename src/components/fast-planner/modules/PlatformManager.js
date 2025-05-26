@@ -2604,8 +2604,31 @@ class PlatformManager {
       // Add a small delay to ensure style is fully loaded
       setTimeout(() => {
         try {
-          this.addPlatformLayers();
+          // Use lightweight restoration instead of full addPlatformsToMap to avoid loops
+          this._restorePlatformLayersOnly();
           console.log('✅ Platform layers restored successfully');
+          
+          // 🚁 DISABLED FOR DEMO - Keep original beautiful styling intact
+          const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
+          console.log(`🔍 DEBUG: Current style is: ${currentStyle} - 3D disabled for demo`);
+          
+          // COMMENTED OUT 3D functionality to preserve demo-ready 2D styling
+          /*
+          if (currentStyle === '3d' || currentStyle === 'satellite') {
+            console.log(`🚁 ADDING 3D rigs ON TOP of existing beautiful layers for style: ${currentStyle}`);
+            console.log(`🔍 DEBUG: Platforms available: ${this.platforms?.length || 0}`);
+            setTimeout(() => {
+              console.log(`🔍 DEBUG: Adding 3D models WITHOUT disturbing original styling`);
+              // ADD 3D models without touching the original beautiful 2D layers
+              this.add3DRigsOnTopOfExistingLayers();
+            }, 100);
+          } else {
+            console.log(`ℹ️ In 2D mode - keeping original beautiful styling - style is: ${currentStyle}`);
+          }
+          */
+          
+          console.log(`ℹ️ 3D functionality disabled for demo - preserving original beautiful 2D styling`);
+          
         } catch (error) {
           console.error('❌ Error restoring platform layers:', error);
           // Try again with basic layer setup
@@ -2630,11 +2653,100 @@ class PlatformManager {
   }
 
   /**
+   * Lightweight platform layer restoration - just re-adds layers without triggering events
+   */
+  _restorePlatformLayersOnly() {
+    const map = this.mapManager.getMap();
+    if (!map || !this.platforms || this.platforms.length === 0) return;
+
+    console.log('🔄 Lightweight platform layer restoration (no events)');
+    
+    const sourceId = 'major-platforms';
+
+    // Prepare simplified GeoJSON data
+    const features = this.platforms.map(p => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: p.coordinates
+      },
+      properties: {
+        name: p.name,
+        platformType: p.isAirfield ? 'airfield' : 
+                     p.isMovable ? 'movable' : 
+                     p.isBlocks ? 'blocks' :
+                     p.isBases ? 'bases' : 'fixed'
+      }
+    }));
+
+    const geoJsonData = {
+      type: 'FeatureCollection',
+      features: features
+    };
+
+    // Add source if it doesn't exist
+    if (!map.getSource(sourceId)) {
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: geoJsonData
+      });
+    } else {
+      // Update existing source
+      map.getSource(sourceId).setData(geoJsonData);
+    }
+
+    // Add basic platform layers without complex configuration
+    const basicLayers = [
+      {
+        id: 'platforms-fixed-basic',
+        filter: ['==', ['get', 'platformType'], 'fixed'],
+        color: '#1976D2'
+      },
+      {
+        id: 'platforms-movable-basic',
+        filter: ['==', ['get', 'platformType'], 'movable'],
+        color: '#FF6B6B'
+      },
+      {
+        id: 'airfields-basic',
+        filter: ['==', ['get', 'platformType'], 'airfield'],
+        color: '#4CAF50'
+      }
+    ];
+
+    basicLayers.forEach(config => {
+      if (!map.getLayer(config.id)) {
+        map.addLayer({
+          id: config.id,
+          type: 'circle',
+          source: sourceId,
+          filter: config.filter,
+          paint: {
+            'circle-radius': 3,
+            'circle-color': config.color,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': '#ffffff'
+          }
+        });
+      }
+    });
+
+    console.log('✅ Lightweight platform restoration complete');
+  }
+
+  /**
    * Add basic platform layers with style-compatible properties
    */
   addBasicPlatformLayers() {
     const map = this.mapManager.getMap();
     if (!map || !this.platforms || this.platforms.length === 0) return;
+
+    // CRITICAL: Prevent multiple simultaneous calls
+    if (this._addingBasicLayers) {
+      console.log('ℹ️ Basic platform layers already being added, skipping');
+      return;
+    }
+    this._addingBasicLayers = true;
 
     console.log('🔄 Adding basic platform layers (style-safe)');
     
@@ -2715,8 +2827,13 @@ class PlatformManager {
       }
 
       console.log('✅ Basic platform layers added successfully');
+      
+      // CRITICAL: Reset the flag to allow future legitimate calls
+      this._addingBasicLayers = false;
     } catch (error) {
       console.error('❌ Error adding basic platform layers:', error);
+      // CRITICAL: Reset flag even on error
+      this._addingBasicLayers = false;
     }
   }
 
@@ -2724,16 +2841,43 @@ class PlatformManager {
    * 🚁 ADD 3D RIG MODELS - The magic happens here!
    */
   add3DRigModels() {
+    console.log(`🔍 DEBUG: add3DRigModels() called`);
+    
     const map = this.mapManager.getMap();
-    if (!map) return;
+    if (!map) {
+      console.log(`❌ DEBUG: No map available`);
+      return;
+    }
+
+    console.log(`✅ DEBUG: Map is available`);
+
+    // CRITICAL: Prevent infinite loop by checking if 3D layer already exists
+    if (map.getLayer('3d-rigs-layer')) {
+      console.log('ℹ️ 3D rigs layer already exists, skipping creation');
+      this._adding3DModels = false;
+      return;
+    }
+
+    console.log(`✅ DEBUG: No existing 3D layer found`);
+
+    // CRITICAL: Add flag to prevent multiple simultaneous calls
+    if (this._adding3DModels) {
+      console.log('ℹ️ 3D models already being added, skipping');
+      return;
+    }
+    this._adding3DModels = true;
 
     console.log('🛢️ Adding 3D rig models...');
 
     // Check if Three.js is available
     if (typeof THREE === 'undefined') {
       console.error('❌ Three.js not loaded! Cannot create 3D rigs');
+      this._adding3DModels = false;
       return;
     }
+
+    console.log(`✅ DEBUG: Three.js is available: ${THREE.REVISION}`);
+    console.log(`🔍 DEBUG: Available platforms: ${this.platforms?.length || 0}`);
 
     // Get platforms that should have 3D models
     const rigsFor3D = this.platforms.filter(p => 
@@ -2742,9 +2886,23 @@ class PlatformManager {
     );
 
     console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs`);
+    console.log(`🔍 DEBUG: Total platforms: ${this.platforms.length}`);
+    console.log(`🔍 DEBUG: Sample platform:`, this.platforms[0]);
+    if (rigsFor3D.length > 0) {
+      console.log(`🔍 DEBUG: Sample rig for 3D:`, rigsFor3D[0]);
+    }
 
     if (rigsFor3D.length === 0) {
       console.log('ℹ️ No rigs found for 3D modeling');
+      // Let's see why no rigs were found
+      const breakdown = {
+        isPlatform: this.platforms.filter(p => p.isPlatform).length,
+        isMovable: this.platforms.filter(p => p.isMovable).length,
+        notAirfieldOrBases: this.platforms.filter(p => !p.isAirfield && !p.isBases).length,
+        hasCoordinates: this.platforms.filter(p => p.coordinates && p.coordinates.length === 2).length
+      };
+      console.log(`🔍 DEBUG: Platform breakdown:`, breakdown);
+      this._adding3DModels = false;
       return;
     }
 
@@ -2762,10 +2920,11 @@ class PlatformManager {
     }));
 
     // Add custom 3D layer for rigs
-    map.addLayer({
-      id: '3d-rigs-layer',
-      type: 'custom',
-      renderingMode: '3d',
+    try {
+      map.addLayer({
+        id: '3d-rigs-layer',
+        type: 'custom',
+        renderingMode: '3d',
       
       onAdd: function(map, gl) {
         console.log('🛢️ Initializing 3D rig layer...');
@@ -2800,6 +2959,11 @@ class PlatformManager {
       },
 
       render: function(gl, matrix) {
+        // Add occasional debug to verify rendering is happening
+        if (Math.random() < 0.001) { // Log 1 in 1000 renders
+          console.log('🎨 3D rig render cycle active');
+        }
+        
         try {
           // Set up camera matrix
           const halfFov = this.map.transform.fov / 2;
@@ -2832,8 +2996,8 @@ class PlatformManager {
           // Create a simple oil rig structure
           const rigGroup = new THREE.Group();
 
-          // Platform deck (main structure)
-          const deckGeometry = new THREE.BoxGeometry(0.001, 0.001, 0.0002); // Much smaller scale for Mapbox
+          // Platform deck (main structure) - MUCH BIGGER
+          const deckGeometry = new THREE.BoxGeometry(0.01, 0.01, 0.002); // 10x bigger
           const deckMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x444444,
             transparent: true,
@@ -2842,14 +3006,23 @@ class PlatformManager {
           const deck = new THREE.Mesh(deckGeometry, deckMaterial);
           rigGroup.add(deck);
 
-          // Helipad (bright yellow circle) - most important for pilots!
-          const helipadGeometry = new THREE.CylinderGeometry(0.0003, 0.0003, 0.00005, 8);
+          // Helipad (bright yellow circle) - MUCH BIGGER and HIGHER
+          const helipadGeometry = new THREE.CylinderGeometry(0.003, 0.003, 0.0005, 8); // 10x bigger
           const helipadMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xFFFF00 // Bright yellow
           });
           const helipad = new THREE.Mesh(helipadGeometry, helipadMaterial);
-          helipad.position.set(0.0002, 0.0002, 0.0001);
+          helipad.position.set(0.002, 0.002, 0.001); // Higher position
           rigGroup.add(helipad);
+
+          // Add a tall tower structure for visibility
+          const towerGeometry = new THREE.CylinderGeometry(0.0005, 0.0005, 0.005, 6);
+          const towerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xFF0000 // Red tower for visibility
+          });
+          const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+          tower.position.set(0, 0, 0.0025); // Centered and tall
+          rigGroup.add(tower);
 
           // Position the rig at correct coordinates using Mapbox's coordinate system
           const [lng, lat] = rig.coordinates;
@@ -2861,12 +3034,16 @@ class PlatformManager {
           rigGroup.position.y = mercatorCoord.y;
           rigGroup.position.z = mercatorCoord.z;
 
-          // Scale for Mapbox world
+          // Scale for Mapbox world - EXTREMELY LARGE SCALE FOR TESTING
           const scale = mercatorCoord.meterInMercatorCoordinateUnits();
-          rigGroup.scale.set(scale, scale, scale);
+          const massiveScale = scale * 10000; // 10,000x bigger - impossible to miss!
+          rigGroup.scale.set(massiveScale, massiveScale, massiveScale);
+
+          console.log(`🔍 DEBUG: Rig ${rig.name} positioned at [${lng}, ${lat}] with MASSIVE scale ${massiveScale.toFixed(8)}`);
+          console.log(`🔍 DEBUG: Mercator coords: x=${mercatorCoord.x}, y=${mercatorCoord.y}, z=${mercatorCoord.z}`);
 
           this.scene.add(rigGroup);
-          console.log(`✅ Added 3D model ${index + 1} for ${rig.name}`);
+          console.log(`✅ Added MASSIVE 3D model ${index + 1} for ${rig.name}`);
           
         } catch (error) {
           console.error(`❌ Error in createRigModel for ${rig.name}:`, error);
@@ -2874,7 +3051,14 @@ class PlatformManager {
       }
     });
 
-    console.log('🛢️ 3D rig layer added to map');
+      console.log('🛢️ 3D rig layer added to map');
+      
+    } catch (error) {
+      console.error('❌ Error adding 3D rig layer:', error);
+    } finally {
+      // CRITICAL: Reset the flag to allow future legitimate calls
+      this._adding3DModels = false;
+    }
   }
 
   /**
@@ -2884,6 +3068,9 @@ class PlatformManager {
     const map = this.mapManager?.getMap();
     if (!map) return;
 
+    // 🚁 DISABLED FOR DEMO - Prevent automatic style restoration
+    // This was causing the beautiful rig styling to switch to basic disks automatically
+    /*
     // Listen for style changes and restore layers
     map.on('styledata', () => {
       // Longer delay to ensure style is fully loaded and stable
@@ -2892,8 +3079,759 @@ class PlatformManager {
         this.restoreLayersAfterStyleChange();
       }, 500); // Increased delay
     });
+    */
 
-    console.log('🎨 PlatformManager: Style change listener set up');
+    console.log('🎨 PlatformManager: Style change listener DISABLED for demo - preserving original beautiful styling');
+  }
+
+  /**
+   * 🚁 ADD SIMPLE 3D-LOOKING MARKERS - Simpler approach that will definitely work
+   */
+  addSimple3DMarkers() {
+    console.log(`🔍 DEBUG: addSimple3DMarkers() called`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ DEBUG: No map available`);
+      return;
+    }
+
+    // Remove ALL existing simple 3D layers first
+    const simpleLayersToRemove = [
+      'simple-3d-rigs', 'simple-3d-rigs-base', 'simple-3d-rigs-deck', 
+      'simple-3d-rigs-helipad', 'simple-3d-rigs-center'
+    ];
+    
+    simpleLayersToRemove.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🧹 Removing existing simple layer: ${layerId}`);
+        map.removeLayer(layerId);
+      }
+    });
+
+    // Remove simple source if exists
+    if (map.getSource('simple-3d-rigs-source')) {
+      map.removeSource('simple-3d-rigs-source');
+    }
+
+    // Get some platforms for testing
+    const rigsFor3D = this.platforms.filter(p => 
+      (p.isPlatform || p.isMovable || (!p.isAirfield && !p.isBases)) && 
+      p.coordinates && p.coordinates.length === 2
+    ).slice(0, 10); // Just first 10 for testing
+
+    console.log(`🛢️ Creating simple 3D markers for ${rigsFor3D.length} rigs`);
+
+    if (rigsFor3D.length === 0) {
+      console.log('ℹ️ No rigs found for simple 3D markers');
+      return;
+    }
+
+    // Create GeoJSON for 3D-style markers
+    const features = rigsFor3D.map(rig => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: rig.coordinates
+      },
+      properties: {
+        name: rig.name,
+        type: '3d-rig'
+      }
+    }));
+
+    const geoJsonData = {
+      type: 'FeatureCollection',
+      features: features
+    };
+
+    // Add source
+    if (!map.getSource('simple-3d-rigs-source')) {
+      map.addSource('simple-3d-rigs-source', {
+        type: 'geojson',
+        data: geoJsonData
+      });
+    }
+
+    // Add layered circles to simulate 3D oil rig structure
+    
+    // Layer 1: Platform base (largest, dark)
+    map.addLayer({
+      id: 'simple-3d-rigs-base',
+      type: 'circle',
+      source: 'simple-3d-rigs-source',
+      paint: {
+        'circle-radius': 18,
+        'circle-color': '#333333', // Dark platform base
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#666666'
+      }
+    });
+
+    // Layer 2: Platform deck (medium, gray)
+    map.addLayer({
+      id: 'simple-3d-rigs-deck',
+      type: 'circle',
+      source: 'simple-3d-rigs-source',
+      paint: {
+        'circle-radius': 12,
+        'circle-color': '#666666', // Gray deck
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#888888'
+      }
+    });
+
+    // Layer 3: Helipad (small, bright yellow - most important for pilots!)
+    map.addLayer({
+      id: 'simple-3d-rigs-helipad',
+      type: 'circle',
+      source: 'simple-3d-rigs-source',
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#FFFF00', // Bright yellow helipad
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FF0000' // Red border for visibility
+      }
+    });
+
+    // Layer 4: Center marker (tiny, white)
+    map.addLayer({
+      id: 'simple-3d-rigs-center',
+      type: 'circle',
+      source: 'simple-3d-rigs-source',
+      paint: {
+        'circle-radius': 2,
+        'circle-color': '#FFFFFF' // White center point
+      }
+    });
+
+    console.log(`✅ Added ${rigsFor3D.length} layered 3D-style oil rig markers!`);
+  }
+
+  /**
+   * 🛢️ ADD REAL 3D RIG MODELS - Using Mapbox native 3D extrusion instead of Three.js
+   */
+  addReal3DRigModels() {
+    console.log(`🔍 DEBUG: addReal3DRigModels() called - NATIVE MAPBOX 3D APPROACH`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ DEBUG: No map available`);
+      return;
+    }
+
+    // Clean up ALL existing real 3D layers
+    const layersToRemove = ['real-3d-rigs', 'real-3d-rigs-helipad'];
+    layersToRemove.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🧹 Removing existing layer: ${layerId}`);
+        map.removeLayer(layerId);
+      }
+    });
+
+    // Remove source if exists
+    if (map.getSource('real-3d-rigs-source')) {
+      map.removeSource('real-3d-rigs-source');
+    }
+
+    // Get platforms for 3D modeling
+    const rigsFor3D = this.platforms.filter(p => 
+      (p.isPlatform || p.isMovable || (!p.isAirfield && !p.isBases)) && 
+      p.coordinates && p.coordinates.length === 2
+    ).slice(0, 3); // Just 3 for testing
+
+    console.log(`🛢️ Creating REAL 3D models for ${rigsFor3D.length} rigs using POLYGON geometry`);
+
+    if (rigsFor3D.length === 0) {
+      console.log('ℹ️ No rigs found for real 3D modeling');
+      return;
+    }
+
+    // Create POLYGON features (required for fill-extrusion)
+    const features = rigsFor3D.map(rig => {
+      const [lng, lat] = rig.coordinates;
+      // Create a square polygon around the rig coordinates
+      const size = 0.001; // Platform size in degrees
+      
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [lng - size, lat - size],
+            [lng + size, lat - size], 
+            [lng + size, lat + size],
+            [lng - size, lat + size],
+            [lng - size, lat - size] // Close the polygon
+          ]]
+        },
+        properties: {
+          name: rig.name,
+          type: 'oil-rig',
+          height: (rig.deckHeight || 85) * 0.3 // Convert feet to meters and scale for visibility
+        }
+      };
+    });
+
+    const geoJsonData = {
+      type: 'FeatureCollection',
+      features: features
+    };
+
+    console.log(`🔍 DEBUG: Created ${features.length} polygon features for 3D extrusion`);
+
+    // Add source for real 3D rigs
+    map.addSource('real-3d-rigs-source', {
+      type: 'geojson',
+      data: geoJsonData
+    });
+
+    // Add 3D extruded layer using Mapbox's native 3D support
+    map.addLayer({
+      id: 'real-3d-rigs',
+      type: 'fill-extrusion',
+      source: 'real-3d-rigs-source',
+      paint: {
+        'fill-extrusion-color': '#444444', // Dark gray platform
+        'fill-extrusion-height': ['get', 'height'], // Use height property
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.9
+      }
+    });
+
+    // Add bright helipad markers on top
+    map.addLayer({
+      id: 'real-3d-rigs-helipad',
+      type: 'circle',
+      source: 'real-3d-rigs-source',
+      paint: {
+        'circle-radius': 8,
+        'circle-color': '#FFFF00', // Bright yellow
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FF0000'
+      }
+    });
+
+    console.log(`✅ Added ${rigsFor3D.length} REAL 3D extruded oil rigs with POLYGON geometry!`);
+  }
+
+  /**
+   * Generate rig module layout for realistic platform representation
+   */
+  generateRigModules(rig) {
+    // This will eventually contain real module data for pilot orientation
+    return {
+      helipad: { position: 'northeast', size: 'standard' },
+      drillFloor: { position: 'center', active: true },
+      cranes: [{ position: 'southwest' }, { position: 'southeast' }],
+      accommodations: { position: 'northwest', capacity: 150 },
+      fuelStorage: { position: 'south', capacity: '5000bbl' }
+    };
+  }
+
+  /**
+   * 🛢️ FIXED THREE.JS APPROACH - Proper WebGL integration
+   */
+  addFixed3DRigModels() {
+    console.log(`🚁 FIXED Three.js approach - proper WebGL context handling`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ No map available`);
+      return;
+    }
+
+    // Clean up existing Three.js layer
+    if (map.getLayer('fixed-3d-rigs-layer')) {
+      console.log('🧹 Removing existing Three.js layer');
+      map.removeLayer('fixed-3d-rigs-layer');
+    }
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Three.js available: ${THREE.REVISION}`);
+
+    // Get a few platforms for testing
+    const rigsFor3D = this.platforms.filter(p => 
+      (p.isPlatform || p.isMovable || (!p.isAirfield && !p.isBases)) && 
+      p.coordinates && p.coordinates.length === 2
+    ).slice(0, 2); // Just 2 for testing
+
+    console.log(`🛢️ Creating ${rigsFor3D.length} Three.js rigs`);
+
+    if (rigsFor3D.length === 0) {
+      console.log('❌ No rigs found');
+      return;
+    }
+
+    // Store rig data for the layer
+    const rigData = rigsFor3D.map(rig => ({
+      coordinates: rig.coordinates,
+      name: rig.name,
+      height: rig.deckHeight || 85
+    }));
+
+    // Add Three.js custom layer with FIXED integration
+    map.addLayer({
+      id: 'fixed-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🚁 Initializing FIXED Three.js layer');
+        
+        // Create Three.js scene with proper WebGL context
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // CRITICAL: Use the existing WebGL context from Mapbox
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create rig models with PROPER scaling
+        rigData.forEach((rig, index) => {
+          this.createBetterRigModel(rig, index);
+        });
+
+        console.log(`✅ FIXED Three.js layer initialized with ${rigData.length} models`);
+      },
+
+      render: function(gl, matrix) {
+        // MUCH SIMPLER camera setup
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        
+        // Render with minimal state changes
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createBetterRigModel: function(rig, index) {
+        console.log(`🛢️ Creating BETTER rig model for ${rig.name}`);
+        
+        const [lng, lat] = rig.coordinates;
+        
+        // Convert to world coordinates 
+        const worldCoords = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        
+        // Create rig group
+        const rigGroup = new THREE.Group();
+        
+        // ABSOLUTELY MASSIVE GEOMETRY
+        const size = 0.01; // Large size in world space
+        
+        // Platform deck (bright color for visibility)
+        const deckGeometry = new THREE.BoxGeometry(size, size, size * 0.3);
+        const deckMaterial = new THREE.MeshBasicMaterial({ 
+          color: 0xFF0000 // BRIGHT RED
+        });
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        rigGroup.add(deck);
+
+        // Helipad tower (even brighter)
+        const towerGeometry = new THREE.BoxGeometry(size * 0.3, size * 0.3, size);
+        const towerMaterial = new THREE.MeshBasicMaterial({ 
+          color: 0xFFFF00 // BRIGHT YELLOW
+        });
+        const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+        tower.position.z = size * 0.5;
+        rigGroup.add(tower);
+
+        // Position in world space
+        rigGroup.position.x = worldCoords.x;
+        rigGroup.position.y = worldCoords.y;
+        rigGroup.position.z = 0;
+
+        this.scene.add(rigGroup);
+        console.log(`✅ Added MASSIVE rig model ${index + 1} for ${rig.name}`);
+      }
+    });
+
+    console.log('🚁 FIXED Three.js layer added to map');
+  }
+
+  /**
+   * 🛢️ REPLACE ALL CIRCLES WITH 3D RIGS - Different shapes for different rig types!
+   */
+  replaceCirclesWith3DRigs() {
+    console.log(`🚁 REPLACING ALL CIRCLES WITH 3D RIGS!`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ No map available`);
+      return;
+    }
+
+    // Clean up existing Three.js layer
+    if (map.getLayer('all-3d-rigs-layer')) {
+      console.log('🧹 Removing existing all-3d-rigs layer');
+      map.removeLayer('all-3d-rigs-layer');
+    }
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Three.js available: ${THREE.REVISION}`);
+
+    // Get ALL platforms and categorize them
+    const allRigs = this.platforms.filter(p => 
+      p.coordinates && p.coordinates.length === 2
+    ).slice(0, 200); // More rigs now that they're smaller!
+
+    console.log(`🛢️ Creating 3D models for ${allRigs.length} rigs of different types`);
+
+    if (allRigs.length === 0) {
+      console.log('❌ No rigs found');
+      return;
+    }
+
+    // Categorize rigs by type
+    const rigsByType = {
+      fuel: allRigs.filter(p => p.hasFuel || p.fuelAvailable),
+      platforms: allRigs.filter(p => p.isPlatform && !p.hasFuel),
+      blocks: allRigs.filter(p => p.isBlocks),
+      mobile: allRigs.filter(p => p.isMovable),
+      other: allRigs.filter(p => !p.hasFuel && !p.isPlatform && !p.isBlocks && !p.isMovable)
+    };
+
+    console.log(`🔍 Rig breakdown: Fuel:${rigsByType.fuel.length}, Platforms:${rigsByType.platforms.length}, Blocks:${rigsByType.blocks.length}, Mobile:${rigsByType.mobile.length}, Other:${rigsByType.other.length}`);
+
+    // Store rig data for the layer
+    const rigData = allRigs.map(rig => ({
+      coordinates: rig.coordinates,
+      name: rig.name,
+      type: rig.hasFuel ? 'fuel' : 
+            rig.isPlatform ? 'platform' :
+            rig.isBlocks ? 'blocks' :
+            rig.isMovable ? 'mobile' : 'other',
+      height: rig.deckHeight || 85
+    }));
+
+    // Add Three.js custom layer for ALL rigs
+    map.addLayer({
+      id: 'all-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🚁 Initializing ALL 3D RIGS layer');
+        
+        // Create Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // Use Mapbox's WebGL context
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create different rig models for each type
+        rigData.forEach((rig, index) => {
+          this.createRigByType(rig, index);
+        });
+
+        console.log(`✅ ALL 3D RIGS layer initialized with ${rigData.length} models`);
+      },
+
+      render: function(gl, matrix) {
+        // Simple camera setup
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        
+        // Render all rigs
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createRigByType: function(rig, index) {
+        const [lng, lat] = rig.coordinates;
+        
+        // Convert to world coordinates 
+        const worldCoords = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        
+        // Create rig group
+        const rigGroup = new THREE.Group();
+        const size = 0.00003; // Tiny size
+        
+        // Create REALISTIC oil rig structure instead of simple shapes
+        this.createRealisticRig(rigGroup, rig.type, size);
+
+        // Position in world space
+        rigGroup.position.x = worldCoords.x;
+        rigGroup.position.y = worldCoords.y;
+        rigGroup.position.z = 0;
+
+        this.scene.add(rigGroup);
+        
+        if (index < 10) { // Only log first 10 to avoid spam
+          console.log(`✅ Added realistic ${rig.type} rig for ${rig.name}`);
+        }
+      },
+
+      createRealisticRig: function(rigGroup, rigType, size) {
+        // REALISTIC GRAY COLORS - much more muted
+        const colors = {
+          platform: 0x666666,    // Medium gray
+          deck: 0x555555,        // Darker gray  
+          legs: 0x444444,        // Dark gray
+          helipad: 0xFFDD00,     // Muted yellow
+          crane: 0x333333,       // Very dark gray
+          tower: 0x777777        // Light gray
+        };
+
+        // 1. CONICAL BASE (main platform structure) - FIXED ORIENTATION
+        const baseGeometry = new THREE.ConeGeometry(size * 1.2, size * 0.8, 8);
+        const baseMaterial = new THREE.MeshBasicMaterial({ color: colors.platform });
+        const base = new THREE.Mesh(baseGeometry, baseMaterial);
+        base.position.z = size * 0.4; // Sitting on seafloor
+        rigGroup.add(base);
+
+        // 2. MAIN PLATFORM DECK (flat on top of base)
+        const deckGeometry = new THREE.CylinderGeometry(size * 1.0, size * 1.0, size * 0.15, 8);
+        const deckMaterial = new THREE.MeshBasicMaterial({ color: colors.deck });
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        deck.position.z = size * 0.85; // On top of cone
+        rigGroup.add(deck);
+
+        // 3. EXTENDED DECK on one side (helicopter landing area)
+        const heliDeckGeometry = new THREE.BoxGeometry(size * 0.8, size * 0.8, size * 0.1);
+        const heliDeckMaterial = new THREE.MeshBasicMaterial({ color: colors.deck });
+        const heliDeck = new THREE.Mesh(heliDeckGeometry, heliDeckMaterial);
+        heliDeck.position.x = size * 1.0; // Extended to one side
+        heliDeck.position.z = size * 0.95; // Same level as main deck
+        rigGroup.add(heliDeck);
+
+        // 4. SUPPORT LEGS (4 legs going down to seafloor)
+        const legGeometry = new THREE.CylinderGeometry(size * 0.08, size * 0.12, size * 0.8, 6);
+        const legMaterial = new THREE.MeshBasicMaterial({ color: colors.legs });
+        
+        const legPositions = [
+          { x: size * 0.6, y: size * 0.6 },   // Front right
+          { x: size * 0.6, y: -size * 0.6 },  // Back right
+          { x: -size * 0.6, y: size * 0.6 },  // Front left
+          { x: -size * 0.6, y: -size * 0.6 }  // Back left
+        ];
+
+        legPositions.forEach(pos => {
+          const leg = new THREE.Mesh(legGeometry, legMaterial);
+          leg.position.x = pos.x;
+          leg.position.y = pos.y;
+          leg.position.z = size * 0.4; // From seafloor to platform
+          rigGroup.add(leg);
+        });
+
+        // 5. HELIPAD (on the extended deck)
+        const helipadGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 0.05, 8);
+        const helipadMaterial = new THREE.MeshBasicMaterial({ color: colors.helipad });
+        const helipad = new THREE.Mesh(helipadGeometry, helipadMaterial);
+        helipad.position.x = size * 1.0; // On the extended deck
+        helipad.position.z = size * 1.0; // On top of extended deck
+        rigGroup.add(helipad);
+
+        // 6. DRILLING TOWER (vertical tower in center)
+        if (rigType === 'platform' || rigType === 'fuel') {
+          const towerGeometry = new THREE.BoxGeometry(size * 0.12, size * 0.12, size * 1.5);
+          const towerMaterial = new THREE.MeshBasicMaterial({ color: colors.tower });
+          const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+          tower.position.z = size * 1.6; // Tall tower above platform
+          rigGroup.add(tower);
+        }
+
+        // 7. CRANE ARM (horizontal arm for lifting)
+        if (rigType === 'platform') {
+          const craneGeometry = new THREE.BoxGeometry(size * 1.2, size * 0.06, size * 0.06);
+          const craneMaterial = new THREE.MeshBasicMaterial({ color: colors.crane });
+          const crane = new THREE.Mesh(craneGeometry, craneMaterial);
+          crane.position.y = size * 0.8; // Extending from one side
+          crane.position.z = size * 1.3; // Above the deck
+          rigGroup.add(crane);
+        }
+      }
+    });
+
+    console.log('🚁 ALL 3D RIGS layer added to map - NO MORE CIRCLES!');
+  }
+
+  /**
+   * 🛢️ ADD 3D RIGS ON TOP - Don't touch the beautiful original 2D styling!
+   */
+  add3DRigsOnTopOfExistingLayers() {
+    console.log(`🚁 ADDING 3D rigs ON TOP of existing beautiful layers!`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ No map available`);
+      return;
+    }
+
+    // Clean up ONLY our 3D layer (don't touch original 2D layers!)
+    if (map.getLayer('additive-3d-rigs-layer')) {
+      console.log('🧹 Removing only our 3D layer, keeping original beautiful styling');
+      map.removeLayer('additive-3d-rigs-layer');
+    }
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Three.js available - adding 3D models ON TOP of original styling`);
+
+    // Get more platforms for testing (increased from 20 to 100)
+    const rigsFor3D = this.platforms.filter(p => 
+      p.coordinates && p.coordinates.length === 2
+    ).slice(0, 100); // More rigs now that we have better performance
+
+    console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs ON TOP of existing styling`);
+
+    if (rigsFor3D.length === 0) {
+      console.log('❌ No rigs found');
+      return;
+    }
+
+    // Store rig data for the layer
+    const rigData = rigsFor3D.map(rig => ({
+      coordinates: rig.coordinates,
+      name: rig.name,
+      type: rig.hasFuel ? 'fuel' : 
+            rig.isPlatform ? 'platform' :
+            rig.isBlocks ? 'blocks' :
+            rig.isMovable ? 'mobile' : 'other'
+    }));
+
+    // Add Three.js custom layer ADDITIVELY (don't replace anything)
+    map.addLayer({
+      id: 'additive-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🚁 Initializing ADDITIVE 3D RIGS layer - keeping original styling!');
+        
+        // Create Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // Use Mapbox's WebGL context
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create simple 3D models that complement the original styling
+        rigData.forEach((rig, index) => {
+          this.createSimple3DRig(rig, index);
+        });
+
+        console.log(`✅ ADDITIVE 3D RIGS layer initialized - original styling preserved!`);
+      },
+
+      render: function(gl, matrix) {
+        // Simple camera setup
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        
+        // Render 3D models on top of original styling
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createSimple3DRig: function(rig, index) {
+        const [lng, lat] = rig.coordinates;
+        
+        // Convert to world coordinates 
+        const worldCoords = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        
+        // SUPER SIMPLE: One leg + flat top - FORCE VERTICAL ORIENTATION
+        const rigGroup = new THREE.Group();
+        const size = 0.00003; // Small but visible
+        
+        // 1. ONE VERTICAL LEG (cylinder) - SHORTER LEG
+        const legGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 2, 6); // Reduced from size * 3 to size * 2
+        const legMaterial = new THREE.MeshBasicMaterial({ color: 0x444444 }); // Dark gray
+        const leg = new THREE.Mesh(legGeometry, legMaterial);
+        
+        // ROTATE CYLINDER TO BE VERTICAL (Three.js cylinders are horizontal by default)
+        leg.rotation.x = Math.PI / 2; // Rotate 90 degrees to make it stand up
+        leg.rotation.y = 0;
+        leg.rotation.z = 0;
+        leg.position.x = 0; // Centered
+        leg.position.y = 0; // Centered  
+        leg.position.z = size * 1; // Adjust for shorter leg
+        rigGroup.add(leg);
+
+        // 2. FLAT TOP (simple box on top) - ADJUST FOR SHORTER LEG
+        const deckGeometry = new THREE.BoxGeometry(size * 1.5, size * 1.5, size * 0.2);
+        const deckMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 }); // Gray
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        
+        // FORCE HORIZONTAL ORIENTATION
+        deck.rotation.x = 0; // No rotation - should be flat
+        deck.rotation.y = 0; // No rotation
+        deck.rotation.z = 0; // No rotation
+        deck.position.x = 0; // Centered on leg
+        deck.position.y = 0; // Centered on leg
+        deck.position.z = size * 2.1; // On top of shorter leg
+        rigGroup.add(deck);
+
+        // 3. TINY GREEN HELIPAD DOT on top (cylinder lying FLAT on deck)
+        const helipadGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 0.05, 6);
+        const helipadMaterial = new THREE.MeshBasicMaterial({ color: 0x00AA00 }); // Green
+        const helipad = new THREE.Mesh(helipadGeometry, helipadMaterial);
+        
+        // ROTATE HELIPAD TO LIE FLAT (same rotation as the leg but opposite direction)
+        helipad.rotation.x = Math.PI / 2; // Rotate 90 degrees to make it flat like a landing pad
+        helipad.rotation.y = 0;
+        helipad.rotation.z = 0;
+        helipad.position.x = 0;
+        helipad.position.y = 0;
+        helipad.position.z = size * 2.25; // On top of deck
+        rigGroup.add(helipad);
+
+        // REMOVED: Nameplate boxes - too big and no text capability yet
+        // TODO: Add proper text rendering later - Three.js text is complex
+
+        // FORCE THE ENTIRE GROUP TO BE UPRIGHT
+        rigGroup.rotation.x = 0;
+        rigGroup.rotation.y = 0;
+        rigGroup.rotation.z = 0;
+
+        // Position in world space - MOVE ENTIRE RIG SO DECK IS AT GROUND LEVEL
+        rigGroup.position.x = worldCoords.x;
+        rigGroup.position.y = worldCoords.y;
+        rigGroup.position.z = -size * 2.1; // Move rig DOWN by deck height so deck ends up at z=0
+        
+        this.scene.add(rigGroup);
+        
+        if (index < 5) {
+          console.log(`✅ Added rig for ${rig.name} - deck should be at ground level for pin landing!`);
+        }
+      }
+    });
+
+    console.log('🚁 ADDITIVE 3D layer added - original beautiful styling PRESERVED!');
+    
+    // REMOVED: Flashing Mapbox labels - using physical nameplates instead
   }
 }
 

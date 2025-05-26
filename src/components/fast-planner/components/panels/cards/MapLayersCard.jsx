@@ -323,6 +323,41 @@ const MapLayersCard = ({
           {renderLayerToggle('vfrCharts', 'VFR Charts', !!vfrChartsRef?.current)}
         </div>
         
+        <div className="layer-section">
+          <h4>Map View</h4>
+          <div className="map-view-controls">
+            <button 
+              className="map-3d-toggle-button"
+              onClick={async () => {
+                try {
+                  console.log('🗺️ Testing 3D map style switch...');
+                  
+                  const mapManager = mapManagerRef?.current;
+                  if (!mapManager) {
+                    alert('Map manager not available');
+                    return;
+                  }
+                  
+                  // Toggle between dark and 3D style
+                  const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
+                  const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+                  
+                  console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
+                  
+                  await mapManager.switchMapStyle(newStyle);
+                  alert(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : 'Dark'} style!`);
+                  
+                } catch (error) {
+                  console.error('3D map switch failed:', error);
+                  alert('3D map switch failed: ' + error.message);
+                }
+              }}
+            >
+              🗺️ Toggle 3D Map
+            </button>
+          </div>
+        </div>
+        
         <div className="layer-info">
           <p>* Layers marked with an asterisk are not available in the current region.</p>
         </div>
