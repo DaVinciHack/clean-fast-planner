@@ -118,6 +118,9 @@
   border-radius: 8px;
   padding: 16px;
   margin-top: 20px;
+  /* Ensure proper scrolling within panel constraints */
+  max-height: none; /* Let the parent panel handle overflow */
+  overflow: visible; /* Allow content to flow naturally */
 }
 
 .cost-breakdown-section h4 {
