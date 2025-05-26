@@ -1,6 +1,7 @@
 // src/components/fast-planner/hooks/useUIControls.js
 
 import { useState, useEffect } from 'react';
+import useScreenSize from './useScreenSize';
 
 /**
  * Custom hook for managing UI control state and interactions
@@ -14,6 +15,9 @@ const useUIControls = ({
   routeInput,
   setRouteInput
 }) => {
+  // Screen size detection
+  const { isSmallScreen } = useScreenSize();
+  
   // UI panel visibility state
   const [leftPanelVisible, setLeftPanelVisible] = useState(false);
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
@@ -54,11 +58,287 @@ const useUIControls = ({
     }
   }, [appSettingsManagerRef]);
 
+  // Clean iPad auto-hide: Close left panel on small screens (runs after all loading)
+  useEffect(() => {
+    if (isSmallScreen) {
+      // Wait for all loading and settings to complete before checking
+      const timer = setTimeout(() => {
+        console.log('📱 iPad detected - checking panel state after loading');
+        
+        // Check both state AND visual position
+        const panel = document.querySelector('.route-editor-panel');
+        const rect = panel?.getBoundingClientRect();
+        const isVisuallyOpen = rect && rect.left >= 0;
+        
+        console.log('Panel check:', { 
+          leftPanelVisible, 
+          isVisuallyOpen,
+          panelLeft: rect?.left 
+        });
+        
+        // Close if either state says open OR panel is visually open
+        if (leftPanelVisible || isVisuallyOpen) {
+          console.log('Panel needs closing - doing it now');
+          setLeftPanelVisible(false);
+          
+          // Force slide-out animation
+          if (panel) {
+            panel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          }
+          
+          // Save the setting
+          if (appSettingsManagerRef?.current) {
+            appSettingsManagerRef.current.updateUISettings({
+              leftPanelVisible: false
+            });
+          }
+        } else {
+          console.log('Panel is properly closed - good!');
+        }
+      }, 2000); // Wait 2 seconds for all loading to complete
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isSmallScreen]); // Only depend on isSmallScreen, not leftPanelVisible
+
+  // Clean iPad auto-hide: Close RIGHT panel on small screens (runs after all loading) 
+  useEffect(() => {
+    if (isSmallScreen) {
+      // Wait for all loading and settings to complete before checking
+      const timer = setTimeout(() => {
+        console.log('📱 iPad detected - checking RIGHT panel state after loading');
+        
+        // Check both state AND visual position
+        const panel = document.querySelector('.info-panel');
+        const rect = panel?.getBoundingClientRect();
+        const isVisuallyOpen = rect && rect.right <= window.innerWidth;
+        
+        console.log('RIGHT Panel check:', { 
+          rightPanelVisible, 
+          isVisuallyOpen,
+          panelRight: rect?.right 
+        });
+        
+        // Close if either state says open OR panel is visually open
+        if (rightPanelVisible || isVisuallyOpen) {
+          console.log('RIGHT Panel needs closing - doing it now');
+          setRightPanelVisible(false);
+          
+          // Force slide-out animation
+          if (panel) {
+            panel.style.animation = 'slideOutToRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          }
+          
+          // Save the setting
+          if (appSettingsManagerRef?.current) {
+            appSettingsManagerRef.current.updateUISettings({
+              rightPanelVisible: false
+            });
+          }
+        } else {
+          console.log('RIGHT Panel is properly closed - good!');
+        }
+      }, 2000); // Wait 2 seconds for all loading to complete
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isSmallScreen]); // Only depend on isSmallScreen, not rightPanelVisible
+
+  // iPad map click: Open panel when map is clicked (for adding waypoints)
+  useEffect(() => {
+    if (!isSmallScreen) return; // Only on iPad/small screens
+    
+    console.log('🗺️ Setting up map click detection for iPad');
+    
+    const handleMapClick = (e) => {
+      // Only open if clicking on the map area (not on panels or controls)
+      const isMapArea = e.target.closest('.leaflet-container') || e.target.closest('canvas');
+      
+      if (isMapArea && !leftPanelVisible) {
+        console.log('🗺️ Map clicked - opening panel for waypoint');
+        setLeftPanelVisible(true);
+        
+        // Save the setting
+        if (appSettingsManagerRef?.current) {
+          appSettingsManagerRef.current.updateUISettings({
+            leftPanelVisible: true
+          });
+        }
+        
+        // Trigger slide-in animation
+        const panel = document.querySelector('.route-editor-panel');
+        if (panel) {
+          panel.style.animation = 'slideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+        }
+      }
+    };
+    
+    // Add click listener
+    document.addEventListener('click', handleMapClick);
+    
+    return () => {
+      console.log('🧹 Removing map click listener');
+      document.removeEventListener('click', handleMapClick);
+    };
+  }, [isSmallScreen, leftPanelVisible, appSettingsManagerRef]);
+
+  // iPad hover logic: Open on left edge, close when mouse leaves panel
+  useEffect(() => {
+    if (!isSmallScreen) return; // Only on iPad/small screens
+    
+    console.log('🖱️ Setting up hover interactions for iPad');
+    
+    let closeTimer = null;
+    
+    const handleMouseMove = (e) => {
+      const isNearLeftEdge = e.clientX < 50; // Within 50px of left edge for opening
+      const isInLeftPanelArea = e.clientX < 350; // Within 350px of left edge for staying open
+      
+      // Open panel if mouse near left edge and panel is closed
+      if (isNearLeftEdge && !leftPanelVisible) {
+        console.log('🖱️ Mouse near left edge - opening panel');
+        setLeftPanelVisible(true);
+        
+        // Save setting and trigger animation (same as toggle)
+        if (appSettingsManagerRef?.current) {
+          appSettingsManagerRef.current.updateUISettings({
+            leftPanelVisible: true
+          });
+        }
+        
+        const panel = document.querySelector('.route-editor-panel');
+        if (panel) {
+          panel.style.animation = 'slideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+        }
+        
+        // Clear any pending close timer
+        if (closeTimer) {
+          clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      }
+      // Start close timer if mouse leaves left panel area
+      else if (!isInLeftPanelArea && leftPanelVisible && !closeTimer) {
+        console.log('🖱️ Mouse left LEFT panel area - starting close timer');
+        
+        closeTimer = setTimeout(() => {
+          console.log('🖱️ Closing LEFT panel after timeout');
+          setLeftPanelVisible(false);
+          
+          if (appSettingsManagerRef?.current) {
+            appSettingsManagerRef.current.updateUISettings({
+              leftPanelVisible: false
+            });
+          }
+          
+          const panel = document.querySelector('.route-editor-panel');
+          if (panel) {
+            panel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          }
+          closeTimer = null;
+        }, 1000);
+      }
+      // Cancel close timer if mouse re-enters left area
+      else if (isInLeftPanelArea && closeTimer) {
+        console.log('🖱️ Mouse back in LEFT area - canceling close');
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+    };
+    
+    // Add event listeners - only mousemove needed now
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      console.log('🧹 Removing LEFT panel hover listeners');
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (closeTimer) clearTimeout(closeTimer);
+    };
+  }, [isSmallScreen, leftPanelVisible, appSettingsManagerRef]);
+
+  // RIGHT panel hover logic: Open on right edge, close when mouse leaves panel
+  useEffect(() => {
+    if (!isSmallScreen) return; // Only on iPad/small screens
+    
+    console.log('🖱️ Setting up RIGHT panel hover interactions for iPad');
+    
+    let closeTimer = null;
+    
+    const handleMouseMove = (e) => {
+      const isNearRightEdge = e.clientX > (window.innerWidth - 50); // Within 50px of right edge for opening
+      const isInRightPanelArea = e.clientX > (window.innerWidth - 350); // Within 350px of right edge for staying open
+      
+      // Open panel if mouse near right edge and panel is closed
+      if (isNearRightEdge && !rightPanelVisible) {
+        console.log('🖱️ Mouse near RIGHT edge - opening panel');
+        setRightPanelVisible(true);
+        
+        // Save setting and trigger animation (same as toggle)
+        if (appSettingsManagerRef?.current) {
+          appSettingsManagerRef.current.updateUISettings({
+            rightPanelVisible: true
+          });
+        }
+        
+        const panel = document.querySelector('.info-panel');
+        if (panel) {
+          panel.style.animation = 'slideInFromRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+        }
+        
+        // Clear any pending close timer
+        if (closeTimer) {
+          clearTimeout(closeTimer);
+          closeTimer = null;
+        }
+      }
+      // Start close timer if mouse leaves right panel area
+      else if (!isInRightPanelArea && rightPanelVisible && !closeTimer) {
+        console.log('🖱️ Mouse left RIGHT panel area - starting close timer');
+        
+        closeTimer = setTimeout(() => {
+          console.log('🖱️ Closing RIGHT panel after timeout');
+          setRightPanelVisible(false);
+          
+          if (appSettingsManagerRef?.current) {
+            appSettingsManagerRef.current.updateUISettings({
+              rightPanelVisible: false
+            });
+          }
+          
+          const panel = document.querySelector('.info-panel');
+          if (panel) {
+            panel.style.animation = 'slideOutToRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          }
+          closeTimer = null;
+        }, 1000);
+      }
+      // Cancel close timer if mouse re-enters right area
+      else if (isInRightPanelArea && closeTimer) {
+        console.log('🖱️ Mouse back in RIGHT area - canceling close');
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+    };
+    
+    // Add event listeners - only mousemove needed now
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      console.log('🧹 Removing RIGHT panel hover listeners');
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (closeTimer) clearTimeout(closeTimer);
+    };
+  }, [isSmallScreen, rightPanelVisible, appSettingsManagerRef]);
+
   /**
    * Toggles the left panel visibility
    */
   const toggleLeftPanel = () => {
+    console.log('🔄 toggleLeftPanel called:', { currentState: leftPanelVisible, isSmallScreen });
+    
     const newState = !leftPanelVisible;
+    console.log('🔄 Setting new state:', newState);
+    
     setLeftPanelVisible(newState);
 
     // Save to settings
@@ -66,6 +346,7 @@ const useUIControls = ({
       appSettingsManagerRef.current.updateUISettings({
         leftPanelVisible: newState
       });
+      console.log('💾 Saved to settings:', newState);
     }
 
     // Trigger animation by adding and removing classes
@@ -73,9 +354,11 @@ const useUIControls = ({
     if (panel) {
       if (newState) {
         // Panel becoming visible - slide in
+        console.log('📤 Triggering slide-in animation');
         panel.style.animation = 'slideInFromLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
       } else {
         // Panel becoming hidden - slide out
+        console.log('📥 Triggering slide-out animation');
         panel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
       }
     }

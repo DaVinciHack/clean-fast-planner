@@ -2153,3 +2153,22 @@
   margin-top: 4px;
   margin-bottom: 12px;
 }
+
+/* iPad Auto-Hide Panel Behavior - Phase 1: CSS Foundation */
+@media (max-width: 1600px) {
+/* Removed auto-hide CSS rules - using simple toggle approach instead */
+  
+  /* Right panel auto-hide */
+  .info-panel.auto-hide {
+    transform: translateX(320px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+  }
+  
+  .info-panel.auto-hide.show {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
