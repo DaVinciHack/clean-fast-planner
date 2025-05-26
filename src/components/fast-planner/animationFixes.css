@@ -48,7 +48,8 @@
   padding: 20px;
   border-radius: 10px;
   max-width: 350px;
-  max-height: calc(100vh - 30px);
+  min-height: 200px; /* Minimum height for small content */
+  max-height: calc(100vh - 175px); /* Matched to left panel's internal spacing */
   overflow-y: auto;
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
   border-left: 1px solid var(--border-color);
