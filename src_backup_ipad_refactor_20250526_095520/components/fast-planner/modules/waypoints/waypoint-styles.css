@@ -1,0 +1,168 @@
+/* 
+ * waypoint-styles.css
+ * 
+ * Enhanced styling for waypoints in the Fast Planner application.
+ * This file provides distinct styling for waypoints vs stops.
+ */
+
+/* Enhance markers for waypoints and stops */
+/* Disable all transitions and animations for waypoint markers to prevent flying */
+.mapboxgl-marker[data-marker-type="waypoint"] {
+  filter: drop-shadow(0 0 3px rgba(186, 85, 211, 0.8)) !important; /* Brighter purple shadow */
+  transition: none !important; /* Disable all transitions */
+  width: 16px !important; /* Make them larger */
+  height: 16px !important;
+  background-color: #BA55D3 !important; /* Brighter medium purple */
+  border-radius: 0 !important; /* Not a circle anymore, will be a star */
+  pointer-events: auto !important;
+  /* REMOVED: transform: none !important; - This breaks positioning */
+  animation: none !important; /* Disable all animations */
+  /* REMOVED: position: absolute !important; - This breaks positioning */
+  /* Remove any margins that might cause offset */
+  margin: 0 !important;
+  padding: 0 !important;
+  /* Create star shape with clip-path */
+  clip-path: polygon(
+    50% 0%, 
+    61% 35%, 
+    98% 35%, 
+    68% 57%, 
+    79% 91%, 
+    50% 70%, 
+    21% 91%, 
+    32% 57%, 
+    2% 35%, 
+    39% 35%
+  ) !important;
+}
+
+/* Remove the hover effect completely for waypoints */
+.mapboxgl-marker[data-marker-type="waypoint"]:hover {
+  /* REMOVED: transform: none !important; - This breaks positioning */
+  filter: none !important;
+  /* Keep the z-index higher on hover to ensure it's above other elements */
+  z-index: 10 !important;
+}
+
+/* Adjust marker sizes based on zoom level */
+.mapboxgl-map[data-zoom-level="low"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 3px !important;
+  height: 3px !important;
+}
+
+.mapboxgl-map[data-zoom-level="medium"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+.mapboxgl-map[data-zoom-level="high"] .mapboxgl-marker[data-marker-type="waypoint"] {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+/* Waypoint labels visibility based on zoom */
+.mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: none; /* Hide by default */
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background-color: rgba(50, 50, 50, 0.8); /* Dark grey background */
+  color: #e0e0e0; /* Light grey text */
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 8px;
+  margin-bottom: 3px;
+  pointer-events: none;
+  border: 1px solid rgba(128, 0, 128, 0.7); /* Purple border */
+}
+
+/* Show labels at higher zoom levels */
+.mapboxgl-map[data-zoom-level="medium"] .mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: block;
+  font-size: 7px;
+}
+
+.mapboxgl-map[data-zoom-level="high"] .mapboxgl-marker[data-marker-type="waypoint"] .marker-label {
+  display: block;
+  font-size: 9px;
+  padding: 3px 6px;
+}
+
+/* Waypoint mode indicator */
+body.waypoint-mode-active {
+  cursor: crosshair;
+}
+
+body.waypoint-mode-active .waypoint-mode-button {
+  background-color: #BA55D3 !important; /* Medium purple */
+  color: #e0e0e0 !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 5px rgba(186, 85, 211, 0.7) !important;
+}
+
+body.waypoint-mode-active .map-container::after {
+  content: "WAYPOINT MODE";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(186, 85, 211, 0.9); /* Medium purple */
+  color: #e0e0e0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-weight: bold;
+  z-index: 1000;
+  pointer-events: none;
+  animation: pulse 2s infinite;
+}
+
+/* Pulsing animation for waypoint mode indicator */
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* Enhance popups for waypoints and stops */
+.waypoint-popup .mapboxgl-popup-content {
+  border-left: 4px solid #BA55D3 !important; /* Medium purple border */
+  background-color: rgba(30, 30, 30, 0.95) !important; /* Very dark background */
+  color: #e0e0e0 !important; /* Light grey text */
+  padding: 8px !important;
+  border-radius: 4px !important;
+}
+
+.waypoint-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(30, 30, 30, 0.95) !important; /* Match popup background */
+  border-bottom-color: rgba(30, 30, 30, 0.95) !important; /* Match popup background */
+}
+
+.stop-popup .mapboxgl-popup-content {
+  border-left: 4px solid #FF4136 !important;
+  background-color: rgba(30, 30, 30, 0.95) !important; /* Match the waypoint popup style */
+  color: #e0e0e0 !important;
+  padding: 8px !important;
+  border-radius: 4px !important;
+}
+
+.stop-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(30, 30, 30, 0.95) !important; /* Match popup background */
+  border-bottom-color: rgba(30, 30, 30, 0.95) !important; /* Match popup background */
+}
+
+/* Add styling for text in waypoint popups */
+.waypoint-popup .mapboxgl-popup-content strong,
+.waypoint-popup .mapboxgl-popup-content span,
+.stop-popup .mapboxgl-popup-content strong,
+.stop-popup .mapboxgl-popup-content span {
+  color: #e0e0e0 !important; /* Light grey text */
+}
+
+/* Route label styling */
+.waypoint-leg-label {
+  color: #BA55D3 !important; /* Medium purple text */
+  font-style: italic !important;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.7) !important; /* Add shadow for readability */
+}

@@ -1,0 +1,86 @@
+/* 
+ * clean-styles.css
+ * Clean styling for proper panel handling without conflicting with map
+ */
+
+/* Ensure panels are above the map and receive proper interaction events */
+.left-panel, .right-panel, .route-stats-card {
+  position: relative !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure child elements in panels receive interaction events */
+.left-panel *, .right-panel *, .route-stats-card * {
+  pointer-events: auto !important;
+}
+
+/* Special handling for controls and inputs */
+.left-panel input,
+.left-panel button,
+.left-panel select,
+.right-panel input,
+.right-panel button,
+.right-panel select,
+.route-stats-card button {
+  z-index: 101 !important;
+  position: relative !important;
+}
+
+/* Visual indicator for waypoint mode */
+body[data-waypoint-mode="active"] .route-stats-card {
+  border-top: 2px solid #FFCC00 !important;
+}
+
+body[data-waypoint-mode="active"] .route-stats-header::after {
+  content: "WAYPOINT MODE";
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 10px;
+  background-color: #FFCC00;
+  color: #333;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+/* Make waypoint buttons visually distinct when active */
+button[data-waypoint-mode-button].active,
+.waypoint-mode-toggle.active {
+  background-color: #FFCC00 !important;
+  color: #333 !important;
+  font-weight: bold !important;
+  box-shadow: 0 0 5px rgba(255, 204, 0, 0.7) !important;
+}
+
+/* Styling for different waypoint types */
+.waypoint-item[data-point-type="NAVIGATION_WAYPOINT"],
+.waypoint-item.navigation-point {
+  background-color: rgba(255, 204, 0, 0.1) !important;
+  border-left: 3px solid #FFCC00 !important;
+}
+
+.waypoint-item[data-point-type="LANDING_STOP"],
+.waypoint-item.landing-stop {
+  background-color: rgba(255, 65, 54, 0.05) !important;
+  border-left: 3px solid #FF4136 !important;
+}
+
+/* Ensure map receives proper events when no panels are active */
+.maplibregl-canvas-container,
+.mapboxgl-canvas-container {
+  pointer-events: auto;
+}
+
+/* Only when panels are open, restrict map clicks */
+body.panel-open .maplibregl-canvas-container,
+body.panel-open .mapboxgl-canvas-container {
+  pointer-events: none;
+}
+
+/* But still allow clicks on map controls */
+body.panel-open .maplibregl-ctrl-group,
+body.panel-open .mapboxgl-ctrl-group {
+  pointer-events: auto !important;
+}

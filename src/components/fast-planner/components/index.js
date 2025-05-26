@@ -10,6 +10,7 @@ import RegionSelector from './controls/RegionSelector';
 import RouteStatsCard from './flight/RouteStatsCard';
 import SimpleRouteStatsCard from './flight/SimpleRouteStatsCard';
 import FlightSettings from './flight/FlightSettings';
+import AppHeader from './layout/AppHeader';
 
 export {
   LeftPanel,
@@ -19,5 +20,6 @@ export {
   RegionSelector,
   RouteStatsCard,
   SimpleRouteStatsCard,
-  FlightSettings
+  FlightSettings,
+  AppHeader
 };

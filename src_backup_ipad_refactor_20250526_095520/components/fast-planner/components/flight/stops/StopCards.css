@@ -1,0 +1,323 @@
+/* StopCards.css */
+.stop-cards-container {
+  margin-top: 5px;
+  padding-top: 2px;
+}
+
+.stop-cards-header {
+  margin-bottom: 10px;
+  padding-left: 3px;
+}
+
+.stop-cards-header h4 {
+  margin: 0;
+  color: #3498db;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Stop cards container for FLIP animations */
+.stop-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 5px;
+  padding-bottom: 5px;
+  position: relative; /* Important for absolute positioning during animation */
+}
+
+/* Base card styling */
+.stop-card {
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
+  border-left: 3px solid #34495e;
+  border-radius: 3px;
+  padding: 8px 10px;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease,
+              background-color 0.3s ease;
+  will-change: transform, opacity;
+  z-index: 1;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Special styles for departure card */
+.stop-card.departure-card {
+  border-left-color: #3498db;
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
+}
+
+.stop-card.departure-card .stop-number {
+  background-color: #3498db;
+}
+
+.stop-card.departure-card:hover {
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
+}
+
+/* Special styles for destination card */
+.stop-card.destination-card {
+  border-left-color: #2ecc71;
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
+}
+
+.stop-card.destination-card .stop-number {
+  background-color: #2ecc71;
+}
+
+.stop-card.destination-card:hover {
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
+}
+
+/* Fuel components section */
+.fuel-components {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fuel-components-text {
+  font-size: 0.7em;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Animation states */
+.stop-card.moving {
+  z-index: 2;
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); 
+}
+
+.stop-card.new-card {
+  animation: cardAppear 0.3s ease-out;
+}
+
+.stop-card.removing {
+  animation: cardRemove 0.3s ease-in forwards;
+}
+
+.stop-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  position: relative;
+  width: 100%;
+}
+
+.stop-number {
+  background-color: #3498db;
+  color: white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75em;
+  font-weight: bold;
+  margin-right: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.stop-name {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  margin-right: 8px;
+}
+
+.stop-wind {
+  font-size: 0.7em;
+  margin-left: auto;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 2px 5px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.wind-value {
+  color: #f5f5f5;
+}
+
+.wind-value[data-positive="true"] {
+  color: #e74c3c;
+}
+
+.wind-value[data-negative="true"] {
+  color: #2ecc71;
+}
+
+.stop-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+  margin-top: 0;
+  width: 100%;
+}
+
+.stop-metric {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.stop-metric .icon {
+  font-size: 0.8em;
+  color: #3498db;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+  flex-shrink: 0;
+}
+
+/* Special icon colors for departure */
+.departure-card .stop-metric .icon {
+  color: #2ecc71;
+}
+
+/* Special icon colors for destination */
+.destination-card .stop-metric .icon {
+  color: #e74c3c;
+}
+
+.metric-value {
+  font-size: 0.75em;
+  font-weight: 500;
+  color: #f5f5f5;
+  display: flex;
+  align-items: center;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leg-value {
+  font-weight: 600;
+}
+
+.total-value {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9em;
+  margin-left: 3px;
+}
+
+.stop-metric.wind-info .metric-value {
+  color: #f5f5f5;
+}
+
+/* Style headwind and tailwind differently */
+.stop-metric.wind-info[title*="kts"] .metric-value {
+  position: relative;
+}
+
+/* Color based on headwind/tailwind value */
+.metric-value[data-positive="true"] {
+  color: #e74c3c !important; /* Red for headwind (slows you down) */
+}
+
+.metric-value[data-negative="true"] {
+  color: #2ecc71 !important; /* Green for tailwind (speeds you up) */
+}
+
+/* Style for route stops container */
+.route-stops {
+  background-color: rgba(35, 35, 35, 0.85);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-top: 5px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Route stops header styling */
+.route-stops-title {
+  color: #3498db;
+  font-size: 0.85em;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.stop-card:hover {
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.stop-card-active {
+  background: linear-gradient(to bottom, rgba(50, 60, 75, 0.9), rgba(35, 45, 60, 0.9)); /* Slightly bluer when active */
+  border-left-color: #5dade2;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Special active styles for departure */
+.departure-card.stop-card-active {
+  border-left-color: #2980b9; /* Darker blue */
+  background-color: rgba(40, 55, 70, 0.95);
+}
+
+/* Special active styles for destination */
+.destination-card.stop-card-active {
+  border-left-color: #27ae60; /* Darker green */
+  background-color: rgba(40, 70, 55, 0.95);
+}
+
+/* Animation for new cards */
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animation for card removal */
+@keyframes cardRemove {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* Weather control styling */
+.weather-control-section {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background-color: rgba(30, 35, 40, 0.6);
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+}
+
+.weather-control-section h4 {
+  color: #3498db;
+  margin-top: 0;
+  margin-bottom: 5px;
+  font-size: 0.85em;
+}
+
+.weather-control-section .small-hint {
+  font-size: 0.7em;
+  color: #888;
+  margin-top: 2px;
+}

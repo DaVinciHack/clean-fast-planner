@@ -177,9 +177,306 @@
   position: relative;
   width: 100%;
   height: 100vh;
-  background-color: var(--bg-color);
+  background: linear-gradient(135deg, 
+    #1a1a1a 0%,     /* Very dark gray */
+    #2d2d2d 25%,    /* Dark gray */
+    #3a3a3a 50%,    /* Medium gray */
+    #2f2f2f 75%,    /* Dark gray */
+    #1e1e1e 100%    /* Very dark gray */
+  );
+  background-size: 200% 200%;
+  animation: gradientFlow 30s ease-in-out infinite;
   color: var(--text-color);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Add very subtle flowing shape overlays */
+.fast-planner-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    ellipse at 25% 25%, 
+    rgba(60, 60, 60, 0.08) 0%, 
+    rgba(60, 60, 60, 0.03) 40%, 
+    transparent 70%
+  );
+  animation: floatingShape1 40s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.fast-planner-container::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -30%;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(
+    ellipse at 75% 75%, 
+    rgba(80, 80, 80, 0.06) 0%, 
+    rgba(80, 80, 80, 0.02) 50%, 
+    transparent 80%
+  );
+  animation: floatingShape2 45s ease-in-out infinite reverse;
+  pointer-events: none;
+}
+
+/* Smooth flowing animation */
+@keyframes gradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  25% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes floatingShape1 {
+  0%, 100% {
+    transform: rotate(0deg) translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: rotate(120deg) translate(30px, -20px) scale(1.1);
+  }
+  66% {
+    transform: rotate(240deg) translate(-20px, 30px) scale(0.9);
+  }
+}
+
+@keyframes floatingShape2 {
+  0%, 100% {
+    transform: rotate(0deg) translate(0px, 0px) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) translate(40px, 40px) scale(1.15);
+  }
+}
+
+/* iPad-friendly layout styles */
+.map-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 60px); /* Subtract header height */
+  padding: 15px 10px 20px 10px !important; /* Match left and right padding for consistent spacing */
+  background-color: transparent; /* Let the container background show through */
+  box-sizing: border-box; /* Ensure padding is included in width calculation */
+}
+
+.fast-planner-map {
+  position: relative;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1;
+  border-radius: 16px; /* Slightly larger radius for more dramatic card effect */
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); /* Slightly lighter shadow to let gradient show */
+}
+
+/* Ensure Mapbox canvas fills the container */
+.fast-planner-map .mapboxgl-canvas-container,
+.fast-planner-map .mapboxgl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Map Loading Bar Styles - controlled visibility */
+.map-loading-container {
+  position: absolute;
+  width: calc(100% - 40px);
+  height: 4px;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: transparent;
+  top: 15px;
+  left: 20px;
+  z-index: 1000;
+  border: none;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.map-loading-container.loading {
+  opacity: 1;
+}
+
+.map-loading-container.finishing {
+  animation: fadeOut 0.5s ease-out forwards;
+}
+
+.map-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(to right, 
+    rgba(0, 180, 255, 0) 0%, 
+    rgba(0, 200, 255, 0.7) 35%, 
+    rgba(190, 255, 255, 1) 50%, 
+    rgba(0, 200, 255, 0.7) 65%, 
+    rgba(0, 180, 255, 0) 100%
+  );
+  width: 40%;
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(0, 200, 255, 0.5);
+}
+
+.map-loading-container.loading .map-loading-bar {
+  animation: smooth-scroll 1.5s infinite linear;
+}
+
+.map-loading-container.finishing .map-loading-bar {
+  animation: smooth-scroll 1.5s infinite linear, fadeOut 1.5s ease-out forwards;
+}
+
+/* Fade out animation for graceful finish */
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Simple, smooth animation - just position movement */
+@keyframes smooth-scroll {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(250%); }
+}
+
+@keyframes map-elastic-scroll {
+  0% {
+    left: -30%;
+    width: 20%;
+  }
+  20% {
+    left: -15%;
+    width: 40%;
+  }
+  40% {
+    left: 10%;
+    width: 55%;
+  }
+  60% {
+    left: 40%;
+    width: 45%;
+  }
+  80% {
+    left: 70%;
+    width: 25%;
+  }
+  100% {
+    left: 100%;
+    width: 15%;
+  }
+}
+
+/* Pulsing glow effect */
+@keyframes map-pulse-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 8px rgba(0, 200, 255, 0.3),
+      0 0 16px rgba(0, 200, 255, 0.1);
+    filter: blur(0.5px);
+  }
+  50% {
+    box-shadow: 
+      0 0 12px rgba(0, 200, 255, 0.5),
+      0 0 24px rgba(0, 200, 255, 0.2),
+      0 0 36px rgba(0, 200, 255, 0.1);
+    filter: blur(0.3px);
+  }
+}
+
+/* Shimmer overlay effect */
+@keyframes map-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Enhanced loading bar with shimmer overlay */
+.map-loading-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 30%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.4) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: map-shimmer 3.6s infinite linear;
+  border-radius: 2px;
+}
+
+/* Completion animation - sweeps to 100% then fades */
+@keyframes map-complete-scroll {
+  0% {
+    left: var(--current-position, 50%);
+    width: 35%;
+    opacity: 1;
+  }
+  70% {
+    left: 100%;
+    width: 25%;
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    width: 0%;
+    opacity: 0;
+  }
+}
+
+.map-loading-bar.finishing {
+  animation: map-complete-scroll 1.2s forwards cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* Variable speed loading bar for different loading states */
+.map-loading-bar.loading-fast {
+  animation-duration: 1.6s, 0.8s, 2.4s;
+}
+
+.map-loading-bar.loading-slow {
+  animation-duration: 3.2s, 1.6s, 4.8s;
+}
+
+.map-loading-bar.loading-critical {
+  animation: 
+    map-elastic-scroll 1.0s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    map-pulse-glow 0.6s infinite ease-in-out,
+    map-shimmer 1.8s infinite linear;
+  background: linear-gradient(to right, 
+    rgba(255, 100, 0, 0) 0%, 
+    rgba(255, 150, 0, 0.4) 20%,
+    rgba(255, 200, 0, 0.7) 35%, 
+    rgba(255, 255, 100, 1) 50%, 
+    rgba(255, 200, 0, 0.7) 65%, 
+    rgba(255, 150, 0, 0.4) 80%,
+    rgba(255, 100, 0, 0) 100%
+  );
 }
 
 /* Panel visibility toggle - improved visibility */
@@ -213,7 +510,7 @@
 
 .left-panel-tab {
   left: 0;
-  top: 50px; /* Fixed position at exactly the same height as right panel tab */
+  top: 110px; /* Move below header + some spacing for visibility */
   transform: none; /* Remove the vertical centering */
   border-radius: 0 5px 5px 0; /* Rounded corners on right side */
   border-left: none;
@@ -222,7 +519,7 @@
 }
 
 .right-panel-tab {
-  right: 0;
+  right: 0; /* Back to edge now that map has proper spacing */
   border-radius: 5px 0 0 5px; /* Rounded corners on left side */
   border-right: none;
 }
@@ -526,10 +823,10 @@
 /* Initial animation for route editor panel */
 .route-editor-panel {
   position: absolute;
-  top: 15px;
-  left: 15px;
+  top: 90px; /* Move further down to account for new map spacing */
+  left: 25px; /* Adjust to work with reduced map padding */
   width: 300px;
-  max-height: calc(100vh - 30px);
+  max-height: calc(100vh - 120px); /* Better mobile height calculation */
   background: linear-gradient(to bottom, 
     rgba(60, 60, 60, 0.95) 0%, 
     rgba(45, 45, 45, 0.85) 30%, 
@@ -870,14 +1167,13 @@
 }
 
 .fast-planner-map {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   width: 100%;
   height: 100%;
   z-index: 1;
+  border-radius: 12px; /* Rounded corners for card effect */
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
 
 /* Make info panel smaller to accommodate route editor */
@@ -906,10 +1202,11 @@
   }
 }
 
+/* MAIN INFO PANEL POSITIONING - must be last to override other rules */
 .info-panel {
-  position: absolute;
-  top: 15px;
-  right: 45px;
+  position: absolute !important;
+  top: 90px !important; /* Match left panel height */
+  right: 40px !important;
   z-index: 2;
   background: linear-gradient(to bottom, 
     rgba(60, 60, 60, 0.95) 0%, 
@@ -921,7 +1218,7 @@
   padding: 20px;
   border-radius: 10px;
   max-width: 350px;
-  max-height: calc(100vh - 30px);
+  max-height: calc(100vh - 120px); /* Better mobile height calculation */
   overflow-y: auto;
   box-shadow: 0 4px 15px rgba(0,0,0,0.4);
   border-left: 1px solid var(--border-color);

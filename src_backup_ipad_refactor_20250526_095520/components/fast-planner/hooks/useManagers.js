@@ -1,0 +1,672 @@
+// src/components/fast-planner/hooks/useManagers.js
+
+import { useRef, useEffect, useState } from 'react';
+import {
+  MapManager,
+  WaypointManager,
+  PlatformManager,
+  RouteCalculator,
+  RegionManager,
+  FavoriteLocationsManager,
+  AircraftManager,
+  MapInteractionHandler,
+  AppSettingsManager
+} from '../modules';
+import FlightCalculations from '../modules/calculations/FlightCalculations';
+import { createWaypointInsertionManager, setupWaypointCallbacks, patchWaypointManager } from '../modules/waypoints';
+import * as WindCalc from '../modules/calculations/WindCalculations';
+import WaypointHandler from '../modules/WaypointHandler';
+
+/**
+ * Custom hook to initialize and manage all manager instances
+ * 
+ * Region management has been moved to RegionContext
+ */
+const useManagers = ({
+  client,
+  setFavoriteLocations,
+  setWaypoints,
+  flightSettings,
+  setFlightSettings,
+  forceUpdate,
+  setForceUpdate,
+  addWaypoint,
+  weather,
+  setWeather
+}) => {
+  // Local state for aircraft loading - no longer dependent on parent component
+  const [localAircraftLoading, setLocalAircraftLoading] = useState(false);
+  
+  // Core managers refs
+  const mapManagerRef = useRef(null);
+  const waypointManagerRef = useRef(null);
+  const platformManagerRef = useRef(null);
+  const routeCalculatorRef = useRef(null);
+  const regionManagerRef = useRef(null);
+  const favoriteLocationsManagerRef = useRef(null);
+  const aircraftManagerRef = useRef(null);
+  const flightCalculationsRef = useRef(null);
+  const waypointInsertionManagerRef = useRef(null);
+  const mapInteractionHandlerRef = useRef(null);
+  const appSettingsManagerRef = useRef(null);
+  const waypointHandlerRef = useRef(null);
+
+  // Track initialization status to prevent multiple initializations
+  const [managersInitialized, setManagersInitialized] = useState(false);
+
+  // Initialize managers
+  useEffect(() => {
+    // Skip if already initialized to prevent re-initialization loops
+    if (managersInitialized) {
+      console.log("FastPlannerApp: Managers already initialized, skipping initialization");
+      return;
+    }
+
+    console.log("FastPlannerApp: Initializing managers...");
+
+    // Check if OSDK client is available
+    if (!client) {
+      console.error("OSDK Client Error: client is null or undefined");
+      createErrorDialog();
+      return;
+    }
+
+    // Create MapManager
+    if (!mapManagerRef.current) {
+      console.log("FastPlannerApp: Creating MapManager instance");
+      mapManagerRef.current = new MapManager();
+      
+      // EMERGENCY FIX: Update global reference
+      window.mapManager = mapManagerRef.current;
+
+      // Don't initialize the map here - let MapComponent handle that
+      console.log("FastPlannerApp: MapManager created, initialization will be handled by MapComponent");
+    }
+
+    // Create FavoriteLocationsManager
+    if (!favoriteLocationsManagerRef.current) {
+      console.log("FastPlannerApp: Creating FavoriteLocationsManager instance");
+      favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
+
+      // Set up callback for when favorites change
+      favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
+        console.log(`Favorites changed, updating UI`);
+        setFavoriteLocations(favorites);
+      });
+    }
+
+    // Create PlatformManager
+    if (!platformManagerRef.current && mapManagerRef.current) {
+      console.log("FastPlannerApp: Creating PlatformManager instance");
+      platformManagerRef.current = new PlatformManager(mapManagerRef.current);
+    }
+
+    // Create RegionManager 
+    // (Still needed for some functionality, but main state is managed by RegionContext)
+    if (!regionManagerRef.current && mapManagerRef.current && platformManagerRef.current) {
+      console.log("FastPlannerApp: Creating RegionManager instance");
+      regionManagerRef.current = new RegionManager(mapManagerRef.current, platformManagerRef.current);
+      
+      // We don't set callbacks here anymore as RegionContext handles this
+    }
+
+    // Create WaypointManager
+    if (!waypointManagerRef.current) {
+      console.log("FastPlannerApp: Creating WaypointManager instance");
+      waypointManagerRef.current = new WaypointManager(mapManagerRef.current);
+      
+      // EMERGENCY FIX: Update global reference
+      window.waypointManager = waypointManagerRef.current;
+    }
+
+    // Add platformManager to waypointManager if both exist
+    if (waypointManagerRef.current && platformManagerRef.current) {
+      waypointManagerRef.current.setPlatformManager(platformManagerRef.current);
+    }
+
+    // Create RouteCalculator
+    if (!routeCalculatorRef.current) {
+      console.log("FastPlannerApp: Creating RouteCalculator instance");
+      routeCalculatorRef.current = new RouteCalculator();
+
+      // Make the route calculator accessible globally for basic calculations
+      window.routeCalculator = routeCalculatorRef.current;
+
+      // Set up route calculator callbacks
+      routeCalculatorRef.current.setCallback('onCalculationComplete', (stats) => {
+        console.log('🔄 Route calculation complete with stats:', {
+          totalDistance: stats?.totalDistance,
+          estimatedTime: stats?.estimatedTime,
+          timeHours: stats?.timeHours,
+          legCount: stats?.legs?.length || 0,
+          hasWind: stats?.windAdjusted || false
+        });
+
+        console.log('🔄 Route calculation complete. Triggering centralized fuel calculation...');
+      });
+
+      console.log("FastPlannerApp: RouteCalculator configured with accurate wind calculations");
+    }
+
+    // Create AircraftManager
+    if (!aircraftManagerRef.current) {
+      console.log("FastPlannerApp: Creating AircraftManager instance");
+      aircraftManagerRef.current = new AircraftManager();
+
+      // Set up aircraft manager callbacks
+      aircraftManagerRef.current.setCallback('onAircraftLoaded', (aircraftList) => {
+        console.log(`Loaded ${aircraftList.length} total aircraft`);
+      });
+
+      aircraftManagerRef.current.setCallback('onAircraftFiltered', (filteredAircraft, type) => {
+        console.log(`Filtered to ${filteredAircraft.length} aircraft of type ${type || 'all'}`);
+        setLocalAircraftLoading(false); // Use local state
+      });
+    }
+
+    // Create FlightCalculations
+    if (!flightCalculationsRef.current) {
+      console.log("FastPlannerApp: Creating FlightCalculations instance");
+      flightCalculationsRef.current = new FlightCalculations();
+
+      // Update with current settings
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight: flightSettings.passengerWeight,
+        contingencyFuelPercent: flightSettings.contingencyFuelPercent,
+        taxiFuel: flightSettings.taxiFuel,
+        reserveFuel: flightSettings.reserveFuel,
+        deckTimePerStop: flightSettings.deckTimePerStop,
+        deckFuelFlow: flightSettings.deckFuelFlow,
+      });
+
+      // Import and make WindCalculations available globally
+      import('../modules/calculations/WindCalculations')
+        .then(WindCalc => {
+          // Make WindCalculations globally available
+          window.WindCalculations = WindCalc;
+          console.log("WindCalculations module imported and made globally available");
+        })
+        .catch(error => {
+          console.error("Failed to import WindCalculations module:", error);
+        });
+    }
+    
+    // Initialize the WaypointInsertionManager
+    if (!waypointInsertionManagerRef.current && 
+        mapManagerRef.current && 
+        waypointManagerRef.current &&
+        platformManagerRef.current) {
+      console.log("FastPlannerApp: Creating WaypointInsertionManager instance");
+      
+      try {
+        // Create the manager with added safety checks
+        waypointInsertionManagerRef.current = createWaypointInsertionManager(
+          mapManagerRef.current, 
+          waypointManagerRef.current,
+          platformManagerRef.current
+        );
+        
+        // Even if the manager is returned as null, we will try again later
+        if (!waypointInsertionManagerRef.current) {
+          console.log("WaypointInsertionManager creation failed - will retry later");
+          
+          // Retry after a delay
+          setTimeout(() => {
+            if (!waypointInsertionManagerRef.current && 
+                mapManagerRef.current && 
+                mapManagerRef.current.getMap() &&
+                waypointManagerRef.current && 
+                platformManagerRef.current) {
+              console.log("Retrying WaypointInsertionManager creation...");
+              waypointInsertionManagerRef.current = createWaypointInsertionManager(
+                mapManagerRef.current, 
+                waypointManagerRef.current,
+                platformManagerRef.current
+              );
+              
+              // Set up callbacks on the retry
+              if (waypointInsertionManagerRef.current) {
+                console.log("Successfully created WaypointInsertionManager on retry");
+                setupWaypointCallbacks(
+                  waypointInsertionManagerRef.current,
+                  (data) => console.log("Waypoint inserted:", data),
+                  (data) => console.log("Waypoint removed:", data),
+                  (error) => console.error("Waypoint error:", error)
+                );
+              }
+            }
+          }, 3000);
+          
+        } else {
+          // Set up callbacks if the manager was successfully created
+          setupWaypointCallbacks(
+            waypointInsertionManagerRef.current,
+            (data) => console.log("Waypoint inserted:", data),
+            (data) => console.log("Waypoint removed:", data),
+            (error) => console.error("Waypoint error:", error)
+          );
+        }
+        
+      } catch (error) {
+        console.error("Error creating WaypointInsertionManager:", error);
+      }
+    }
+
+    // Initialize the AppSettingsManager
+    if (!appSettingsManagerRef.current) {
+      console.log("FastPlannerApp: Creating AppSettingsManager instance");
+      appSettingsManagerRef.current = new AppSettingsManager();
+
+      // Set callbacks for settings changes
+      appSettingsManagerRef.current.setCallback('onRegionChange', (regionId) => {
+        console.log(`AppSettingsManager: Region changed to ${regionId}`);
+      });
+
+      appSettingsManagerRef.current.setCallback('onAircraftChange', (aircraft) => {
+        console.log(`AppSettingsManager: Aircraft changed to ${aircraft.type} ${aircraft.registration}`);
+      });
+
+      appSettingsManagerRef.current.setCallback('onFlightSettingsChange', (settings) => {
+        console.log('AppSettingsManager: Flight settings changed');
+        setFlightSettings(settings);
+      });
+
+      appSettingsManagerRef.current.setCallback('onUISettingsChange', (uiSettings) => {
+        console.log('AppSettingsManager: UI settings changed');
+      });
+
+      // Load any saved settings
+      const savedSettings = appSettingsManagerRef.current.getAllSettings();
+
+      // Apply flight settings
+      const flightSettingsFromStorage = savedSettings.flightSettings;
+      if (flightSettingsFromStorage) {
+        // Conditional update to prevent loops if flightSettings is a dependency of this useEffect
+        // A proper deep equality check would be more robust here.
+        if (JSON.stringify(flightSettings) !== JSON.stringify(flightSettingsFromStorage)) {
+          console.log("useManagers: Applying saved flight settings from AppSettingsManager as they differ.");
+          setFlightSettings(flightSettingsFromStorage);
+        } else {
+          console.log("useManagers: Saved flight settings are identical to current state, skipping update.");
+        }
+      }
+    }
+
+    // Create the MapInteractionHandler
+    if (!mapInteractionHandlerRef.current &&
+        mapManagerRef.current &&
+        waypointManagerRef.current &&
+        platformManagerRef.current) {
+      console.log("FastPlannerApp: Creating MapInteractionHandler instance");
+      mapInteractionHandlerRef.current = new MapInteractionHandler(
+        mapManagerRef.current,
+        waypointManagerRef.current,
+        platformManagerRef.current
+      );
+      
+      // EMERGENCY FIX: Update global reference
+      window.mapInteractionHandler = mapInteractionHandlerRef.current;
+
+      // Set up callbacks
+      mapInteractionHandlerRef.current.setCallback('onLeftPanelOpen', () => {
+        console.log('Opening left panel due to map click');
+      });
+
+      mapInteractionHandlerRef.current.setCallback('onMapClick', async (data) => {
+        console.log('🗺️ Map click callback received in useManagers', data);
+        try {
+          // Create a local copy of the data to avoid reference issues
+          const clickData = {...data};
+          
+          // Use the implementation if available
+          if (typeof addWaypoint.implementation === 'function') {
+            await addWaypoint.implementation(clickData);
+          } else if (typeof addWaypoint === 'function') {
+            await addWaypoint(clickData);
+          } else {
+            console.error('No valid addWaypoint function available');
+          }
+          
+        } catch (error) {
+          console.error('Error processing map click in useManagers:', error);
+        }
+      });
+
+      mapInteractionHandlerRef.current.setCallback('onPlatformClick', async (data) => {
+        console.log('🏢 Platform click callback received in useManagers', data);
+        try {
+          // Create a local copy of the data to avoid reference issues
+          const clickData = {...data};
+
+          // Use the implementation if available
+          if (typeof addWaypoint.implementation === 'function') {
+            await addWaypoint.implementation(clickData);
+          } else if (typeof addWaypoint === 'function') {
+            await addWaypoint(clickData);
+          } else {
+            console.error('No valid addWaypoint function available');
+          }
+
+        } catch (error) {
+          console.error('Error processing platform click in useManagers:', error);
+        }
+      });
+
+      mapInteractionHandlerRef.current.setCallback('onRouteClick', async (data) => {
+        console.log('🛣️ Route click callback received in useManagers', data);
+        try {
+          // Create a local copy of the data
+          const clickData = {...data};
+          
+          // Check if we're in waypoint mode
+          const isWaypointMode = window.isWaypointModeActive === true;
+          
+          // IMPROVED: Check for nearest waypoint or platform if not already in the data
+          // If we're in waypoint mode, try to find nearest waypoint
+          if (isWaypointMode && !clickData.nearestWaypoint && platformManagerRef.current) {
+            try {
+              if (typeof platformManagerRef.current.findNearestOsdkWaypoint === 'function') {
+                const nearestWp = platformManagerRef.current.findNearestOsdkWaypoint(
+                  clickData.lngLat.lat, 
+                  clickData.lngLat.lng, 
+                  5  // Search within 5nm
+                );
+                
+                if (nearestWp) {
+                  console.log(`🛣️ Found nearby waypoint for route click: ${nearestWp.name} (${nearestWp.distance.toFixed(2)}nm away)`);
+                  clickData.nearestWaypoint = nearestWp;
+                }
+              }
+            } catch (error) {
+              console.error('Error finding nearest waypoint:', error);
+            }
+          }
+          
+          // If not already found, try to find nearest platform
+          if (!clickData.nearestRig && platformManagerRef.current) {
+            try {
+              if (typeof platformManagerRef.current.findNearestPlatform === 'function') {
+                const nearestPlatform = platformManagerRef.current.findNearestPlatform(
+                  clickData.lngLat.lat, 
+                  clickData.lngLat.lng, 
+                  5  // Search within 5nm
+                );
+                
+                if (nearestPlatform) {
+                  console.log(`🛣️ Found nearby platform for route click: ${nearestPlatform.name} (${nearestPlatform.distance.toFixed(2)}nm away)`);
+                  clickData.nearestRig = nearestPlatform;
+                }
+              }
+            } catch (error) {
+              console.error('Error finding nearest platform:', error);
+            }
+          }
+          
+          // IMPROVED: Use 5nm snapping radius instead of 2nm/1nm
+          // If in waypoint mode and we have a nearest waypoint available, use that
+          if (isWaypointMode && clickData.nearestWaypoint && clickData.nearestWaypoint.distance < 5) {
+            console.log('🛣️ Adding navigation waypoint at route click:', clickData.nearestWaypoint.name);
+            
+            // Show user feedback
+            if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Added waypoint: ${clickData.nearestWaypoint.name} (${clickData.nearestWaypoint.distance.toFixed(1)} nm away)`,
+                'success',
+                2000
+              );
+            }
+            
+            waypointManagerRef.current.addWaypointAtIndex(
+              clickData.nearestWaypoint.coordinates,
+              clickData.nearestWaypoint.name,
+              clickData.insertIndex,
+              { isWaypoint: true, type: 'WAYPOINT' }
+            );
+          }
+          // If not in waypoint mode and we have a nearest rig and it's close (now using 5nm)
+          else if (!isWaypointMode && clickData.nearestRig && clickData.nearestRig.distance < 5) {
+            // Add the rig instead of the clicked point
+            console.log('🛣️ Adding rig at route click:', clickData.nearestRig.name);
+            
+            // Show user feedback
+            if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Added stop: ${clickData.nearestRig.name} (${clickData.nearestRig.distance.toFixed(1)} nm away)`,
+                'success',
+                2000
+              );
+            }
+            
+            waypointManagerRef.current.addWaypointAtIndex(
+              clickData.nearestRig.coordinates,
+              clickData.nearestRig.name,
+              clickData.insertIndex,
+              { isWaypoint: isWaypointMode, type: isWaypointMode ? 'WAYPOINT' : 'STOP' }
+            );
+          } else {
+            // Add the clicked point - no nearby facility found
+            console.log(`🛣️ Adding ${isWaypointMode ? 'waypoint' : 'stop'} at route click`);
+            waypointManagerRef.current.addWaypointAtIndex(
+              [clickData.lngLat.lng, clickData.lngLat.lat],
+              null,
+              clickData.insertIndex,
+              { isWaypoint: isWaypointMode, type: isWaypointMode ? 'WAYPOINT' : 'STOP' }
+            );
+          }
+
+          // Get updated waypoints
+          const updatedWaypoints = waypointManagerRef.current.getWaypoints();
+
+          // Update the state - wait for it to complete
+          await new Promise(resolve => {
+            setWaypoints([...updatedWaypoints]);
+            setTimeout(resolve, 0);
+          });
+
+          console.log('🛣️ Waypoints updated. Centralized useEffect will recalculate fuel.');
+          
+          // Add a small delay to prevent rapid-fire clicks
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+        } catch (error) {
+          console.error('Error processing route click in useManagers:', error);
+        }
+      });
+
+      mapInteractionHandlerRef.current.setCallback('onError', (error) => {
+        console.error(`MapInteractionHandler error: ${error}`);
+      });
+    }
+
+    // Mark initialization as complete
+    setManagersInitialized(true);
+    
+    // Set up event listeners
+    const handleSaveAircraftSettings = (event) => {
+      const { key, settings } = event.detail;
+      console.log(`Saving settings for ${key}:`, settings);
+
+      try {
+        // Save the settings to localStorage
+        localStorage.setItem(`fastPlanner_settings_${key}`, JSON.stringify(settings));
+        console.log(`Successfully saved settings for ${key}`);
+
+        // Update AppSettingsManager if it exists
+        if (appSettingsManagerRef.current) {
+          appSettingsManagerRef.current.updateFlightSettings(settings);
+        }
+      } catch (error) {
+        console.error(`Error saving settings for ${key}:`, error);
+      }
+    };
+
+    const handleSettingsChanged = () => {
+      console.log("Settings changed event received. Centralized useEffect should handle updates.");
+    };
+
+    // Add event listeners
+    window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+    window.addEventListener('settings-changed', handleSettingsChanged);
+
+    // Clean up event listeners on unmount
+    return () => {
+      window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
+      window.removeEventListener('settings-changed', handleSettingsChanged);
+    };
+  }, [
+    client, 
+    managersInitialized // Only depend on this flag and client
+  ]); 
+
+  // Effect to handle flightSettings changes
+  useEffect(() => {
+    if (flightSettings && flightCalculationsRef.current) {
+      console.log("useManagers: flightSettings changed, updating flightCalculationsRef config.");
+      flightCalculationsRef.current.updateConfig({
+        passengerWeight: flightSettings.passengerWeight,
+        contingencyFuelPercent: flightSettings.contingencyFuelPercent,
+        taxiFuel: flightSettings.taxiFuel,
+        reserveFuel: flightSettings.reserveFuel,
+        deckTimePerStop: flightSettings.deckTimePerStop,
+        deckFuelFlow: flightSettings.deckFuelFlow,
+      });
+    }
+  }, [flightSettings]);
+  
+  // Map initialization handler
+  const handleMapReady = (mapInstance) => {
+    console.log("🗺️ Map is ready", mapInstance);
+
+    // Wrap in try/catch for safety
+    try {
+      // Initialize the map interaction handler
+      if (mapInteractionHandlerRef.current) {
+        console.log("🗺️ Initializing map interaction handler...");
+
+        // Make sure the waypointManager is properly connected
+        if (waypointManagerRef.current) {
+          // Set up the waypoint manager's callbacks
+          waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
+            console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
+
+            // Update the waypoints state
+            if (typeof setWaypoints === 'function') {
+              setWaypoints([...updatedWaypoints]);
+            } else {
+              console.warn('setWaypoints is not a function in onChange callback');
+            }
+          });
+
+          waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
+            console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
+          });
+        }
+
+        // Initialize map interactions
+        console.log("🧹 Initializing map interaction handler");
+        
+        // First, make sure global flags are properly set
+        window.isWaypointModeActive = window.isWaypointModeActive || false;
+        
+        // Clean up any existing handlers before initializing new ones
+        const map = mapManagerRef.current.getMap();
+        if (map && map._listeners && map._listeners.click) {
+          console.log(`🧹 Removing ${map._listeners.click.length} existing click handlers before initializing`);
+          map.off('click');
+        }
+        
+        // Add a small delay to ensure the map is fully loaded
+        setTimeout(() => {
+          // Initialize map interactions carefully
+          if (mapInteractionHandlerRef.current) {
+            // Only initialize if we haven't already
+            if (!mapInteractionHandlerRef.current.isInitialized) {
+              const initSuccess = mapInteractionHandlerRef.current.initialize();
+              
+              if (initSuccess) {
+                console.log("🧹 Map interaction handler initialized successfully");
+              } else {
+                console.error("🧹 Failed to initialize map interaction handler, will retry once");
+                
+                // Try again after a longer delay
+                setTimeout(() => {
+                  if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
+                    console.log("🧹 Second attempt at initializing map handler");
+                    mapInteractionHandlerRef.current.initialize();
+                  }
+                }, 1000);
+              }
+            } else {
+              console.log("🧹 Map interaction handler already initialized, skipping");
+            }
+          }
+        }, 500);
+      }
+    } catch (error) {
+      console.error("Error in handleMapReady:", error);
+    }
+  };
+
+  // Helper function to create error dialog
+  const createErrorDialog = () => {
+    const errorDialog = document.createElement('div');
+    errorDialog.style.position = 'fixed';
+    errorDialog.style.top = '0';
+    errorDialog.style.left = '0';
+    errorDialog.style.right = '0';
+    errorDialog.style.bottom = '0';
+    errorDialog.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+    errorDialog.style.display = 'flex';
+    errorDialog.style.alignItems = 'center';
+    errorDialog.style.justifyContent = 'center';
+    errorDialog.style.zIndex = '9999';
+
+    const dialogContent = document.createElement('div');
+    dialogContent.style.backgroundColor = 'white';
+    dialogContent.style.padding = '20px';
+    dialogContent.style.borderRadius = '8px';
+    dialogContent.style.maxWidth = '500px';
+    dialogContent.style.textAlign = 'center';
+
+    dialogContent.innerHTML = `
+      <h3 style="color: #dc3545; margin-top: 0;">OSDK Client Error</h3>
+      <p>The Palantir OSDK client failed to initialize properly. This will prevent loading aircraft and platform data.</p>
+      <p>Error: Client is null or undefined</p>
+      <p>Please reload the page and try again. If the problem persists, check the console for more details.</p>
+      <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+        <button id="dismiss-btn" style="padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; background-color: #f8f9fa; color: #212529;">Dismiss</button>
+        <button id="reload-btn" style="padding: 8px 16px; border-radius: 4px; border: none; cursor: pointer; background-color: #007bff; color: white;">Reload Page</button>
+      </div>
+    `;
+
+    errorDialog.appendChild(dialogContent);
+    document.body.appendChild(errorDialog);
+
+    // Add event listeners to buttons
+    document.getElementById('dismiss-btn').addEventListener('click', () => {
+      document.body.removeChild(errorDialog);
+    });
+
+    document.getElementById('reload-btn').addEventListener('click', () => {
+      window.location.reload();
+    });
+  };
+
+  return {
+    mapManagerRef,
+    waypointManagerRef,
+    platformManagerRef,
+    routeCalculatorRef,
+    regionManagerRef,
+    favoriteLocationsManagerRef,
+    aircraftManagerRef,
+    flightCalculationsRef,
+    waypointInsertionManagerRef,
+    mapInteractionHandlerRef,
+    appSettingsManagerRef,
+    waypointHandlerRef,
+    handleMapReady
+  };
+};
+
+export default useManagers;

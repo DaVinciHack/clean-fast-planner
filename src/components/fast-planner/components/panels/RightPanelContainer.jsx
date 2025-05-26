@@ -106,7 +106,7 @@ const RightPanelContainer = React.forwardRef(({
       {/* Right panel toggle tab */}
       <div 
         className="panel-tab right-panel-tab main-toggle tab-selector" 
-        style={{ top: '50px' }}
+        style={{ top: '90px' }}
         onClick={onToggleVisibility}
       >
         {visible ? 'Hide →' : '← Show'}
@@ -118,7 +118,7 @@ const RightPanelContainer = React.forwardRef(({
           key={card.id}
           className={`panel-tab right-panel-tab tab-selector tab-${card.id} ${activeCard === card.id ? 'active' : ''}`}
           style={{ 
-            top: `${120 + index * 98}px`
+            top: `${90 + (index + 1) * 80}px` // More spacing between buttons
           }}
           onClick={() => handleCardChange(card.id)}
           title={card.name}

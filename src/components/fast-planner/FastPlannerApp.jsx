@@ -12,7 +12,7 @@ import {
   LeftPanel,
   RightPanel,
   MapComponent,
-  SimpleRouteStatsCard
+  AppHeader
 } from './components';
 
 // Import MapZoomHandler for waypoint display
@@ -24,6 +24,8 @@ import ModeHandler from './modules/waypoints/ModeHandler';
 // Import Region Context Provider and hook
 import { RegionProvider, useRegion } from './context/region';
 
+// Import LoadingIndicator for status checking
+import LoadingIndicator from './modules/LoadingIndicator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
 import useWeather from './hooks/useWeather';
@@ -53,6 +55,38 @@ const FastPlannerCore = ({
 }) => {
   const { isAuthenticated, userName, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion(); 
+  
+  // State for tracking actual loading status from LoadingIndicator
+  const [isActuallyLoading, setIsActuallyLoading] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+  
+  // Check LoadingIndicator status periodically
+  useEffect(() => {
+    const checkLoadingStatus = () => {
+      const status = LoadingIndicator.getQueueStatus();
+      const hasActiveLoading = status.length > 0 || status.isProcessing || status.currentMessage;
+      
+      if (!hasActiveLoading && isActuallyLoading && !isFinishing) {
+        // Loading just finished - start finishing animation
+        setIsFinishing(true);
+        // After one complete cycle (1.5s), actually stop
+        setTimeout(() => {
+          setIsActuallyLoading(false);
+          setIsFinishing(false);
+        }, 1500);
+      } else if (hasActiveLoading && !isActuallyLoading) {
+        // Loading started
+        setIsActuallyLoading(true);
+        setIsFinishing(false);
+      }
+    };
+    
+    // Check immediately and then every 200ms
+    checkLoadingStatus();
+    const interval = setInterval(checkLoadingStatus, 200);
+    
+    return () => clearInterval(interval);
+  }, [isActuallyLoading, isFinishing]); 
   
   useEffect(() => {
     const removeDebugUI = () => {
@@ -230,16 +264,27 @@ const FastPlannerCore = ({
           <div className="loading-spinner"></div>
           <div className="loading-message">Loading...</div>
         </div>
-        <SimpleRouteStatsCard
+        {/* New iPad-friendly header */}
+        <AppHeader
           selectedAircraft={selectedAircraft}
           stopCards={stopCards}
           taxiFuel={flightSettings.taxiFuel}
           reserveFuel={flightSettings.reserveFuel}
           contingencyFuelPercent={flightSettings.contingencyFuelPercent}
           deckTimePerStop={flightSettings.deckTimePerStop}
+          isLoading={aircraftLoading || rigsLoading}
+          loadingText={aircraftLoading ? "Loading aircraft..." : rigsLoading ? "Loading platforms..." : ""}
         />
-        <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReadyImpl} className="fast-planner-map" />
-        <MapZoomHandler mapManagerRef={mapManagerRef} />
+        
+        {/* Map container - now full width below header */}
+        <div className="map-container">
+          {/* Controlled loading bar - graceful finish */}
+          <div className={`map-loading-container ${isActuallyLoading ? (isFinishing ? 'finishing' : 'loading') : ''}`}>
+            <div className="map-loading-bar"></div>
+          </div>
+          <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReadyImpl} className="fast-planner-map" />
+          <MapZoomHandler mapManagerRef={mapManagerRef} />
+        </div>
         <LeftPanel
           visible={leftPanelVisible} onToggleVisibility={toggleLeftPanel} waypoints={waypoints}
           onRemoveWaypoint={removeWaypoint} onWaypointNameChange={updateWaypointName}
