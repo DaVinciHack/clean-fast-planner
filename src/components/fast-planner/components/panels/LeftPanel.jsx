@@ -232,7 +232,9 @@ const LeftPanel = ({
       </div>
       
       {/* Route Editor Panel */}
-      <div className={`route-editor-panel ${!visible ? "hidden" : ""}`}>
+      <div 
+        className={`route-editor-panel ${!visible ? "hidden" : ""}`}
+      >
         <h3>Flight Stops</h3>
         <p style={{ fontSize: '0.8em', color: 'var(--label-color)', margin: '0 0 10px 0' }}>
           Click map to add stops or enter names below
