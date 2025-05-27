@@ -2485,6 +2485,42 @@ class PlatformManager {
   }
   
   /**
+   * Get OSDK waypoints
+   * @returns {Array} - Array of OSDK waypoint objects
+   */
+  getOsdkWaypoints() {
+    return this.osdkWaypoints || [];
+  }
+  
+  /**
+   * Find a platform/base by exact name match
+   * @param {string} name - Name to search for
+   * @returns {Object|null} - Platform object or null if not found
+   */
+  findPlatformByName(name) {
+    if (!this.platforms || !name) return null;
+    
+    const searchName = name.toUpperCase().trim();
+    return this.platforms.find(platform => 
+      platform.name && platform.name.toUpperCase().trim() === searchName
+    ) || null;
+  }
+  
+  /**
+   * Find an OSDK waypoint by exact name match
+   * @param {string} name - Name to search for
+   * @returns {Object|null} - Waypoint object or null if not found
+   */
+  findWaypointByName(name) {
+    if (!this.osdkWaypoints || !name) return null;
+    
+    const searchName = name.toUpperCase().trim();
+    return this.osdkWaypoints.find(waypoint => 
+      waypoint.name && waypoint.name.toUpperCase().trim() === searchName
+    ) || null;
+  }
+  
+  /**
    * Get visibility state
    * @returns {boolean} - True if platforms are visible
    */

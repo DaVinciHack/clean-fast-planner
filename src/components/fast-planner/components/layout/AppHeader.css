@@ -18,19 +18,27 @@
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px; /* Reduce gap from 15px to 8px */
+  gap: 5px; /* Reduced from 8px to 5px - closer to logo */
   flex: 0 0 auto;
 }
 
 .logo-container {
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 .vtol-logo {
   height: 40px;
   width: auto;
+  position: relative;
 }
+
+.compass-overlay {
+  /* Remove this old compass overlay CSS - not used anymore */
+}
+
+/* Background Compass Effect - REMOVED */
 
 .aircraft-display {
   display: flex;
@@ -53,7 +61,7 @@
 }
 
 .no-aircraft {
-  font-size: 14px;
+  font-size: 12px; /* Reduced from 14px to 12px */
   color: #8e8e93;
   font-style: italic;
 }
@@ -81,8 +89,8 @@
 }
 
 .detail-label {
-  font-size: 10px;
-  color: #8e8e93;
+  font-size: 8px; /* Reduced from 10px to 8px */
+  color: #87ceeb; /* Light blue instead of gray */
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.5px;

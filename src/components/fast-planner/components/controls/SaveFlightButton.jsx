@@ -222,26 +222,52 @@ const SaveFlightButton = ({
       // Get the region code from context
       const regionCode = currentRegion?.osdkRegion || "NORWAY";
       
-      // Get waypoint locations for the API - clean up whitespace
-      const locations = waypoints.map(wp => {
-        // Clean up location names - trim whitespace to avoid issues
-        const locationName = wp.name ? wp.name.trim() : `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
-        return locationName;
+      // DEBUG: Let's see what properties each waypoint actually has
+      console.log('=== WAYPOINT DEBUG INFO ===');
+      waypoints.forEach((wp, index) => {
+        console.log(`Waypoint ${index} (${wp.name}):`, {
+          name: wp.name,
+          type: wp.type,
+          pointType: wp.pointType,
+          isWaypoint: wp.isWaypoint,
+          coords: wp.coords,
+          id: wp.id
+        });
       });
+      console.log('=== END WAYPOINT DEBUG ===');
+      
+      // Get waypoint locations for the API - ONLY include landing stops (rigs/airports), NOT navigation waypoints
+      const locations = waypoints
+        .filter(wp => {
+          // Use the SAME logic as the left panel to determine waypoint type
+          const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+          
+          // Debug: Log waypoint properties to understand classification
+          console.log(`Filtering ${wp.name}: isWaypoint=${wp.isWaypoint}, type=${wp.type}, classified as waypoint=${isWaypointType}`);
+          
+          // Only include in locations if it's NOT a waypoint (i.e., it's a landing stop)
+          return !isWaypointType;
+        })
+        .map(wp => {
+          // Clean up location names - trim whitespace to avoid issues
+          const locationName = wp.name ? wp.name.trim() : `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
+          return locationName;
+        });
       
       // Format the ETD for Palantir
       const etdTimestamp = new Date(flightData.etd).toISOString();
       
-      // We need to use the numeric ID which we've confirmed works
-      // The assetId is likely the correct field based on our testing
-      const finalAircraftId = selectedAircraft.assetId || "190"; // Fallback to 190 if assetId isn't available
+      // CRITICAL FIX: Use the aircraft tail number (rawRegistration) first, then assetId as fallback
+      // The automation expects the aircraft's tail number to look up the aircraft in the system
+      const finalAircraftId = selectedAircraft.rawRegistration || selectedAircraft.assetId || "190";
       
       // Debug output of IDs to help find issues
       console.log('OSDK Flight Creation - Debug Data:', {
-        aircraftId: finalAircraftId, // We'll use this value directly
+        aircraftId: finalAircraftId, // This is what we're actually sending to the API
         rawReg: selectedAircraft.rawRegistration,
         displayReg: selectedAircraft.registration,
         aircraftAssetId: selectedAircraft.assetId || '(none)',
+        usingRawRegistration: !!selectedAircraft.rawRegistration,
         captainId: flightData.captainId,
         copilotId: flightData.copilotId,
         regionCode: regionCode
@@ -249,12 +275,17 @@ const SaveFlightButton = ({
       
       // Prepare waypoints with leg structure
       // Group waypoints by leg if available, otherwise put all in leg 0
+      // CRITICAL FIX: Include waypoint type information to distinguish navigation waypoints from stops
       const waypointsWithLegs = waypoints.map((wp, index) => {
         return {
           legIndex: wp.legIndex || 0,
           name: wp.name || `Waypoint ${index + 1}`,
           coords: wp.coords,
-          id: wp.id
+          id: wp.id,
+          // IMPORTANT: Include type classification properties so Palantir knows these are waypoints, not stops
+          type: wp.type,
+          pointType: wp.pointType,
+          isWaypoint: wp.isWaypoint
         };
       });
       

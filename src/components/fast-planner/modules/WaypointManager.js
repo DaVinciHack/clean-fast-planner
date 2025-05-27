@@ -356,6 +356,89 @@ class WaypointManager {
     }
   }
   
+  /**
+   * Add a waypoint by name, looking up coordinates from the platform manager
+   * This is the preferred method for loading waypoints from flight data
+   * 
+   * @param {string} waypointName - Name of the waypoint to add
+   * @param {Object} options - Options object (isWaypoint, type, etc.)
+   * @returns {Promise<Object|null>} The created waypoint object or null if failed
+   */
+  async addWaypointByName(waypointName, options = {}) {
+    try {
+      console.log(`WaypointManager.addWaypointByName: Looking up waypoint "${waypointName}"`);
+      
+      if (!waypointName || typeof waypointName !== 'string') {
+        console.error('Invalid waypoint name provided:', waypointName);
+        return null;
+      }
+      
+      // Determine if this is a waypoint or a stop
+      const isWaypointOption = options && (options.isWaypoint === true || options.type === 'WAYPOINT');
+      const isWaypoint = isWaypointOption;
+      
+      // Try to find the waypoint coordinates using the platform manager
+      let waypointData = null;
+      
+      if (this.platformManager) {
+        if (isWaypoint) {
+          // For navigation waypoints, search OSDK waypoints
+          if (typeof this.platformManager.findWaypointByName === 'function') {
+            waypointData = this.platformManager.findWaypointByName(waypointName);
+          } else if (typeof this.platformManager.getOsdkWaypoints === 'function') {
+            // Fallback: search through OSDK waypoints manually
+            const allWaypoints = this.platformManager.getOsdkWaypoints();
+            waypointData = allWaypoints.find(wp => 
+              wp.name && wp.name.toUpperCase() === waypointName.toUpperCase()
+            );
+          }
+        } else {
+          // For landing stops, search platforms/bases
+          if (typeof this.platformManager.findPlatformByName === 'function') {
+            waypointData = this.platformManager.findPlatformByName(waypointName);
+          } else if (typeof this.platformManager.getPlatforms === 'function') {
+            // Fallback: search through platforms manually
+            const allPlatforms = this.platformManager.getPlatforms();
+            waypointData = allPlatforms.find(platform => 
+              platform.name && platform.name.toUpperCase() === waypointName.toUpperCase()
+            );
+          }
+        }
+      }
+      
+      if (waypointData && waypointData.coordinates) {
+        // Use the found coordinates
+        const coords = Array.isArray(waypointData.coordinates) ? 
+          waypointData.coordinates : 
+          [waypointData.longitude || waypointData.lng, waypointData.latitude || waypointData.lat];
+          
+        console.log(`Found coordinates for ${waypointName}:`, coords);
+        
+        // Add the waypoint using the found coordinates
+        return this.addWaypoint(coords, waypointName, options);
+        
+      } else {
+        console.warn(`Could not find coordinates for waypoint: ${waypointName}`);
+        
+        // If we can't find the waypoint, log it but don't fail
+        // This prevents 0,0 coordinate issues
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Waypoint "${waypointName}" not found in database`, 
+            'warning',
+            3000
+          );
+        }
+        
+        return null;
+      }
+      
+    } catch (error) {
+      console.error(`Error adding waypoint by name "${waypointName}":`, error);
+      return null;
+    }
+  }
+  
   addWaypointAtIndex(coords, name, index, options = {}) {
     const map = this.mapManager.getMap();
     if (!map) return null;

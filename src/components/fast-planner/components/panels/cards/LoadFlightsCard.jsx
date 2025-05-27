@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FlightService from '../../../services/FlightService';
 
 /**
  * LoadFlightsCard Component
@@ -10,43 +11,54 @@ const LoadFlightsCard = ({
   id,
   onLoad, 
   onCancel,
-  isLoading
+  isLoading,
+  currentRegion = null // Add region prop to filter flights
 }) => {
   const [flights, setFlights] = useState([]);
   const [selectedFlightId, setSelectedFlightId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoadingFlights, setIsLoadingFlights] = useState(false);
   
-  // Load flights when the card is shown
+  // Load flights when the card is shown or region changes
   useEffect(() => {
     loadFlights();
-  }, []);
+  }, [currentRegion]); // Reload when region changes
   
   // Load flights from Palantir
   const loadFlights = async () => {
     setIsLoadingFlights(true);
     
     try {
-      // Mock data for now - this would be replaced with real API call
-      setTimeout(() => {
-        const mockFlights = [
-          { id: '1', name: 'KLCH to KIYA - 2025-05-09', date: '2025-05-09T10:00:00', status: 'Completed' },
-          { id: '2', name: 'ENZV to ENLE - 2025-05-08', date: '2025-05-08T14:30:00', status: 'Planned' },
-          { id: '3', name: 'KIYA to EC176 - 2025-05-07', date: '2025-05-07T08:15:00', status: 'In Progress' },
-          { id: '4', name: 'WC369 to KHUM - 2025-05-06', date: '2025-05-06T16:45:00', status: 'Completed' },
-          { id: '5', name: 'KLCH to WC487 - 2025-05-05', date: '2025-05-05T11:20:00', status: 'Cancelled' }
-        ];
-        setFlights(mockFlights);
-        setIsLoadingFlights(false);
-      }, 1000);
+      console.log(`LoadFlightsCard: Loading flights for region: ${currentRegion || 'ALL'}`);
       
-      // This is where the real API call would go
-      // const sdk = await import('@flight-app/sdk');
-      // const result = await client(sdk.listFlights).applyAction({});
-      // setFlights(result.flights);
+      // Use the real FlightService to load flights filtered by region
+      const result = await FlightService.loadFlights(currentRegion, 50);
+      
+      if (result.success) {
+        console.log(`LoadFlightsCard: Loaded ${result.flights.length} flights`);
+        setFlights(result.flights);
+        
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Loaded ${result.flights.length} flights`, 
+            'success'
+          );
+        }
+      } else {
+        console.error('LoadFlightsCard: Failed to load flights:', result.error);
+        setFlights([]);
+        
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Failed to load flights: ${result.error}`, 
+            'error'
+          );
+        }
+      }
     } catch (error) {
-      console.error('Error loading flights:', error);
+      console.error('LoadFlightsCard: Error loading flights:', error);
       setFlights([]);
+      
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator(
           `Failed to load flights: ${error.message}`, 
@@ -68,21 +80,50 @@ const LoadFlightsCard = ({
     }
   };
   
-  // Filter flights based on search term
-  const filteredFlights = flights.filter(flight => 
-    flight.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    flight.status.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter and sort flights based on search term, with newest flights first
+  const filteredFlights = flights
+    .filter(flight => 
+      flight.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      flight.status.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Sort by date in descending order (newest first)
+      // Handle cases where date might be null or undefined
+      const dateA = a.date ? new Date(a.date) : new Date(0);
+      const dateB = b.date ? new Date(b.date) : new Date(0);
+      
+      return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+    });
   
   const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    
     const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+    
+    // Show relative time for recent flights
+    if (diffInMinutes < 1) {
+      return 'Just now';
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    } else if (diffInDays < 7) {
+      return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+    } else {
+      // For older flights, show the full date
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    }
   };
   
   return (
@@ -121,9 +162,22 @@ const LoadFlightsCard = ({
           />
         </div>
         
+        {/* Flights list header */}
+        {!isLoadingFlights && filteredFlights.length > 0 && (
+          <div style={{
+            fontSize: '12px',
+            color: '#999',
+            marginTop: '15px',
+            marginBottom: '5px',
+            fontStyle: 'italic'
+          }}>
+            {flights.length} flight{flights.length !== 1 ? 's' : ''} found • Sorted by newest first
+          </div>
+        )}
+        
         {/* Flights list */}
         <div style={{ 
-          marginTop: '15px', 
+          marginTop: filteredFlights.length > 0 ? '5px' : '15px', 
           marginBottom: '15px', 
           maxHeight: '300px', 
           overflowY: 'auto', 
@@ -151,43 +205,65 @@ const LoadFlightsCard = ({
               {searchTerm ? 'No flights match your search' : 'No saved flights found'}
             </div>
           ) : (
-            filteredFlights.map(flight => (
-              <div 
-                key={flight.id}
-                style={{
-                  padding: '10px',
-                  borderBottom: '1px solid #444',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  backgroundColor: selectedFlightId === flight.id ? 'rgba(60, 130, 180, 0.4)' : 'transparent'
-                }}
-                onClick={() => setSelectedFlightId(flight.id)}
-              >
-                <div style={{ 
-                  fontWeight: 'bold', 
-                  fontSize: '14px', 
-                  marginBottom: '5px'
-                }}>
-                  {flight.name}
+            filteredFlights.map(flight => {
+              // Check if flight is new (created within last 24 hours)
+              const isNewFlight = flight.date && 
+                (new Date() - new Date(flight.date)) < 24 * 60 * 60 * 1000;
+              
+              return (
+                <div 
+                  key={flight.id}
+                  style={{
+                    padding: '10px',
+                    borderBottom: '1px solid #444',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    backgroundColor: selectedFlightId === flight.id ? 'rgba(60, 130, 180, 0.4)' : 'transparent'
+                  }}
+                  onClick={() => setSelectedFlightId(flight.id)}
+                >
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    fontSize: '14px', 
+                    marginBottom: '5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>{flight.name}</span>
+                    {isNewFlight && (
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        borderRadius: '3px',
+                        backgroundColor: '#4caf50',
+                        color: 'white',
+                        textTransform: 'uppercase'
+                      }}>
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                    {formatDate(flight.date)}
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    marginTop: '5px',
+                    display: 'inline-block',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    backgroundColor: 'rgba(40, 40, 40, 0.6)',
+                    color: flight.status === 'Completed' ? '#4caf50' : 
+                          flight.status === 'Planned' ? '#2196f3' :
+                          flight.status === 'In Progress' ? '#ff9800' : '#f44336'
+                  }}>
+                    {flight.status}
+                  </div>
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                  {formatDate(flight.date)}
-                </div>
-                <div style={{
-                  fontSize: '12px',
-                  marginTop: '5px',
-                  display: 'inline-block',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  backgroundColor: 'rgba(40, 40, 40, 0.6)',
-                  color: flight.status === 'Completed' ? '#4caf50' : 
-                        flight.status === 'Planned' ? '#2196f3' :
-                        flight.status === 'In Progress' ? '#ff9800' : '#f44336'
-                }}>
-                  {flight.status}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
         

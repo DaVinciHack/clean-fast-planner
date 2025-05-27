@@ -51,6 +51,36 @@ const useWaypoints = ({
     console.log('🌐 waypointManagerRef.current available:', !!waypointManagerRef.current);
     console.log('🌐 platformManagerRef.current available:', !!platformManagerRef.current);
     
+    // CRITICAL: Handle multiple waypoints separated by spaces (e.g., "ENFL ENOW ENOR ENPL")
+    if (typeof waypointData === 'string' && waypointData.includes(' ')) {
+      console.log('🌐 MULTIPLE WAYPOINTS DETECTED: Processing route string with multiple waypoints');
+      const waypointNames = waypointData.trim().split(/\s+/).filter(name => name.length > 0);
+      console.log(`🌐 Split into ${waypointNames.length} individual waypoints:`, waypointNames);
+      
+      // Process each waypoint individually
+      for (let i = 0; i < waypointNames.length; i++) {
+        const waypointName = waypointNames[i];
+        console.log(`🌐 Processing waypoint ${i + 1}/${waypointNames.length}: ${waypointName}`);
+        
+        try {
+          // Recursively call addWaypoint for each individual waypoint
+          await addWaypoint(waypointName);
+          console.log(`🌐 Successfully added waypoint: ${waypointName}`);
+        } catch (error) {
+          console.error(`🌐 Error adding waypoint ${waypointName}:`, error);
+          // Continue with other waypoints even if one fails
+        }
+        
+        // Small delay between waypoints to avoid overwhelming the system
+        if (i < waypointNames.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
+      console.log('🌐 MULTIPLE WAYPOINTS PROCESSING COMPLETE');
+      return; // Exit early after processing all waypoints
+    }
+    
     // Try to use the clean implementation first - TEMPORARILY DISABLED FOR COORDINATE TESTING
     if (false && window.addWaypointClean && typeof window.addWaypointClean === 'function') {
       console.log('🌐 Using clean implementation for addWaypoint');
@@ -168,15 +198,36 @@ const useWaypoints = ({
               name = platform.name;
               console.log(`🌐 Found platform by name: ${name} at [${coords}]`);
             } else {
-              console.log(`🌐 Platform "${waypointData}" not found`);
+              console.log(`🌐 Platform "${waypointData}" not found in database`);
+              
+              // Instead of returning early, create a placeholder waypoint
+              // This allows the flight loading to continue even if some waypoints aren't in the database
+              console.log(`🌐 Creating placeholder waypoint for: ${waypointData}`);
+              name = waypointData; // Use the provided name
+              coords = null; // Will be handled later - maybe set a default or skip coordinates
+              
               if (window.LoadingIndicator) {
-                window.LoadingIndicator.updateStatusIndicator(`Platform "${waypointData}" not found.`, 'error');
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Waypoint "${waypointData}" not found in database - added as placeholder`, 
+                  'warning',
+                  3000
+                );
               }
-              return;
             }
           } else {
             console.log('🌐 PlatformManager not available');
-            return;
+            // Create placeholder waypoint even without platform manager
+            console.log(`🌐 Creating placeholder waypoint (no platform manager): ${waypointData}`);
+            name = waypointData;
+            coords = null;
+            
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Platform manager not available - added "${waypointData}" as placeholder`, 
+                'warning',
+                3000
+              );
+            }
           }
         }
       } else if (waypointData && typeof waypointData === 'object') {
@@ -221,11 +272,28 @@ const useWaypoints = ({
         return;
       }
 
+      // Handle the case where coordinates might be null (placeholder waypoints)
       if (!coords || !Array.isArray(coords) || coords.length !== 2) {
-        if (window.LoadingIndicator) {
-          window.LoadingIndicator.updateStatusIndicator(`Invalid coordinates.`, 'error');
+        if (coords === null && name) {
+          // This is a placeholder waypoint - create it with default coordinates
+          console.log(`🌐 Creating placeholder waypoint "${name}" with default coordinates`);
+          coords = [0, 0]; // Default coordinates - will be updated if the waypoint is found later
+          
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              `Created placeholder for "${name}" - coordinates need to be set manually`, 
+              'warning',
+              3000
+            );
+          }
+        } else {
+          // Invalid coordinates and not a placeholder
+          console.log('🌐 Invalid coordinates provided:', coords);
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(`Invalid coordinates.`, 'error');
+          }
+          return;
         }
-        return;
       }
 
       if (window.isWaypointModeActive === true) {
