@@ -281,9 +281,8 @@ const FastPlannerCore = ({
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
     try {
-      console.log('FastPlannerApp: Loading flight data:', flightData);
-      console.log('DEBUG: Loading flight ID:', flightData.id);
-      console.log('DEBUG: Loading flight name:', flightData.name);
+      console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
+      console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
       
       // Clear existing route first
       clearRoute();
@@ -305,44 +304,6 @@ const FastPlannerCore = ({
         
         // Set the route input field for display
         setRouteInput(routeString);
-        
-        // Restore aircraft selection if available
-        if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
-          console.log(`Restoring aircraft selection: ${flightData.aircraftId}`);
-          try {
-            // Get available aircraft and find the matching one
-            const availableAircraft = appManagers.aircraftManagerRef.current.getFilteredAircraft();
-            const matchingAircraft = availableAircraft.find(aircraft => 
-              aircraft.aircraftId === flightData.aircraftId || 
-              aircraft.id === flightData.aircraftId
-            );
-            
-            if (matchingAircraft) {
-              console.log(`Found matching aircraft: ${matchingAircraft.name || matchingAircraft.aircraftId}`);
-              setSelectedAircraft(matchingAircraft);
-              
-              // Update loading indicator
-              if (window.LoadingIndicator) {
-                window.LoadingIndicator.updateStatusIndicator(
-                  `Aircraft restored: ${matchingAircraft.name || matchingAircraft.aircraftId}`, 
-                  'success',
-                  2000
-                );
-              }
-            } else {
-              console.warn(`Could not find aircraft with ID: ${flightData.aircraftId}`);
-              if (window.LoadingIndicator) {
-                window.LoadingIndicator.updateStatusIndicator(
-                  `Aircraft ${flightData.aircraftId} not found in current region`, 
-                  'warning',
-                  3000
-                );
-              }
-            }
-          } catch (error) {
-            console.error('Error restoring aircraft selection:', error);
-          }
-        }
         
         // Actually process the route to create waypoints using the hookAddWaypoint function
         console.log('Processing route string to create waypoints...');
@@ -700,10 +661,47 @@ const FastPlannerCore = ({
       }
       
       // Set aircraft if available
-      if (flightData.aircraftId) {
-        console.log(`TODO: Set aircraft: ${flightData.aircraftId}`);
-        // The aircraft should be updated through the aircraft selection UI
-        // This will require updating the aircraft context/state
+      console.log('🛩️ Checking aircraft restoration conditions:');
+      console.log('🛩️ flightData.aircraftId:', flightData.aircraftId);
+      console.log('🛩️ appManagers.aircraftManagerRef?.current exists:', !!appManagers.aircraftManagerRef?.current);
+      
+      if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
+        console.log(`Restoring aircraft: ${flightData.aircraftId}`);
+        try {
+          // Get available aircraft using the correct method
+          const availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
+          console.log(`Searching in ${availableAircraft.length} available aircraft for region: ${flightData.region}`);
+          console.log('🔍 Sample aircraft structure:', availableAircraft[0]);
+          console.log('🔍 Looking for aircraftId:', flightData.aircraftId);
+          
+          const matchingAircraft = availableAircraft.find(aircraft => {
+            return aircraft.aircraftId === flightData.aircraftId || 
+                   aircraft.id === flightData.aircraftId ||
+                   aircraft.rawRegistration === flightData.aircraftId ||  // Use rawRegistration!
+                   aircraft.registration === flightData.aircraftId ||
+                   aircraft.name === flightData.aircraftId;
+          });
+          
+          if (matchingAircraft) {
+            console.log(`✅ Aircraft restored: ${matchingAircraft.name || matchingAircraft.registration || matchingAircraft.aircraftId}`);
+            setSelectedAircraft(matchingAircraft);
+            
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Aircraft restored: ${matchingAircraft.name || matchingAircraft.registration}`, 
+                'success',
+                2000
+              );
+            }
+          } else {
+            console.warn(`❌ Aircraft ${flightData.aircraftId} not found. Available aircraft:`, 
+              availableAircraft.map(a => a.aircraftId || a.id || a.registration).join(', '));
+          }
+        } catch (error) {
+          console.error('Error restoring aircraft:', error);
+        }
+      } else {
+        console.log('🛩️ Aircraft restoration skipped - missing aircraftId or aircraftManager');
       }
       
       // Update status
