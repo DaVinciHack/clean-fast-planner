@@ -163,40 +163,26 @@ const FinanceCard = ({
     return hours + (minutes / 60);
   };
   
-  // Read route data directly from the route stats card DOM elements
+  // Read route data from React props instead of DOM elements
   const readRouteData = () => {
     try {
-      // Find the route-stats-card element
-      const statsCard = document.querySelector('.route-stats-card');
-      if (!statsCard) return false;
+      // Use the React props that are passed to the component
+      if (!routeStats || !stopCards || stopCards.length === 0) {
+        return false;
+      }
       
-      // Find all route-stat-value elements
-      const statValues = statsCard.querySelectorAll('.route-stat-value');
-      if (statValues.length < 4) return false;
+      // Extract data from routeStats prop
+      const distance = parseFloat(routeStats.totalDistance) || 0;
+      const flightTimeHours = parseFloat(routeStats.timeHours) || 0;
+      const totalTimeHours = parseFloat(routeStats.totalTimeHours) || 0;
+      const fuelRequired = parseInt(routeStats.fuelRequired) || 0;
       
-      // Extract distance from the first value
-      const distanceText = statValues[0].textContent || '';
-      const distanceMatch = distanceText.match(/(\d+\.?\d*)/);
-      const distance = distanceMatch ? parseFloat(distanceMatch[1]) : 0;
+      // Format times
+      const flightTime = routeStats.estimatedTime || '00:00';
+      const totalTime = routeStats.totalTimeFormatted || '00:00';
       
-      // Extract flight time from the third value
-      const flightTimeText = statValues[2].textContent || '';
-      const flightTime = flightTimeText.trim();
-      const flightTimeHours = timeToHours(flightTime);
-      
-      // Extract total time from the 7th value (should be the one in the second row, third column)
-      const totalTimeText = statValues[6]?.textContent || '';
-      const totalTime = totalTimeText.trim();
-      const totalTimeHours = timeToHours(totalTime);
-      
-      // Extract fuel from the fourth value
-      const fuelText = statValues[3].textContent || '';
-      const fuelMatch = fuelText.match(/(\d+)/);
-      const fuelRequired = fuelMatch ? parseInt(fuelMatch[1]) : 0;
-      
-      // Count waypoints for landings
-      const waypoints = document.querySelectorAll('.stop-entry').length;
-      const landings = waypoints;
+      // Count landings from stopCards
+      const landings = stopCards.length || 0;
       
       // Update route data if we found valid data
       if (distance > 0 || flightTimeHours > 0) {

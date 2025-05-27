@@ -181,9 +181,9 @@
     ellipse at center center,
     #1a3d5f 0%,     /* Darker rich blue at center */
     #122e4a 30%,    /* Darker medium blue */
-    #0c2138 60%,    /* Much darker blue */
-    #071728 90%,    /* Very dark blue */
-    #0f0a1a 100%    /* Dark purple-black at edges */
+    #061939 60%,    /* Much darker blue */
+    #171717 90%,    /* Very dark blue */
+    #202020 100%    /* Almost black at edges */
   );
   background-size: 100% 100%;
   animation: none; /* Remove flashing animation */
@@ -420,7 +420,7 @@
   height: 100% !important;
 }
 
-/* Map Loading Bar Styles - controlled visibility */
+/* Map Loading Bar Styles - reverted to working version */
 .map-loading-container {
   position: absolute;
   width: calc(100% - 40px);
@@ -450,11 +450,15 @@
   left: 0;
   height: 2px;
   background: linear-gradient(to right, 
-    rgba(0, 180, 255, 0) 0%, 
-    rgba(0, 200, 255, 0.7) 35%, 
-    rgba(190, 255, 255, 1) 50%, 
-    rgba(0, 200, 255, 0.7) 65%, 
-    rgba(0, 180, 255, 0) 100%
+    rgba(0, 80, 120, 0.8) 0%, 
+    rgba(0, 120, 160, 0.6) 25%, 
+    rgba(0, 180, 220, 0.4) 35%, 
+    rgba(0, 200, 240, 0.8) 45%, 
+    rgba(220, 250, 255, 1) 50%, 
+    rgba(0, 200, 240, 0.8) 55%, 
+    rgba(0, 180, 220, 0.4) 65%, 
+    rgba(0, 120, 160, 0.6) 75%, 
+    rgba(0, 80, 120, 0.8) 100%
   );
   width: 40%;
   border-radius: 2px;
@@ -467,6 +471,89 @@
 
 .map-loading-container.finishing .map-loading-bar {
   animation: smooth-scroll 1.5s infinite linear, fadeOut 1.5s ease-out forwards;
+}
+
+.map-loading-container.loading {
+  opacity: 1;
+}
+
+.map-loading-container.finishing {
+  animation: fadeOut 0.5s ease-out forwards;
+}
+
+..map-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 60%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(100, 200, 255, 0.3) 20%,
+    rgba(150, 220, 255, 0.7) 40%,
+    rgba(200, 240, 255, 1) 50%,
+    rgba(150, 220, 255, 0.7) 60%,
+    rgba(100, 200, 255, 0.3) 80%,
+    transparent 100%
+  );
+  border-radius: 3px;
+  box-shadow: 
+    0 0 20px rgba(200, 240, 255, 0.8),
+    0 0 40px rgba(150, 220, 255, 0.6),
+    0 0 60px rgba(100, 200, 255, 0.4);
+  animation: lightBeamSweep 2s ease-in-out infinite;
+}
+
+.map-loading-container.loading ..map-loading-bar {
+  animation: lightBeamSweep 2s ease-in-out infinite;
+}
+
+.map-loading-container.finishing ..map-loading-bar {
+  animation: lightBeamComplete 1s ease-out forwards;
+}
+
+/* Stunning Light Beam Animations */
+@keyframes lightBeamSweep {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 
+      0 0 30px rgba(200, 240, 255, 1),
+      0 0 60px rgba(150, 220, 255, 0.8),
+      0 0 90px rgba(100, 200, 255, 0.6);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(180%);
+    opacity: 0;
+  }
+}
+
+@keyframes lightBeamComplete {
+  0% {
+    transform: translateX(-100%);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(0%);
+    opacity: 1;
+    box-shadow: 
+      0 0 40px rgba(200, 240, 255, 1),
+      0 0 80px rgba(150, 220, 255, 0.9),
+      0 0 120px rgba(100, 200, 255, 0.7);
+  }
+  100% {
+    transform: translateX(200%);
+    opacity: 0;
+  }
 }
 
 /* Fade out animation for graceful finish */

@@ -111,57 +111,48 @@ class PalantirFlightService {
       if (sdk.createFlightWithWaypoints) {
         console.log('Using new createFlightWithWaypoints function');
         
-        // Format waypoints in the structured format if available
-        let structuredWaypoints = [];
-        let legs = [];
+        // Format waypoints with type information - distinguish stops from navigation waypoints
+        let displayWaypoints = null;
         
-        // If we have waypoints with leg information
         if (flightData.waypoints && Array.isArray(flightData.waypoints)) {
-          // Group waypoints by leg index
-          const waypointsByLeg = {};
-          
-          flightData.waypoints.forEach(wp => {
-            const legIndex = wp.legIndex || 0;
-            if (!waypointsByLeg[legIndex]) {
-              waypointsByLeg[legIndex] = [];
-            }
-            waypointsByLeg[legIndex].push(wp.name || wp.id);
-          });
-          
-          // Convert to legs array
-          Object.keys(waypointsByLeg).forEach(legIndex => {
-            legs.push({
-              index: Number(legIndex),
-              waypoints: waypointsByLeg[legIndex]
-            });
-          });
-          
-          // If no legs were created but we have waypoints, create a single leg
-          if (legs.length === 0 && flightData.waypoints.length > 0) {
-            legs.push({
-              index: 0,
-              waypoints: flightData.waypoints.map(wp => wp.name || wp.id)
-            });
+          // Create structured waypoints with leg index and waypoint type information
+          // CRITICAL FIX: Use proper waypoint classification logic instead of incorrect string comparison
+          const structuredWaypoints = flightData.waypoints
+            .filter(wp => {
+              // Use the same classification logic as WaypointManager.js
+              // 1. First check the explicit point type (most reliable)
+              if (wp.pointType === 'NAVIGATION_WAYPOINT') return true;
+              if (wp.pointType === 'LANDING_STOP') return false;
+              
+              // 2. Check the isWaypoint boolean flag
+              if (typeof wp.isWaypoint === 'boolean') return wp.isWaypoint;
+              
+              // 3. Check the type string (older method)
+              if (wp.type === 'WAYPOINT') return true; // Note: uppercase WAYPOINT
+              if (wp.type === 'STOP') return false;
+              
+              // 4. Default: if no clear classification, assume it's a navigation waypoint
+              // since user explicitly added it as a waypoint in waypoint mode
+              return true;
+            })
+            .map((wp, index) => ({
+              legIndex: wp.legIndex || 0,
+              waypoint: wp.name || wp.id
+            }));
+            
+          // Convert to JSON string if we have waypoints
+          if (structuredWaypoints.length > 0) {
+            displayWaypoints = JSON.stringify(structuredWaypoints);
           }
-        } else {
-          // If no waypoint structure is provided, use locations as a simple leg
-          legs.push({
-            index: 0,
-            waypoints: cleanLocations
-          });
         }
         
         // Prepare the parameters for createFlightWithWaypoints
         const params = {
           "flightName": flightData.flightName || "Fast Planner Flight",
           "locations": cleanLocations,
-          "legs": legs,
-          "useOnlyProvidedWaypoints": true,
+          "displayWaypoints": displayWaypoints,  // Send structured waypoint information
           "aircraftId": flightData.aircraftId || "190",
-          "region": "NORWAY",
-          "aircraftRegion": "NORWAY",
-          "etd": flightData.etd || new Date().toISOString(),
-          "alternateLocation": flightData.alternateLocation || ""
+          "region": flightData.region || "NORWAY"
         };
         
         // Add crew members if provided

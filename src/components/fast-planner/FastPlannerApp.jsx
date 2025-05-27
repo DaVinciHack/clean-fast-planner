@@ -26,6 +26,8 @@ import { RegionProvider, useRegion } from './context/region';
 
 // Import LoadingIndicator for status checking
 import LoadingIndicator from './modules/LoadingIndicator';
+// Import StopCardCalculator for stop cards generation
+import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
 import useWeather from './hooks/useWeather';
@@ -239,10 +241,489 @@ const FastPlannerCore = ({
     }
   };
 
+  // Generate stop cards data using StopCardCalculator
+  const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
+    try {
+      // Ensure routeStats has the properties the FinanceCard expects
+      if (routeStats) {
+        // Add missing properties that FinanceCard might be looking for
+        if (!routeStats.totalTime && routeStats.totalTimeFormatted) {
+          routeStats.totalTime = routeStats.totalTimeFormatted;
+        }
+        if (!routeStats.flightTime && routeStats.estimatedTime) {
+          routeStats.flightTime = routeStats.estimatedTime;
+        }
+        if (!routeStats.deckTime && routeStats.deckTimeMinutes) {
+          routeStats.deckTime = Math.round(routeStats.deckTimeMinutes);
+        }
+      }
+      
+      const stopCards = StopCardCalculator.calculateStopCards(waypoints, routeStats, selectedAircraft, weather, options);
+      // Make it available globally for debugging
+      window.currentStopCards = stopCards;
+      return stopCards;
+    } catch (error) {
+      console.error('Error generating stop cards:', error);
+      return [];
+    }
+  };
+
+  // Make generateStopCardsData available globally for debugging
+  window.generateStopCardsData = generateStopCardsData;
+
   const handleRemoveFavoriteLocation = (locationId) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       appManagers.favoriteLocationsManagerRef.current.removeFavoriteLocation(locationId);
       setFavoriteLocations(appManagers.favoriteLocationsManagerRef.current.getFavoriteLocations());
+    }
+  };
+
+  // Handle loading a flight from the LoadFlightsCard
+  const handleFlightLoad = async (flightData) => {
+    try {
+      console.log('FastPlannerApp: Loading flight data:', flightData);
+      console.log('DEBUG: Loading flight ID:', flightData.id);
+      console.log('DEBUG: Loading flight name:', flightData.name);
+      
+      // Clear existing route first
+      clearRoute();
+      
+      // Wait for clear to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Build and set the route from stops using the proper handler
+      // BUT ONLY if we don't have waypoint data (to avoid double loading)
+      const hasWaypointData = (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) ||
+                            (flightData.waypoints && flightData.waypoints.length > 0);
+      
+      if (flightData.stops && flightData.stops.length > 0 && !hasWaypointData) {
+        console.log(`Loading ${flightData.stops.length} stops as route (no waypoint data available)`);
+        
+        // Create a route string by joining the stops
+        const routeString = flightData.stops.join(' ');
+        console.log(`Setting route input to: ${routeString}`);
+        
+        // Set the route input field for display
+        setRouteInput(routeString);
+        
+        // Restore aircraft selection if available
+        if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
+          console.log(`Restoring aircraft selection: ${flightData.aircraftId}`);
+          try {
+            // Get available aircraft and find the matching one
+            const availableAircraft = appManagers.aircraftManagerRef.current.getFilteredAircraft();
+            const matchingAircraft = availableAircraft.find(aircraft => 
+              aircraft.aircraftId === flightData.aircraftId || 
+              aircraft.id === flightData.aircraftId
+            );
+            
+            if (matchingAircraft) {
+              console.log(`Found matching aircraft: ${matchingAircraft.name || matchingAircraft.aircraftId}`);
+              setSelectedAircraft(matchingAircraft);
+              
+              // Update loading indicator
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Aircraft restored: ${matchingAircraft.name || matchingAircraft.aircraftId}`, 
+                  'success',
+                  2000
+                );
+              }
+            } else {
+              console.warn(`Could not find aircraft with ID: ${flightData.aircraftId}`);
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Aircraft ${flightData.aircraftId} not found in current region`, 
+                  'warning',
+                  3000
+                );
+              }
+            }
+          } catch (error) {
+            console.error('Error restoring aircraft selection:', error);
+          }
+        }
+        
+        // Actually process the route to create waypoints using the hookAddWaypoint function
+        console.log('Processing route string to create waypoints...');
+        try {
+          if (hookAddWaypoint) {
+            await hookAddWaypoint(routeString);
+            console.log('Route processing completed via hookAddWaypoint');
+          } else {
+            console.warn('hookAddWaypoint not available, trying alternative method');
+            // Alternative: use the addWaypointDirectImpl if available
+            if (window.addWaypointClean) {
+              await window.addWaypointClean(routeString);
+              console.log('Route processing completed via addWaypointClean');
+            } else {
+              console.error('No waypoint processing function available');
+            }
+          }
+        } catch (error) {
+          console.error('Error processing route:', error);
+        }
+        
+        // Wait for waypoint processing to complete with improved timing
+        console.log('Waiting for waypoint processing to complete...');
+        
+        // Use a more robust waiting mechanism
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkInterval = 500; // Check every 500ms
+        
+        const waitForWaypoints = () => {
+          return new Promise((resolve) => {
+            const checkWaypoints = () => {
+              attempts++;
+              
+              // Get current waypoints from multiple sources
+              const currentWaypoints = waypoints || 
+                                     window.waypointManager?.getWaypoints?.() || 
+                                     appManagers.waypointManagerRef?.current?.getWaypoints?.() ||
+                                     [];
+              
+              console.log(`Attempt ${attempts}: Found ${currentWaypoints.length} waypoints`);
+              
+              // Check if we have the expected number of waypoints (at least the stops)
+              if (currentWaypoints.length >= flightData.stops.length || attempts >= maxAttempts) {
+                console.log(`Waypoint processing complete: ${currentWaypoints.length} waypoints created`);
+                resolve(currentWaypoints);
+              } else {
+                console.log(`Waiting for more waypoints... (expected at least ${flightData.stops.length})`);
+                setTimeout(checkWaypoints, checkInterval);
+              }
+            };
+            
+            checkWaypoints();
+          });
+        };
+        
+        // Wait for waypoints to be processed
+        const processedWaypoints = await waitForWaypoints();
+        
+        console.log('Triggering stop card generation after flight load...');
+        const currentRouteStats = routeStats || window.currentRouteStats;
+          
+        console.log(`Found ${processedWaypoints.length} waypoints for stop card generation`);
+        console.log('Waypoints:', processedWaypoints.map(wp => wp.name || 'unnamed').join(', '));
+        
+        if (processedWaypoints && processedWaypoints.length >= 2) {
+          console.log(`Generating stop cards for ${processedWaypoints.length} waypoints`);
+          
+          // Generate stop cards using the same logic as normal route building
+          const newStopCards = generateStopCardsData(
+            processedWaypoints, 
+            currentRouteStats, 
+            selectedAircraft, 
+            weather
+          );
+          
+          if (newStopCards && newStopCards.length > 0) {
+            console.log(`Generated ${newStopCards.length} stop cards for loaded flight`);
+            setStopCards(newStopCards);
+            
+            // Make stop cards globally available for debugging
+            window.debugStopCards = newStopCards;
+            console.log('Stop cards available at window.debugStopCards');
+            
+            // Update loading indicator with success
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Flight loaded: ${flightData.flightNumber || 'Unknown'} with ${flightData.stops.length} stops`, 
+                'success',
+                3000
+              );
+            }
+          } else {
+            console.warn('Stop card generation returned no results');
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                'Flight loaded but stop cards could not be generated', 
+                'warning',
+                3000
+              );
+            }
+          }
+        } else {
+          console.warn(`Insufficient waypoints for stop card generation (need >= 2, have ${processedWaypoints.length})`);
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              'Flight loaded but insufficient waypoints for route calculation', 
+              'warning',
+              3000
+            );
+          }
+        }
+      }
+      
+      // After loading completes, ensure we return to the main card
+      setTimeout(() => {
+        // The RightPanel should automatically show stop cards if they exist
+        // This timeout ensures the panel switches back to main view after loading
+        console.log('Flight loading complete - returning to main view');
+      }, 2000);
+      
+      // Process waypoints - handle both displayWaypoints (strings) and waypoints (objects)
+      let waypointsToProcess = [];
+      
+      if (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) {
+        console.log('Using displayWaypoints format');
+        waypointsToProcess = flightData.displayWaypoints;
+      } else if (flightData.waypoints && flightData.waypoints.length > 0) {
+        console.log('Using waypoints format - converting to displayWaypoints format');
+        console.log('Flight waypoints:', flightData.waypoints);
+        console.log('Flight stops:', flightData.stops);
+        
+        // We need to reconstruct the full sequence from the original displayWaypoints
+        // Check if we have the raw flight data with the original displayWaypoints
+        if (flightData._rawFlight && flightData._rawFlight.displayWaypoints) {
+          const rawDisplayWaypoints = flightData._rawFlight.displayWaypoints;
+          console.log('Found raw displayWaypoints:', rawDisplayWaypoints);
+          
+          if (typeof rawDisplayWaypoints === 'string' && rawDisplayWaypoints.includes('|')) {
+            waypointsToProcess = rawDisplayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
+            console.log('Using parsed raw displayWaypoints:', waypointsToProcess);
+          } else if (Array.isArray(rawDisplayWaypoints)) {
+            waypointsToProcess = rawDisplayWaypoints;
+            console.log('Using raw displayWaypoints array:', waypointsToProcess);
+          }
+        }
+        
+        // Fallback: reconstruct from waypoints + stops if raw data not available
+        if (waypointsToProcess.length === 0) {
+          console.log('Reconstructing displayWaypoints from waypoints and stops...');
+          
+          // Create a basic sequence: departure + waypoints + destination
+          const stops = flightData.stops || [];
+          const waypoints = flightData.waypoints || [];
+          
+          if (stops.length >= 2) {
+            // Add departure
+            waypointsToProcess.push(`${stops[0]} (Dep)`);
+            
+            // Add navigation waypoints (they don't have coordinates so we'll use name-based lookup)
+            for (const wp of waypoints) {
+              if (wp.name && !wp.isStop) {
+                waypointsToProcess.push(wp.name);
+              }
+            }
+            
+            // Add intermediate stops
+            for (let i = 1; i < stops.length - 1; i++) {
+              waypointsToProcess.push(`${stops[i]} (Stop${i})`);
+            }
+            
+            // Add destination
+            waypointsToProcess.push(`${stops[stops.length - 1]} (Des)`);
+          }
+        }
+        
+        console.log('Final converted waypoints:', waypointsToProcess);
+      }
+      
+      if (waypointsToProcess.length > 0) {
+        console.log(`Loading flight waypoints with coordinate placement - ${waypointsToProcess.length} waypoints`);
+        
+        // Set the route input for display (just the stops)
+        if (flightData.stops && flightData.stops.length > 0) {
+          const routeString = flightData.stops.join(' ');
+          console.log(`Setting route input to: ${routeString}`);
+          setRouteInput(routeString);
+        }
+        
+        try {
+          // Get the full route coordinates from the raw flight data
+          const rawFlight = flightData._rawFlight;
+          let routeCoordinates = [];
+          
+          console.log('DEBUG: Raw flight object:', rawFlight);
+          
+          if (rawFlight && rawFlight.fullRouteGeoShape) {
+            console.log('DEBUG: Found fullRouteGeoShape, extracting coordinates...');
+            // Extract coordinates from the GeoShape
+            const geoShape = rawFlight.fullRouteGeoShape.toGeoJson ? 
+              rawFlight.fullRouteGeoShape.toGeoJson() : rawFlight.fullRouteGeoShape;
+              
+            console.log('DEBUG: GeoShape:', geoShape);
+              
+            if (geoShape && geoShape.coordinates) {
+              routeCoordinates = geoShape.coordinates;
+              console.log(`Found ${routeCoordinates.length} coordinate points in route`);
+              console.log('First few coordinates:', routeCoordinates.slice(0, 3));
+            } else {
+              console.warn('DEBUG: No coordinates found in geoShape');
+            }
+          } else {
+            console.warn('DEBUG: No fullRouteGeoShape found in raw flight');
+          }
+          
+          // Get the waypoint names with labels
+          const displayWaypoints = waypointsToProcess;
+          console.log(`Display waypoints: ${displayWaypoints.join(', ')}`);
+          
+          // Match waypoints with coordinates and place them directly
+          if (routeCoordinates.length > 0 && displayWaypoints.length === routeCoordinates.length) {
+            console.log('Coordinate count matches waypoint count - proceeding with direct placement');
+            
+            // Wait for stops to be processed first
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Clear any existing waypoints first
+            if (appManagers.waypointManagerRef?.current) {
+              console.log('Clearing existing waypoints before loading flight waypoints');
+              if (typeof appManagers.waypointManagerRef.current.clearWaypoints === 'function') {
+                appManagers.waypointManagerRef.current.clearWaypoints();
+              } else {
+                console.log('clearWaypoints method not available, skipping waypoint clearing');
+              }
+            }
+            
+            // Add each waypoint using direct coordinates
+            for (let i = 0; i < displayWaypoints.length; i++) {
+              const waypointLabel = displayWaypoints[i];
+              const coordinates = routeCoordinates[i]; // [lng, lat]
+              
+              // Parse the waypoint name and determine type
+              const isStop = waypointLabel.includes('(Dep)') || 
+                           waypointLabel.includes('(Stop') || 
+                           waypointLabel.includes('(Des)');
+              
+              // Clean name (remove labels)
+              const cleanName = waypointLabel.replace(/\s*\([^)]*\)\s*$/, '').trim();
+              
+              console.log(`Adding ${isStop ? 'STOP' : 'WAYPOINT'}: ${cleanName} at [${coordinates[0]}, ${coordinates[1]}]`);
+              
+              try {
+                // Add the waypoint using direct coordinates
+                if (appManagers.waypointManagerRef?.current) {
+                  await appManagers.waypointManagerRef.current.addWaypoint(
+                    coordinates, // [lng, lat]
+                    cleanName,
+                    {
+                      isWaypoint: !isStop,
+                      type: isStop ? 'LANDING_STOP' : 'WAYPOINT'
+                    }
+                  );
+                  console.log(`Successfully placed ${isStop ? 'stop' : 'waypoint'}: ${cleanName}`);
+                }
+                
+                // Small delay between placements to avoid conflicts
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+              } catch (error) {
+                console.error(`Error placing waypoint ${cleanName}:`, error);
+                // Continue with other waypoints even if one fails
+              }
+            }
+            
+            console.log('All flight waypoints and stops loaded successfully');
+            
+            // Update loading indicator
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Loaded ${displayWaypoints.length} waypoints from flight`, 
+                'success',
+                2000
+              );
+            }
+            
+          } else {
+            console.warn(`Coordinate/waypoint count mismatch: ${routeCoordinates.length} coordinates vs ${displayWaypoints.length} waypoints`);
+            // Fallback to the original method if counts don't match
+            console.log('Falling back to name-based waypoint loading...');
+            
+            for (const waypointLabel of displayWaypoints) {
+              const isStop = waypointLabel.includes('(Dep)') || 
+                           waypointLabel.includes('(Stop') || 
+                           waypointLabel.includes('(Des)');
+              
+              if (!isStop) { // Only add navigation waypoints, stops already handled
+                const cleanName = waypointLabel.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                
+                try {
+                  if (appManagers.waypointManagerRef?.current?.addWaypointByName) {
+                    await appManagers.waypointManagerRef.current.addWaypointByName(cleanName, {
+                      isWaypoint: true,
+                      type: 'WAYPOINT'
+                    });
+                  }
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                  console.error(`Error adding waypoint ${cleanName}:`, error);
+                }
+              }
+            }
+          }
+          
+        } catch (error) {
+          console.error('Error loading flight waypoints:', error);
+        }
+      } else {
+        console.log('DEBUG: No displayWaypoints found, checking combinedWaypoints...');
+        
+        // Fallback: try using combinedWaypoints if displayWaypoints is not available
+        if (flightData.combinedWaypoints && flightData.combinedWaypoints.length > 0) {
+          console.log('DEBUG: Using combinedWaypoints as fallback');
+          console.log('Combined waypoints:', flightData.combinedWaypoints);
+          
+          try {
+            // Process combinedWaypoints - these don't have labels so we need to determine type differently
+            const stops = flightData.stops || [];
+            
+            for (const waypointName of flightData.combinedWaypoints) {
+              const isStop = stops.includes(waypointName);
+              
+              if (!isStop) { // Only add navigation waypoints, stops are already handled
+                console.log(`Adding navigation waypoint from combinedWaypoints: ${waypointName}`);
+                
+                try {
+                  if (appManagers.waypointManagerRef?.current?.addWaypointByName) {
+                    await appManagers.waypointManagerRef.current.addWaypointByName(waypointName, {
+                      isWaypoint: true,
+                      type: 'WAYPOINT'
+                    });
+                    console.log(`Successfully added waypoint: ${waypointName}`);
+                  }
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                  console.error(`Error adding waypoint ${waypointName}:`, error);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error processing combinedWaypoints:', error);
+          }
+        } else {
+          console.log('DEBUG: No waypoints to load (neither displayWaypoints nor combinedWaypoints available)');
+        }
+      }
+      
+      // Set aircraft if available
+      if (flightData.aircraftId) {
+        console.log(`TODO: Set aircraft: ${flightData.aircraftId}`);
+        // The aircraft should be updated through the aircraft selection UI
+        // This will require updating the aircraft context/state
+      }
+      
+      // Update status
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(
+          `Flight loaded: ${flightData.flightNumber || 'Unknown'} with ${flightData.stops.length} stops`, 
+          'success',
+          3000
+        );
+      }
+      
+    } catch (error) {
+      console.error('Error loading flight:', error);
+      
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(
+          `Failed to load flight: ${error.message}`, 
+          'error'
+        );
+      }
     }
   };
   
@@ -254,6 +735,7 @@ const FastPlannerCore = ({
     <>
       {/* RegionAircraftConnector removed - using only event-based region sync */}
       <div className="fast-planner-container">
+        
         <ModeHandler 
           mapManagerRef={mapManagerRef}
           waypointManagerRef={waypointManagerRef}
@@ -301,8 +783,9 @@ const FastPlannerCore = ({
           onAircraftTypeChange={changeAircraftType} aircraftRegistration={aircraftRegistration}
           onAircraftRegistrationChange={changeAircraftRegistration} selectedAircraft={selectedAircraft}
           aircraftsByType={aircraftsByType} aircraftLoading={aircraftLoading} routeStats={routeStats}
-          waypoints={waypoints} onRemoveWaypoint={removeWaypoint} isAuthenticated={isAuthenticated}
+          stopCards={stopCards} waypoints={waypoints} onRemoveWaypoint={removeWaypoint} isAuthenticated={isAuthenticated}
           authUserName={userName} rigsLoading={rigsLoading} onLogin={login}
+          onFlightLoad={handleFlightLoad} // Add flight loading handler
           deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
           passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}

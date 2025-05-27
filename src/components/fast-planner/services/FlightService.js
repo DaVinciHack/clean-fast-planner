@@ -207,6 +207,89 @@ class FlightService {
   }
   
   /**
+   * Extract display waypoints from flight object, handling different storage formats
+   * 
+   * @param {Object} flight - Flight object from OSDK
+   * @returns {Array<string>} Array of waypoint names with labels
+   */
+  static extractDisplayWaypoints(flight) {
+    try {
+      console.log('FlightService: extractDisplayWaypoints - Raw flight.displayWaypoints:', {
+        value: flight.displayWaypoints,
+        type: typeof flight.displayWaypoints,
+        length: flight.displayWaypoints?.length || 0
+      });
+      
+      // Try direct array first
+      if (Array.isArray(flight.displayWaypoints) && flight.displayWaypoints.length > 0) {
+        console.log('FlightService: Using direct displayWaypoints array');
+        return flight.displayWaypoints;
+      }
+      
+      // Try displayWaypoints as string (pipe-separated)
+      if (typeof flight.displayWaypoints === 'string' && flight.displayWaypoints.length > 0) {
+        console.log('FlightService: Found displayWaypoints as string:', flight.displayWaypoints);
+        if (flight.displayWaypoints.includes('|')) {
+          console.log('FlightService: Parsing displayWaypoints from pipe-separated string');
+          return flight.displayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
+        } else {
+          // Single waypoint as string
+          return [flight.displayWaypoints.trim()];
+        }
+      }
+      
+      // Look for any field that contains pipe-separated waypoint data
+      const potentialFields = Object.keys(flight).filter(key => 
+        typeof flight[key] === 'string' && 
+        flight[key].includes('|') &&
+        (flight[key].includes('(Dep)') || flight[key].includes('(Des)') || flight[key].includes('(Stop'))
+      );
+      
+      if (potentialFields.length > 0) {
+        console.log(`FlightService: Found potential waypoint field: ${potentialFields[0]}`);
+        const waypointString = flight[potentialFields[0]];
+        return waypointString.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
+      }
+      
+      // Try combinedWaypoints as fallback
+      if (Array.isArray(flight.combinedWaypoints) && flight.combinedWaypoints.length > 0) {
+        console.log('FlightService: Using combinedWaypoints as fallback for displayWaypoints');
+        console.log('FlightService: CombinedWaypoints content:', flight.combinedWaypoints);
+        
+        // Convert combinedWaypoints to displayWaypoints format
+        // We need to determine which are stops vs waypoints
+        const stops = flight.stopsArray || [];
+        console.log('FlightService: Stops for comparison:', stops);
+        
+        return flight.combinedWaypoints.map(waypoint => {
+          // Check if this waypoint is a stop
+          if (stops.includes(waypoint)) {
+            // Determine what type of stop this is
+            const stopIndex = stops.indexOf(waypoint);
+            if (stopIndex === 0) {
+              return `${waypoint} (Dep)`;
+            } else if (stopIndex === stops.length - 1) {
+              return `${waypoint} (Des)`;
+            } else {
+              return `${waypoint} (Stop${stopIndex})`;
+            }
+          } else {
+            // This is a navigation waypoint
+            return waypoint;
+          }
+        });
+      }
+      
+      console.log('FlightService: No displayWaypoints found in any format');
+      return [];
+      
+    } catch (error) {
+      console.error('FlightService: Error extracting displayWaypoints:', error);
+      return [];
+    }
+  }
+  
+  /**
    * Extract structured waypoints from OSDK result
    * 
    * @param {Object} flight - Flight object from OSDK
@@ -267,6 +350,164 @@ class FlightService {
     }
     
     return structuredWaypoints;
+  }
+  /**
+   * Load flights from Palantir filtered by region
+   * 
+   * @param {string} region - Region code to filter flights (optional)
+   * @param {number} limit - Maximum number of flights to return (default: 50)
+   * @returns {Promise<Object>} Result with flights array
+   */
+  static async loadFlights(region = null, limit = 50) {
+    try {
+      console.log(`FlightService: Loading flights for region: ${region || 'ALL'}`);
+      
+      // Import the SDK to get MainFlightObjectFp2
+      const sdk = await import('@flight-app/sdk');
+      
+      // Get the MainFlightObjectFp2 object from SDK
+      const MainFlightObjectFp2 = sdk.MainFlightObjectFp2;
+      
+      if (!MainFlightObjectFp2) {
+        throw new Error(`MainFlightObjectFp2 not found in SDK. Available objects: ${Object.keys(sdk).join(', ')}`);
+      }
+      
+      console.log('FlightService: Querying flights from MainFlightObjectFp2...');
+      
+      // Build the query using client like other managers do
+      const query = client(MainFlightObjectFp2);
+      
+      // Fetch the data with appropriate page size
+      const response = await query.fetchPage({
+        $pageSize: limit
+      });
+      
+      console.log('FlightService: Query response:', {
+        dataLength: response.data?.length || 0,
+        totalCount: response.totalCount || 'unknown',
+        hasMore: response.hasMore || false
+      });
+      
+      if (!response || !response.data) {
+        console.log('FlightService: No response or data from query');
+        return { success: true, flights: [] };
+      }
+      
+      console.log(`FlightService: Found ${response.data.length} total flights`);
+      
+      // Debug: Log the regions we find in the data
+      const regionsFound = [...new Set(response.data.map(flight => flight.region).filter(Boolean))];
+      console.log(`FlightService: Regions found in flights:`, regionsFound);
+      
+      // Filter by region if specified (client-side filtering)
+      let flights = response.data;
+      if (region && region !== 'ALL') {
+        // Debug: Log exactly what we're filtering for
+        console.log(`FlightService: Filtering for region: "${region}"`);
+        
+        flights = flights.filter(flight => {
+          const flightRegion = flight.region;
+          console.log(`Checking flight ${flight.flightNumber || flight.flightId}: region="${flightRegion}"`);
+          
+          // Try exact match first, then case-insensitive match
+          return flightRegion === region || 
+                 (flightRegion && flightRegion.toUpperCase() === region.toUpperCase());
+        });
+        console.log(`FlightService: Filtered to ${flights.length} flights for region: ${region}`);
+      }
+      
+      // Process flights into a simplified format for the UI
+      const processedFlights = flights.map(flight => {
+        // Determine status based on available data
+        let status = 'Planned'; // Default
+        if (flight.isCompleted) {
+          status = 'Completed';
+        } else if (flight.isInProgress) {
+          status = 'In Progress';
+        } else if (flight.isCancelled) {
+          status = 'Cancelled';
+        }
+        
+        // Use the actual flight number/name as created, not artificial route names
+        let flightName = flight.flightNumber || 'Unknown Flight';
+        
+        // Only fall back to route-based naming if no flight number exists
+        if (!flight.flightNumber && flight.stopsArray && flight.stopsArray.length >= 2) {
+          const departure = flight.stopsArray[0];
+          const destination = flight.stopsArray[flight.stopsArray.length - 1];
+          flightName = `${departure} to ${destination}`;
+          
+          // Add date if available
+          if (flight.etd) {
+            const etdDate = new Date(flight.etd);
+            const dateStr = etdDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+            flightName += ` - ${dateStr}`;
+          }
+        }
+        
+        console.log(`FlightService: Using flight name: "${flightName}" (flightNumber: "${flight.flightNumber}")`);
+        
+        console.log(`FlightService: Processing flight - ID: ${flight.flightId}, Name: "${flightName}", StopsArray: ${flight.stopsArray?.join(' -> ') || 'none'}, DisplayWaypoints: ${flight.displayWaypoints?.length || 0}, CombinedWaypoints: ${flight.combinedWaypoints?.length || 0}`);
+        
+        // DEBUG: Log all flight properties to find where waypoints are stored
+        console.log('FlightService: All flight properties:', Object.keys(flight));
+        console.log('FlightService: Flight object waypoint-related fields:', {
+          displayWaypoints: flight.displayWaypoints,
+          combinedWaypoints: flight.combinedWaypoints,
+          waypointIds: flight.waypointIds,
+          legIds: flight.legIds,
+          legsNames: flight.legsNames
+        });
+        
+        // Check for waypoint data that might be stored as strings
+        const potentialWaypointFields = Object.keys(flight).filter(key => 
+          key.toLowerCase().includes('waypoint') || 
+          key.toLowerCase().includes('display') ||
+          key.toLowerCase().includes('combined') ||
+          (typeof flight[key] === 'string' && flight[key].includes('|'))
+        );
+        console.log('FlightService: Potential waypoint fields:', potentialWaypointFields.map(key => ({
+          field: key,
+          value: flight[key],
+          type: typeof flight[key]
+        })));
+        
+        const extractedDisplayWaypoints = this.extractDisplayWaypoints(flight);
+        console.log(`FlightService: Extracted displayWaypoints for flight ${flight.flightId}:`, extractedDisplayWaypoints);
+        
+        return {
+          id: flight.flightId,
+          name: flightName,
+          flightNumber: flight.flightNumber,
+          date: flight.etd || flight.createdAt,
+          status: status,
+          region: flight.region,
+          stops: flight.stopsArray || [],
+          displayWaypoints: extractedDisplayWaypoints,
+          combinedWaypoints: flight.combinedWaypoints || [],
+          aircraftId: flight.aircraftId,
+          captainId: flight.captainId,
+          copilotId: flight.copilotId,
+          medicId: flight.medicId,
+          soId: flight.soId,
+          rswId: flight.rswId,
+          alternateLocation: flight.alternateSplitPoint ? 
+            `${flight.alternateSplitPoint} ${flight.alternateName || ''}` : null,
+          // Include raw flight object for detailed loading
+          _rawFlight: flight
+        };
+      });
+      
+      return { success: true, flights: processedFlights };
+      
+    } catch (error) {
+      console.error('FlightService: Error loading flights:', error);
+      return { 
+        success: false, 
+        error: error.message || 'Unknown error loading flights',
+        details: error
+      };
+    }
   }
 }
 
