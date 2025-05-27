@@ -214,26 +214,16 @@ class FlightService {
    */
   static extractDisplayWaypoints(flight) {
     try {
-      console.log('FlightService: extractDisplayWaypoints - Raw flight.displayWaypoints:', {
-        value: flight.displayWaypoints,
-        type: typeof flight.displayWaypoints,
-        length: flight.displayWaypoints?.length || 0
-      });
-      
       // Try direct array first
       if (Array.isArray(flight.displayWaypoints) && flight.displayWaypoints.length > 0) {
-        console.log('FlightService: Using direct displayWaypoints array');
         return flight.displayWaypoints;
       }
       
       // Try displayWaypoints as string (pipe-separated)
       if (typeof flight.displayWaypoints === 'string' && flight.displayWaypoints.length > 0) {
-        console.log('FlightService: Found displayWaypoints as string:', flight.displayWaypoints);
         if (flight.displayWaypoints.includes('|')) {
-          console.log('FlightService: Parsing displayWaypoints from pipe-separated string');
           return flight.displayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
         } else {
-          // Single waypoint as string
           return [flight.displayWaypoints.trim()];
         }
       }
@@ -246,25 +236,17 @@ class FlightService {
       );
       
       if (potentialFields.length > 0) {
-        console.log(`FlightService: Found potential waypoint field: ${potentialFields[0]}`);
         const waypointString = flight[potentialFields[0]];
         return waypointString.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
       }
       
       // Try combinedWaypoints as fallback
       if (Array.isArray(flight.combinedWaypoints) && flight.combinedWaypoints.length > 0) {
-        console.log('FlightService: Using combinedWaypoints as fallback for displayWaypoints');
-        console.log('FlightService: CombinedWaypoints content:', flight.combinedWaypoints);
-        
         // Convert combinedWaypoints to displayWaypoints format
-        // We need to determine which are stops vs waypoints
         const stops = flight.stopsArray || [];
-        console.log('FlightService: Stops for comparison:', stops);
         
         return flight.combinedWaypoints.map(waypoint => {
-          // Check if this waypoint is a stop
           if (stops.includes(waypoint)) {
-            // Determine what type of stop this is
             const stopIndex = stops.indexOf(waypoint);
             if (stopIndex === 0) {
               return `${waypoint} (Dep)`;
@@ -274,13 +256,11 @@ class FlightService {
               return `${waypoint} (Stop${stopIndex})`;
             }
           } else {
-            // This is a navigation waypoint
             return waypoint;
           }
         });
       }
       
-      console.log('FlightService: No displayWaypoints found in any format');
       return [];
       
     } catch (error) {
@@ -447,30 +427,10 @@ class FlightService {
         
         console.log(`FlightService: Using flight name: "${flightName}" (flightNumber: "${flight.flightNumber}")`);
         
-        console.log(`FlightService: Processing flight - ID: ${flight.flightId}, Name: "${flightName}", StopsArray: ${flight.stopsArray?.join(' -> ') || 'none'}, DisplayWaypoints: ${flight.displayWaypoints?.length || 0}, CombinedWaypoints: ${flight.combinedWaypoints?.length || 0}`);
-        
-        // DEBUG: Log all flight properties to find where waypoints are stored
-        console.log('FlightService: All flight properties:', Object.keys(flight));
-        console.log('FlightService: Flight object waypoint-related fields:', {
-          displayWaypoints: flight.displayWaypoints,
-          combinedWaypoints: flight.combinedWaypoints,
-          waypointIds: flight.waypointIds,
-          legIds: flight.legIds,
-          legsNames: flight.legsNames
-        });
-        
-        // Check for waypoint data that might be stored as strings
-        const potentialWaypointFields = Object.keys(flight).filter(key => 
-          key.toLowerCase().includes('waypoint') || 
-          key.toLowerCase().includes('display') ||
-          key.toLowerCase().includes('combined') ||
-          (typeof flight[key] === 'string' && flight[key].includes('|'))
-        );
-        console.log('FlightService: Potential waypoint fields:', potentialWaypointFields.map(key => ({
-          field: key,
-          value: flight[key],
-          type: typeof flight[key]
-        })));
+        // Only log detailed flight info in development or for specific debugging
+        if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) { // Only 10% of flights in dev
+          console.log(`FlightService: Sample flight - ID: ${flight.flightId}, DisplayWaypoints: ${flight.displayWaypoints?.length || 0}, CombinedWaypoints: ${flight.combinedWaypoints?.length || 0}`);
+        }
         
         const extractedDisplayWaypoints = this.extractDisplayWaypoints(flight);
         console.log(`FlightService: Extracted displayWaypoints for flight ${flight.flightId}:`, extractedDisplayWaypoints);
