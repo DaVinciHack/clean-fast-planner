@@ -509,6 +509,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         deckFuel: deckFuelValue,
         reserveFuel: reserveFuelValue
       },
+      // Add wind information to all cards
+      windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
+      windData: {
+        windSpeed: weather?.windSpeed || 0,
+        windDirection: weather?.windDirection || 0,
+        source: weather?.source || 'manual'
+      },
       isDeparture: true,
       isDestination: false
     };
@@ -686,6 +693,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           taxiFuel: 0,
           deckFuel: 0
         },
+        // Add wind information to all cards
+        windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
+        windData: {
+          windSpeed: weather?.windSpeed || 0,
+          windDirection: weather?.windDirection || 0,
+          source: weather?.source || 'manual'
+        },
         isDeparture: isDeparture,
         isDestination: isDestination
       };
@@ -711,6 +725,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         deckFuel: Number(remainingDeckFuel),
         fuelComponents: fuelComponentsText,
         fuelComponentsObject: fuelComponents,
+        // Add wind information to all cards
+        windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
+        windData: {
+          windSpeed: weather?.windSpeed || 0,
+          windDirection: weather?.windDirection || 0,
+          source: weather?.source || 'manual'
+        },
         isDeparture: isDeparture,
         isDestination: isDestination
       };

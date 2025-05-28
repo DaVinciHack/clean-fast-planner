@@ -245,6 +245,13 @@ const StopCardsContainer = ({
           deckFuel: safeComponents.deckFuel,
           reserveFuel: safeComponents.reserveFuel,
           sum: sum, // Include the sum for verification
+          // Include wind data for consistency
+          windData: {
+            windSpeed: weather?.windSpeed || 0,
+            windDirection: weather?.windDirection || 0,
+            windSource: weather?.source || 'manual',
+            lastUpdated: new Date().toISOString()
+          },
           // Include parameters used in calculation for reference/debugging
           calculationParams: {
             passengerWeight: Number(passengerWeight) || 0,
