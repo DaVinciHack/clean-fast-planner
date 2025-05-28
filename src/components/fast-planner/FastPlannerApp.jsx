@@ -52,6 +52,8 @@ const FastPlannerCore = ({
   routeInput, setRouteInput,       // Pass state and setter
   favoriteLocations, setFavoriteLocations, // Pass state and setter
   reserveMethod, setReserveMethod, // Pass state and setter
+  alternateRouteData, setAlternateRouteData, // Pass alternate route state and setter
+  alternateRouteInput, setAlternateRouteInput, // Pass alternate route input state and setter
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl // Pass the map ready implementation
 }) => {
@@ -181,11 +183,25 @@ const FastPlannerCore = ({
 
   const {
     waypointModeActive, addWaypoint: hookAddWaypoint, removeWaypoint, updateWaypointName,
-    clearRoute, reorderWaypoints, toggleWaypointMode
+    clearRoute: hookClearRoute, reorderWaypoints, toggleWaypointMode
   } = useWaypoints({
     waypointManagerRef, platformManagerRef, mapInteractionHandlerRef, setWaypoints,
     client, currentRegion: activeRegionFromContext, setRouteStats, setStopCards
   });
+
+  // Enhanced clearRoute that also clears alternate route state
+  const clearRoute = useCallback(() => {
+    console.log('🧹 FastPlannerApp: Clearing route and alternate route');
+    
+    // Call the hook's clearRoute function
+    hookClearRoute();
+    
+    // Clear alternate route state
+    setAlternateRouteData(null);
+    setAlternateRouteInput('');
+    
+    console.log('✅ FastPlannerApp: Route and alternate route cleared');
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput]);
 
   const { updateWeatherSettings } = useWeather({
     weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
@@ -194,7 +210,8 @@ const FastPlannerCore = ({
 
   const { updateFlightSetting } = useRouteCalculation({
     waypoints, selectedAircraft, flightSettings, setFlightSettings,
-    setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef
+    setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
+    alternateRouteData
   });
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
@@ -275,6 +292,197 @@ const FastPlannerCore = ({
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       appManagers.favoriteLocationsManagerRef.current.removeFavoriteLocation(locationId);
       setFavoriteLocations(appManagers.favoriteLocationsManagerRef.current.getFavoriteLocations());
+    }
+  };
+
+  // Handle alternate route input changes
+  const handleAlternateRouteInputChange = (value) => {
+    setAlternateRouteInput(value);
+  };
+
+  // Helper function to determine split point for new flights
+  const determineNewFlightSplitPoint = useCallback((currentWaypoints) => {
+    console.log('🎯 Determining split point for new flight');
+    console.log('🎯 Current waypoints:', currentWaypoints?.length || 0);
+    
+    if (!currentWaypoints || currentWaypoints.length === 0) {
+      console.log('🎯 No waypoints available, using default split point: ENXW');
+      return "ENXW"; // Default fallback
+    }
+    
+    // Find the first landing point (stop)
+    // Landing points have labels like "(Stop1)", "(Stop2)", etc., or "(Des)" for destination
+    for (let i = 0; i < currentWaypoints.length; i++) {
+      const waypoint = currentWaypoints[i];
+      const waypointName = waypoint.name || waypoint.id || '';
+      
+      console.log(`🎯 Checking waypoint ${i}: ${waypointName}`);
+      
+      // Skip departure point
+      if (waypointName.includes('(Dep)')) {
+        console.log('🎯 Skipping departure point');
+        continue;
+      }
+      
+      // Look for first landing point (Stop or Des)
+      if (waypointName.includes('(Stop') || waypointName.includes('(Des)')) {
+        // Extract the base location name (remove the label)
+        const splitPoint = waypointName.split(' (')[0].trim();
+        console.log(`🎯 Found first landing point as split point: ${splitPoint}`);
+        return splitPoint;
+      }
+      
+      // If waypoint doesn't have labels, assume stops are any waypoint after departure
+      if (i > 0) {
+        const splitPoint = waypointName.trim();
+        console.log(`🎯 Using waypoint ${i} as split point (no labels): ${splitPoint}`);
+        return splitPoint;
+      }
+    }
+    
+    // Fallback: use last waypoint if no stops found
+    if (currentWaypoints.length > 0) {
+      const lastWaypoint = currentWaypoints[currentWaypoints.length - 1];
+      const splitPoint = (lastWaypoint.name || lastWaypoint.id || '').split(' (')[0].trim();
+      console.log(`🎯 Using last waypoint as split point: ${splitPoint}`);
+      return splitPoint;
+    }
+    
+    console.log('🎯 No suitable waypoints found, using default: ENXW');
+    return "ENXW"; // Ultimate fallback
+  }, []);
+
+  // Handle alternate route submission
+  const handleAlternateRouteSubmit = async (input) => {
+    console.log('🛣️ handleAlternateRouteSubmit called with:', input);
+    
+    try {
+      // Parse the input to determine if it's single location or pair
+      const trimmedInput = input.trim();
+      const locations = trimmedInput.split(/\s+/).filter(loc => loc.length > 0);
+      
+      console.log('🛣️ Parsed locations:', locations);
+      
+      // Helper function to look up coordinates for a location
+      const getLocationCoordinates = async (locationName) => {
+        try {
+          // Use the platform manager to find the location
+          if (appManagers.platformManagerRef?.current) {
+            const platforms = appManagers.platformManagerRef.current.getPlatforms();
+            const platform = platforms.find(p => 
+              p.name?.toUpperCase() === locationName.toUpperCase() ||
+              p.id?.toUpperCase() === locationName.toUpperCase()
+            );
+            
+            if (platform && platform.coordinates) {
+              console.log(`🛣️ Found coordinates for ${locationName}:`, platform.coordinates);
+              return platform.coordinates; // [lng, lat]
+            }
+          }
+          
+          console.warn(`🛣️ Could not find coordinates for location: ${locationName}`);
+          return null;
+        } catch (error) {
+          console.error(`🛣️ Error looking up coordinates for ${locationName}:`, error);
+          return null;
+        }
+      };
+      
+      if (locations.length === 1) {
+        // Single location - determine split point based on context
+        console.log('🛣️ Single location alternate route');
+        const destination = locations[0];
+        
+        // ENHANCED SPLIT POINT LOGIC
+        let currentSplitPoint;
+        
+        if (alternateRouteData?.splitPoint) {
+          // LOADED FLIGHT: Use existing split point from flight data
+          currentSplitPoint = alternateRouteData.splitPoint;
+          console.log('🛣️ Using existing split point from loaded flight:', currentSplitPoint);
+        } else {
+          // NEW FLIGHT: Determine split point from current waypoints
+          currentSplitPoint = determineNewFlightSplitPoint(waypoints);
+          console.log('🛣️ Determined split point for new flight:', currentSplitPoint);
+        }
+        
+        // Look up coordinates for both locations
+        const fromCoords = await getLocationCoordinates(currentSplitPoint);
+        const toCoords = await getLocationCoordinates(destination);
+        
+        if (fromCoords && toCoords) {
+          // Create actual coordinates array
+          const coordinates = [fromCoords, toCoords];
+          
+          const newAlternateRouteData = {
+            coordinates: coordinates,
+            splitPoint: currentSplitPoint,
+            name: `${currentSplitPoint} ${destination} (Alternate)`, // Correct format: FROM TO (Alternate)
+            geoPoint: `${toCoords[1]},${toCoords[0]}`, // lat,lng format
+            legIds: []
+          };
+          
+          console.log('🛣️ Created single location alternate route with real coordinates:', newAlternateRouteData);
+          setAlternateRouteData(newAlternateRouteData);
+          
+          // Trigger map update immediately
+          if (appManagers.waypointManagerRef?.current) {
+            console.log('🛣️ Triggering immediate map update for new alternate route');
+            appManagers.waypointManagerRef.current.updateRoute(routeStats, newAlternateRouteData);
+          }
+        } else {
+          console.error('🛣️ Could not find coordinates for alternate route locations');
+          return;
+        }
+        
+      } else if (locations.length === 2) {
+        // Pair of locations - custom from/to route
+        console.log('🛣️ Custom from/to alternate route');
+        const [from, to] = locations;
+        console.log(`🛣️ Creating alternate route from ${from} to ${to}`);
+        
+        // Look up coordinates for both locations
+        const fromCoords = await getLocationCoordinates(from);
+        const toCoords = await getLocationCoordinates(to);
+        
+        if (fromCoords && toCoords) {
+          // Create actual coordinates array
+          const coordinates = [fromCoords, toCoords];
+          
+          const newAlternateRouteData = {
+            coordinates: coordinates,
+            splitPoint: from,
+            name: `${from} ${to} (Alternate)`,
+            geoPoint: `${toCoords[1]},${toCoords[0]}`, // lat,lng format
+            legIds: []
+          };
+          
+          console.log('🛣️ Created custom from/to alternate route with real coordinates:', newAlternateRouteData);
+          setAlternateRouteData(newAlternateRouteData);
+          
+          // Trigger map update immediately
+          if (appManagers.waypointManagerRef?.current) {
+            console.log('🛣️ Triggering immediate map update for new alternate route');
+            appManagers.waypointManagerRef.current.updateRoute(routeStats, newAlternateRouteData);
+          }
+        } else {
+          console.error('🛣️ Could not find coordinates for alternate route locations');
+          return;
+        }
+        
+      } else {
+        console.error('🛣️ Invalid alternate route format. Expected 1 or 2 locations.');
+        return;
+      }
+      
+      // Update the input field to show the formatted name
+      const newName = locations.length === 1 ? 
+        `${alternateRouteData?.splitPoint || "ENXW"} ${locations[0]} (Alternate)` : 
+        `${locations[0]} ${locations[1]} (Alternate)`;
+      setAlternateRouteInput(newName);
+      
+    } catch (error) {
+      console.error('🛣️ Error processing alternate route:', error);
     }
   };
 
@@ -497,6 +705,7 @@ const FastPlannerCore = ({
           // Get the full route coordinates from the raw flight data
           const rawFlight = flightData._rawFlight;
           let routeCoordinates = [];
+          let alternateRouteData = null;
           
           console.log('DEBUG: Raw flight object:', rawFlight);
           
@@ -517,6 +726,50 @@ const FastPlannerCore = ({
             }
           } else {
             console.warn('DEBUG: No fullRouteGeoShape found in raw flight');
+          }
+          
+          // Extract alternate route data if available
+          if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
+            console.log('DEBUG: Found alternateFullRouteGeoShape, extracting alternate route data...');
+            
+            // Extract alternate route coordinates
+            const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
+              rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
+              
+            console.log('DEBUG: Alternate GeoShape:', alternateGeoShape);
+            
+            if (alternateGeoShape && alternateGeoShape.coordinates) {
+              alternateRouteData = {
+                coordinates: alternateGeoShape.coordinates,
+                splitPoint: rawFlight.alternateSplitPoint || null,
+                name: rawFlight.alternateName || 'Alternate Route',
+                geoPoint: rawFlight.alternateGeoPoint || null,
+                legIds: rawFlight.alternateLegIds || []
+              };
+              
+              console.log(`DEBUG: Found alternate route with ${alternateRouteData.coordinates.length} coordinate points`);
+              console.log('DEBUG: Alternate split point:', alternateRouteData.splitPoint);
+              console.log('DEBUG: Alternate name:', alternateRouteData.name);
+              console.log('DEBUG: Alternate coordinates:', alternateRouteData.coordinates);
+            } else {
+              console.warn('DEBUG: No coordinates found in alternate geoShape');
+            }
+          } else {
+            console.log('DEBUG: No alternateFullRouteGeoShape found in raw flight');
+          }
+          
+          // Store alternate route data in state for rendering
+          if (alternateRouteData) {
+            console.log('DEBUG: Storing alternate route data in component state');
+            setAlternateRouteData(alternateRouteData);
+            
+            // Also populate the alternate route input field with the current alternate name
+            console.log('DEBUG: Setting alternate route input to:', alternateRouteData.name);
+            setAlternateRouteInput(alternateRouteData.name);
+          } else {
+            console.log('DEBUG: Clearing alternate route data (no alternate route in flight)');
+            setAlternateRouteData(null);
+            setAlternateRouteInput(''); // Clear input field too
           }
           
           // Get the waypoint names with labels
@@ -770,6 +1023,8 @@ const FastPlannerCore = ({
           onRemoveWaypoint={removeWaypoint} onWaypointNameChange={updateWaypointName}
           onAddWaypoint={hookAddWaypoint} onReorderWaypoints={reorderWaypoints} routeInput={routeInput}
           onRouteInputChange={handleRouteInputChange} favoriteLocations={favoriteLocations}
+          alternateRouteInput={alternateRouteInput} onAlternateRouteInputChange={handleAlternateRouteInputChange}
+          onAlternateRouteSubmit={handleAlternateRouteSubmit}
           onAddFavoriteLocation={handleAddFavoriteLocation} onRemoveFavoriteLocation={handleRemoveFavoriteLocation}
           onClearRoute={clearRoute} onToggleChart={togglePlatformsVisibility} chartsVisible={platformsVisible}
           onToggleWaypointMode={toggleWaypointMode} waypointModeActive={waypointModeActive}
@@ -814,6 +1069,7 @@ const FastPlannerCore = ({
           toggleBlocksVisibility={toggleBlocksVisibility} // New prop
           toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
+          alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
         />
       </div>
     </>
@@ -837,6 +1093,8 @@ const FastPlannerApp = () => {
   const [forceUpdate, setForceUpdate] = useState(0);
   const [routeInput, setRouteInput] = useState('');
   const [reserveMethod, setReserveMethod] = useState('fixed');
+  const [alternateRouteData, setAlternateRouteData] = useState(null);
+  const [alternateRouteInput, setAlternateRouteInput] = useState('');
 
   // Define addWaypointDirect and its implementation here, so they can be passed to useManagers
   // and then the implementation to FastPlannerCore
@@ -1003,6 +1261,8 @@ const FastPlannerApp = () => {
         routeInput={routeInput} setRouteInput={setRouteInput}
         favoriteLocations={favoriteLocations} setFavoriteLocations={setFavoriteLocations}
         reserveMethod={reserveMethod} setReserveMethod={setReserveMethod}
+        alternateRouteData={alternateRouteData} setAlternateRouteData={setAlternateRouteData}
+        alternateRouteInput={alternateRouteInput} setAlternateRouteInput={setAlternateRouteInput}
         addWaypointDirectImplementation={addWaypointDirectImpl}
         handleMapReadyImpl={handleMapReadyImpl}
       />

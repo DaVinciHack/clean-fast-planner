@@ -40,6 +40,8 @@ const MainCard = ({
   // Weather props
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {},
+  // Alternate route data
+  alternateRouteData = null,
 }) => {
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
@@ -493,6 +495,7 @@ const MainCard = ({
             deckFuelFlow={deckFuelFlow}
             taxiFuel={taxiFuel}
             weather={weather}
+            alternateRouteData={alternateRouteData}
           />
         )}
       </div>

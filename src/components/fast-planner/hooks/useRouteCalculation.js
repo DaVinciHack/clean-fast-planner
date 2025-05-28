@@ -21,7 +21,8 @@ const useRouteCalculation = ({
   setStopCards,
   weather,
   waypointManagerRef,
-  appSettingsManagerRef
+  appSettingsManagerRef,
+  alternateRouteData
 }) => {
   // Initialize static properties for calculation state tracking
   if (!useRouteCalculation.lastInputHash) {
@@ -81,9 +82,13 @@ const useRouteCalculation = ({
       return;
     }
     
-    if (inputHash === useRouteCalculation.lastInputHash && timeSinceLastCalculation < 300) {
-      console.warn('⚠️ useRouteCalculation: Duplicate calculation detected within 300ms, skipping');
-      return;
+    // Only prevent calculation if one is literally in progress RIGHT NOW
+    // Remove time-based debouncing that's blocking legitimate calculations
+    console.log('⚡ useRouteCalculation: Starting calculation (no debounce blocking)');
+    
+    // Log if this is a duplicate hash for debugging
+    if (inputHash === useRouteCalculation.lastInputHash) {
+      console.log('📝 useRouteCalculation: Same input hash, but settings may have changed');
     }
     
     // Set the tracking variables
@@ -154,8 +159,54 @@ const useRouteCalculation = ({
           // Store the result hash
           useRouteCalculation.lastResultHash = resultHash;
           
+          // CRITICAL FIX: Preserve existing StopCards data when updating route stats
+          // StopCardsContainer publishes authoritative fuel data that must not be overwritten
+          const existingStopCardsData = window.currentRouteStats?.stopCards || null;
+          const existingFuelData = window.currentRouteStats?.fuelData || null;
+          const existingPassengerData = window.currentRouteStats?.passengerData || null;
+          const existingUpdateTrigger = window.currentRouteStats?.updateTrigger || null;
+          
+          // SMART UPDATE: Always update route stats, but preserve StopCards authoritative data
+          console.log('⛽ useRouteCalculation: Updating route stats while preserving StopCards authoritative data');
+          
           // Update global state with validated results
           window.currentRouteStats = result.enhancedResults;
+          
+          // IMMEDIATELY re-apply StopCards authoritative data if it exists
+          if (existingStopCardsData) {
+            window.currentRouteStats.stopCards = existingStopCardsData;
+            console.log('⛽ useRouteCalculation: Restored StopCards data');
+          }
+          if (existingFuelData) {
+            // CRITICAL: Override specific fuel properties with StopCards values
+            window.currentRouteStats.totalFuel = existingFuelData.totalFuel;
+            window.currentRouteStats.tripFuel = existingFuelData.tripFuel;
+            window.currentRouteStats.contingencyFuel = existingFuelData.contingencyFuel;
+            window.currentRouteStats.taxiFuel = existingFuelData.taxiFuel;
+            window.currentRouteStats.deckFuel = existingFuelData.deckFuel;
+            window.currentRouteStats.reserveFuel = existingFuelData.reserveFuel;
+            window.currentRouteStats.fuelData = existingFuelData;
+            console.log('⛽ useRouteCalculation: Restored StopCards fuel data:', {
+              totalFuel: existingFuelData.totalFuel,
+              source: 'StopCards'
+            });
+          }
+          if (existingPassengerData) {
+            window.currentRouteStats.passengerData = existingPassengerData;
+          }
+          if (existingUpdateTrigger) {
+            window.currentRouteStats.updateTrigger = Date.now(); // Update trigger timestamp
+          }
+          
+          console.log('⛽ useRouteCalculation: Updated window.currentRouteStats with distance/time, preserved StopCards fuel data');
+          
+          // FORCE: Trigger top card update after preserving StopCards data
+          setTimeout(() => {
+            if (typeof window.triggerRouteStatsUpdate === 'function') {
+              console.log('⛽ useRouteCalculation: Triggering top card update after preserving StopCards data');
+              window.triggerRouteStatsUpdate();
+            }
+          }, 50);
           
           // Set state updates with validated data
           setRouteStats(result.enhancedResults);
@@ -167,7 +218,7 @@ const useRouteCalculation = ({
             const currentWaypointManager = waypointManagerRef.current;
             const routeUpdateId = setTimeout(() => {
               if (currentWaypointManager) {
-                currentWaypointManager.updateRoute(result.enhancedResults);
+                currentWaypointManager.updateRoute(result.enhancedResults, alternateRouteData);
               }
             }, 50);
           }

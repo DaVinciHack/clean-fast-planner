@@ -832,6 +832,397 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     return finalCards;
 };
 
+/**
+ * Calculate alternate stop card data for alternate route
+ * Shows the fuel required for: legs to split point + alternate leg
+ * This represents the minimal fuel needed for alternate route capability
+ * 
+ * @param {Array} waypoints - Main route waypoints array
+ * @param {Object} alternateRouteData - Alternate route information
+ * @param {Object} routeStats - Route statistics from RouteCalculator
+ * @param {Object} selectedAircraft - Selected aircraft with performance data
+ * @param {Object} weather - Weather data (windSpeed, windDirection)
+ * @param {Object} options - Calculation parameters (same as normal stop cards)
+ * @returns {Object|null} Alternate stop card object or null if no alternate route
+ */
+const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, selectedAircraft, weather, options = {}) => {
+  console.log('🟠 AlternateStopCard: Starting calculation');
+  
+  // Verify we have the necessary input data
+  if (!waypoints || waypoints.length < 2 || !selectedAircraft || !alternateRouteData) {
+    console.log('🟠 AlternateStopCard: Missing required input data');
+    return null;
+  }
+  
+  // CRITICAL: Ensure aircraft has all required properties
+  if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
+    console.error('🟠 AlternateStopCard: Aircraft missing critical cruiseSpeed or fuelBurn property');
+    return null;
+  }
+  
+  // Extract same settings as normal stop cards - using 0 for missing values to show problems immediately
+  const {
+    passengerWeight = 0,  // Default to 0 to make missing settings obvious
+    taxiFuel = 0,         // Default to 0 to make missing settings obvious
+    contingencyFuelPercent = 0, // Default to 0 to make missing settings obvious
+    reserveFuel = 0,      // Default to 0 to make missing settings obvious
+    deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
+    deckFuelFlow = 0      // Default to 0 to make missing settings obvious
+  } = options;
+  
+  // Convert all calculation parameters to proper numeric values
+  const taxiFuelValue = Number(taxiFuel) || 0;
+  const passengerWeightValue = Number(passengerWeight) || 0;
+  const contingencyFuelPercentValue = Number(contingencyFuelPercent) || 0;
+  const reserveFuelValue = Number(reserveFuel) || 0;
+  const deckTimePerStopValue = Number(deckTimePerStop) || 0;
+  const deckFuelFlowValue = Number(deckFuelFlow) || 0;
+  
+  console.log('🟠 AlternateStopCard: Using same settings as normal stop cards:', {
+    taxiFuelValue,
+    passengerWeightValue,
+    contingencyFuelPercentValue,
+    reserveFuelValue,
+    deckTimePerStopValue,
+    deckFuelFlowValue
+  });
+  
+  // Find the split point in the waypoints
+  const splitPointName = alternateRouteData.splitPoint;
+  if (!splitPointName) {
+    console.error('🟠 AlternateStopCard: No split point defined in alternate route data');
+    return null;
+  }
+  
+  // Filter to landing stops only (same logic as normal stop cards)
+  const landingStopsOnly = waypoints.filter(wp => {
+    const isWaypoint = 
+      wp.pointType === 'NAVIGATION_WAYPOINT' || 
+      wp.isWaypoint === true || 
+      wp.type === 'WAYPOINT';
+    return !isWaypoint;
+  });
+  
+  // Find split point index in landing stops
+  console.log('🟠 AlternateStopCard: Looking for split point:', splitPointName);
+  console.log('🟠 AlternateStopCard: Available landing stops:', landingStopsOnly.map(wp => ({
+    name: wp.name,
+    id: wp.id,
+    pointType: wp.pointType,
+    isWaypoint: wp.isWaypoint,
+    type: wp.type
+  })));
+  
+  let splitPointIndex = landingStopsOnly.findIndex(wp => 
+    wp.name && wp.name.toUpperCase() === splitPointName.toUpperCase()
+  );
+  
+  // If not found in landing stops, try searching in all waypoints
+  if (splitPointIndex === -1) {
+    console.log('🟠 AlternateStopCard: Split point not found in landing stops, searching all waypoints...');
+    
+    const allWaypointsIndex = waypoints.findIndex(wp => 
+      wp.name && wp.name.toUpperCase() === splitPointName.toUpperCase()
+    );
+    
+    if (allWaypointsIndex !== -1) {
+      console.log('🟠 AlternateStopCard: Found split point in all waypoints at index:', allWaypointsIndex);
+      
+      // Find the corresponding landing stop index
+      // Count how many landing stops come before this waypoint
+      splitPointIndex = 0;
+      for (let i = 0; i <= allWaypointsIndex && splitPointIndex < landingStopsOnly.length; i++) {
+        const wp = waypoints[i];
+        const isWaypoint = 
+          wp.pointType === 'NAVIGATION_WAYPOINT' || 
+          wp.isWaypoint === true || 
+          wp.type === 'WAYPOINT';
+        
+        if (!isWaypoint) {
+          if (wp.name && wp.name.toUpperCase() === splitPointName.toUpperCase()) {
+            break;
+          }
+          splitPointIndex++;
+        }
+      }
+      
+      console.log('🟠 AlternateStopCard: Mapped to landing stops index:', splitPointIndex);
+    }
+  }
+  
+  if (splitPointIndex === -1 || splitPointIndex >= landingStopsOnly.length) {
+    console.error('🟠 AlternateStopCard: Split point not found or invalid index:', {
+      splitPointName,
+      splitPointIndex,
+      landingStopsLength: landingStopsOnly.length
+    });
+    return null;
+  }
+  
+  console.log(`🟠 AlternateStopCard: Split point "${splitPointName}" found at index ${splitPointIndex}`);
+  
+  // Calculate fuel for legs TO the split point (not including the split point leg itself)
+  let legsToSplitPointFuel = 0;
+  let legsToSplitPointDistance = 0;
+  let legsToSplitPointTime = 0;
+  
+  // Use route stats legs if available for consistency
+  if (routeStats && routeStats.legs && routeStats.legs.length > 0) {
+    console.log('🟠 AlternateStopCard: Using route stats legs for calculation');
+    
+    // Sum up legs TO the split point (up to but not including split point index)
+    for (let i = 0; i < Math.min(splitPointIndex, routeStats.legs.length); i++) {
+      const leg = routeStats.legs[i];
+      legsToSplitPointFuel += leg.fuel || 0;
+      legsToSplitPointDistance += leg.distance || 0;
+      legsToSplitPointTime += leg.time || 0;
+      
+      console.log(`🟠 AlternateStopCard: Added leg ${i}: fuel=${leg.fuel}, distance=${leg.distance}, time=${leg.time}`);
+    }
+  } else {
+    console.log('🟠 AlternateStopCard: Calculating legs to split point manually');
+    
+    // Manual calculation for legs to split point
+    for (let i = 0; i < splitPointIndex; i++) {
+      const fromWaypoint = landingStopsOnly[i];
+      const toWaypoint = landingStopsOnly[i + 1];
+      
+      // Calculate leg distance, time, and fuel
+      const legData = calculateLegWithWind(fromWaypoint, toWaypoint, selectedAircraft, weather);
+      if (legData) {
+        legsToSplitPointFuel += legData.fuel;
+        legsToSplitPointDistance += legData.distance;
+        legsToSplitPointTime += legData.time;
+      }
+    }
+  }
+  
+  console.log(`🟠 AlternateStopCard: Legs to split point totals:`, {
+    fuel: legsToSplitPointFuel,
+    distance: legsToSplitPointDistance,
+    time: legsToSplitPointTime
+  });
+  
+  // Calculate alternate leg fuel (from split point to alternate destination)
+  let alternateLegFuel = 0;
+  let alternateLegDistance = 0;
+  let alternateLegTime = 0;
+  
+  if (alternateRouteData.coordinates && alternateRouteData.coordinates.length >= 2) {
+    // Get split point and alternate destination coordinates
+    const splitPointCoords = alternateRouteData.coordinates[0]; // [lon, lat]
+    const alternateDestCoords = alternateRouteData.coordinates[alternateRouteData.coordinates.length - 1]; // [lon, lat]
+    
+    // Calculate alternate leg distance
+    try {
+      const from = window.turf.point(splitPointCoords);
+      const to = window.turf.point(alternateDestCoords);
+      alternateLegDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+      
+      // Calculate time and fuel with wind
+      if (window.WindCalculations) {
+        const fromCoords = { lat: splitPointCoords[1], lon: splitPointCoords[0] };
+        const toCoords = { lat: alternateDestCoords[1], lon: alternateDestCoords[0] };
+        
+        const legDetails = window.WindCalculations.calculateLegWithWind(
+          fromCoords,
+          toCoords,
+          alternateLegDistance,
+          selectedAircraft,
+          weather
+        );
+        
+        alternateLegTime = legDetails.time;
+        alternateLegFuel = Math.round(legDetails.fuel);
+        
+        console.log('🟠 AlternateStopCard: Alternate leg with wind:', legDetails);
+      } else {
+        // Fallback calculation without wind
+        alternateLegTime = alternateLegDistance / selectedAircraft.cruiseSpeed;
+        alternateLegFuel = Math.round(alternateLegTime * selectedAircraft.fuelBurn);
+      }
+      
+    } catch (error) {
+      console.error('🟠 AlternateStopCard: Error calculating alternate leg:', error);
+      return null;
+    }
+  } else {
+    console.error('🟠 AlternateStopCard: Invalid alternate route coordinates');
+    return null;
+  }
+  
+  console.log(`🟠 AlternateStopCard: Alternate leg totals:`, {
+    fuel: alternateLegFuel,
+    distance: alternateLegDistance,
+    time: alternateLegTime
+  });
+  
+  // Calculate total trip fuel for alternate route
+  const totalAlternateTripFuel = legsToSplitPointFuel + alternateLegFuel;
+  
+  // Calculate fuel components using same logic as normal stop cards
+  const alternateContingencyFuel = Math.round((totalAlternateTripFuel * contingencyFuelPercentValue) / 100);
+  
+  // Calculate deck fuel for intermediate stops TO the split point only
+  const intermediateStopsToSplit = Math.max(0, splitPointIndex - 1); // Exclude departure and split point
+  const alternateDeckTimeHours = (intermediateStopsToSplit * deckTimePerStopValue) / 60;
+  const alternateDeckFuel = Math.round(alternateDeckTimeHours * deckFuelFlowValue);
+  
+  console.log(`🟠 AlternateStopCard: Fuel components calculation:`, {
+    totalAlternateTripFuel,
+    alternateContingencyFuel,
+    intermediateStopsToSplit,
+    alternateDeckFuel,
+    taxiFuelValue,
+    reserveFuelValue
+  });
+  
+  // Calculate total fuel required for alternate route
+  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + alternateDeckFuel + reserveFuelValue;
+  
+  // Calculate max passengers using same logic as normal stop cards
+  let maxPassengers = 0;
+  if (selectedAircraft) {
+    maxPassengers = PassengerCalculator.calculateMaxPassengers(
+      selectedAircraft, 
+      totalAlternateFuel, 
+      passengerWeightValue
+    );
+  }
+  
+  // Create fuel components text
+  const fuelComponentsText = `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue}`;
+  
+  // Create route description
+  const alternateDestination = alternateRouteData.name ? 
+    alternateRouteData.name.replace(' (Alternate)', '').split(' ').pop() : 
+    'Unknown';
+  const routeDescription = `Legs to ${splitPointName} + Alternate to ${alternateDestination}`;
+  
+  // Calculate total distance and time with proper number handling
+  const totalAlternateDistance = Number(legsToSplitPointDistance || 0) + Number(alternateLegDistance || 0);
+  const totalAlternateTime = Number(legsToSplitPointTime || 0) + Number(alternateLegTime || 0);
+  
+  console.log(`🟠 AlternateStopCard: Final calculations:`, {
+    totalAlternateFuel,
+    maxPassengers,
+    totalAlternateDistance,
+    totalAlternateTime,
+    routeDescription,
+    legsToSplitPointDistance: Number(legsToSplitPointDistance || 0),
+    alternateLegDistance: Number(alternateLegDistance || 0),
+    legsToSplitPointTime: Number(legsToSplitPointTime || 0),
+    alternateLegTime: Number(alternateLegTime || 0)
+  });
+  
+  // Create the alternate stop card
+  const alternateCard = {
+    index: 'A',
+    id: 'alternate-route',
+    stopName: 'Alternate Route',
+    legDistance: Number(alternateLegDistance || 0).toFixed(1),
+    totalDistance: Number(totalAlternateDistance || 0).toFixed(1),
+    legTime: Number(alternateLegTime || 0),
+    totalTime: Number(totalAlternateTime || 0),
+    legFuel: Number(alternateLegFuel || 0),
+    totalFuel: Number(totalAlternateFuel || 0),
+    maxPassengers: maxPassengers,
+    maxPassengersDisplay: maxPassengers,
+    maxPassengersWeight: maxPassengers * passengerWeightValue,
+    groundSpeed: selectedAircraft.cruiseSpeed, // Average ground speed
+    headwind: 0, // Could be calculated as average if needed
+    deckTime: Number(alternateDeckTimeHours * 60), // Convert back to minutes
+    deckFuel: Number(alternateDeckFuel),
+    fuelComponents: fuelComponentsText,
+    fuelComponentsObject: {
+      tripFuel: totalAlternateTripFuel,
+      contingencyFuel: alternateContingencyFuel,
+      taxiFuel: taxiFuelValue,
+      deckFuel: alternateDeckFuel,
+      reserveFuel: reserveFuelValue
+    },
+    isDeparture: false,
+    isDestination: false,
+    isAlternate: true, // Special flag for alternate cards
+    routeDescription: routeDescription
+  };
+  
+  console.log('🟠 AlternateStopCard: Created alternate card:', alternateCard);
+  
+  return alternateCard;
+};
+
+/**
+ * Helper function to calculate a single leg with wind effects
+ * Used for manual alternate leg calculations when route stats are not available
+ */
+const calculateLegWithWind = (fromWaypoint, toWaypoint, aircraft, weather) => {
+  // Check for coordinates
+  const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) ||
+                       (fromWaypoint.coords && fromWaypoint.coords.length === 2);
+  const toHasCoords = (toWaypoint.lat && toWaypoint.lon) ||
+                     (toWaypoint.coords && toWaypoint.coords.length === 2);
+  
+  if (!fromHasCoords || !toHasCoords) {
+    console.error('🟠 AlternateStopCard: Missing coordinates for leg calculation');
+    return null;
+  }
+  
+  // Get coordinates
+  const fromCoords = {
+    lat: fromWaypoint.lat || fromWaypoint.coords[1],
+    lon: fromWaypoint.lon || fromWaypoint.coords[0]
+  };
+  
+  const toCoords = {
+    lat: toWaypoint.lat || toWaypoint.coords[1],
+    lon: toWaypoint.lon || toWaypoint.coords[0]
+  };
+  
+  // Calculate distance
+  let distance = 0;
+  try {
+    const from = window.turf.point([fromCoords.lon, fromCoords.lat]);
+    const to = window.turf.point([toCoords.lon, toCoords.lat]);
+    distance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+  } catch (error) {
+    console.error('🟠 AlternateStopCard: Error calculating distance:', error);
+    return null;
+  }
+  
+  // Calculate time and fuel with wind if available
+  if (window.WindCalculations) {
+    try {
+      const legDetails = window.WindCalculations.calculateLegWithWind(
+        fromCoords,
+        toCoords,
+        distance,
+        aircraft,
+        weather
+      );
+      
+      return {
+        distance: distance,
+        time: legDetails.time,
+        fuel: Math.round(legDetails.fuel)
+      };
+    } catch (error) {
+      console.error('🟠 AlternateStopCard: Error calculating wind effects:', error);
+    }
+  }
+  
+  // Fallback calculation without wind
+  const time = distance / aircraft.cruiseSpeed;
+  const fuel = Math.round(time * aircraft.fuelBurn);
+  
+  return {
+    distance: distance,
+    time: time,
+    fuel: fuel
+  };
+};
+
 export default {
-  calculateStopCards
+  calculateStopCards,
+  calculateAlternateStopCard
 };

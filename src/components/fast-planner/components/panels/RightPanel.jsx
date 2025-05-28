@@ -61,6 +61,7 @@ const RightPanel = ({
   reserveFuel,
   onReserveFuelChange,
   routeStats,
+  alternateRouteData, // Add alternate route data for alternate stop card
   stopCards,
   waypoints,
   onRemoveWaypoint,
@@ -467,6 +468,7 @@ const RightPanel = ({
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
         cargoWeight={cargoWeight}
+        alternateRouteData={alternateRouteData}
       />
       
       {/* Settings Card */}

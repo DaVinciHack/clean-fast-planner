@@ -417,8 +417,13 @@ const useWaypoints = ({
    * Clears all waypoints from the route
    */
   const clearRoute = useCallback(() => {
+    console.log('🧹 Clearing route and alternate route data');
     if (waypointManagerRef.current) {
+      // Clear the main route
       waypointManagerRef.current.clearRoute();
+      
+      // CRITICAL: Also clear alternate route data
+      waypointManagerRef.current.clearAlternateRouteData();
       
       // Use a single batched update to avoid re-render cascades
       // This prevents the infinite loop when called from effects
@@ -437,6 +442,8 @@ const useWaypoints = ({
         
         // Reset global state
         window.currentRouteStats = null;
+        
+        console.log('✅ Route and alternate route cleared successfully');
       }, 0);
     }
   }, [waypointManagerRef, setWaypoints, setRouteStats, setStopCards]);

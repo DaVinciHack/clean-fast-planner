@@ -72,6 +72,34 @@
   background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
 }
 
+/* Special styles for alternate card */
+.stop-card.alternate-card {
+  border-left-color: #f39c12;
+  background: linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95)); /* Match exact gradient of top card */
+  margin-top: 8px; /* Add extra spacing above alternate card to separate it */
+}
+
+.stop-card.alternate-card .stop-number {
+  background-color: #f39c12;
+}
+
+.stop-card.alternate-card:hover {
+  background: linear-gradient(to bottom, rgba(50, 60, 70, 0.95), rgba(35, 45, 55, 0.95)); /* Slightly lighter on hover */
+}
+
+/* Special icon colors for alternate */
+.alternate-card .stop-metric .icon {
+  color: #f39c12;
+}
+
+/* Route description styling for alternate cards */
+.alternate-card .route-description {
+  font-size: 0.65em !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-top: 2px !important;
+  line-height: 1.2 !important;
+}
+
 /* Fuel components section */
 .fuel-components {
   margin-top: 6px;
@@ -273,6 +301,12 @@
 .destination-card.stop-card-active {
   border-left-color: #27ae60; /* Darker green */
   background-color: rgba(40, 70, 55, 0.95);
+}
+
+/* Special active styles for alternate */
+.alternate-card.stop-card-active {
+  border-left-color: #e67e22; /* Darker orange */
+  background-color: rgba(70, 60, 40, 0.95);
 }
 
 /* Animation for new cards */
