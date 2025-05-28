@@ -15,7 +15,7 @@ import { EnhancedFuelDisplay } from '../fuel';
 const RouteStatsCard = ({ 
   selectedAircraft, 
   waypoints = [],
-  weather = { windSpeed: 0, windDirection: 0 },
+  weather, // No default - weather must be provided from parent
   // The ONLY source of data - calculated by StopCardsContainer
   stopCards = []
 }) => {

@@ -430,10 +430,21 @@ class FlightService {
         // Only log detailed flight info in development or for specific debugging
         if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) { // Only 10% of flights in dev
           console.log(`FlightService: Sample flight - ID: ${flight.flightId}, DisplayWaypoints: ${flight.displayWaypoints?.length || 0}, CombinedWaypoints: ${flight.combinedWaypoints?.length || 0}`);
+          console.log(`FlightService: Wind data - avgWindSpeed: ${flight.avgWindSpeed}, avgWindDirection: ${flight.avgWindDirection}, windSpeed: ${flight.windSpeed}, windDirection: ${flight.windDirection}`);
         }
         
         const extractedDisplayWaypoints = this.extractDisplayWaypoints(flight);
         console.log(`FlightService: Extracted displayWaypoints for flight ${flight.flightId}:`, extractedDisplayWaypoints);
+        
+        // CRITICAL DEBUG: Always log wind data extraction for debugging
+        console.log(`🌬️ FlightService: Wind data extraction for flight ${flight.flightId}:`, {
+          avgWindSpeed: flight.avgWindSpeed,
+          avgWindDirection: flight.avgWindDirection,
+          windSpeed: flight.windSpeed,
+          windDirection: flight.windDirection,
+          finalWindSpeed: flight.avgWindSpeed || flight.windSpeed || 0,
+          finalWindDirection: flight.avgWindDirection || flight.windDirection || 0
+        });
         
         return {
           id: flight.flightId,
@@ -451,6 +462,11 @@ class FlightService {
           medicId: flight.medicId,
           soId: flight.soId,
           rswId: flight.rswId,
+          
+          // CRITICAL FIX: Extract wind data from saved flight - use avgWindSpeed/avgWindDirection
+          windSpeed: flight.avgWindSpeed || flight.windSpeed || 0,
+          windDirection: flight.avgWindDirection || flight.windDirection || 0,
+          
           alternateLocation: flight.alternateSplitPoint ? 
             `${flight.alternateSplitPoint} ${flight.alternateName || ''}` : null,
           // Include raw flight object for detailed loading

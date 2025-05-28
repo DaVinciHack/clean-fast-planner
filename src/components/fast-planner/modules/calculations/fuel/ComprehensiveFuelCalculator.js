@@ -19,6 +19,12 @@ import StopCardCalculator from '../flight/StopCardCalculator';
  * @returns {Object} An object containing enhanced fuel results and stop card data.
  */
 const calculateAllFuelData = (waypoints, selectedAircraft, flightSettings, weather, routeStats) => {
+  // 🌬️ CRITICAL DEBUG: Log inputs to ComprehensiveFuelCalculator
+  console.log('🌬️ ComprehensiveFuelCalculator.calculateAllFuelData called with:');
+  console.log('🌬️   waypoints:', waypoints?.length || 0);
+  console.log('🌬️   weather input:', weather);
+  console.log('🌬️   flightSettings:', flightSettings);
+  
   // Guard against recursive calls
   if (calculateAllFuelData.inProgress) {
     console.warn('⚠️ ComprehensiveFuelCalculator: Calculation already in progress, returning last result');

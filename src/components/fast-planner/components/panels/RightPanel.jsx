@@ -180,6 +180,12 @@ const RightPanel = ({
         // Structured waypoints for the new API
         waypoints: waypointsWithLegs,
         
+        // CRITICAL FIX: Include wind data in saved flight - use MainFlightObjectFp2 field names
+        avgWindSpeed: weather?.windSpeed || 0,
+        avgWindDirection: weather?.windDirection || 0,
+        windSpeed: weather?.windSpeed || 0,  // Keep both for compatibility
+        windDirection: weather?.windDirection || 0,
+        
         // Crew member IDs
         captainId: flightData.captainId || null,
         copilotId: flightData.copilotId || null,
@@ -297,6 +303,13 @@ const RightPanel = ({
         medicId: flight.medicId,
         soId: flight.soId,
         rswId: flight.rswId,
+        
+        // CRITICAL FIX: Extract wind data from flight if available - use avgWindSpeed/avgWindDirection
+        windData: {
+          windSpeed: flight._rawFlight?.avgWindSpeed || flight._rawFlight?.windSpeed || flight.avgWindSpeed || flight.windSpeed || 0,
+          windDirection: flight._rawFlight?.avgWindDirection || flight._rawFlight?.windDirection || flight.avgWindDirection || flight.windDirection || 0,
+          source: 'loaded_flight'
+        },
         
         // Other flight data
         etd: flight.date,
@@ -471,6 +484,7 @@ const RightPanel = ({
         onWeatherUpdate={onWeatherUpdate}
         cargoWeight={cargoWeight}
         alternateRouteData={alternateRouteData}
+        stopCards={stopCards}
       />
       
       {/* Settings Card */}

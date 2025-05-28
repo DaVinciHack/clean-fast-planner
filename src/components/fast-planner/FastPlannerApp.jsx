@@ -281,6 +281,24 @@ const FastPlannerCore = ({
 
   // Generate stop cards data using StopCardCalculator
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
+    // 🌬️ CRITICAL DEBUG: Log all inputs to trace wind sync issue
+    console.log('🌬️ generateStopCardsData called with:');
+    console.log('🌬️   waypoints:', waypoints?.length || 0, 'items');
+    console.log('🌬️   weather input:', weather);
+    console.log('🌬️   selectedAircraft:', !!selectedAircraft);
+    console.log('🌬️   routeStats:', !!routeStats);
+    
+    // 🌬️ Check current weather state from various sources
+    const currentWeatherFromState = weather;
+    const currentWeatherFromWindow = window.currentWeather;
+    const windInputDirection = document.querySelector('input[placeholder*="direction" i]')?.value;
+    const windInputSpeed = document.querySelector('input[placeholder*="speed" i]')?.value;
+    
+    console.log('🌬️ Weather comparison:');
+    console.log('🌬️   From parameter:', currentWeatherFromState);
+    console.log('🌬️   From window:', currentWeatherFromWindow);
+    console.log('🌬️   From input fields:', { direction: windInputDirection, speed: windInputSpeed });
+    
     try {
       // Ensure routeStats has the properties the FinanceCard expects
       if (routeStats) {
@@ -296,7 +314,25 @@ const FastPlannerCore = ({
         }
       }
       
+      // 🌬️ CRITICAL: Log exactly what weather data is being passed to StopCardCalculator
+      console.log('🌬️ Calling StopCardCalculator.calculateStopCards with weather:', weather);
+      
       const stopCards = StopCardCalculator.calculateStopCards(waypoints, routeStats, selectedAircraft, weather, options);
+      
+      // 🌬️ CRITICAL: Log the wind info in the generated stop cards
+      if (stopCards && stopCards.length > 0) {
+        const departureCard = stopCards.find(card => card.isDeparture);
+        const firstNonDepCard = stopCards.find(card => !card.isDeparture);
+        
+        console.log('🌬️ Generated stop cards wind info:');
+        if (departureCard) {
+          console.log('🌬️   Departure card wind:', departureCard.windInfo, departureCard.windData);
+        }
+        if (firstNonDepCard) {
+          console.log('🌬️   First stop card wind:', firstNonDepCard.windInfo, firstNonDepCard.windData);
+        }
+      }
+      
       // Make it available globally for debugging
       window.currentStopCards = stopCards;
       return stopCards;
@@ -308,6 +344,9 @@ const FastPlannerCore = ({
 
   // Make generateStopCardsData available globally for debugging
   window.generateStopCardsData = generateStopCardsData;
+
+  // Make StopCardCalculator available globally for AppHeader real-time calculations
+  window.StopCardCalculator = StopCardCalculator;
 
   const handleRemoveFavoriteLocation = (locationId) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
@@ -513,6 +552,29 @@ const FastPlannerCore = ({
       console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
       console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
       
+      // CRITICAL FIX: Apply wind data from loaded flight if available
+      if (flightData.windData) {
+        console.log('🌬️ Applying wind data from loaded flight:', flightData.windData);
+        console.log('🌬️ Current weather state before update:', weather);
+        
+        const newWeather = {
+          windSpeed: flightData.windData.windSpeed || 0,
+          windDirection: flightData.windData.windDirection || 0,
+          source: flightData.windData.source || 'loaded_flight'
+        };
+        
+        console.log('🌬️ Setting new weather state:', newWeather);
+        setWeather(newWeather);
+        
+        // Also trigger weather update through the update handler to ensure UI sync
+        if (typeof updateWeatherSettings === 'function') {
+          console.log('🌬️ Triggering weather settings update for UI sync');
+          updateWeatherSettings(newWeather.windSpeed, newWeather.windDirection);
+        }
+      } else {
+        console.log('⚠️ No wind data found in loaded flight:', flightData);
+      }
+      
       // Clear existing route first
       clearRoute();
       
@@ -675,6 +737,74 @@ const FastPlannerCore = ({
         }
       } else {
         console.log('🌤️ No flight ID available for weather segments loading');
+      }
+      
+      // CRITICAL FIX: Force wind input UI update at the end of flight loading
+      if (flightData.windData) {
+        console.log('🌬️ FINAL: Updating wind input UI with loaded flight data');
+        console.log('🌬️ Wind data to apply:', flightData.windData);
+        
+        // Force update wind input fields by setting values directly
+        setTimeout(() => {
+          // Find wind input elements and update them
+          const windDirectionInput = document.querySelector('input[value="' + weather.windDirection + '"]') || 
+                                   document.querySelector('#wind-direction') ||
+                                   document.querySelector('input[placeholder*="direction" i]');
+          const windSpeedInput = document.querySelector('input[value="' + weather.windSpeed + '"]') || 
+                               document.querySelector('#wind-speed') ||
+                               document.querySelector('input[placeholder*="speed" i]');
+          
+          if (windDirectionInput) {
+            windDirectionInput.value = flightData.windData.windDirection;
+            windDirectionInput.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log('🌬️ Updated wind direction input to:', flightData.windData.windDirection);
+          }
+          
+          if (windSpeedInput) {
+            windSpeedInput.value = flightData.windData.windSpeed;
+            windSpeedInput.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log('🌬️ Updated wind speed input to:', flightData.windData.windSpeed);
+          }
+          
+          // Also trigger any weather update handlers
+          if (typeof updateWeatherSettings === 'function') {
+            console.log('🌬️ Final weather settings update call');
+            updateWeatherSettings(flightData.windData.windSpeed, flightData.windData.windDirection);
+          }
+          
+          // CRITICAL FIX: Force stop cards regeneration with new wind data
+          if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+            console.log('🔄 Regenerating stop cards with loaded flight wind data');
+            const currentRouteStats = routeStats || window.currentRouteStats;
+            
+            // Use the updated weather state for stop card regeneration
+            const updatedWeather = {
+              windSpeed: flightData.windData.windSpeed,
+              windDirection: flightData.windData.windDirection,
+              source: 'loaded_flight'
+            };
+            
+            const newStopCards = generateStopCardsData(
+              waypoints,
+              currentRouteStats,
+              selectedAircraft,
+              updatedWeather,
+              {
+                passengerWeight: flightSettings.passengerWeight,
+                taxiFuel: flightSettings.taxiFuel,
+                contingencyFuelPercent: flightSettings.contingencyFuelPercent,
+                reserveFuel: flightSettings.reserveFuel,
+                deckTimePerStop: flightSettings.deckTimePerStop,
+                deckFuelFlow: flightSettings.deckFuelFlow
+              }
+            );
+            
+            if (newStopCards && newStopCards.length > 0) {
+              console.log('🔄 Updated stop cards with new wind data:', newStopCards.length, 'cards');
+              setStopCards(newStopCards);
+            }
+          }
+        }, 100);
       }
       
       // After loading completes, ensure we return to the main card
@@ -1058,6 +1188,9 @@ const FastPlannerCore = ({
           deckTimePerStop={flightSettings.deckTimePerStop}
           isLoading={aircraftLoading || rigsLoading}
           loadingText={aircraftLoading ? "Loading aircraft..." : rigsLoading ? "Loading platforms..." : ""}
+          weather={weather}
+          waypoints={waypoints}
+          waypoints={waypoints}
         />
         
         {/* Map container - now full width below header */}
