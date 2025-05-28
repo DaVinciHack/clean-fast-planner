@@ -193,6 +193,30 @@ const FastPlannerCore = ({
     client, currentRegion: activeRegionFromContext, setRouteStats, setStopCards
   });
 
+  const { updateWeatherSettings } = useWeather({
+    weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
+    waypointManagerRef, flightSettings, setRouteStats, setStopCards, setForceUpdate
+  });
+
+  const { updateFlightSetting } = useRouteCalculation({
+    waypoints, selectedAircraft, flightSettings, setFlightSettings,
+    setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
+    alternateRouteData
+  });
+
+  // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
+  const {
+    weatherSegments,
+    weatherSegmentsLoading,
+    weatherSegmentsError,
+    loadWeatherSegments,
+    toggleWeatherLayer,
+    clearWeatherSegments
+  } = useWeatherSegments({
+    mapManagerRef,
+    onWeatherUpdate: updateWeatherSettings
+  });
+
   // Enhanced clearRoute that also clears alternate route state
   const clearRoute = useCallback(() => {
     console.log('🧹 FastPlannerApp: Clearing route and alternate route');
@@ -210,30 +234,6 @@ const FastPlannerCore = ({
     
     console.log('✅ FastPlannerApp: Route and alternate route cleared');
   }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments]);
-
-  const { updateWeatherSettings } = useWeather({
-    weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
-    waypointManagerRef, flightSettings, setRouteStats, setStopCards, setForceUpdate
-  });
-
-  const { updateFlightSetting } = useRouteCalculation({
-    waypoints, selectedAircraft, flightSettings, setFlightSettings,
-    setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
-    alternateRouteData
-  });
-
-  // Weather segments integration
-  const {
-    weatherSegments,
-    weatherSegmentsLoading,
-    weatherSegmentsError,
-    loadWeatherSegments,
-    toggleWeatherLayer,
-    clearWeatherSegments
-  } = useWeatherSegments({
-    mapManagerRef,
-    onWeatherUpdate: updateWeatherSettings
-  });
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
 
