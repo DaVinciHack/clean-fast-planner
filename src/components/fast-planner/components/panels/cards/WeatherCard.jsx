@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BaseCard from './BaseCard';
-import WeatherSegmentsService from '../../services/WeatherSegmentsService';
+import WeatherSegmentsService from '../../../services/WeatherSegmentsService';
 
 /**
  * Enhanced WeatherCard Component
