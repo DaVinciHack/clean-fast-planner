@@ -63,7 +63,17 @@ class WeatherSegmentsService {
     const alternateSegments = [];
     const weatherData = [];
     
-    rawSegments.forEach(segment => {
+    console.log('WeatherSegmentsService: Processing raw segments:', rawSegments.length);
+    
+    rawSegments.forEach((segment, index) => {
+      console.log(`Processing segment ${index}:`, {
+        airportIcao: segment.airportIcao,
+        isAlternateFor: segment.isAlternateFor,
+        rawMetar: segment.rawMetar?.substring(0, 50) + '...',
+        windSpeed: segment.windSpeed,
+        windDirection: segment.windDirection
+      });
+      
       const processedSegment = this.processSingleSegment(segment);
       
       if (segment.isAlternateFor) {
@@ -72,36 +82,50 @@ class WeatherSegmentsService {
         mainSegments.push(processedSegment);
       }
       
-      // Extract weather data for each segment (segments 1-10)
+      // Extract weather data for each time segment (segments 1-10)
+      // These represent different time periods for the same location
       for (let i = 1; i <= 10; i++) {
         const segmentData = segment[`segment${i}`];
         const ranking = segment[`ranking${i}`];
         
-        if (segmentData && ranking) {
+        if (segmentData || ranking) {
+          console.log(`Found segment${i} data:`, { segmentData, ranking });
           weatherData.push({
             segmentIndex: i,
-            data: segmentData,
-            ranking: ranking,
+            locationCode: segment.airportIcao,
+            data: segmentData || 'No data',
+            ranking: ranking || 'N/A',
             color: this.getRankingColor(ranking),
             airportIcao: segment.airportIcao,
             flightUuid: segment.flightUuid,
             geoPoint: segment.geoPoint,
-            timestamp: segment.timestamp
+            timestamp: segment.timestamp,
+            windSpeed: segment.windSpeed,
+            windDirection: segment.windDirection,
+            isAlternate: !!segment.isAlternateFor,
+            rawMetar: segment.rawMetar,
+            rawTaf: segment.rawTaf,
+            isAccessible: segment.isAccessible,
+            isDaytime: segment.isDaytime,
+            araRequired: segment.araRequired,
+            warnings: segment.warnings
           });
         }
       }
     });
     
-    // Sort segments by distance from departure if available
+    // Sort main segments by distance from departure if available
     mainSegments.sort((a, b) => 
       (a.distanceFromDeparture || 0) - (b.distanceFromDeparture || 0)
     );
     
+    // Sort alternate segments by alternate ranking
     alternateSegments.sort((a, b) => 
       (a.alternateRanking || 0) - (b.alternateRanking || 0)
     );
     
-    console.log(`WeatherSegmentsService: Processed ${mainSegments.length} main, ${alternateSegments.length} alternates`);
+    console.log(`WeatherSegmentsService: Processed ${mainSegments.length} main segments, ${alternateSegments.length} alternates`);
+    console.log(`WeatherSegmentsService: Extracted ${weatherData.length} weather data points`);
     
     return {
       segments: mainSegments,
@@ -156,21 +180,22 @@ class WeatherSegmentsService {
   
   /**
    * Get color for ranking based on Norwegian aviation standards
+   * Colors match Palantir's weather segment display with reduced brightness
    */
   static getRankingColor(ranking) {
     switch (ranking) {
       case 5:
-        return '#E91E63'; // Pink/Red - Below minimums, cannot be used
+        return '#C2185B'; // Darker pink/red - Below minimums, cannot be used
       case 8:
-        return '#FF9800'; // Orange - ARA required (rigs only)
+        return '#388E3C'; // Darker green - ARA required but accessible
       case 10:
-        return '#FF9800'; // Orange - Warning
+        return '#F57C00'; // Darker orange - Warning conditions
       case 15:
-        return '#4CAF50'; // Green - Good conditions
+        return '#388E3C'; // Darker green - Good conditions
       case 20:
-        return '#9E9E9E'; // Grey - Outside arrival window
+        return '#616161'; // Darker grey - Outside arrival window (better contrast)
       default:
-        return '#2196F3'; // Blue - Default/Unknown
+        return '#1976D2'; // Darker blue - Default/Unknown
     }
   }  
   /**

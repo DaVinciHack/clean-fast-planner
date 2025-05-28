@@ -1,0 +1,655 @@
+/* Weather Card Styling - Match FlightApp Interface */
+
+.osdk-weather-data {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Location weather cards - match FlightApp style */
+.location-weather-card {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  position: relative; /* Important for absolute positioning of ranking disk */
+}
+
+/* Header with shield icon and ranking */
+.location-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  position: relative; /* For ranking disk positioning */
+}
+
+.location-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.location-icon {
+  color: #E91E63;
+  font-size: 14px;
+}
+
+.location-code {
+  color: #E91E63;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+/* Location code with box around it */
+.location-code-box {
+  color: #E91E63;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 2px 6px;
+  border: 1px solid #E91E63;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.location-type {
+  font-size: 11px;
+  color: #999;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+/* Alternate ranking disk - positioned like FlightApp */
+.alternate-ranking-disk {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: help;
+  transition: transform 0.2s ease;
+}
+
+/* Flight details section */
+.flight-details {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.flight-details > div {
+  margin-bottom: 2px;
+  color: #ccc;
+}
+
+.flight-category {
+  color: #ccc;
+}
+
+.vfr-tag {
+  background: #388E3C;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.flight-time {
+  color: #ccc;
+}
+
+.best-approach {
+  color: #ccc;
+  margin-bottom: 8px; /* Added padding under Best Approach */
+}
+
+.weather-source {
+  color: #ccc;
+  margin-bottom: 8px;
+}
+
+.warning-section {
+  color: #ccc;
+  margin: 4px 0;
+}
+
+/* Raw METAR section with padding */
+.raw-metar-section {
+  margin-bottom: 12px; /* Added padding under Raw Metar */
+  font-size: 12px;
+}
+
+.metar-label {
+  color: #ccc;
+  font-weight: 500;
+}
+
+.metar-text {
+  background: #1a1a1a;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+  color: #eee;
+  margin-top: 4px;
+  word-break: break-all;
+  border: 1px solid #3a3a3a;
+}
+
+/* Arrival section */
+.arrival-section {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+.arrival-number {
+  margin-right: 4px;
+  font-weight: bold;
+}
+
+.arrival-text {
+  color: #4CAF50;
+}
+
+/* Weather segments list - ensure each segment is on its own line */
+.weather-segments-list {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column; /* Force vertical stacking */
+  gap: 4px; /* Space between segments */
+}
+
+.segment-badge {
+  padding: 3px 6px;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: help;
+  transition: opacity 0.2s ease;
+  display: block; /* Force each segment to be on its own line */
+  width: fit-content; /* Only take needed width */
+  border: 1px solid var(--outline-color, #1976D2);
+  border-radius: 3px;
+  background: transparent;
+  /* Colored text matching the border */
+  color: var(--outline-color, #1976D2);
+}
+
+.segment-badge:hover {
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Best approach badge - same style as weather segments */
+.approach-badge {
+  padding: 3px 6px;
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+  border: 1px solid var(--outline-color, #1976D2);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--outline-color, #1976D2);
+}
+
+/* Warning outline style - orange text with orange border */
+.warning-section {
+  color: #ccc;
+  margin: 4px 0;
+}
+
+.warning-outline {
+  padding: 3px 6px;
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+  border: 1px solid #F57C00;
+  border-radius: 3px;
+  background: transparent;
+  color: #F57C00;
+}
+
+/* Update timestamp with warning styles */
+.update-timestamp {
+  font-size: 11px;
+  color: #888;
+  border-top: 1px solid #3a3a3a;
+  padding-top: 6px;
+  margin-top: 6px;
+}
+
+.timestamp-normal {
+  color: #888;
+}
+
+.timestamp-warning {
+  padding: 2px 6px;
+  border: 1px solid #F57C00;
+  border-radius: 3px;
+  background: transparent;
+  color: #F57C00;
+  font-weight: 500;
+}
+
+.weather-segments,
+.weather-data-points,
+.alternate-segments {
+  margin-bottom: 20px;
+}
+
+.weather-segments h5,
+.weather-data-points h5,
+.alternate-segments h5 {
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Individual weather segments */
+.weather-segment {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.airport-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.airport-code {
+  font-weight: 600;
+  color: #fff;
+  font-size: 14px;
+}
+
+.flight-category {
+  color: #999;
+  font-size: 11px;
+}
+
+.weather-details {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.weather-source {
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.raw-metar {
+  background: #1a1a1a;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+  color: #ccc;
+  margin: 4px 0;
+  word-break: break-all;
+}
+
+.arrival-info {
+  color: #4CAF50;
+  margin: 4px 0;
+}
+
+.conditions {
+  margin: 4px 0;
+  color: #ddd;
+}
+
+.time-info {
+  color: #888;
+  font-size: 11px;
+  margin: 4px 0;
+}
+
+.accessibility-flags {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.ara-required {
+  color: #FF9800;
+  font-weight: 500;
+}
+
+.warnings {
+  color: #F44336;
+  font-weight: 500;
+}
+
+/* Weather data points (like Palantir) */
+.location-weather-group {
+  background: #353535; /* Consistent lighter grey background */
+  border: 1px solid #4a4a4a;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  position: relative; /* For positioning the ranking circle */
+}
+
+/* Special styling for locations outside arrival window (ranking 20) - same background for now */
+.location-weather-group.outside-arrival-window {
+  background: #353535; /* Same as normal for now */
+  border: 1px solid #4a4a4a;
+}
+
+.location-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Space out badge and circle */
+  margin-bottom: 8px;
+}
+
+.location-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Ranking circle in top-right */
+.ranking-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3); /* Add subtle border for visibility */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Add shadow for depth */
+}
+
+/* Alternate ranking disk - smaller, more prominent */
+.alternate-ranking-disk {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #FF9800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: help;
+  transition: transform 0.2s ease;
+}
+
+.alternate-ranking-disk:hover {
+  transform: scale(1.1);
+}
+
+/* Location type badge styles */
+.location-type {
+  font-size: 11px;
+  color: #999;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+/* Weather segments display */
+.weather-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.weather-segment-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: help;
+}
+
+/* Status flags */
+.status-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 11px;
+}
+
+.ara-flag {
+  color: #FF9800;
+  font-weight: 500;
+}
+
+.inaccessible-flag {
+  color: #F44336;
+  font-weight: 500;
+}
+
+.warning-flag {
+  color: #F44336;
+  font-weight: 500;
+}
+
+/* Information display */
+.wind-info,
+.distance-info,
+.flight-time {
+  color: #ddd;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.last-updated {
+  color: #888;
+  font-size: 10px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #444;
+}
+
+.alternate-indicator {
+  color: #888;
+  font-size: 11px;
+}
+
+.location-details {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.location-details > div {
+  margin-bottom: 3px;
+  color: #ccc;
+}
+
+/* Arrival info styling */
+.arrival-info {
+  color: #4CAF50;
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.arrival-info strong {
+  font-weight: 600;
+}
+
+/* Raw METAR styling */
+.raw-metar {
+  background: #2a2a2a; /* Darker background for better contrast */
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+  color: #eee; /* Slightly brighter text */
+  margin: 6px 0;
+  word-break: break-all;
+  border: 1px solid #3a3a3a; /* Add subtle border */
+}
+
+/* METAR in outside arrival window cards */
+.outside-arrival-window .raw-metar {
+  background: #1a1a1a; /* Even darker for outside window */
+  border: 1px solid #2a2a2a;
+}
+
+.raw-metar strong {
+  font-weight: 600;
+  color: #fff; /* Pure white for emphasis */
+}
+
+/* Flight time info */
+.flight-time {
+  color: #9C27B0;
+  margin: 4px 0;
+  font-weight: 500;
+}
+
+.distance-info {
+  color: #ddd;
+  margin: 4px 0;
+}
+
+.updated-info {
+  color: #666;
+  font-size: 10px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2a2a2a;
+}
+
+/* Alternate segments */
+.alternate-segment {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+
+.alternate-segment .segment-header {
+  margin-bottom: 4px;
+}
+
+.ranking-indicator {
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Loading and error states */
+.loading-indicator {
+  color: #999;
+  font-style: italic;
+  padding: 20px;
+  text-align: center;
+}
+
+.error-message {
+  color: #F44336;
+  background: rgba(244, 67, 54, 0.1);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+/* Weather source options */
+.weather-source-options {
+  margin-bottom: 15px;
+}
+
+.weather-source-options div {
+  margin-bottom: 8px;
+}
+
+.weather-source-options input[type="radio"] {
+  margin-right: 8px;
+}
+
+.weather-source-options label {
+  font-size: 13px;
+  color: #ddd;
+  cursor: pointer;
+}
+
+/* Current weather display */
+.weather-data {
+  border-top: 1px solid #3a3a3a;
+  padding-top: 15px;
+}
+
+.weather-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weather-icon {
+  font-size: 20px;
+}
+
+.weather-details div {
+  color: #ddd;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+/* Segment rankings - clean horizontal layout */
+.segment-rankings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.segment-ranking {
+  display: inline-block;
+  margin: 0; /* Remove margin to clean up left edge */
+}
+
+.ranking-badge {
+  font-weight: 500;
+  font-size: 10px;
+  display: inline-block;
+}
