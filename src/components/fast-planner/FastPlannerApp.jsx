@@ -36,6 +36,7 @@ import useWaypoints from './hooks/useWaypoints';
 import useRouteCalculation from './hooks/useRouteCalculation';
 import useUIControls from './hooks/useUIControls';
 import useMapLayers from './hooks/useMapLayers';
+import useWeatherSegments from './hooks/useWeatherSegments';
 
 /**
  * FastPlannerCore Component
@@ -63,6 +64,9 @@ const FastPlannerCore = ({
   // State for tracking actual loading status from LoadingIndicator
   const [isActuallyLoading, setIsActuallyLoading] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  
+  // State for tracking current loaded flight for weather segments
+  const [currentFlightId, setCurrentFlightId] = useState(null);
   
   // Check LoadingIndicator status periodically
   useEffect(() => {
@@ -200,8 +204,12 @@ const FastPlannerCore = ({
     setAlternateRouteData(null);
     setAlternateRouteInput('');
     
+    // Clear current flight ID and weather segments
+    setCurrentFlightId(null);
+    clearWeatherSegments();
+    
     console.log('✅ FastPlannerApp: Route and alternate route cleared');
-  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput]);
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments]);
 
   const { updateWeatherSettings } = useWeather({
     weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
@@ -212,6 +220,19 @@ const FastPlannerCore = ({
     waypoints, selectedAircraft, flightSettings, setFlightSettings,
     setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
     alternateRouteData
+  });
+
+  // Weather segments integration
+  const {
+    weatherSegments,
+    weatherSegmentsLoading,
+    weatherSegmentsError,
+    loadWeatherSegments,
+    toggleWeatherLayer,
+    clearWeatherSegments
+  } = useWeatherSegments({
+    mapManagerRef,
+    onWeatherUpdate: updateWeatherSettings
   });
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
@@ -624,6 +645,36 @@ const FastPlannerCore = ({
             );
           }
         }
+      }
+      
+      // Load weather segments for the flight if flightId is available
+      if (flightData.flightId || flightData.id) {
+        const flightId = flightData.flightId || flightData.id;
+        console.log('🌤️ Loading weather segments for flight:', flightId);
+        
+        // Set current flight ID for WeatherCard
+        setCurrentFlightId(flightId);
+        
+        try {
+          const weatherResult = await loadWeatherSegments(flightId);
+          if (weatherResult && weatherResult.segments && weatherResult.segments.length > 0) {
+            console.log(`🌤️ Loaded ${weatherResult.segments.length} weather segments`);
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Weather segments loaded: ${weatherResult.segments.length} locations`, 
+                'success',
+                3000
+              );
+            }
+          } else {
+            console.log('🌤️ No weather segments found for this flight');
+          }
+        } catch (weatherError) {
+          console.error('🌤️ Error loading weather segments:', weatherError);
+          // Don't block flight loading if weather fails
+        }
+      } else {
+        console.log('🌤️ No flight ID available for weather segments loading');
       }
       
       // After loading completes, ensure we return to the main card
@@ -1070,6 +1121,7 @@ const FastPlannerCore = ({
           toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
+          currentFlightId={currentFlightId} // Pass current flight ID for weather segments
         />
       </div>
     </>
