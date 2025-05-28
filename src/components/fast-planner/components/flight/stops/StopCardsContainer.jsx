@@ -21,7 +21,7 @@ const StopCardsContainer = ({
   deckTimePerStop,  // No default - must be provided
   deckFuelFlow,     // No default - must be provided 
   taxiFuel,         // No default - must be provided
-  weather = { windSpeed: 0, windDirection: 0 }, // Default to no wind
+  weather, // No default - weather must be provided from parent
   alternateRouteData = null, // Alternate route data for alternate stop card
   stopCards = [] // Kept for backward compatibility but not used
 }) => {
@@ -48,6 +48,20 @@ const StopCardsContainer = ({
   
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
+    console.log('🎯 StopCardsContainer useEffect triggered');
+    console.log('🎯 Waypoints:', waypoints?.length || 0);
+    console.log('🎯 Aircraft:', !!selectedAircraft);
+    console.log('🎯 Weather at time of calculation:', weather);
+    console.log('🎯 Received stopCards from props:', stopCards?.length || 0);
+    
+    // CRITICAL FIX: Use stopCards from props if available (preferred path)
+    if (stopCards && stopCards.length > 0) {
+      console.log('✅ Using pre-calculated stopCards from useRouteCalculation');
+      setCalculatedStopCards(stopCards);
+      return;
+    }
+    
+    console.log('⚠️ No stopCards provided, calculating independently (fallback path)');
     console.log('🔍 StopCardsContainer useEffect triggered with:', {
       waypointsLength: waypoints?.length || 0,
       taxiFuel: taxiFuel, // Using direct taxiFuel value with no transformation
@@ -114,15 +128,51 @@ const StopCardsContainer = ({
       taxiFuel: Number(taxiFuel) || 0
     };
     
+    // CRITICAL: Ensure weather is valid before proceeding
+    let safeWeather = weather;
+    if (!weather || typeof weather.windSpeed !== 'number' || typeof weather.windDirection !== 'number') {
+      console.warn('🌬️ StopCardsContainer: Invalid weather data, checking alternative sources');
+      console.log('🌬️ Weather received from props:', weather);
+      
+      // Check if there's weather in window.currentWeather or parent component
+      if (window.currentWeather && typeof window.currentWeather.windSpeed === 'number') {
+        safeWeather = window.currentWeather;
+        console.log('🌬️ Using window.currentWeather:', safeWeather);
+      } else {
+        // As absolute last resort, get weather from the UI inputs
+        const windDirectionInput = document.querySelector('input[placeholder*="direction" i]')?.value;
+        const windSpeedInput = document.querySelector('input[placeholder*="speed" i]')?.value;
+        
+        if (windDirectionInput && windSpeedInput) {
+          safeWeather = {
+            windSpeed: parseInt(windSpeedInput) || 0,
+            windDirection: parseInt(windDirectionInput) || 0,
+            source: 'ui_inputs'
+          };
+          console.log('🌬️ Using weather from UI inputs:', safeWeather);
+        } else {
+          safeWeather = { windSpeed: 0, windDirection: 0, source: 'absolute_fallback' };
+          console.log('🌬️ Using absolute fallback weather:', safeWeather);
+        }
+      }
+    }
+    
     // Use the StopCardCalculator to calculate the stop cards
     // Log input values to debug
     console.log('🧮 StopCardsContainer calculating with numeric parameters:', numericParams);
+    console.log('🌬️ StopCardsContainer: WEATHER INPUT:', safeWeather);
+    console.log('🌬️ StopCardsContainer: Weather source check:', {
+      windSpeed: safeWeather?.windSpeed,
+      windDirection: safeWeather?.windDirection,
+      hasWeatherProp: !!weather,
+      isFallbackWeather: safeWeather?.source === 'fallback'
+    });
     
     const newCards = StopCardCalculator.calculateStopCards(
       waypoints, 
       routeStats, 
       selectedAircraft, 
-      weather, 
+      safeWeather, 
       numericParams
     );
     
@@ -363,7 +413,7 @@ const StopCardsContainer = ({
         }, 50);
       }
     }
-  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather, alternateRouteData]);
+  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather, alternateRouteData, stopCards]);
   
   // Apply FLIP animation after cards update
   useEffect(() => {

@@ -40,6 +40,14 @@ const useRouteCalculation = ({
   // Centralized useEffect for comprehensive fuel calculations
   // This effect runs whenever waypoints, selected aircraft, flight settings, or weather change
   useEffect(() => {
+    console.log('🛠️ useRouteCalculation useEffect triggered');
+    console.log('🛠️ Inputs:', {
+      waypoints: waypoints?.length || 0,
+      hasAircraft: !!selectedAircraft,
+      hasFlightSettings: !!flightSettings,
+      weather: weather
+    });
+    
     // CRITICAL: Skip calculation if essential inputs are missing
     if (!waypoints || waypoints.length < 2) {
         console.log('⛽ useRouteCalculation: Skipping fuel calculation - insufficient waypoints');
@@ -130,6 +138,12 @@ const useRouteCalculation = ({
 
     // Use a debounce to prevent too frequent calculations
     const debounceTimeoutId = setTimeout(() => {
+      // 🌬️ CRITICAL DEBUG: Log weather data being passed to ComprehensiveFuelCalculator
+      console.log('🌬️ useRouteCalculation: About to call ComprehensiveFuelCalculator with:');
+      console.log('🌬️   waypoints:', waypoints?.length);
+      console.log('🌬️   weather:', weather);
+      console.log('🌬️   numericSettings:', numericSettings);
+      
       // Perform a single calculation attempt with proper error handling
       try {
         const result = window.ComprehensiveFuelCalculator.calculateAllFuelData(

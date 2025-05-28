@@ -38,10 +38,12 @@ const MainCard = ({
   contingencyFuelPercent = 0,
   taxiFuel = 0,
   // Weather props
-  weather = { windSpeed: 15, windDirection: 270 },
+  weather, // No default - weather must be provided from parent
   onWeatherUpdate = () => {},
   // Alternate route data
   alternateRouteData = null,
+  // Stop cards data from useRouteCalculation
+  stopCards = [],
 }) => {
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
@@ -496,6 +498,7 @@ const MainCard = ({
             taxiFuel={taxiFuel}
             weather={weather}
             alternateRouteData={alternateRouteData}
+            stopCards={stopCards}
           />
         )}
       </div>

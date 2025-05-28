@@ -18,7 +18,9 @@ const AppHeader = ({
   contingencyFuelPercent = 5, 
   deckTimePerStop = 5,
   isLoading = false,        // New prop for loading state
-  loadingText = ""          // New prop for loading text
+  loadingText = "",         // New prop for loading text
+  weather, // CRITICAL: Weather must be provided from parent
+  waypoints = []            // CRITICAL: Add waypoints prop for real-time calculations
 }) => {
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
@@ -66,6 +68,22 @@ const AppHeader = ({
   let deckFuel = 0;
   let passengers = [];
   
+  // CRITICAL DEBUG: Log what data AppHeader is actually using
+  console.log('🔍 AppHeader render - stopCards received:', stopCards?.length || 0, 'cards');
+  console.log('🔍 AppHeader render - weather received:', weather);
+  
+  // CRITICAL: Handle case where weather is undefined
+  const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
+  
+  if (stopCards && stopCards.length > 0) {
+    const departureCard = stopCards.find(card => card.isDeparture);
+    const destinationCard = stopCards.find(card => card.isDestination);
+    console.log('🔍 AppHeader - departure card fuel:', departureCard?.totalFuel || 'none');
+    console.log('🔍 AppHeader - destination card time:', destinationCard?.totalTime || 'none');
+    console.log('🔍 AppHeader - wind info in departure card:', departureCard?.windInfo || 'none');
+    console.log('🔍 AppHeader - wind data in departure card:', departureCard?.windData || 'none');
+  }
+  
   // Find departure and destination cards
   let departureCard = null;
   let destinationCard = null;
@@ -99,20 +117,24 @@ const AppHeader = ({
       }
     }
     
-    // Calculate deck time and total time (using same logic as SimpleRouteStatsCard)
-    const intermediateStops = Math.max(0, stopCards.length - 2);
-    const totalDeckTime = intermediateStops * safeNumber(deckTimePerStop);
-    
-    // Calculate total time (flight time + deck time)
-    let totalTimeHours = 0;
-    if (flightTime !== '00:00') {
-      const [hours, minutes] = flightTime.split(':').map(Number);
-      totalTimeHours = hours + (minutes / 60);
+    // Get total time directly from destination card (already calculated by StopCardCalculator)
+    if (destinationCard) {
+      // Use the pre-calculated totalTime from StopCardCalculator (includes deck time)
+      if (destinationCard.totalTime !== undefined) {
+        totalTime = typeof destinationCard.totalTime === 'string' 
+          ? destinationCard.totalTime 
+          : formatTime(destinationCard.totalTime);
+      }
+      
+      // Get flight time separately if available
+      if (destinationCard.flightTime !== undefined) {
+        flightTime = typeof destinationCard.flightTime === 'string'
+          ? destinationCard.flightTime
+          : formatTime(destinationCard.flightTime);
+      }
     }
-    const deckTimeHours = totalDeckTime / 60;
-    totalTime = formatTime(totalTimeHours + deckTimeHours);
     
-    // Get passenger data from all non-destination cards (EXACT same logic as SimpleRouteStatsCard)
+    // Extract passenger data from pre-calculated stop cards (no calculations here!)
     passengers = stopCards
       .filter(card => !card.isDestination && card.maxPassengers !== undefined)
       .map(card => ({
@@ -120,6 +142,65 @@ const AppHeader = ({
         isDeparture: card.isDeparture,
         maxPassengers: safeNumber(card.maxPassengers)
       }));
+  }
+  
+  // CRITICAL FIX: If stopCards seem stale or we have waypoints + weather, do real-time calculation
+  if ((!stopCards || stopCards.length === 0) && waypoints && waypoints.length >= 2 && selectedAircraft && safeWeather) {
+    console.log('🔄 AppHeader: No stopCards available, performing real-time calculation');
+    
+    // Use StopCardCalculator from window object only (avoid require in browser)
+    const StopCardCalculator = window.StopCardCalculator;
+    
+    if (StopCardCalculator) {
+      try {
+        const realTimeCards = StopCardCalculator.calculateStopCards(
+          waypoints,
+          window.currentRouteStats || null,
+          selectedAircraft,
+          safeWeather,
+          {
+            passengerWeight: 220, // Default values
+            taxiFuel,
+            contingencyFuelPercent,
+            reserveFuel,
+            deckTimePerStop: deckTimePerStop,
+            deckFuelFlow: 400
+          }
+        );
+        
+        if (realTimeCards && realTimeCards.length > 0) {
+          console.log('🔄 AppHeader: Using real-time calculated data');
+          
+          const rtDepartureCard = realTimeCards.find(card => card.isDeparture);
+          const rtDestinationCard = realTimeCards.find(card => card.isDestination);
+          
+          if (rtDestinationCard) {
+            totalDistance = rtDestinationCard.totalDistance || '0.0';
+            totalTime = typeof rtDestinationCard.totalTime === 'string' 
+              ? rtDestinationCard.totalTime 
+              : formatTime(rtDestinationCard.totalTime);
+          }
+          
+          if (rtDepartureCard) {
+            totalFuel = safeNumber(rtDepartureCard.totalFuel);
+            if (rtDepartureCard.fuelComponentsObject) {
+              tripFuel = safeNumber(rtDepartureCard.fuelComponentsObject.tripFuel);
+            }
+          }
+          
+          // Update passengers from real-time calculation
+          passengers = realTimeCards
+            .filter(card => !card.isDestination && card.maxPassengers !== undefined)
+            .map(card => ({
+              id: card.id,
+              isDeparture: card.isDeparture,
+              maxPassengers: safeNumber(card.maxPassengers)
+            }));
+        }
+      } catch (error) {
+        console.error('🔄 AppHeader: Real-time calculation failed:', error);
+      }
+    }
   }
   
   return (

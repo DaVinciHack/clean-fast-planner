@@ -35,6 +35,7 @@ const useWeather = ({
    */
   const updateWeatherSettings = (windSpeed, windDirection) => {
     console.log('🌬️ updateWeatherSettings called with:', windSpeed, windDirection);
+    console.log('🌬️ Current weather state before update:', weather);
 
     // Ensure we have valid numbers
     const windSpeedNum = parseInt(windSpeed) || 0;
@@ -43,11 +44,12 @@ const useWeather = ({
 
     const newWeather = {
       windSpeed: windSpeedNum,
-      windDirection: windDirectionNum
+      windDirection: windDirectionNum,
+      source: 'manual_input'
     };
 
     console.log(`🌬️ Updating weather settings: Wind ${newWeather.windSpeed} kts from ${newWeather.windDirection}°`);
-    console.log('🌬️ Old weather state:', weather);
+    console.log('🌬️ New weather object:', newWeather);
 
     // IMPORTANT FIX: Two-step update process to ensure correct wind calculations
     
@@ -58,9 +60,11 @@ const useWeather = ({
     }
     
     // Step 2: Immediately set the new weather state
+    console.log('🌬️ Step 2: Calling setWeather with:', newWeather);
     setWeather(newWeather);
     
     // Step 3: Force an immediate UI update
+    console.log('🌬️ Step 3: Forcing UI update');
     setForceUpdate(prev => prev + 1);
     
     // Step 4: Manually recalculate the route with the new wind settings
@@ -181,6 +185,14 @@ const useWeather = ({
           }
           
           // Update state with new calculations
+          console.log('🌬️ Step 5c: Updating state with new calculations');
+          console.log('🌬️   New stop cards count:', newStopCards?.length || 0);
+          if (newStopCards && newStopCards.length > 0) {
+            const deptCard = newStopCards.find(c => c.isDeparture);
+            console.log('🌬️   Departure card wind info:', deptCard?.windInfo);
+            console.log('🌬️   Departure card wind data:', deptCard?.windData);
+          }
+          
           setRouteStats(enhancedResults);
           setStopCards(newStopCards);
           
