@@ -89,7 +89,9 @@ const RightPanel = ({
   onReserveMethodChange = () => {},
   // Weather props
   weather = { windSpeed: 15, windDirection: 270 },
-  onWeatherUpdate = () => {}
+  onWeatherUpdate = () => {},
+  // Flight ID for weather segments
+  currentFlightId = null
 }) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -504,6 +506,7 @@ const RightPanel = ({
         id="weather" 
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
+        flightId={currentFlightId}
       />
       
       {/* Finance Card */}
