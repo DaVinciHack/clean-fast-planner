@@ -17,6 +17,15 @@ class WaypointManager {
       onRouteUpdated: null
     };
     this._routeDragHandlers = null; // To store references to drag handlers
+    this.storedAlternateRouteData = null; // Store alternate route data for persistence
+  }
+
+  /**
+   * Clear stored alternate route data (call when starting new route)
+   */
+  clearAlternateRouteData() {
+    console.log('⭐ Clearing stored alternate route data');
+    this.storedAlternateRouteData = null;
   }
   
 
@@ -735,6 +744,7 @@ class WaypointManager {
   
   /**
    * Create 3D flight path with curved routes and drop shadows
+   * BACK TO ORIGINAL: Smooth curves, we'll handle waypoint visualization separately
    * @param {Array} coordinates - Array of [lng, lat] coordinates
    * @returns {Object} - { mainPath: GeoJSON, dropShadow: GeoJSON }
    */
@@ -759,7 +769,7 @@ class WaypointManager {
       const curvedCoordinates = [];
       const shadowCoordinates = [];
 
-      // Process each segment to create curved flight paths
+      // Process each segment to create curved flight paths (ORIGINAL LOGIC)
       for (let i = 0; i < coordinates.length - 1; i++) {
         const start = coordinates[i];
         const end = coordinates[i + 1];
@@ -769,7 +779,7 @@ class WaypointManager {
         const endPoint = turf.point(end);
         const distance = turf.distance(startPoint, endPoint, { units: 'nauticalmiles' });
         
-        // Create curved segment for main flight path
+        // Create curved segment for main flight path (ORIGINAL METHOD)
         const curvedSegment = this.createCurvedSegment(start, end, distance);
         
         // Add curved points (skip first point if not the first segment to avoid duplication)
@@ -811,6 +821,50 @@ class WaypointManager {
 
   /**
    * Create a curved segment between two points (takeoff/landing arc)
+   * @param {Array} start - [lng, lat] start coordinate
+   * @param {Array} end - [lng, lat] end coordinate  
+   * @param {number} distance - Distance in nautical miles
+   * @returns {Array} - Array of curved coordinates
+   */
+  createCurvedSegment(start, end, distance) {
+    const numPoints = Math.max(15, Math.min(30, Math.floor(distance / 3))); // More points for smoother curves
+    const curvedPoints = [];
+    
+    // IMPROVED: Curve height based on distance with better scaling for short segments
+    // Shorter segments get proportionally less curve
+    let maxCurveOffset;
+    if (distance < 10) {
+      maxCurveOffset = distance * 0.002; // Very subtle for short hops
+    } else if (distance < 50) {
+      maxCurveOffset = distance * 0.004; // Moderate for medium distances
+    } else {
+      maxCurveOffset = Math.min(0.1, distance * 0.006); // Max for long distances
+    }
+    
+    console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
+    
+    for (let i = 0; i <= numPoints; i++) {
+      const t = i / numPoints; // Progress along the segment (0 to 1)
+      
+      // Linear interpolation between start and end points
+      const lng = start[0] + (end[0] - start[0]) * t;
+      const lat = start[1] + (end[1] - start[1]) * t;
+      
+      // Create flight arc: always curves UP (toward top of screen) for consistent 3D camera view
+      // Using sine curve for smooth takeoff/landing feel
+      const curveHeight = Math.sin(t * Math.PI) * maxCurveOffset;
+      
+      // FIXED: Always apply curve in the UP direction (positive latitude offset)
+      // This ensures all curves go "up" toward the top of screen regardless of flight direction
+      curvedPoints.push([lng, lat + curveHeight]); // Simple upward curve
+    }
+    
+    return curvedPoints;
+  }
+
+  /**
+   * Create a curved segment between two points (takeoff/landing arc)
+   * BACK TO ORIGINAL: Simple, smooth curves that work
    * @param {Array} start - [lng, lat] start coordinate
    * @param {Array} end - [lng, lat] end coordinate  
    * @param {number} distance - Distance in nautical miles
@@ -1424,7 +1478,15 @@ class WaypointManager {
     return 0;
   }
   
-  updateRoute(routeStats = null) {
+  updateRoute(routeStats = null, alternateRouteData = null) {
+    // Store alternate route data for persistence across route updates
+    if (alternateRouteData !== null) {
+      console.log('⭐ Storing alternate route data in WaypointManager');
+      this.storedAlternateRouteData = alternateRouteData;
+    }
+    
+    // Use stored alternate route data if no new data provided
+    const activeAlternateRouteData = alternateRouteData || this.storedAlternateRouteData;
     const map = this.mapManager.getMap();
     if (!map || !this.mapManager.isMapLoaded()) {
       // console.log("WaypointManager.updateRoute: Map not ready.");
@@ -1657,6 +1719,17 @@ class WaypointManager {
             filter: ['==', '$type', 'LineString']
           }, routeLayerId);
         }
+      }
+
+      // Render alternate route if available
+      if (activeAlternateRouteData && activeAlternateRouteData.coordinates) {
+        console.log('⭐ Rendering alternate route with', activeAlternateRouteData.coordinates.length, 'coordinates');
+        console.log('⭐ Using alternate route data:', activeAlternateRouteData.name || 'No name');
+        this.renderAlternateRoute(activeAlternateRouteData, map);
+      } else {
+        console.log('⭐ No alternate route data available or clearing alternate route');
+        console.log('⭐ activeAlternateRouteData:', activeAlternateRouteData);
+        this.clearAlternateRoute(map);
       }
 
       // Update or add arrows source and layers
@@ -1952,6 +2025,20 @@ class WaypointManager {
     // Reset internal arrays
     this.markers = [];
     this.waypoints = [];
+    
+    // CRITICAL: Also clear alternate route data and visual elements
+    try {
+      console.log('🧹 WaypointManager: Clearing alternate route data');
+      this.clearAlternateRouteData();
+      
+      // Clear alternate route visual elements from map
+      const map = this.mapManager?.getMap();
+      if (map && this.mapManager?.isMapLoaded()) {
+        this.clearAlternateRoute(map);
+      }
+    } catch (error) {
+      console.error('Error clearing alternate route:', error);
+    }
     
     // Safely remove route layers and sources
     try {
@@ -2633,6 +2720,157 @@ class WaypointManager {
     });
 
     console.log('🎨 WaypointManager: Style change listener set up');
+  }
+
+  /**
+   * Render alternate route with orange dotted styling
+   * @param {Object} alternateRouteData - Alternate route data from flight
+   * @param {Object} map - MapBox map instance
+   */
+  renderAlternateRoute(alternateRouteData, map) {
+    if (!alternateRouteData || !alternateRouteData.coordinates || alternateRouteData.coordinates.length < 2) {
+      console.warn('⭐ renderAlternateRoute: Invalid alternate route data');
+      return;
+    }
+
+    const alternateSourceId = 'alternate-route';
+    const alternateShadowSourceId = 'alternate-route-shadow';
+    const alternateLayerId = 'alternate-route';
+    const alternateShadowLayerId = 'alternate-route-shadow';
+    const alternateGlowLayerId = 'alternate-route-glow';
+
+    try {
+      // Create 3D flight path for alternate route using same method as main route
+      const alternateFlightPathData = this.create3DFlightPath(alternateRouteData.coordinates);
+      const alternateRouteGeoJson = alternateFlightPathData.mainPath;
+      const alternateShadowGeoJson = alternateFlightPathData.dropShadow;
+
+      console.log('⭐ Created 3D alternate route with', alternateRouteGeoJson.geometry.coordinates.length, 'curved coordinates');
+
+      // Add or update alternate route shadow source
+      if (map.getSource(alternateShadowSourceId)) {
+        map.getSource(alternateShadowSourceId).setData(alternateShadowGeoJson);
+      } else {
+        map.addSource(alternateShadowSourceId, { type: 'geojson', data: alternateShadowGeoJson });
+        
+        // Shadow layer for alternate route
+        map.addLayer({ 
+          id: alternateShadowLayerId, 
+          type: 'line', 
+          source: alternateShadowSourceId, 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round', 
+            'line-sort-key': -1 // Behind everything
+          }, 
+          paint: { 
+            'line-color': '#000000', // Black shadow
+            'line-width': 10, // Slightly narrower than main route shadow
+            'line-opacity': 0.4, // Less pronounced than main route
+            'line-blur': 4,
+            'line-translate': [0, 2] // Slight shadow offset
+          }
+        });
+      }
+
+      // Add or update alternate route main source
+      if (map.getSource(alternateSourceId)) {
+        map.getSource(alternateSourceId).setData(alternateRouteGeoJson);
+      } else {
+        map.addSource(alternateSourceId, { type: 'geojson', data: alternateRouteGeoJson });
+      }
+
+      // Add alternate route main layer if it doesn't exist
+      if (!map.getLayer(alternateLayerId)) {
+        map.addLayer({ 
+          id: alternateLayerId, 
+          type: 'line', 
+          source: alternateSourceId, 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round', 
+            'line-sort-key': 3 // Render above main route
+          }, 
+          paint: { 
+            'line-color': '#ff8c42', // Orange color for alternate
+            'line-width': 2.5, // Much thinner line
+            'line-opacity': 1.0,
+            'line-dasharray': [3, 3] // Smaller dashes: 3px dash, 3px gap
+          }
+        });
+
+        // Glow effect for alternate route
+        if (!map.getLayer(alternateGlowLayerId)) {
+          map.addLayer({ 
+            id: alternateGlowLayerId, 
+            type: 'line', 
+            source: alternateSourceId, 
+            layout: { 
+              'line-join': 'round', 
+              'line-cap': 'round', 
+              'visibility': 'visible', 
+              'line-sort-key': 2.5 // Between main route and alternate route
+            }, 
+            paint: { 
+              'line-color': '#ffaa66', // Lighter orange for glow
+              'line-width': 4, // Slightly wider for subtle glow effect
+              'line-opacity': 0.15, // Very subtle glow
+              'line-blur': 1.5, // Light blur
+              'line-dasharray': [3, 3] // Same dash pattern as main line
+            }, 
+            filter: ['==', '$type', 'LineString']
+          }, alternateLayerId);
+        }
+      }
+
+      console.log('⭐ Alternate route rendered successfully');
+
+    } catch (error) {
+      console.error('⭐ Error rendering alternate route:', error);
+    }
+  }
+
+  /**
+   * Clear alternate route layers from map
+   * @param {Object} map - MapBox map instance
+   */
+  clearAlternateRoute(map) {
+    console.log('⭐ clearAlternateRoute called - checking for existing layers...');
+    
+    const layersToRemove = [
+      'alternate-route',
+      'alternate-route-shadow', 
+      'alternate-route-glow'
+    ];
+    
+    const sourcesToRemove = [
+      'alternate-route',
+      'alternate-route-shadow'
+    ];
+
+    let removedAny = false;
+
+    // Remove layers
+    layersToRemove.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+        console.log('⭐ Removed alternate route layer:', layerId);
+        removedAny = true;
+      }
+    });
+
+    // Remove sources
+    sourcesToRemove.forEach(sourceId => {
+      if (map.getSource(sourceId)) {
+        map.removeSource(sourceId);
+        console.log('⭐ Removed alternate route source:', sourceId);
+        removedAny = true;
+      }
+    });
+
+    if (!removedAny) {
+      console.log('⭐ No alternate route layers to remove');
+    }
   }
 }
 

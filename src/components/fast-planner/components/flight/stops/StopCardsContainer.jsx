@@ -22,15 +22,29 @@ const StopCardsContainer = ({
   deckFuelFlow,     // No default - must be provided 
   taxiFuel,         // No default - must be provided
   weather = { windSpeed: 0, windDirection: 0 }, // Default to no wind
+  alternateRouteData = null, // Alternate route data for alternate stop card
   stopCards = [] // Kept for backward compatibility but not used
 }) => {
   const [calculatedStopCards, setCalculatedStopCards] = useState([]);
+  const [alternateStopCard, setAlternateStopCard] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   const [cardPositions, setCardPositions] = useState({});
   const [animatingCards, setAnimatingCards] = useState({});
   const prevWaypointsRef = useRef([]);
   const cardRefs = useRef({});
   const containerRef = useRef(null);
+  
+  // Add dedicated useEffect to monitor alternateRouteData changes
+  useEffect(() => {
+    console.log('🟠 ALTERNATE ROUTE DATA CHANGED:', {
+      exists: !!alternateRouteData,
+      data: alternateRouteData ? {
+        splitPoint: alternateRouteData.splitPoint,
+        name: alternateRouteData.name,
+        coordinatesLength: alternateRouteData.coordinates?.length || 0
+      } : null
+    });
+  }, [alternateRouteData]);
   
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
@@ -42,7 +56,13 @@ const StopCardsContainer = ({
       reserveFuel,
       contingencyFuelPercent, // Fixed parameter name to match StopCardCalculator
       hasAircraft: !!selectedAircraft,
-      hasRouteStats: !!routeStats
+      hasRouteStats: !!routeStats,
+      hasAlternateRouteData: !!alternateRouteData,
+      alternateRouteDataDetails: alternateRouteData ? {
+        splitPoint: alternateRouteData.splitPoint,
+        name: alternateRouteData.name,
+        coordinatesLength: alternateRouteData.coordinates?.length || 0
+      } : null
     });
     
     if (waypoints.length < 2) {
@@ -264,7 +284,79 @@ const StopCardsContainer = ({
         }
       }, 50);
     }
-  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather]);
+    
+    // Calculate alternate stop card if alternate route data exists
+    if (alternateRouteData && selectedAircraft) {
+      console.log('🟠 StopCardsContainer: Calculating alternate stop card with data:', {
+        splitPoint: alternateRouteData.splitPoint,
+        name: alternateRouteData.name,
+        coordinatesLength: alternateRouteData.coordinates?.length || 0,
+        hasWaypoints: waypoints.length >= 2,
+        hasSelectedAircraft: !!selectedAircraft
+      });
+      
+      try {
+        const alternateCard = StopCardCalculator.calculateAlternateStopCard(
+          waypoints,
+          alternateRouteData,
+          routeStats,
+          selectedAircraft,
+          weather,
+          numericParams
+        );
+        
+        if (alternateCard) {
+          console.log('🟠 StopCardsContainer: Alternate stop card calculated successfully:', {
+            totalFuel: alternateCard.totalFuel,
+            maxPassengers: alternateCard.maxPassengers,
+            routeDescription: alternateCard.routeDescription
+          });
+          setAlternateStopCard(alternateCard);
+          
+          // CRITICAL: Trigger route stats update when alternate card changes
+          // This ensures the top card gets updated with alternate route data
+          window.currentRouteStats.updateTrigger = Date.now();
+          setTimeout(() => {
+            if (typeof window.triggerRouteStatsUpdate === 'function') {
+              console.log('🟠 StopCardsContainer: Triggering route stats update after alternate card calculation');
+              window.triggerRouteStatsUpdate();
+            }
+          }, 100); // Slightly longer delay for alternate cards
+        } else {
+          console.log('🟠 StopCardsContainer: No alternate stop card generated (calculation returned null)');
+          setAlternateStopCard(null);
+        }
+      } catch (error) {
+        console.error('🟠 StopCardsContainer: Error calculating alternate stop card:', error);
+        setAlternateStopCard(null);
+      }
+    } else {
+      // Clear alternate stop card if no alternate route data
+      const shouldClear = alternateRouteData === null || alternateRouteData === undefined;
+      const reason = !alternateRouteData ? 'no alternateRouteData' : 
+                     !selectedAircraft ? 'no selectedAircraft' : 
+                     'unknown';
+      
+      console.log('🟠 StopCardsContainer: Clearing alternate stop card -', reason, {
+        hasAlternateRouteData: !!alternateRouteData,
+        hasSelectedAircraft: !!selectedAircraft,
+        shouldClear
+      });
+      
+      if (shouldClear) {
+        setAlternateStopCard(null);
+        
+        // CRITICAL: Also trigger update when clearing alternate card
+        // This ensures top card gets updated when alternate route is removed
+        setTimeout(() => {
+          if (typeof window.triggerRouteStatsUpdate === 'function') {
+            console.log('🟠 StopCardsContainer: Triggering route stats update after clearing alternate card');
+            window.triggerRouteStatsUpdate();
+          }
+        }, 50);
+      }
+    }
+  }, [waypoints, routeStats, selectedAircraft, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, weather, alternateRouteData]);
   
   // Apply FLIP animation after cards update
   useEffect(() => {
@@ -386,6 +478,33 @@ const StopCardsContainer = ({
               />
             );
           })}
+          
+          {/* Render alternate stop card at the end if it exists */}
+          {alternateStopCard && (
+            <StopCard
+              key="alternate-stop-card"
+              id="alternate-stop-card"
+              index={alternateStopCard.index}
+              stopName={alternateStopCard.stopName}
+              totalDistance={alternateStopCard.totalDistance}
+              totalTime={alternateStopCard.totalTime}
+              totalFuel={alternateStopCard.totalFuel}
+              maxPassengers={alternateStopCard.maxPassengers}
+              maxPassengersDisplay={alternateStopCard.maxPassengersDisplay}
+              groundSpeed={alternateStopCard.groundSpeed}
+              headwind={alternateStopCard.headwind}
+              deckTime={alternateStopCard.deckTime}
+              isDeparture={alternateStopCard.isDeparture}
+              isDestination={alternateStopCard.isDestination}
+              isAlternate={alternateStopCard.isAlternate}
+              routeDescription={alternateStopCard.routeDescription}
+              fuelComponents={alternateStopCard.fuelComponents}
+              isActive={false} // Alternate cards don't participate in active state
+              onClick={() => {}} // No click handler for alternate cards
+              className="alternate-card"
+              ref={el => setCardRef('alternate-stop-card', el)}
+            />
+          )}
         </div>
       </div>
     </div>

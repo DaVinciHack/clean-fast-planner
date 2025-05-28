@@ -21,6 +21,8 @@ const StopCard = React.forwardRef(({
   deckTime,
   isDeparture,
   isDestination,
+  isAlternate,
+  routeDescription,
   fuelComponents,
   isActive,
   onClick,
@@ -41,6 +43,7 @@ const StopCard = React.forwardRef(({
   const getBorderColor = () => {
     if (isDeparture) return '#3498db'; // First stop always blue
     if (isDestination) return '#2ecc71'; // Last stop always green
+    if (isAlternate) return '#f39c12'; // Alternate card always orange
     // Use colors array for intermediate stops
     return colors[Math.min(index, colors.length - 1)];
   };
@@ -55,7 +58,7 @@ const StopCard = React.forwardRef(({
   };
   
   // Combine all class names
-  const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${isDeparture ? 'departure-card' : ''} ${isDestination ? 'destination-card' : ''} ${className}`;
+  const cardClasses = `stop-card ${isActive ? 'stop-card-active' : ''} ${isDeparture ? 'departure-card' : ''} ${isDestination ? 'destination-card' : ''} ${isAlternate ? 'alternate-card' : ''} ${className}`;
   
   // Determine the display text for the stop number
   let stopNumberDisplay = index;
@@ -63,6 +66,8 @@ const StopCard = React.forwardRef(({
     stopNumberDisplay = 'D';
   } else if (isDestination) {
     stopNumberDisplay = 'F';
+  } else if (isAlternate) {
+    stopNumberDisplay = 'A';
   }
   
   // Determine the style for the stop number circle
@@ -84,8 +89,20 @@ const StopCard = React.forwardRef(({
     >
       <div className="stop-header">
         <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
-        <div className="stop-name">{stopName || `Stop ${index}`}</div>
-        {headwind !== undefined && !isDeparture && (
+        <div className="stop-name">
+          {stopName || `Stop ${index}`}
+          {isAlternate && routeDescription && (
+            <div className="route-description" style={{ 
+              fontSize: '0.65em', 
+              color: 'rgba(255, 255, 255, 0.7)', 
+              marginTop: '2px',
+              lineHeight: '1.2'
+            }}>
+              {routeDescription}
+            </div>
+          )}
+        </div>
+        {headwind !== undefined && !isDeparture && !isAlternate && (
           <div className="stop-wind" title={`Groundspeed: ${groundSpeed || 0} kts`}>
             <span className="wind-value" data-positive={headwind > 0} data-negative={headwind < 0}>
               {headwind > 0 ? `+${parseFloat(Number(headwind).toFixed(1))}` : parseFloat(Number(headwind).toFixed(1))} kts

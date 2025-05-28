@@ -14,6 +14,9 @@ const LeftPanel = ({
   onToggleVisibility,
   routeInput,
   onRouteInputChange,
+  alternateRouteInput, // Added for alternate route input
+  onAlternateRouteInputChange, // Added for alternate route input handler
+  onAlternateRouteSubmit, // Added for alternate route submission
   favoriteLocations, // Receive favorite locations
   onAddFavoriteLocation, // Receive add favorite function
   onRemoveFavoriteLocation, // Receive remove favorite function
@@ -445,6 +448,79 @@ const LeftPanel = ({
             lineHeight: "1.3"
           }}>
             Examples: STAVANGER, 60.7917,5.3417, 60° 47.502' N, 5° 20.502' E
+          </div>
+        </div>
+
+        {/* Alternate Route Input */}
+        <div style={{ marginTop: "15px" }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <input 
+              type="text" 
+              className="route-input"
+              placeholder="Alternate Name (e.g., ENXW ENZV or ENZV)"
+              style={{ 
+                flex: 1, 
+                marginRight: "5px", 
+                marginBottom: 0, 
+                height: "36px"
+              }}
+              value={alternateRouteInput || ''}
+              onChange={(e) => {
+                if (onAlternateRouteInputChange) {
+                  onAlternateRouteInputChange(e.target.value);
+                }
+              }}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && alternateRouteInput && alternateRouteInput.trim() !== "") {
+                  if (onAlternateRouteSubmit) {
+                    console.log('LeftPanel: Alternate route Enter key pressed with input:', alternateRouteInput.trim());
+                    onAlternateRouteSubmit(alternateRouteInput.trim());
+                  }
+                }
+              }}
+            />
+            <button 
+              className="control-button" 
+              style={{
+                marginTop: 0,
+                height: "36px",
+                padding: "0 15px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}
+              onClick={() => {
+                console.log('=== LeftPanel: Alternate Route Add button clicked ===');
+                console.log('onAlternateRouteSubmit function available:', !!onAlternateRouteSubmit);
+                console.log('alternateRouteInput value:', JSON.stringify(alternateRouteInput));
+                
+                if (onAlternateRouteSubmit && alternateRouteInput && alternateRouteInput.trim()) {
+                  console.log('LeftPanel: Calling onAlternateRouteSubmit with input:', alternateRouteInput.trim());
+                  try {
+                    onAlternateRouteSubmit(alternateRouteInput.trim());
+                    console.log('LeftPanel: onAlternateRouteSubmit call completed successfully');
+                  } catch (error) {
+                    console.error('LeftPanel: Error calling onAlternateRouteSubmit:', error);
+                  }
+                } else {
+                  console.log('LeftPanel: Cannot submit alternate route - missing function or empty input');
+                  console.log('  - onAlternateRouteSubmit available:', !!onAlternateRouteSubmit);
+                  console.log('  - alternateRouteInput has content:', !!(alternateRouteInput && alternateRouteInput.trim()));
+                }
+              }}
+            >
+              Set
+            </button>
+          </div>
+          
+          {/* Alternate route help text */}
+          <div style={{ 
+            fontSize: "11px", 
+            color: "#888", 
+            marginTop: "3px",
+            lineHeight: "1.3"
+          }}>
+            Single: ENZV (uses current split) | Pair: ENXW ENZV (custom route)
           </div>
         </div>
         
