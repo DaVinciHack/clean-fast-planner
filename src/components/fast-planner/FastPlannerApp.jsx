@@ -232,6 +232,9 @@ const FastPlannerCore = ({
     setCurrentFlightId(null);
     clearWeatherSegments();
     
+    // CRITICAL FIX: Clear persistent alternate card storage
+    window.currentAlternateCard = null;
+    
     console.log('✅ FastPlannerApp: Route and alternate route cleared');
   }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments]);
 

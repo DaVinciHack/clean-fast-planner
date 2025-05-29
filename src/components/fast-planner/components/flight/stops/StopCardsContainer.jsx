@@ -25,8 +25,47 @@ const StopCardsContainer = ({
   alternateRouteData = null, // Alternate route data for alternate stop card
   stopCards = [] // Kept for backward compatibility but not used
 }) => {
+  console.log('🎯 StopCardsContainer: Component mounted/rendered');
+  
   const [calculatedStopCards, setCalculatedStopCards] = useState([]);
   const [alternateStopCard, setAlternateStopCard] = useState(null);
+  
+  // CRITICAL FIX: Restore alternate card from persistent storage on mount
+  useEffect(() => {
+    if (window.currentAlternateCard && !alternateStopCard) {
+      console.log('🟠 Restoring alternate card from persistent storage:', window.currentAlternateCard);
+      setAlternateStopCard(window.currentAlternateCard);
+    }
+  }, []);
+  
+  // CRITICAL FIX: Persist alternate card to survive component unmount/remount
+  useEffect(() => {
+    if (alternateStopCard) {
+      console.log('🟠 Persisting alternate card to window storage:', alternateStopCard);
+      window.currentAlternateCard = alternateStopCard;
+    } else if (alternateStopCard === null) {
+      console.log('🟠 Clearing persisted alternate card');
+      window.currentAlternateCard = null;
+    }
+  }, [alternateStopCard]);
+  
+  // Debug effect to track alternate card state changes
+  useEffect(() => {
+    console.log('🟠 ALTERNATE CARD STATE CHANGED:', {
+      hasAlternateCard: !!alternateStopCard,
+      cardData: alternateStopCard ? {
+        totalFuel: alternateStopCard.totalFuel,
+        routeDescription: alternateStopCard.routeDescription
+      } : null
+    });
+  }, [alternateStopCard]);
+  
+  // Debug effect to track when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('🎯 StopCardsContainer: Component unmounting');
+    };
+  }, []);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   const [cardPositions, setCardPositions] = useState({});
   const [animatingCards, setAnimatingCards] = useState({});
@@ -358,7 +397,7 @@ const StopCardsContainer = ({
           alternateRouteData,
           routeStats,
           selectedAircraft,
-          weather,
+          safeWeather,
           numericParams
         );
         
