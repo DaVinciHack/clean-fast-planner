@@ -7,12 +7,18 @@
 import FuelCalculationManager from './FuelCalculationManager';
 import TripFuelCalculator from './TripFuelCalculator';
 import AuxiliaryFuelCalculator from './AuxiliaryFuelCalculator';
+import EnhancedFuelManager from './EnhancedFuelManager';
+import WeatherFuelAnalyzer from './weather/WeatherFuelAnalyzer';
+import ManualFuelOverride from './weather/ManualFuelOverride';
 
 export {
   FuelCalculationManager,
   TripFuelCalculator,
-  AuxiliaryFuelCalculator
+  AuxiliaryFuelCalculator,
+  EnhancedFuelManager,
+  WeatherFuelAnalyzer,
+  ManualFuelOverride
 };
 
-// Export a default instance for easy import and use
-export default new FuelCalculationManager();
+// Export an enhanced instance as default for weather-aware fuel calculations
+export default new EnhancedFuelManager();

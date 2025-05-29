@@ -870,6 +870,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
  */
 const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, selectedAircraft, weather, options = {}) => {
   console.log('🟠 AlternateStopCard: Starting calculation');
+  console.log('🟠 AlternateStopCard: Weather input:', weather);
+  console.log('🟠 AlternateStopCard: Weather details:', {
+    windSpeed: weather?.windSpeed,
+    windDirection: weather?.windDirection,
+    hasWeather: !!weather
+  });
   
   // Verify we have the necessary input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft || !alternateRouteData) {
@@ -1044,6 +1050,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       
       // Calculate time and fuel with wind
       if (window.WindCalculations) {
+        console.log('🟠 AlternateStopCard: Using WindCalculations with weather:', weather);
         const fromCoords = { lat: splitPointCoords[1], lon: splitPointCoords[0] };
         const toCoords = { lat: alternateDestCoords[1], lon: alternateDestCoords[0] };
         
@@ -1059,10 +1066,13 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
         alternateLegFuel = Math.round(legDetails.fuel);
         
         console.log('🟠 AlternateStopCard: Alternate leg with wind:', legDetails);
+        console.log('🟠 AlternateStopCard: Final time/fuel:', { time: alternateLegTime, fuel: alternateLegFuel });
       } else {
+        console.log('🟠 AlternateStopCard: WindCalculations not available, using basic calculation');
         // Fallback calculation without wind
         alternateLegTime = alternateLegDistance / selectedAircraft.cruiseSpeed;
         alternateLegFuel = Math.round(alternateLegTime * selectedAircraft.fuelBurn);
+        console.log('🟠 AlternateStopCard: Basic calculation result:', { time: alternateLegTime, fuel: alternateLegFuel });
       }
       
     } catch (error) {
