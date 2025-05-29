@@ -37,6 +37,7 @@ import useRouteCalculation from './hooks/useRouteCalculation';
 import useUIControls from './hooks/useUIControls';
 import useMapLayers from './hooks/useMapLayers';
 import useWeatherSegments from './hooks/useWeatherSegments';
+import useFuelPolicy from './hooks/useFuelPolicy';
 
 /**
  * FastPlannerCore Component
@@ -146,6 +147,24 @@ const FastPlannerCore = ({
     }
   }, [aircraftManagerRef, appSettingsManagerRef, setAircraftManagers]);
 
+  // Effect to select appropriate fuel policy when aircraft changes
+  useEffect(() => {
+    if (!selectedAircraft || !fuelPolicy.hasPolicies) {
+      return;
+    }
+
+    console.log(`Aircraft changed to: ${selectedAircraft.registration}, selecting appropriate fuel policy`);
+    
+    // Try to find and select default policy for this aircraft
+    const defaultPolicy = fuelPolicy.selectDefaultPolicyForAircraft(selectedAircraft);
+    
+    if (defaultPolicy) {
+      console.log(`Selected fuel policy: ${defaultPolicy.name} for aircraft: ${selectedAircraft.registration}`);
+    } else {
+      console.warn(`No suitable fuel policy found for aircraft: ${selectedAircraft.registration}`);
+    }
+  }, [selectedAircraft, fuelPolicy]);
+
   // Memoize the region change handler to maintain stable reference
   const handleRegionChange = useCallback((event) => {
     if (event.detail && event.detail.region) {
@@ -239,6 +258,34 @@ const FastPlannerCore = ({
   }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments]);
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
+
+  // Effect to load fuel policies when region changes
+  useEffect(() => {
+    if (!activeRegionFromContext?.id) {
+      console.log('No active region for fuel policy loading');
+      return;
+    }
+
+    console.log(`Loading fuel policies for region: ${activeRegionFromContext.id}`);
+    fuelPolicy.loadPoliciesForRegion(activeRegionFromContext.id)
+      .then(policies => {
+        console.log(`Loaded ${policies.length} fuel policies for ${activeRegionFromContext.id}`);
+        
+        // If no current policy is selected and we have policies, select the first one as default
+        if (policies.length > 0 && !fuelPolicy.currentPolicy) {
+          const defaultPolicy = policies.find(p => 
+            p.name.toLowerCase().includes('standard') || 
+            p.name.toLowerCase().includes('default')
+          ) || policies[0];
+          
+          console.log(`Auto-selecting default fuel policy: ${defaultPolicy.name}`);
+          fuelPolicy.selectPolicy(defaultPolicy);
+        }
+      })
+      .catch(error => {
+        console.error('Error loading fuel policies for region:', error);
+      });
+  }, [activeRegionFromContext?.id, fuelPolicy]);
 
   // Effect to clear route when activeRegionFromContext (from useRegion) changes
   const firstLoadDone = useRef(false);
@@ -1238,6 +1285,11 @@ const FastPlannerCore = ({
           onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
           onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
           forceUpdate={forceUpdate} weather={weather} onWeatherUpdate={updateWeatherSettings}
+          
+          // Fuel policy props
+          fuelPolicy={fuelPolicy}
+          currentRegion={activeRegionFromContext}
+          
           mapManagerRef={mapManagerRef}
           gulfCoastMapRef={gulfCoastMapRef}
           weatherLayerRef={weatherLayerRef}
@@ -1310,6 +1362,9 @@ const FastPlannerApp = () => {
     weather,
     setWeather
   });
+
+  // Initialize fuel policy management
+  const fuelPolicy = useFuelPolicy();
 
   const addWaypointDirectImpl = async (waypointData) => {
     const { waypointManagerRef, platformManagerRef } = appManagers; 
