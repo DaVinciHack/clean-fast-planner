@@ -91,7 +91,10 @@ const RightPanel = ({
   weather = { windSpeed: 15, windDirection: 270 },
   onWeatherUpdate = () => {},
   // Flight ID for weather segments
-  currentFlightId = null
+  currentFlightId = null,
+  // Fuel policy props
+  fuelPolicy = null,
+  currentRegion = null
 }) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -510,6 +513,8 @@ const RightPanel = ({
         onReserveFuelChange={onReserveFuelChange}
         selectedAircraft={selectedAircraft}
         aircraftType={aircraftType}
+        fuelPolicy={fuelPolicy}
+        currentRegion={currentRegion}
       />
       
       {/* Performance Card */}

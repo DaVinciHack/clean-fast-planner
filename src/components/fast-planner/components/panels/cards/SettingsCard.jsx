@@ -28,7 +28,10 @@ const SettingsCard = ({
   onReserveFuelChange = () => {},
   // Selected aircraft info
   selectedAircraft,
-  aircraftType
+  aircraftType,
+  // Fuel policy props
+  fuelPolicy = null,
+  currentRegion = null
 }) => {
   
   // Add state for approach fuel
@@ -126,6 +129,9 @@ const SettingsCard = ({
         <FlightSettings 
           settings={flightSettings}
           onSettingsChange={handleFlightSettingsChange}
+          fuelPolicy={fuelPolicy}
+          currentRegion={currentRegion}
+          selectedAircraft={selectedAircraft}
         />
         
         {/* Additional settings */}
