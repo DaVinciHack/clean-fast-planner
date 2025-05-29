@@ -1193,7 +1193,6 @@ const FastPlannerCore = ({
           loadingText={aircraftLoading ? "Loading aircraft..." : rigsLoading ? "Loading platforms..." : ""}
           weather={weather}
           waypoints={waypoints}
-          waypoints={waypoints}
         />
         
         {/* Map container - now full width below header */}
