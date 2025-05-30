@@ -62,6 +62,9 @@ const FastPlannerCore = ({
   const { isAuthenticated, userName, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion(); 
   
+  // Initialize fuel policy management
+  const fuelPolicy = useFuelPolicy();
+  
   // State for tracking actual loading status from LoadingIndicator
   const [isActuallyLoading, setIsActuallyLoading] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
@@ -263,6 +266,11 @@ const FastPlannerCore = ({
   useEffect(() => {
     if (!activeRegionFromContext?.id) {
       console.log('No active region for fuel policy loading');
+      return;
+    }
+
+    if (!fuelPolicy || !fuelPolicy.loadPoliciesForRegion) {
+      console.log('Fuel policy hook not ready yet');
       return;
     }
 
@@ -1362,9 +1370,6 @@ const FastPlannerApp = () => {
     weather,
     setWeather
   });
-
-  // Initialize fuel policy management
-  const fuelPolicy = useFuelPolicy();
 
   const addWaypointDirectImpl = async (waypointData) => {
     const { waypointManagerRef, platformManagerRef } = appManagers; 

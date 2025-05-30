@@ -93,8 +93,7 @@ const RightPanel = ({
   // Flight ID for weather segments
   currentFlightId = null,
   // Fuel policy props
-  fuelPolicy = null,
-  currentRegion = null
+  fuelPolicy = null
 }) => {
   // Get current region from context
   const { currentRegion } = useRegion();
