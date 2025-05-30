@@ -84,12 +84,20 @@ class FuelPolicyService {
    * @returns {Array} Processed policy objects
    */
   processPolicies(rawPolicies) {
-    return rawPolicies.map(policy => ({
-      // Core identification
-      uuid: policy.uuid,
-      name: policy.name || 'Unnamed Policy',
-      description: policy.description || '',
-      region: policy.region || '',
+    return rawPolicies.map(policy => {
+      // DEBUG: Log the raw policy structure to understand OSDK field names
+      console.log('🔍 OSDK RAW POLICY STRUCTURE:', policy);
+      console.log('🔍 CONTINGENCY FIELDS:');
+      console.log('  - contingencyFuelFlightLegsValue:', policy.contingencyFuelFlightLegsValue);
+      console.log('  - contingencyFuelAlternateValue:', policy.contingencyFuelAlternateValue);
+      console.log('  - Available fields:', Object.keys(policy).filter(key => key.includes('contingency')));
+      
+      return {
+        // Core identification
+        uuid: policy.uuid,
+        name: policy.name || 'Unnamed Policy',
+        description: policy.description || '',
+        region: policy.region || '',
       
       // Fuel types and defaults
       fuelTypes: {
@@ -167,7 +175,8 @@ class FuelPolicyService {
       // Metadata
       updatedAt: policy.upDatedAt,
       updatedBy: policy.upDatedBy || 'Unknown'
-    }));
+    };
+    });
   }
 
   /**
