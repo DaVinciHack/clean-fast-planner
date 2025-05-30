@@ -151,7 +151,6 @@ const FlightSettings = ({
     const numValue = Number(value) || 0;
     onSettingsChange({ [field]: numValue });
   };
-  };
 
   const handlePolicyChange = (e) => {
     const policyUuid = e.target.value;
