@@ -105,30 +105,6 @@ const SettingsCard = ({
           selectedAircraft={selectedAircraft}
         />
         
-        {/* Additional settings - now from fuel policy only */}
-        <h4>Additional Settings</h4>
-        
-        <div className="input-group">
-          <div>
-            <label htmlFor="cargo-weight">Payload:</label>
-            <input 
-              type="number" 
-              id="cargo-weight" 
-              defaultValue={cargoWeight || 0}
-              min="0" 
-              max="5000"
-              step="10"
-              onChange={(e) => onCargoWeightChange(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-          <div>
-            <span style={{fontSize: '0.7rem', color: '#9ca3af'}}>
-              Approach/ARA Fuel: Controlled by fuel policy
-            </span>
-          </div>
-        </div>
-      
         <div style={{ marginTop: '15px', padding: '1rem', backgroundColor: '#2a2a2a', borderRadius: '6px' }}>
           <h5 style={{ color: '#4FC3F7', margin: '0 0 0.5rem 0', fontSize: '0.7rem' }}>
             FUEL POLICY INTEGRATION
