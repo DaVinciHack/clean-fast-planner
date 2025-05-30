@@ -140,7 +140,9 @@ export function useFuelPolicy() {
       
       // Display-only settings (from policy)
       contingencyFlightLegs: currentPolicy.contingencyFuel.flightLegs.value,
+      contingencyFlightLegsType: currentPolicy.contingencyFuel.flightLegs.type,
       contingencyAlternate: currentPolicy.contingencyFuel.alternate.value,
+      contingencyAlternateType: currentPolicy.contingencyFuel.alternate.type,
       
       // Fuel type defaults (for reference)
       approachFuel: currentPolicy.fuelTypes.approachFuel.default,

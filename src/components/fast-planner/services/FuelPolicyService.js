@@ -89,7 +89,9 @@ class FuelPolicyService {
       console.log('🔍 OSDK RAW POLICY STRUCTURE:', policy);
       console.log('🔍 CONTINGENCY FIELDS:');
       console.log('  - contingencyFuelFlightLegsValue:', policy.contingencyFuelFlightLegsValue);
+      console.log('  - contingencyFuelFlightLegsDefault:', policy.contingencyFuelFlightLegsDefault);
       console.log('  - contingencyFuelAlternateValue:', policy.contingencyFuelAlternateValue);
+      console.log('  - contingencyFuelAlternateDefault:', policy.contingencyFuelAlternateDefault);
       console.log('  - Available fields:', Object.keys(policy).filter(key => key.includes('contingency')));
       
       return {
@@ -125,7 +127,7 @@ class FuelPolicyService {
           value: policy.reserveFuel || 0,
           default: policy.reserveFuelDefault || 0,
           show: policy.reserveFuelShow !== false,
-          type: policy.reserveFuelType || 'fixed'
+          type: this.mapFuelType(policy.reserveFuelType) || 'fixed'
         },
         taxiFuel: {
           value: policy.taxiFuel || 0,
@@ -141,7 +143,7 @@ class FuelPolicyService {
           value: policy.extraFuel || 0,
           default: policy.extraFuelDefault || 0,
           show: policy.extraFuelShow !== false,
-          type: policy.extraFuelType || 'fixed'
+          type: this.mapFuelType(policy.extraFuelType) || 'fixed'
         },
         timeOnTaskFuel: {
           value: policy.timeOnTaskFuel || 0,
@@ -153,16 +155,16 @@ class FuelPolicyService {
       // Contingency fuel settings
       contingencyFuel: {
         flightLegs: {
-          value: policy.contingencyFuelFlightLegsValue || 5,
-          default: policy.contingencyFuelFlightLegsDefault || 5,
+          value: policy.contingencyFuelFlightLegsDefault ?? 0,
+          default: policy.contingencyFuelFlightLegsDefault ?? 0,
           show: policy.contingencyFuelFlightLegsShow !== false,
-          type: policy.contingencyFuelFlightLegsType || 'percentage'
+          type: this.mapFuelType(policy.contingencyFuelFlightLegsType) || 'percentage'
         },
         alternate: {
-          value: policy.contingencyFuelAlternateValue || 5,
-          default: policy.contingencyFuelAlternateDefault || 5,
+          value: policy.contingencyFuelAlternateDefault ?? 0,
+          default: policy.contingencyFuelAlternateDefault ?? 0,
           show: policy.contingencyFuelAlternateShow !== false,
-          type: policy.contingencyFuelAlternateType || 'percentage'
+          type: this.mapFuelType(policy.contingencyFuelAlternateType) || 'percentage'
         }
       },
 
@@ -177,6 +179,33 @@ class FuelPolicyService {
       updatedBy: policy.upDatedBy || 'Unknown'
     };
     });
+  }
+
+  /**
+   * Map OSDK fuel type strings to internal type strings
+   * @param {string} osdkType - The fuel type from OSDK
+   * @returns {string} Internal type string ('time', 'fixed', 'percentage')
+   */
+  mapFuelType(osdkType) {
+    if (!osdkType) return 'fixed';
+    
+    const type = osdkType.toLowerCase().trim();
+    
+    // Time-based types
+    if (type.includes('time') || type.includes('minute') || type.includes('hour')) {
+      console.log(`🔧 FUEL TYPE MAPPING: "${osdkType}" → "time"`);
+      return 'time';
+    }
+    
+    // Percentage-based types  
+    if (type.includes('percentage') || type.includes('percent') || type.includes('%')) {
+      console.log(`🔧 FUEL TYPE MAPPING: "${osdkType}" → "percentage"`);
+      return 'percentage';
+    }
+    
+    // Fixed amount types (default)
+    console.log(`🔧 FUEL TYPE MAPPING: "${osdkType}" → "fixed"`);
+    return 'fixed';
   }
 
   /**

@@ -123,13 +123,37 @@ const FlightSettings = ({
     }
   }, [currentPolicy, selectedAircraft?.fuelBurn]);
 
+  // Helper function to format contingency fuel display
+  const formatContingencyFuel = React.useMemo(() => {
+    return (value, type) => {
+      if (!value) return '0';
+      
+      console.log(`🔧 CONTINGENCY FORMAT: value=${value}, type=${type}`);
+      
+      switch (type) {
+        case 'percentage':
+          return `${value}%`;
+        case 'time':
+          return `${value} min`;
+        case 'fixed':
+          return `${value} lbs`;
+        default:
+          // Fallback - if type is unclear, assume percentage for backwards compatibility
+          console.log(`⚠️ CONTINGENCY: Unknown type "${type}", defaulting to percentage`);
+          return `${value}%`;
+      }
+    };
+  }, []);
+
   // Get all values from fuel policy (not browser storage)
   const policyValues = React.useMemo(() => {
     if (!policySettings) {
       return {
         taxiFuel: 0,
         contingencyFlightLegs: 5,
+        contingencyFlightLegsType: 'percentage',
         contingencyAlternate: 5,
+        contingencyAlternateType: 'percentage',
         deckTime: 15,
         approachFuel: 0,
         araFuel: 0
@@ -137,11 +161,13 @@ const FlightSettings = ({
     }
 
     return {
-      taxiFuel: policySettings.taxiFuel || 0,
-      contingencyFlightLegs: policySettings.contingencyFlightLegs || 5,
-      contingencyAlternate: policySettings.contingencyAlternate || 5,
-      deckTime: policySettings.deckTime || 15,
-      approachFuel: policySettings.approachFuel || 0,
+      taxiFuel: policySettings.taxiFuel ?? 0,
+      contingencyFlightLegs: policySettings.contingencyFlightLegs ?? 0,
+      contingencyFlightLegsType: policySettings.contingencyFlightLegsType ?? 'percentage',
+      contingencyAlternate: policySettings.contingencyAlternate ?? 0,
+      contingencyAlternateType: policySettings.contingencyAlternateType ?? 'percentage',
+      deckTime: policySettings.deckTime ?? 15,
+      approachFuel: policySettings.approachFuel ?? 0,
       araFuel: policySettings.araFuel || 0
     };
   }, [policySettings]);
@@ -237,11 +263,11 @@ const FlightSettings = ({
         <div className="policy-row">
           <div className="policy-box">
             <label>CONTINGENCY FUEL<br/>(FLIGHT LEGS)</label>
-            <span>{policyValues.contingencyFlightLegs}%</span>
+            <span>{formatContingencyFuel(policyValues.contingencyFlightLegs, policyValues.contingencyFlightLegsType)}</span>
           </div>
           <div className="policy-box">
             <label>CONTINGENCY FUEL<br/>(ALTERNATE)</label>
-            <span>{policyValues.contingencyAlternate}%</span>
+            <span>{formatContingencyFuel(policyValues.contingencyAlternate, policyValues.contingencyAlternateType)}</span>
           </div>
           <div className="policy-box">
             <label>RESERVE FUEL</label>
