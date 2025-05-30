@@ -250,7 +250,10 @@ const FlightSettings = ({
               <br/>
               ({calculateReserveFuel.time} min)
               {calculateReserveFuel.method === 'time' && (
-                <br/><small style={{color: '#9ca3af'}}>Time-based</small>
+                <>
+                  <br/>
+                  <small style={{color: '#9ca3af'}}>Time-based</small>
+                </>
               )}
             </span>
           </div>
