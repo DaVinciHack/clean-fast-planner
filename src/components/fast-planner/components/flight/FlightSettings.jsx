@@ -360,17 +360,6 @@ const FlightSettings = ({
             />
             <span>lbs</span>
           </div>
-          
-          <div className="override-field">
-            <label>ADJUST FUEL</label>
-            <input 
-              type="number" 
-              value={settings.adjustFuel || 0}
-              onChange={(e) => handleInputChange('adjustFuel', e.target.value)}
-              placeholder="0"
-            />
-            <span>lbs</span>
-          </div>
         </div>
       </div>
 
