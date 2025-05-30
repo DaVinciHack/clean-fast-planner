@@ -14,16 +14,18 @@ const FlightSettings = ({
   const currentPolicy = safeFuelPolicy.currentPolicy;
   const policySettings = safeFuelPolicy.getCurrentPolicySettings?.() || {};
   
-  // Enhanced debugging for region and policy data
+  // Enhanced debugging for region and policy data (reduced frequency)
   useEffect(() => {
-    console.log('🔍 FlightSettings DEBUG: Component state check');
-    console.log('  - currentRegion:', currentRegion);
-    console.log('  - currentRegion.osdkRegion:', currentRegion?.osdkRegion);
-    console.log('  - availablePolicies count:', availablePolicies.length);
-    console.log('  - availablePolicies regions:', availablePolicies.map(p => p.region));
-    console.log('  - currentPolicy:', currentPolicy?.name || 'NONE');
-    console.log('  - selectedAircraft:', selectedAircraft?.registration || 'NONE');
-  }, [currentRegion, availablePolicies, currentPolicy, selectedAircraft]);
+    // Only log when something meaningful changes
+    const hasChanges = currentRegion?.osdkRegion || availablePolicies.length > 0 || currentPolicy || selectedAircraft;
+    if (hasChanges) {
+      console.log('🔍 FlightSettings DEBUG: Component state check');
+      console.log('  - currentRegion:', currentRegion?.name, currentRegion?.osdkRegion);
+      console.log('  - availablePolicies count:', availablePolicies.length);
+      console.log('  - currentPolicy:', currentPolicy?.name || 'NONE');
+      console.log('  - selectedAircraft:', selectedAircraft?.registration || 'NONE');
+    }
+  }, [currentRegion?.osdkRegion, availablePolicies.length, currentPolicy?.name, selectedAircraft?.registration]);
   
   // Filter policies by current region with enhanced matching
   const filteredPolicies = React.useMemo(() => {
@@ -86,7 +88,7 @@ const FlightSettings = ({
       safeFuelPolicy.selectPolicy(firstPolicy);
     }
     
-  }, [filteredPolicies, selectedAircraft, currentPolicy, safeFuelPolicy]);
+  }, [filteredPolicies, selectedAircraft?.registration, currentPolicy?.uuid]); // Fixed dependencies
   
   // Filter policies by current region
   const handleInputChange = (field, value) => {

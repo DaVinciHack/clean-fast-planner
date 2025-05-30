@@ -269,10 +269,17 @@ const FastPlannerCore = ({
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
 
-  // Effect to load fuel policies when region changes
+  // Effect to load fuel policies when region changes (with debouncing)
+  const regionIdRef = useRef(null);
   useEffect(() => {
     if (!activeRegionFromContext?.id) {
       console.log('No active region for fuel policy loading');
+      return;
+    }
+
+    // Skip if this is the same region
+    if (regionIdRef.current === activeRegionFromContext.id) {
+      console.log('Same region, skipping fuel policy reload');
       return;
     }
 
@@ -281,9 +288,8 @@ const FastPlannerCore = ({
       return;
     }
 
-    console.log(`🌍 FastPlannerApp: Loading fuel policies for region change`);
-    console.log(`🌍 FastPlannerApp: activeRegionFromContext:`, activeRegionFromContext);
-    console.log(`🌍 FastPlannerApp: Region ID: ${activeRegionFromContext.id}, OSDK Region: ${activeRegionFromContext.osdkRegion}`);
+    regionIdRef.current = activeRegionFromContext.id;
+    console.log(`🌍 FastPlannerApp: Loading fuel policies for region change to: ${activeRegionFromContext.name}`);
 
     console.log(`Loading fuel policies for region: ${activeRegionFromContext.name} (OSDK: ${activeRegionFromContext.osdkRegion})`);
     fuelPolicy.loadPoliciesForRegion(activeRegionFromContext.osdkRegion)
@@ -307,7 +313,7 @@ const FastPlannerCore = ({
       .catch(error => {
         console.error(`Error loading fuel policies for region ${activeRegionFromContext.name} (${activeRegionFromContext.osdkRegion}):`, error);
       });
-  }, [activeRegionFromContext?.id, fuelPolicy, selectedAircraft]);
+  }, [activeRegionFromContext?.id, activeRegionFromContext?.osdkRegion]); // Simplified dependencies
 
   // Effect to clear route when activeRegionFromContext (from useRegion) changes
   const firstLoadDone = useRef(false);
