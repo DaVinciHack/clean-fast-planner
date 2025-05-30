@@ -69,24 +69,6 @@ const SettingsCard = () => {
           settings={flightSettings}
           onSettingsChange={handleFlightSettingsChange}
         />
-        
-        {/* Additional settings */}
-        <h4>Additional Settings</h4>
-        
-        <div className="input-group">
-          <div>
-            <label htmlFor="cargo-weight">Additional Cargo:</label>
-            <input 
-              type="number" 
-              id="cargo-weight" 
-              value={flightSettings.cargoWeight}
-              min="0" 
-              max="5000"
-              onChange={(e) => setCargoWeight(parseInt(e.target.value, 10) || 0)}
-            />
-            <span className="unit">lbs</span>
-          </div>
-        </div>
       
         <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
           <button 
