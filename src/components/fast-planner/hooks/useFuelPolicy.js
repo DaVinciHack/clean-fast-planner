@@ -107,20 +107,6 @@ export function useFuelPolicy() {
   }, [currentRegion, availablePolicies, selectPolicy]);
 
   /**
-   * Set the active fuel policy
-   */
-  const selectPolicy = useCallback((policy) => {
-    if (!policy) {
-      console.warn('Attempted to select null/undefined policy');
-      return;
-    }
-
-    console.log(`Selecting fuel policy: ${policy.name}`);
-    setCurrentPolicy(policy);
-    fuelPolicyService.setCurrentPolicy(policy);
-  }, []);
-
-  /**
    * Find and set default policy for an aircraft
    */
   const selectDefaultPolicyForAircraft = useCallback((aircraft) => {
