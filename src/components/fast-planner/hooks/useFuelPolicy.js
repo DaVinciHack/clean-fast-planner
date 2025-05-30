@@ -107,25 +107,6 @@ export function useFuelPolicy() {
   }, [currentRegion, availablePolicies, selectPolicy]);
 
   /**
-   * Find and set default policy for an aircraft
-   */
-  const selectDefaultPolicyForAircraft = useCallback((aircraft) => {
-    if (!currentRegion || availablePolicies.length === 0) {
-      console.warn('Cannot select default policy: no region or policies loaded');
-      return null;
-    }
-
-    const defaultPolicy = fuelPolicyService.findDefaultPolicyForAircraft(currentRegion, aircraft);
-    if (defaultPolicy) {
-      selectPolicy(defaultPolicy);
-      return defaultPolicy;
-    }
-
-    console.warn('No suitable default policy found for aircraft');
-    return null;
-  }, [currentRegion, availablePolicies, selectPolicy]);
-
-  /**
    * Refresh policies for current region
    */
   const refreshPolicies = useCallback(async () => {
