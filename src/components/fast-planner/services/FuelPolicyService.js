@@ -35,6 +35,20 @@ class FuelPolicyService {
         return [];
       }
 
+      console.log(`🔍 OSDK QUERY: Looking for fuel policies with region.exactMatch("${region}")`);
+
+      // TEMP DEBUG: Load ALL policies to see what regions exist
+      console.log(`🔍 DEBUG: Loading ALL fuel policies to see available regions...`);
+      const allPolicies = await client(sdk.FuelPolicyBuilder)
+        .fetchPage({ $pageSize: 100 });
+      
+      console.log(`🔍 ALL POLICIES: Found ${allPolicies.data?.length || 0} total policies`);
+      if (allPolicies.data && allPolicies.data.length > 0) {
+        const uniqueRegions = [...new Set(allPolicies.data.map(p => p.region))];
+        console.log(`🔍 ALL REGIONS IN OSDK: ${uniqueRegions.map(r => `"${r}"`).join(', ')}`);
+        console.log(`🔍 SEARCHING FOR: "${region}"`);
+      }
+
       // Load all fuel policies for the specified region
       const policies = await client(sdk.FuelPolicyBuilder)
         .where(policy => policy.region.exactMatch(region))
@@ -42,7 +56,13 @@ class FuelPolicyService {
           $pageSize: 50 // Reasonable limit for regional policies
         });
 
-      console.log(`Found ${policies.data?.length || 0} fuel policies for region ${region}`);
+      console.log(`🔍 OSDK RESULT: Found ${policies.data?.length || 0} fuel policies for region "${region}"`);
+      
+      // DEBUG: Log the actual region values in the policies
+      if (policies.data && policies.data.length > 0) {
+        console.log(`🔍 OSDK REGIONS FOUND: ${policies.data.map(p => `"${p.region}"`).join(', ')}`);
+        console.log(`🔍 OSDK POLICY NAMES: ${policies.data.map(p => p.name).join(', ')}`);
+      }
 
       // Process and cache the policies
       const processedPolicies = this.processPolicies(policies.data || []);
@@ -186,30 +206,56 @@ class FuelPolicyService {
   findDefaultPolicyForAircraft(region, aircraft) {
     const policies = this.getCachedPoliciesForRegion(region);
     
+    console.log(`🔍 POLICY SEARCH: Finding default policy for aircraft in region: ${region}`);
+    console.log(`🔍 POLICY SEARCH: Aircraft: ${aircraft?.registration || 'unknown'} (Type: ${aircraft?.aircraftType || 'unknown'})`);
+    console.log(`🔍 POLICY SEARCH: Available policies: ${policies.map(p => p.name).join(', ')}`);
+    
     if (policies.length === 0) {
+      console.log(`🔍 POLICY SEARCH: No policies available for region: ${region}`);
       return null;
     }
 
-    // Look for aircraft-specific policy first
+    // Look for aircraft-specific policy first (by aircraft type)
     if (aircraft?.aircraftType) {
+      const aircraftType = aircraft.aircraftType.toLowerCase();
+      console.log(`🔍 POLICY SEARCH: Looking for policies matching aircraft type: ${aircraftType}`);
+      
       const aircraftPolicy = policies.find(policy => 
-        policy.name.toLowerCase().includes(aircraft.aircraftType.toLowerCase())
+        policy.name.toLowerCase().includes(aircraftType)
       );
       if (aircraftPolicy) {
+        console.log(`✅ POLICY SEARCH: Found aircraft-specific policy: ${aircraftPolicy.name}`);
         return aircraftPolicy;
       }
     }
 
+    // Look for aircraft-specific policy by registration
+    if (aircraft?.registration) {
+      const registration = aircraft.registration.toLowerCase();
+      console.log(`🔍 POLICY SEARCH: Looking for policies matching registration: ${registration}`);
+      
+      const registrationPolicy = policies.find(policy => 
+        policy.name.toLowerCase().includes(registration)
+      );
+      if (registrationPolicy) {
+        console.log(`✅ POLICY SEARCH: Found registration-specific policy: ${registrationPolicy.name}`);
+        return registrationPolicy;
+      }
+    }
+
     // Look for "Standard" or "Default" policy
+    console.log(`🔍 POLICY SEARCH: Looking for standard/default policy`);
     const standardPolicy = policies.find(policy => 
       policy.name.toLowerCase().includes('standard') || 
       policy.name.toLowerCase().includes('default')
     );
     if (standardPolicy) {
+      console.log(`✅ POLICY SEARCH: Found standard/default policy: ${standardPolicy.name}`);
       return standardPolicy;
     }
 
     // Return first policy as fallback
+    console.log(`✅ POLICY SEARCH: Using first available policy as fallback: ${policies[0].name}`);
     return policies[0];
   }
 

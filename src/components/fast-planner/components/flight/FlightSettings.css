@@ -4,7 +4,7 @@
 
 /* Fuel Policy Section */
 .fuel-policy-section {
-  background: linear-gradient(145deg, #6b7280 0%, #374151 100%);
+  background: linear-gradient(90deg, #212020 0%, #202020 100%); 
   border-radius: 6px;
   padding: 0.75rem;
   margin-bottom: 0.75rem;
@@ -18,7 +18,7 @@
 
 /* Policy Settings */
 .policy-settings { 
-  background: linear-gradient(145deg, #6b7280 0%, #374151 100%); 
+  background: linear-gradient(90deg, #212020 0%, #202020 100%); 
   border-radius: 6px; 
   padding: 0.75rem; 
   margin-bottom: 0.75rem; 
@@ -26,13 +26,13 @@
 }
 .policy-settings h5 { color: #4FC3F7; font-size: 0.7rem; margin: 0 0 0.5rem 0; font-weight: 600; }
 .policy-row { display: flex; gap: 0.5rem; }
-.policy-box { flex: 1; background: #4b5563; padding: 0.5rem; border-radius: 4px; text-align: center; }
+.policy-box { flex: 1; background: #303132; padding: 0.5rem; border-radius: 4px; text-align: center; }
 .policy-box label { color: #d1d5db; font-size: 0.6rem; display: block; margin-bottom: 0.25rem; line-height: 1.2; }
 .policy-box span { color: white; font-weight: 600; font-size: 0.75rem; }
 
 /* Flight Overrides */
 .flight-overrides { 
-  background: linear-gradient(145deg, #6b7280 0%, #374151 100%); 
+  background: linear-gradient(90deg, #212020 0%, #202020 100%);  
   border-radius: 6px; 
   padding: 0.75rem; 
   margin-bottom: 0.75rem; 
@@ -46,7 +46,7 @@
 .override-field span { color: #9ca3af; font-size: 0.6rem; margin-left: 0.25rem; }
 /* Adjust Fuel */
 .adjust-fuel { 
-  background: linear-gradient(145deg, #6b7280 0%, #374151 100%); 
+  background: linear-gradient(90deg, #212020 0%, #202020 100%);  
   border-radius: 6px; 
   padding: 0.75rem; 
   margin-bottom: 0.75rem; 
@@ -60,7 +60,7 @@
 
 /* Fuel Note */
 .fuel-note { 
-  background: linear-gradient(145deg, #6b7280 0%, #374151 100%); 
+  background: linear-gradient(90deg, #212020 0%, #202020 100%);   
   border-radius: 6px; 
   padding: 0.6rem; 
   color: #9ca3af; 
