@@ -91,7 +91,60 @@ const FlightSettings = ({
   }, [filteredPolicies, selectedAircraft?.registration, currentPolicy?.uuid]); // Fixed dependencies
   
   // Filter policies by current region
-  const handleInputChange = (field, value) => {
+  // Calculate reserve fuel based on policy type and aircraft
+  const calculateReserveFuel = React.useMemo(() => {
+    if (!currentPolicy || !selectedAircraft) {
+      return { fuel: 0, time: 0, method: 'fixed' };
+    }
+
+    const reserveType = currentPolicy.fuelTypes.reserveFuel.type || 'fixed';
+    const policyValue = currentPolicy.fuelTypes.reserveFuel.default || 0;
+
+    if (reserveType === 'time' && selectedAircraft.fuelBurn) {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = policyValue;
+      const fuelFlowPerHour = selectedAircraft.fuelBurn;
+      const fuelAmount = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      
+      console.log(`🔧 Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${fuelAmount} lbs`);
+      
+      return {
+        fuel: fuelAmount,
+        time: timeMinutes,
+        method: 'time'
+      };
+    } else {
+      // Fixed amount
+      return {
+        fuel: policyValue,
+        time: selectedAircraft.fuelBurn ? Math.round((policyValue * 60) / selectedAircraft.fuelBurn) : 0,
+        method: 'fixed'
+      };
+    }
+  }, [currentPolicy, selectedAircraft?.fuelBurn]);
+
+  // Get all values from fuel policy (not browser storage)
+  const policyValues = React.useMemo(() => {
+    if (!policySettings) {
+      return {
+        taxiFuel: 0,
+        contingencyFlightLegs: 5,
+        contingencyAlternate: 5,
+        deckTime: 15,
+        approachFuel: 0,
+        araFuel: 0
+      };
+    }
+
+    return {
+      taxiFuel: policySettings.taxiFuel || 0,
+      contingencyFlightLegs: policySettings.contingencyFlightLegs || 5,
+      contingencyAlternate: policySettings.contingencyAlternate || 5,
+      deckTime: policySettings.deckTime || 15,
+      approachFuel: policySettings.approachFuel || 0,
+      araFuel: policySettings.araFuel || 0
+    };
+  }, [policySettings]);
     console.log(`🔧 FlightSettings: Input change - ${field}: ${value}`);
     const numValue = Number(value) || 0;
     onSettingsChange({ [field]: numValue });
@@ -182,14 +235,37 @@ const FlightSettings = ({
         <div className="policy-row">
           <div className="policy-box">
             <label>CONTINGENCY FUEL<br/>(FLIGHT LEGS)</label>
-            <span>{policySettings.contingencyFlightLegs || 0}%</span>
+            <span>{policyValues.contingencyFlightLegs}%</span>
           </div>
           <div className="policy-box">
             <label>CONTINGENCY FUEL<br/>(ALTERNATE)</label>
-            <span>{policySettings.contingencyAlternate || 0}%</span>
-          </div>          <div className="policy-box">
+            <span>{policyValues.contingencyAlternate}%</span>
+          </div>
+          <div className="policy-box">
             <label>RESERVE FUEL</label>
-            <span>{policySettings.reserveFuel || 0} lbs<br/>({policySettings.reserveTime || 0} min)</span>
+            <span>
+              {calculateReserveFuel.fuel} lbs
+              <br/>
+              ({calculateReserveFuel.time} min)
+              {calculateReserveFuel.method === 'time' && (
+                <br/><small style={{color: '#9ca3af'}}>Time-based</small>
+              )}
+            </span>
+          </div>
+        </div>
+        
+        <div className="policy-row" style={{marginTop: '0.5rem'}}>
+          <div className="policy-box">
+            <label>TAXI FUEL</label>
+            <span>{policyValues.taxiFuel} lbs</span>
+          </div>
+          <div className="policy-box">
+            <label>DECK TIME</label>
+            <span>{policyValues.deckTime} min</span>
+          </div>
+          <div className="policy-box">
+            <label>APPROACH/ARA</label>
+            <span>{policyValues.approachFuel} lbs</span>
           </div>
         </div>
       </div>
@@ -202,7 +278,7 @@ const FlightSettings = ({
             <label>PAX WEIGHT</label>
             <input 
               type="number" 
-              value={settings.passengerWeight || 0}
+              value={settings.passengerWeight || 220}
               onChange={(e) => handleInputChange('passengerWeight', e.target.value)}
             />
             <span>lbs</span>
@@ -212,8 +288,9 @@ const FlightSettings = ({
             <label>DECK TIME</label>
             <input 
               type="number" 
-              value={settings.deckTimePerStop || 0}
+              value={settings.deckTimePerStop || policyValues.deckTime}
               onChange={(e) => handleInputChange('deckTimePerStop', e.target.value)}
+              placeholder={policyValues.deckTime}
             />
             <span>min</span>
           </div>
@@ -222,24 +299,47 @@ const FlightSettings = ({
             <label>TAXI FUEL</label>
             <input 
               type="number" 
-              value={settings.taxiFuel || 0}
+              value={settings.taxiFuel || policyValues.taxiFuel}
               onChange={(e) => handleInputChange('taxiFuel', e.target.value)}
+              placeholder={policyValues.taxiFuel}
             />
             <span>lbs</span>
           </div>
         </div>
-      </div>
-
-      {/* Adjust Fuel */}
-      <div className="adjust-fuel">
-        <h5>ADJUST FUEL</h5>
-        <div className="adjust-input">
-          <input 
-            type="number" 
-            value={settings.adjustFuel || 0}
-            onChange={(e) => handleInputChange('adjustFuel', e.target.value)}
-          />
-          <span>lbs</span>
+        
+        <div className="override-row" style={{marginTop: '0.5rem'}}>
+          <div className="override-field">
+            <label>EXTRA FUEL</label>
+            <input 
+              type="number" 
+              value={settings.extraFuel || 0}
+              onChange={(e) => handleInputChange('extraFuel', e.target.value)}
+              placeholder="0"
+            />
+            <span>lbs</span>
+          </div>
+          
+          <div className="override-field">
+            <label>CARGO WEIGHT</label>
+            <input 
+              type="number" 
+              value={settings.cargoWeight || 0}
+              onChange={(e) => handleInputChange('cargoWeight', e.target.value)}
+              placeholder="0"
+            />
+            <span>lbs</span>
+          </div>
+          
+          <div className="override-field">
+            <label>ADJUST FUEL</label>
+            <input 
+              type="number" 
+              value={settings.adjustFuel || 0}
+              onChange={(e) => handleInputChange('adjustFuel', e.target.value)}
+              placeholder="0"
+            />
+            <span>lbs</span>
+          </div>
         </div>
       </div>
 
