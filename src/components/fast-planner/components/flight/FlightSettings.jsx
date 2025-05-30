@@ -145,9 +145,12 @@ const FlightSettings = ({
       araFuel: policySettings.araFuel || 0
     };
   }, [policySettings]);
+
+  const handleInputChange = (field, value) => {
     console.log(`🔧 FlightSettings: Input change - ${field}: ${value}`);
     const numValue = Number(value) || 0;
     onSettingsChange({ [field]: numValue });
+  };
   };
 
   const handlePolicyChange = (e) => {
