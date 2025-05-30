@@ -152,21 +152,28 @@ const FastPlannerCore = ({
 
   // Effect to select appropriate fuel policy when aircraft changes
   useEffect(() => {
-    if (!selectedAircraft || !fuelPolicy.hasPolicies) {
+    if (!selectedAircraft || !activeRegionFromContext?.osdkRegion) {
+      console.log(`🛩️ AIRCRAFT: Skipping aircraft policy selection - missing aircraft (${!!selectedAircraft}) or region (${!!activeRegionFromContext?.osdkRegion})`);
       return;
     }
 
-    console.log(`Aircraft changed to: ${selectedAircraft.registration}, selecting appropriate fuel policy`);
+    console.log(`🛩️ AIRCRAFT: Aircraft changed to: ${selectedAircraft.registration}`);
+    console.log(`🛩️ AIRCRAFT: Has policies available: ${fuelPolicy.hasPolicies}`);
+    console.log(`🛩️ AIRCRAFT: Available policies count: ${fuelPolicy.availablePolicies?.length || 0}`);
     
-    // Try to find and select default policy for this aircraft
-    const defaultPolicy = fuelPolicy.selectDefaultPolicyForAircraft(selectedAircraft);
-    
-    if (defaultPolicy) {
-      console.log(`Selected fuel policy: ${defaultPolicy.name} for aircraft: ${selectedAircraft.registration}`);
+    // Aircraft policy selection with enhanced logging
+    if (fuelPolicy.hasPolicies && fuelPolicy.selectDefaultPolicyForAircraft) {
+      console.log(`🛩️ AIRCRAFT: Attempting to select aircraft-specific policy...`);
+      const defaultPolicy = fuelPolicy.selectDefaultPolicyForAircraft(selectedAircraft);
+      if (defaultPolicy) {
+        console.log(`✅ AIRCRAFT: Selected aircraft-specific policy: ${defaultPolicy.name}`);
+      } else {
+        console.log(`⚠️ AIRCRAFT: No specific policy found for aircraft ${selectedAircraft.registration}`);
+      }
     } else {
-      console.warn(`No suitable fuel policy found for aircraft: ${selectedAircraft.registration}`);
+      console.log(`⚠️ AIRCRAFT: Cannot select aircraft policy - hasPolicies: ${fuelPolicy.hasPolicies}, selectFunction: ${!!fuelPolicy.selectDefaultPolicyForAircraft}`);
     }
-  }, [selectedAircraft, fuelPolicy]);
+  }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length]);
 
   // Memoize the region change handler to maintain stable reference
   const handleRegionChange = useCallback((event) => {
@@ -274,26 +281,33 @@ const FastPlannerCore = ({
       return;
     }
 
-    console.log(`Loading fuel policies for region: ${activeRegionFromContext.id}`);
-    fuelPolicy.loadPoliciesForRegion(activeRegionFromContext.id)
+    console.log(`🌍 FastPlannerApp: Loading fuel policies for region change`);
+    console.log(`🌍 FastPlannerApp: activeRegionFromContext:`, activeRegionFromContext);
+    console.log(`🌍 FastPlannerApp: Region ID: ${activeRegionFromContext.id}, OSDK Region: ${activeRegionFromContext.osdkRegion}`);
+
+    console.log(`Loading fuel policies for region: ${activeRegionFromContext.name} (OSDK: ${activeRegionFromContext.osdkRegion})`);
+    fuelPolicy.loadPoliciesForRegion(activeRegionFromContext.osdkRegion)
       .then(policies => {
-        console.log(`Loaded ${policies.length} fuel policies for ${activeRegionFromContext.id}`);
+        console.log(`📋 REGION: Loaded ${policies.length} fuel policies for ${activeRegionFromContext.name}`);
         
-        // If no current policy is selected and we have policies, select the first one as default
-        if (policies.length > 0 && !fuelPolicy.currentPolicy) {
-          const defaultPolicy = policies.find(p => 
-            p.name.toLowerCase().includes('standard') || 
-            p.name.toLowerCase().includes('default')
-          ) || policies[0];
-          
-          console.log(`Auto-selecting default fuel policy: ${defaultPolicy.name}`);
-          fuelPolicy.selectPolicy(defaultPolicy);
+        if (policies.length === 0) {
+          console.warn(`📋 REGION: No policies found for region ${activeRegionFromContext.name}`);
+          return;
+        }
+        
+        // Only auto-select if no current policy or current policy is not from this region
+        const currentPolicy = fuelPolicy.currentPolicy;
+        if (!currentPolicy || !policies.find(p => p.uuid === currentPolicy.uuid)) {
+          console.log(`📋 REGION: Auto-selecting first policy for region: ${policies[0].name}`);
+          fuelPolicy.selectPolicy(policies[0]);
+        } else {
+          console.log(`📋 REGION: Keeping current policy: ${currentPolicy.name}`);
         }
       })
       .catch(error => {
-        console.error('Error loading fuel policies for region:', error);
+        console.error(`Error loading fuel policies for region ${activeRegionFromContext.name} (${activeRegionFromContext.osdkRegion}):`, error);
       });
-  }, [activeRegionFromContext?.id, fuelPolicy]);
+  }, [activeRegionFromContext?.id, fuelPolicy, selectedAircraft]);
 
   // Effect to clear route when activeRegionFromContext (from useRegion) changes
   const firstLoadDone = useRef(false);
