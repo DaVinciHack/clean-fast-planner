@@ -76,8 +76,8 @@ const RightPanel = ({
   deckFuelFlow = 400,
   passengerWeight = 220,
   cargoWeight = 0,
-  taxiFuel = 50,
-  contingencyFuelPercent = 10,
+  taxiFuel = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
+  contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
   reserveMethod = 'fixed',
   onDeckTimeChange = () => {},
   onDeckFuelChange = () => {},
@@ -487,6 +487,7 @@ const RightPanel = ({
         cargoWeight={cargoWeight}
         alternateRouteData={alternateRouteData}
         stopCards={stopCards}
+        fuelPolicy={fuelPolicy}
       />
       
       {/* Settings Card */}

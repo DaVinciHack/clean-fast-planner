@@ -315,6 +315,39 @@ const FastPlannerCore = ({
       });
   }, [activeRegionFromContext?.id, activeRegionFromContext?.osdkRegion]); // Simplified dependencies
 
+  // ✅ CRITICAL FIX: Apply fuel policy values to flightSettings when policy changes
+  useEffect(() => {
+    if (!fuelPolicy.currentPolicy) {
+      console.log('⚙️ FUEL POLICY: No current policy, skipping flightSettings update');
+      return;
+    }
+
+    const policySettings = fuelPolicy.getCurrentPolicySettings();
+    if (!policySettings) {
+      console.log('⚙️ FUEL POLICY: No policy settings available');
+      return;
+    }
+
+    console.log('🔄 FUEL POLICY: Applying policy values to flightSettings');
+    console.log('📊 FUEL POLICY: Policy contingency:', policySettings.contingencyFlightLegs);
+    console.log('📊 FUEL POLICY: Policy taxi fuel:', policySettings.taxiFuel);
+    console.log('📊 FUEL POLICY: Policy reserve fuel:', policySettings.reserveFuel);
+
+    // Apply policy values to flightSettings, preserving user inputs
+    setFlightSettings(currentSettings => ({
+      ...currentSettings, // Preserve user inputs (passenger weight, cargo weight)
+      // Apply OSDK policy values (these are the authoritative source)
+      contingencyFuelPercent: policySettings.contingencyFlightLegs || currentSettings.contingencyFuelPercent || 5,
+      taxiFuel: policySettings.taxiFuel || currentSettings.taxiFuel || 50,
+      reserveFuel: policySettings.reserveFuel || currentSettings.reserveFuel || 600,
+      deckTimePerStop: policySettings.deckTime || currentSettings.deckTimePerStop || 5,
+      // deckFuelFlow could come from policy or aircraft, keep existing for now
+      deckFuelFlow: currentSettings.deckFuelFlow || 400
+    }));
+
+    console.log('✅ FUEL POLICY: Applied policy values to flightSettings');
+  }, [fuelPolicy.currentPolicy?.uuid, fuelPolicy.getCurrentPolicySettings]); // Trigger when policy changes
+
   // Effect to clear route when activeRegionFromContext (from useRegion) changes
   const firstLoadDone = useRef(false);
   const lastRegionId = useRef(null);
@@ -1349,9 +1382,26 @@ const FastPlannerCore = ({
 const FastPlannerApp = () => {
   // Hoist states needed by useManagers or passed to FastPlannerCore
   const [flightSettings, setFlightSettings] = useState({
-    passengerWeight: 220, contingencyFuelPercent: 5, taxiFuel: 50,
-    reserveFuel: 600, deckTimePerStop: 5, deckFuelFlow: 400, cargoWeight: 0,
+    passengerWeight: 220, // ✅ User input - safe default
+    contingencyFuelPercent: 9999, // ⚠️ CRITICAL SAFETY: Must come from OSDK policy, not defaults
+    taxiFuel: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
+    reserveFuel: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults  
+    deckTimePerStop: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
+    deckFuelFlow: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
+    cargoWeight: 0, // ✅ User input - safe default
   });
+
+  // 🔍 DEBUG: Track flightSettings changes to find when contingencyFuelPercent gets corrupted
+  useEffect(() => {
+    console.log('🔍 FLIGHT SETTINGS CHANGED:', {
+      contingencyFuelPercent: flightSettings.contingencyFuelPercent,
+      passengerWeight: flightSettings.passengerWeight,
+      taxiFuel: flightSettings.taxiFuel,
+      reserveFuel: flightSettings.reserveFuel,
+      deckFuelFlow: flightSettings.deckFuelFlow, // ✅ Add this to track aircraft updates
+      deckTimePerStop: flightSettings.deckTimePerStop
+    });
+  }, [flightSettings.contingencyFuelPercent, flightSettings.passengerWeight, flightSettings.taxiFuel, flightSettings.reserveFuel, flightSettings.deckFuelFlow, flightSettings.deckTimePerStop]);
   const [weather, setWeather] = useState({ windSpeed: 15, windDirection: 270 });
   const [favoriteLocations, setFavoriteLocations] = useState([]);
   const [waypoints, setWaypoints] = useState([]);

@@ -1,47 +1,45 @@
-# Current Focus: Alternate Route Completion & Stop Card Implementation
+# Current Focus: COMPREHENSIVE Fuel System Integration
 
-## Overview
-We are finalizing the alternate route functionality in the FastPlanner application:
+## 🎯 **IMMEDIATE PRIORITY**
+**PROBLEM**: Race conditions in fuel system causing crashes + Missing integration for wind/weather/alternates
+**SOLUTION**: Create comprehensive MasterFuelManager for ALL fuel calculations
 
-1. ✅ **Clear Route Enhancement** - COMPLETED
-2. ✅ **Alternate Split Point Logic** - COMPLETED 
-3. **Alternate Stop Card Implementation** - Add an alternate stop card at the end of the stop cards list
+## 🌪️ **CRITICAL ADDITIONS IDENTIFIED**
+1. **Wind Calculations** - Must integrate `WindCalculations.js` system
+2. **Weather Segments** - Must integrate weather segment fuel analysis (ARA/approach)  
+3. **Alternate Routes** - Must integrate alternate route fuel calculations
+4. **Weather-to-Fuel Flow** - Weather segments → ARA/approach fuel requirements
 
-## Core Principles (CRITICAL)
-- No quick fixes or workarounds - only proper structural improvements
-- No dummy or mock data that could be mistaken for real values
-- Clean, maintainable code that accurately represents real-world aviation data
-- Take one step at a time with thorough testing
-- Remember this is aviation software - no shortcuts or potentially misleading numbers
+## 📋 **UPDATED NEXT ACTION**
+**Phase 1**: Create COMPREHENSIVE MasterFuelManager.js (3-4 hours) ⬆️ INCREASED SCOPE
+- `/modules/fuel/MasterFuelManager.js` - Core unified manager WITH wind/weather integration
+- `/hooks/useMasterFuelManager.js` - React hook wrapper  
+- `/modules/fuel/WindIntegrator.js` - Wind calculations coordinator (NEW)
+- Test comprehensive integration before moving to next phase
 
-## ✅ COMPLETED: Clear Route Enhancement
-- Enhanced `clearRoute` functionality to clear both main route and alternate route data
-- Fixed syntax issues and added comprehensive alternate route clearing
+## 🚨 **CRITICAL RULES (UPDATED)**
+1. **No race conditions** - Sequential updates only
+2. **Single source of truth** - MasterFuelManager owns ALL fuel data (including wind/weather/alternate)
+3. **No quick fixes** - Proper structural improvements only
+4. **Test each phase** - Before moving to next phase  
+5. **Aviation safety** - No dummy data, real calculations only
+6. **Wind consistency** - Same wind data used for all calculations ⬅️ NEW
+7. **Weather integration** - Weather segments flow through fuel system ⬅️ NEW
+8. **Alternate accuracy** - Same fuel policies for main and alternate routes ⬅️ NEW
 
-## ✅ COMPLETED: Split Point Logic
+## 📊 **UPDATED STATUS**
+- **Analysis**: ✅ Complete mapping INCLUDING wind/weather/alternate systems  
+- **Plan**: ✅ Comprehensive implementation plan updated
+- **Memory**: ✅ Updated with complete integration requirements
+- **Scope**: ⬆️ EXPANDED to cover all fuel-related calculations
+- **Ready**: ✅ Ready to start comprehensive Phase 1 implementation
 
-### What Was Implemented
-1. **New Flight Logic**: When alternate added with single destination → split point = first landing point
-2. **Loaded Flight Logic**: Use existing split point from flight data (already working)
-3. **Two-Location Logic**: Split point = first location (already working correctly)
+## 🔧 **UPDATED IMPLEMENTATION PHASES**
+1. **Create COMPREHENSIVE MasterFuelManager** (3-4h) → NEXT ⬆️ EXPANDED
+2. **Weather & Wind System Integration** (2-3h) ⬅️ NEW PHASE
+3. **Alternate Route Integration** (2-3h) ⬅️ NEW PHASE  
+4. **Stop Cards Integration** (1-2h)
+5. **Settings & UI Integration** (1-2h)
+6. **Complete Integration Testing** (2-3h) ⬆️ EXPANDED
 
-### Implementation Details
-- **`determineNewFlightSplitPoint` function**: Intelligently finds first landing point from current waypoints
-- **Enhanced single-location logic**: Distinguishes between new flights vs loaded flights
-- **Comprehensive logging**: Added detailed console logs for debugging split point determination
-
-### Testing Required
-- Test new flight: Add route, then add single-location alternate → verify split point = first stop
-- Test loaded flight: Load flight with alternate → verify uses original split point
-- Test two-location alternate → verify split point = from location
-
-## Next Actions
-
-### Phase 3: Alternate Stop Card (NEXT) 
-**Requirement**:
-- Orange circle with "A" icon, display alternate name, small font "alternate leg" text  
-- Fuel, time, and passenger calculations for alternate route
-- Appears ONLY when alternate route exists, positioned at END of stop cards list
-
-## Next Immediate Action
-**READY FOR**: Testing the split point logic and then implementing alternate stop card.
+**Total**: 12-15 hours estimated ⬆️ INCREASED for comprehensive solution

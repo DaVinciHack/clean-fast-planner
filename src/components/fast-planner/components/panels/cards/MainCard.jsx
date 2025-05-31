@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import RegionSelector from '../../controls/RegionSelector';
 import { SaveFlightButton, LoadFlightsButton } from '../../controls';
-import { StopCardsContainer } from '../../flight/stops';
+import EnhancedStopCardsContainer from '../../flight/stops/EnhancedStopCardsContainer.jsx';
 import '../../flight/stops/StopCards.css';
 
 /**
@@ -33,10 +33,10 @@ const MainCard = ({
   // Waypoints for stop cards
   waypoints = [],
   passengerWeight = 0,
-  deckTimePerStop = 0,
-  deckFuelFlow = 0,
-  contingencyFuelPercent = 0,
-  taxiFuel = 0,
+  deckTimePerStop = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
+  deckFuelFlow = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK  
+  contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
+  taxiFuel = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
   // Weather props
   weather, // No default - weather must be provided from parent
   onWeatherUpdate = () => {},
@@ -44,6 +44,8 @@ const MainCard = ({
   alternateRouteData = null,
   // Stop cards data from useRouteCalculation
   stopCards = [],
+  // Fuel policy for MasterFuelManager
+  fuelPolicy = null,
 }) => {
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
@@ -484,9 +486,9 @@ const MainCard = ({
       
       {/* Remove padding in the control section that renders StopCardsContainer */}
       <div className="control-section" style={{ margin: '0', padding: '0' }}>
-        {/* Stop Cards with reduced padding above */}
+        {/* Enhanced Stop Cards with MasterFuelManager Integration */}
         {waypoints.length >= 2 && (
-          <StopCardsContainer
+          <EnhancedStopCardsContainer
             waypoints={waypoints}
             routeStats={routeStats}
             selectedAircraft={selectedAircraft}
@@ -498,6 +500,8 @@ const MainCard = ({
             taxiFuel={taxiFuel}
             weather={weather}
             alternateRouteData={alternateRouteData}
+            fuelPolicy={fuelPolicy}
+            weatherSegments={null} // TODO: Connect weather segments
             stopCards={stopCards}
           />
         )}

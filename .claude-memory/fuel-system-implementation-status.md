@@ -1,75 +1,44 @@
-# Fuel System Implementation Status & Memory Update
+# Fuel System Implementation Status & AppSettingsManager Fix
 
-## ✅ **Completed Backend Work (Palantir)**
+## 🚨 **CRITICAL ISSUE IDENTIFIED AND BEING FIXED**
 
-### **Enhanced Fuel Calculations:**
-- **FlightFuelService.ts**: Enhanced `calculateDeckFuel` method with priority logic
-- **AlternateFuelService.ts**: Both locations updated with enhanced deck fuel logic
-- **New Aircraft Field**: `flatPitchFuelBurnDeckFuel` (Double) - 900 lbs/hr for deck operations
-- **New Policy Field**: `deckFuelTime` (Double) - 15 minutes deck time per stop
-- **Priority Logic**: flatpitch × time → flatpitch × default → legacy policy amount
+### **Root Cause Found:**
+- **AppSettingsManager race condition**: Storing fuel policy values in localStorage
+- **Override conflict**: OSDK policy values (10%) being overwritten by stored defaults (0%)
+- **Systemic problem**: Affects ALL fuel values (contingency, reserve, taxi, deck fuel)
 
-### **Weather-Based Fuel Logic:**
-- **ARA Fuel**: Added when weather ranking2 = 8 or 5 (for rigs)
-- **Approach Fuel**: Added when weather ranking2 = 10 or 5 (for airports)
-- **Distribution Logic**: 
-  - ARA fuel appears before rigs, consumed at rigs
-  - Approach fuel carried throughout entire remaining route
-  - Multiple airports = multiple approach fuel amounts from start
+### **Evidence from Console Logs:**
+```
+✅ First calculation: contingencyFuelPercent: 10 (from OSDK policy)
+❌ Second calculation: contingencyFuelPercent: 0 (from AppSettingsManager override)
+```
 
-### **Calculation Results:**
-- **Working**: 15 min × 900 lbs/hr = 225 lbs deck fuel (vs old 200 lbs)
-- **Debug Confirmed**: AlternateFuelService working correctly
-- **Published**: Functions published in Palantir
-- **OSDK**: New fields added, OSDK being regenerated
+### **Problem Flow:**
+1. User changes passenger weight → Correct OSDK calculation (10%) ✅
+2. AppSettingsManager updates → Triggers callback with stored values ❌  
+3. Stored values override OSDK policy → Calculation uses wrong values (0%) ❌
 
-## 🚧 **Current Fast Planner Status**
+## 🎯 **SOLUTION: Separate User Inputs from Fuel Policy**
 
-### **Existing Fuel Components:**
-- **FuelCalculationManager.js**: Basic fuel calculations
-- **WeatherFuelAnalyzer.js**: Weather-based fuel analysis (NEW)
-- **WeatherStopCardFuelDistributor.js**: Proper stop card distribution (NEW)
-- **EnhancedFuelManager.js**: Integrates weather with fuel system (NEW)
-- **ManualFuelOverride.js**: Manual mode for weather failures (NEW)
+### **Aviation-Compliant Behavior Required:**
+- **Fresh flight = Fresh fuel policy values** (no stale overrides)
+- **Aircraft change = Reset all fuel overrides** 
+- **Region change = New OSDK policy applied**
+- **User overrides = Flight-specific only** (not persisted globally)
 
-### **Integration Points:**
-- **Stop Card Calculator**: Enhanced version created but not integrated
-- **Settings Page**: Currently uses browser storage, needs policy integration
-- **Fuel Tab**: Using evacuation tab temporarily
-- **OSDK**: Old version, needs update with new fields
+## 📋 **IMPLEMENTATION PLAN**
 
-## 🎯 **Key Technical Decisions Made**
+### **Phase 1: Clean AppSettingsManager ✅ IN PROGRESS**
+1. **Remove fuel policy from defaults**
+2. **Update callback mechanism** - Only send user inputs
+3. **Test elimination of race condition**
 
-### **Fuel Policy Priority:**
-1. **Policy Defaults**: Loaded from Palantir fuel policies
-2. **User Overrides**: Stored locally, preserved when possible
-3. **Manual Mode**: Complete override when weather APIs fail
-4. **Aircraft-Specific**: flatpitch burn rates per aircraft type
+### **Phase 2: Implement Flight-Specific Overrides**
+1. **Create override storage system** (in-memory, not localStorage)
+2. **Add reset triggers** for aircraft/flight changes  
+3. **Route fuel overrides** through MasterFuelManager
 
-### **Weather Integration:**
-- **Same Logic as Palantir**: ranking2 values determine fuel requirements
-- **Live Updates**: Fuel recalculates when routes change
-- **Stop Card Distribution**: Proper consumption logic implemented
-- **Comparison Capability**: Compare with imported Palantir fuel
-
-### **UI Architecture:**
-- **Fuel Tab**: Replace evacuation tab with dedicated fuel management
-- **Settings Integration**: Show policy defaults vs user overrides
-- **Manual Override**: Complete interface for weather failures
-- **Policy Display**: Show which policy is active and why
-
-## 🔧 **Architecture Patterns Established**
-
-### **Manager Pattern:**
-- **EnhancedFuelManager**: Extends FuelCalculationManager with weather awareness
-- **WeatherFuelAnalyzer**: Standalone weather analysis
-- **ManualFuelOverride**: Standalone override management
-
-### **Distribution Pattern:**
-- **WeatherStopCardFuelDistributor**: Handles proper fuel consumption logic
-- **EnhancedStopCardCalculator**: Integrates weather with existing stop cards
-
-### **Policy Integration Pattern:**
-- **FuelPolicyLoader**: Loads policies from Palantir OSDK
-- **Settings Enhancement**: Auto-populate from policies
-- **Override Management**: Track policy vs user values
+## 🔧 **CURRENT STATUS**
+- ✅ Renamed wrong SettingsCard to .old
+- ✅ Identified AppSettingsManager race condition 
+- 🔄 Cleaning AppSettingsManager defaults
