@@ -268,7 +268,26 @@ const useManagers = ({
 
       appSettingsManagerRef.current.setCallback('onFlightSettingsChange', (settings) => {
         console.log('AppSettingsManager: Flight settings changed');
-        setFlightSettings(settings);
+        console.log('📥 AppSettingsManager: Settings from storage:', settings);
+        // ✅ CRITICAL FIX: Merge AppSettingsManager values with existing flightSettings
+        // Only user inputs from AppSettingsManager, preserve OSDK policy values
+        setFlightSettings(currentSettings => {
+          console.log('🔍 AppSettingsManager: Current settings before merge:', {
+            contingencyFuelPercent: currentSettings.contingencyFuelPercent,
+            passengerWeight: currentSettings.passengerWeight,
+            taxiFuel: currentSettings.taxiFuel
+          });
+          const merged = {
+            ...currentSettings, // Preserve existing OSDK policy values
+            ...settings         // Apply only user inputs from AppSettingsManager
+          };
+          console.log('🔍 AppSettingsManager: Merged settings result:', {
+            contingencyFuelPercent: merged.contingencyFuelPercent,
+            passengerWeight: merged.passengerWeight,
+            taxiFuel: merged.taxiFuel
+          });
+          return merged;
+        });
       });
 
       appSettingsManagerRef.current.setCallback('onUISettingsChange', (uiSettings) => {
@@ -281,14 +300,13 @@ const useManagers = ({
       // Apply flight settings
       const flightSettingsFromStorage = savedSettings.flightSettings;
       if (flightSettingsFromStorage) {
-        // Conditional update to prevent loops if flightSettings is a dependency of this useEffect
-        // A proper deep equality check would be more robust here.
-        if (JSON.stringify(flightSettings) !== JSON.stringify(flightSettingsFromStorage)) {
-          console.log("useManagers: Applying saved flight settings from AppSettingsManager as they differ.");
-          setFlightSettings(flightSettingsFromStorage);
-        } else {
-          console.log("useManagers: Saved flight settings are identical to current state, skipping update.");
-        }
+        // ✅ CRITICAL FIX: Merge stored user inputs with existing OSDK policy values
+        // Only apply user inputs (passenger weight, cargo), preserve fuel policy values
+        console.log("useManagers: Merging saved user inputs with current OSDK policy values");
+        setFlightSettings(currentSettings => ({
+          ...currentSettings,           // Preserve existing OSDK policy values
+          ...flightSettingsFromStorage  // Apply only user inputs from storage
+        }));
       }
     }
 

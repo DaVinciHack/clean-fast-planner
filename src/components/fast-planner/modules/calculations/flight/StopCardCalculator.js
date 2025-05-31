@@ -176,6 +176,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
 
   // Get aircraft data for calculations
   const aircraft = selectedAircraft;
+  
+  // 🔍 DEBUG: Log complete aircraft object to see all available fields
+  console.log('🔍 COMPLETE AIRCRAFT OBJECT:', aircraft);
+  console.log('🔍 AIRCRAFT FUEL FIELDS:', {
+    fuelFlow: aircraft?.fuelFlow,
+    fuelBurn: aircraft?.fuelBurn,
+    flatPitchFuelBurnDeckFuel: aircraft?.flatPitchFuelBurnDeckFuel,
+    allKeys: aircraft ? Object.keys(aircraft) : 'aircraft is null/undefined'
+  });
 
   // Calculate total trip values
   let totalDistance = 0;
@@ -401,9 +410,29 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   
   console.log(`StopCardCalculator: Calculating deck time for ${intermediateStops} intermediate stops out of ${landingStopsCount} total landing stops`);
   
+  // 🔍 DEBUG: Check what fuel flow data we have from aircraft
+  console.log('🔍 AIRCRAFT FUEL FLOW DEBUG:', {
+    selectedAircraft_available: !!aircraft,
+    aircraft_fuelFlow: aircraft?.fuelFlow,
+    aircraft_fuelBurn: aircraft?.fuelBurn, 
+    aircraft_flatPitchFuelBurnDeckFuel: aircraft?.flatPitchFuelBurnDeckFuel,
+    deckFuelFlowValue_being_used: deckFuelFlowValue,
+    deckFuelFlowValue_source: 'from options parameter'
+  });
+  
   // Calculate deck time and fuel
   const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours
   const deckFuelValue = Math.round(deckTimeHours * deckFuelFlowValue);
+  
+  // 🔍 DEBUG: Show the deck fuel calculation
+  console.log('🔍 DECK FUEL CALCULATION:', {
+    intermediateStops,
+    deckTimePerStopValue_minutes: deckTimePerStopValue,
+    deckTimeHours: deckTimeHours,
+    deckFuelFlowValue_lbs_per_hour: deckFuelFlowValue,
+    deckFuelValue_total_lbs: deckFuelValue,
+    calculation: `${intermediateStops} stops × ${deckTimePerStopValue} min/stop ÷ 60 × ${deckFuelFlowValue} lbs/hr = ${deckFuelValue} lbs`
+  });
 
   // Calculate contingency fuel
   const contingencyFuelValue = Math.round((totalTripFuel * contingencyFuelPercentValue) / 100);

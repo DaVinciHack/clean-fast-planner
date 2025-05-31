@@ -21,11 +21,10 @@ class AppSettingsManager {
       },
       flightSettings: {
         passengerWeight: 220,
-        contingencyFuelPercent: 10,
-        taxiFuel: 50,
-        reserveFuel: 600,
-        deckTimePerStop: 5,
-        deckFuelFlow: 400
+        cargoWeight: 0
+        // ✅ FUEL POLICY VALUES REMOVED - These now come from OSDK only
+        // ❌ No longer storing: contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow
+        // This prevents race conditions where localStorage overrides OSDK policy values
       },
       uiSettings: {
         leftPanelVisible: true,
@@ -184,25 +183,40 @@ class AppSettingsManager {
    * @param {Object} flightSettings - New flight settings
    */
   updateFlightSettings(flightSettings) {
-    // Parse any string values to integers to ensure we don't have string-to-number issues
-    const parsedSettings = {};
+    // ✅ AVIATION SAFETY: Only allow user input values, not fuel policy values
+    const allowedUserInputs = ['passengerWeight', 'cargoWeight'];
+    
+    // Filter to only allowed user inputs
+    const filteredSettings = {};
     Object.keys(flightSettings).forEach(key => {
-      const value = flightSettings[key];
-      if (typeof value === 'string' && !isNaN(parseInt(value, 10))) {
-        parsedSettings[key] = parseInt(value, 10);
+      if (allowedUserInputs.includes(key)) {
+        const value = flightSettings[key];
+        if (typeof value === 'string' && !isNaN(parseInt(value, 10))) {
+          filteredSettings[key] = parseInt(value, 10);
+        } else {
+          filteredSettings[key] = value;
+        }
       } else {
-        parsedSettings[key] = value;
+        console.warn(`AppSettingsManager: Ignoring fuel policy value '${key}' - should come from OSDK only`);
       }
     });
     
+    // Only proceed if we have valid user inputs
+    if (Object.keys(filteredSettings).length === 0) {
+      console.log('AppSettingsManager: No valid user input changes to save');
+      return;
+    }
+    
     // Log what we're updating with
-    console.log('AppSettingsManager: Updating flight settings with parsed values:', parsedSettings);
+    console.log('AppSettingsManager: Updating flight settings with parsed values:', filteredSettings);
     
     this.settings.flightSettings = {
       ...this.settings.flightSettings,
-      ...parsedSettings
+      ...filteredSettings
     };
     this.saveSettings();
+    
+    // ✅ CRITICAL FIX: Only send user inputs in callback, not fuel policy values
     this.triggerCallback('onFlightSettingsChange', this.settings.flightSettings);
   }
   

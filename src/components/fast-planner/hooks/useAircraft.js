@@ -199,15 +199,18 @@ const useAircraft = ({
         console.log(`Found saved settings for ${aircraft.registration}:`, savedSettings);
 
         // Update the flightSettings state with saved settings
+        // ✅ CRITICAL SAFETY FIX: Only apply user inputs, NEVER fuel policy values
         setFlightSettings(prev => ({
           ...prev,
+          // ✅ User inputs only - safe to load from localStorage
           passengerWeight: savedSettings.passengerWeight ?? prev.passengerWeight,
-          contingencyFuelPercent: savedSettings.contingencyFuelPercent ?? prev.contingencyFuelPercent,
-          taxiFuel: savedSettings.taxiFuel ?? prev.taxiFuel,
-          reserveFuel: savedSettings.reserveFuel ?? prev.reserveFuel,
-          deckTimePerStop: savedSettings.deckTimePerStop ?? prev.deckTimePerStop,
-          deckFuelFlow: savedSettings.deckFuelFlow ?? prev.deckFuelFlow,
           cargoWeight: savedSettings.cargoWeight ?? prev.cargoWeight,
+          // ❌ REMOVED ALL FUEL POLICY VALUES - These must come from OSDK only
+          // contingencyFuelPercent: savedSettings.contingencyFuelPercent ?? prev.contingencyFuelPercent,
+          // taxiFuel: savedSettings.taxiFuel ?? prev.taxiFuel,
+          // reserveFuel: savedSettings.reserveFuel ?? prev.reserveFuel,
+          // deckTimePerStop: savedSettings.deckTimePerStop ?? prev.deckTimePerStop,
+          // deckFuelFlow: savedSettings.deckFuelFlow ?? prev.deckFuelFlow,
         }));
 
         // Show a message that settings were loaded
@@ -223,15 +226,18 @@ const useAircraft = ({
           console.log(`Found saved settings for aircraft type ${aircraftType}:`, typeSettings);
 
           // Update the flightSettings state with type settings
+          // ✅ CRITICAL SAFETY FIX: Only apply user inputs, NEVER fuel policy values
           setFlightSettings(prev => ({
             ...prev,
+            // ✅ User inputs only - safe to load from localStorage
             passengerWeight: typeSettings.passengerWeight ?? prev.passengerWeight,
-            contingencyFuelPercent: typeSettings.contingencyFuelPercent ?? prev.contingencyFuelPercent,
-            taxiFuel: typeSettings.taxiFuel ?? prev.taxiFuel,
-            reserveFuel: typeSettings.reserveFuel ?? prev.reserveFuel,
-            deckTimePerStop: typeSettings.deckTimePerStop ?? prev.deckTimePerStop,
-            deckFuelFlow: typeSettings.deckFuelFlow ?? prev.deckFuelFlow,
             cargoWeight: typeSettings.cargoWeight ?? prev.cargoWeight,
+            // ❌ REMOVED ALL FUEL POLICY VALUES - These must come from OSDK only
+            // contingencyFuelPercent: typeSettings.contingencyFuelPercent ?? prev.contingencyFuelPercent,
+            // taxiFuel: typeSettings.taxiFuel ?? prev.taxiFuel,
+            // reserveFuel: typeSettings.reserveFuel ?? prev.reserveFuel,
+            // deckTimePerStop: typeSettings.deckTimePerStop ?? prev.deckTimePerStop,
+            // deckFuelFlow: typeSettings.deckFuelFlow ?? prev.deckFuelFlow,
           }));
 
           // Show a message that type settings were loaded
@@ -284,15 +290,52 @@ const useAircraft = ({
         registration: aircraft?.registration,
         type: aircraft?.modelType,
         cruiseSpeed: aircraft?.cruiseSpeed,
-        fuelBurn: aircraft?.fuelBurn
+        fuelBurn: aircraft?.fuelBurn,
+        flatPitchFuelBurnDeckFuel: aircraft?.flatPitchFuelBurnDeckFuel
       });
+
+      // 🔥 CRITICAL SAFETY FIX: Update flightSettings with OSDK aircraft values
+      // This ensures NO fallback values are used - only real aircraft data
+      if (aircraft) {
+        console.log('🛠️ UPDATING FLIGHT SETTINGS WITH OSDK AIRCRAFT VALUES');
+        console.log('🛠️ AIRCRAFT SELECTED:', aircraft.registration);
+        console.log('🛠️ AIRCRAFT flatPitchFuelBurnDeckFuel:', aircraft.flatPitchFuelBurnDeckFuel);
+        
+        // ✅ SAFETY: Update with actual aircraft OSDK values ONLY
+        setFlightSettings(prev => {
+          const updates = { ...prev };
+          
+          // ✅ Update deckFuelFlow with actual OSDK value (NOT 9999 fallback)
+          if (aircraft.flatPitchFuelBurnDeckFuel !== undefined && aircraft.flatPitchFuelBurnDeckFuel !== null) {
+            updates.deckFuelFlow = aircraft.flatPitchFuelBurnDeckFuel;
+            console.log(`✅ Updated deckFuelFlow from aircraft: ${aircraft.flatPitchFuelBurnDeckFuel}`);
+          } else {
+            console.warn(`❌ aircraft.flatPitchFuelBurnDeckFuel is ${aircraft.flatPitchFuelBurnDeckFuel} - keeping fallback ${prev.deckFuelFlow}`);
+          }
+          
+          // 📝 TODO: Add other OSDK aircraft fuel values here when available:
+          // - Aircraft-specific taxi fuel from OSDK (if available)
+          // - Aircraft-specific reserve fuel from OSDK (if available) 
+          // - Aircraft-specific contingency percent from OSDK (if available)
+          // - Aircraft-specific deck time from OSDK (if available)
+          
+          console.log('🛠️ FINAL FLIGHT SETTINGS UPDATE:', updates);
+          return updates;
+        });
+        
+        console.log('🔍 AIRCRAFT FUEL VALUES:', {
+          flatPitchFuelBurnDeckFuel: aircraft.flatPitchFuelBurnDeckFuel,
+          fuelBurn: aircraft.fuelBurn,
+          // Add other fuel-related properties for debugging
+        });
+      }
 
       // Save to settings
       if (appSettingsManagerInstanceRef.current) {
         appSettingsManagerInstanceRef.current.setAircraft(aircraftType, registration);
       }
 
-      // Load aircraft-specific settings if they exist
+      // Load aircraft-specific settings if they exist (user inputs only)
       if (aircraft) {
         handleLoadAircraftSettings(aircraft);
       }

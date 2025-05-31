@@ -174,8 +174,18 @@ const FlightSettings = ({
 
   const handleInputChange = (field, value) => {
     console.log(`🔧 FlightSettings: Input change - ${field}: ${value}`);
-    const numValue = Number(value) || 0;
-    onSettingsChange({ [field]: numValue });
+    
+    // Allow negative numbers and empty strings during typing
+    if (value === '' || value === '-') {
+      onSettingsChange({ [field]: value });
+      return;
+    }
+    
+    const numValue = Number(value);
+    // Only convert to number if it's a valid number (including negative)
+    if (!isNaN(numValue)) {
+      onSettingsChange({ [field]: numValue });
+    }
   };
 
   const handlePolicyChange = (e) => {
