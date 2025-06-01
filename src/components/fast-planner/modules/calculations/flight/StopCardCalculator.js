@@ -422,7 +422,18 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   
   // Calculate deck time and fuel
   const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours
-  const deckFuelValue = Math.round(deckTimeHours * deckFuelFlowValue);
+  
+  // ✅ AVIATION SAFETY: Use aircraft OSDK data FIRST, fallback to options only if missing
+  const actualDeckFuelFlow = aircraft?.flatPitchFuelBurnDeckFuel || deckFuelFlowValue;
+  const deckFuelValue = Math.round(deckTimeHours * actualDeckFuelFlow);
+  
+  // 🔍 DEBUG: Show what deck fuel flow is actually being used
+  console.log('✅ DECK FUEL FLOW SOURCE:', {
+    aircraft_flatPitchFuelBurnDeckFuel: aircraft?.flatPitchFuelBurnDeckFuel,
+    options_deckFuelFlow: deckFuelFlowValue,
+    actualDeckFuelFlow_used: actualDeckFuelFlow,
+    source: aircraft?.flatPitchFuelBurnDeckFuel ? 'OSDK Aircraft Data' : 'Options Fallback'
+  });
   
   // 🔍 DEBUG: Show the deck fuel calculation
   console.log('🔍 DECK FUEL CALCULATION:', {

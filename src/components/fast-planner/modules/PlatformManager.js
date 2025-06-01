@@ -768,7 +768,7 @@ class PlatformManager {
           } else if (isBlocks) {
             blocksCount++;
             // Debug: Log ALL blocks found (temporarily increase limit)
-            console.log(`Block found: "${name}" with type: "${type}"`);
+            // console.log(`Block found: "${name}" with type: "${type}"`);  // Silenced for debugging
           } else if (isBases) {
             basesCount++;
             // Debug: Log ALL bases found with their isBase field value
