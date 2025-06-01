@@ -324,6 +324,9 @@ class MasterFuelManager {
       
       this.state.calculations = calculations;
       
+      // ✅ SINGLE SOURCE OF TRUTH: Store globally for FastPlannerApp header access
+      window.masterFuelCalculations = calculations;
+      
       console.log('⛽ MasterFuelManager: Unified calculation complete');
       return calculations;
       
