@@ -26,8 +26,8 @@ import { RegionProvider, useRegion } from './context/region';
 
 // Import LoadingIndicator for status checking
 import LoadingIndicator from './modules/LoadingIndicator';
-// Import StopCardCalculator for stop cards generation
-import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
+// ✅ SINGLE SOURCE OF TRUTH: No longer import StopCardCalculator - use MasterFuelManager only
+// import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
 import useWeather from './hooks/useWeather';
@@ -390,67 +390,22 @@ const FastPlannerCore = ({
     }
   };
 
-  // Generate stop cards data using StopCardCalculator
+  // ✅ SINGLE SOURCE OF TRUTH: Get stop cards from MasterFuelManager via global state
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    // 🌬️ CRITICAL DEBUG: Log all inputs to trace wind sync issue
-    console.log('🌬️ generateStopCardsData called with:');
-    console.log('🌬️   waypoints:', waypoints?.length || 0, 'items');
-    console.log('🌬️   weather input:', weather);
-    console.log('🌬️   selectedAircraft:', !!selectedAircraft);
-    console.log('🌬️   routeStats:', !!routeStats);
+    console.log('🎯 generateStopCardsData: Using MasterFuelManager as single source of truth');
     
-    // 🌬️ Check current weather state from various sources
-    const currentWeatherFromState = weather;
-    const currentWeatherFromWindow = window.currentWeather;
-    const windInputDirection = document.querySelector('input[placeholder*="direction" i]')?.value;
-    const windInputSpeed = document.querySelector('input[placeholder*="speed" i]')?.value;
+    // Get stop cards from MasterFuelManager global state
+    // This ensures header and stop cards display use the same calculations
+    const masterFuelCalculations = window.masterFuelCalculations;
     
-    console.log('🌬️ Weather comparison:');
-    console.log('🌬️   From parameter:', currentWeatherFromState);
-    console.log('🌬️   From window:', currentWeatherFromWindow);
-    console.log('🌬️   From input fields:', { direction: windInputDirection, speed: windInputSpeed });
-    
-    try {
-      // Ensure routeStats has the properties the FinanceCard expects
-      if (routeStats) {
-        // Add missing properties that FinanceCard might be looking for
-        if (!routeStats.totalTime && routeStats.totalTimeFormatted) {
-          routeStats.totalTime = routeStats.totalTimeFormatted;
-        }
-        if (!routeStats.flightTime && routeStats.estimatedTime) {
-          routeStats.flightTime = routeStats.estimatedTime;
-        }
-        if (!routeStats.deckTime && routeStats.deckTimeMinutes) {
-          routeStats.deckTime = Math.round(routeStats.deckTimeMinutes);
-        }
-      }
-      
-      // 🌬️ CRITICAL: Log exactly what weather data is being passed to StopCardCalculator
-      console.log('🌬️ Calling StopCardCalculator.calculateStopCards with weather:', weather);
-      
-      const stopCards = StopCardCalculator.calculateStopCards(waypoints, routeStats, selectedAircraft, weather, options);
-      
-      // 🌬️ CRITICAL: Log the wind info in the generated stop cards
-      if (stopCards && stopCards.length > 0) {
-        const departureCard = stopCards.find(card => card.isDeparture);
-        const firstNonDepCard = stopCards.find(card => !card.isDeparture);
-        
-        console.log('🌬️ Generated stop cards wind info:');
-        if (departureCard) {
-          console.log('🌬️   Departure card wind:', departureCard.windInfo, departureCard.windData);
-        }
-        if (firstNonDepCard) {
-          console.log('🌬️   First stop card wind:', firstNonDepCard.windInfo, firstNonDepCard.windData);
-        }
-      }
-      
-      // Make it available globally for debugging
-      window.currentStopCards = stopCards;
-      return stopCards;
-    } catch (error) {
-      console.error('Error generating stop cards:', error);
-      return [];
+    if (masterFuelCalculations && masterFuelCalculations.stopCards) {
+      console.log('✅ generateStopCardsData: Using MasterFuelManager stop cards');
+      return masterFuelCalculations.stopCards;
     }
+    
+    // Fallback: return empty array if MasterFuelManager hasn't calculated yet
+    console.log('⏳ generateStopCardsData: MasterFuelManager not ready, returning empty array');
+    return [];
   };
 
   // Make generateStopCardsData available globally for debugging
