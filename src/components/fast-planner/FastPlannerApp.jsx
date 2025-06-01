@@ -411,8 +411,8 @@ const FastPlannerCore = ({
   // Make generateStopCardsData available globally for debugging
   window.generateStopCardsData = generateStopCardsData;
 
-  // Make StopCardCalculator available globally for AppHeader real-time calculations
-  window.StopCardCalculator = StopCardCalculator;
+  // ✅ REMOVED: No longer need StopCardCalculator globally - using MasterFuelManager only
+  // window.StopCardCalculator = StopCardCalculator;
 
   const handleRemoveFavoriteLocation = (locationId) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {

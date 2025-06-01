@@ -144,32 +144,19 @@ const AppHeader = ({
       }));
   }
   
-  // CRITICAL FIX: If stopCards seem stale or we have waypoints + weather, do real-time calculation
+  // ✅ SINGLE SOURCE OF TRUTH: Get data from MasterFuelManager if no stopCards
   if ((!stopCards || stopCards.length === 0) && waypoints && waypoints.length >= 2 && selectedAircraft && safeWeather) {
-    console.log('🔄 AppHeader: No stopCards available, performing real-time calculation');
+    console.log('🔄 AppHeader: No stopCards available, checking MasterFuelManager global state');
     
-    // Use StopCardCalculator from window object only (avoid require in browser)
-    const StopCardCalculator = window.StopCardCalculator;
+    // Use MasterFuelManager calculations from global state
+    const masterFuelCalculations = window.masterFuelCalculations;
     
-    if (StopCardCalculator) {
-      try {
-        const realTimeCards = StopCardCalculator.calculateStopCards(
-          waypoints,
-          window.currentRouteStats || null,
-          selectedAircraft,
-          safeWeather,
-          {
-            passengerWeight: 220, // Default values
-            taxiFuel,
-            contingencyFuelPercent,
-            reserveFuel,
-            deckTimePerStop: deckTimePerStop,
-            deckFuelFlow: 400
-          }
-        );
+    if (masterFuelCalculations && masterFuelCalculations.stopCards) {
+      console.log('🔄 AppHeader: Using MasterFuelManager global calculations');
+      const realTimeCards = masterFuelCalculations.stopCards;
         
         if (realTimeCards && realTimeCards.length > 0) {
-          console.log('🔄 AppHeader: Using real-time calculated data');
+          console.log('🔄 AppHeader: Using MasterFuelManager data');
           
           const rtDepartureCard = realTimeCards.find(card => card.isDeparture);
           const rtDestinationCard = realTimeCards.find(card => card.isDestination);
@@ -188,7 +175,7 @@ const AppHeader = ({
             }
           }
           
-          // Update passengers from real-time calculation
+          // Update passengers from MasterFuelManager calculation
           passengers = realTimeCards
             .filter(card => !card.isDestination && card.maxPassengers !== undefined)
             .map(card => ({
@@ -197,10 +184,8 @@ const AppHeader = ({
               maxPassengers: safeNumber(card.maxPassengers)
             }));
         }
-      } catch (error) {
-        console.error('🔄 AppHeader: Real-time calculation failed:', error);
-      }
     }
+  }
   }
   
   return (
