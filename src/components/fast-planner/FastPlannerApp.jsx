@@ -26,8 +26,8 @@ import { RegionProvider, useRegion } from './context/region';
 
 // Import LoadingIndicator for status checking
 import LoadingIndicator from './modules/LoadingIndicator';
-// ✅ SINGLE SOURCE OF TRUTH: No longer import StopCardCalculator - use MasterFuelManager only
-// import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
+// Import StopCardCalculator temporarily for fallback
+import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
 import useWeather from './hooks/useWeather';
@@ -392,10 +392,9 @@ const FastPlannerCore = ({
 
   // ✅ SINGLE SOURCE OF TRUTH: Get stop cards from MasterFuelManager via global state
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    console.log('🎯 generateStopCardsData: Using MasterFuelManager as single source of truth');
+    console.log('🎯 generateStopCardsData: Checking MasterFuelManager first, fallback if needed');
     
-    // Get stop cards from MasterFuelManager global state
-    // This ensures header and stop cards display use the same calculations
+    // Get stop cards from MasterFuelManager global state (preferred)
     const masterFuelCalculations = window.masterFuelCalculations;
     
     if (masterFuelCalculations && masterFuelCalculations.stopCards) {
@@ -403,8 +402,16 @@ const FastPlannerCore = ({
       return masterFuelCalculations.stopCards;
     }
     
-    // Fallback: return empty array if MasterFuelManager hasn't calculated yet
-    console.log('⏳ generateStopCardsData: MasterFuelManager not ready, returning empty array');
+    // TEMPORARY FALLBACK: Use old system if MasterFuelManager not ready
+    console.log('⚠️ generateStopCardsData: MasterFuelManager not ready, using fallback calculation');
+    try {
+      if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+        return StopCardCalculator.calculateStopCards(waypoints, routeStats, selectedAircraft, weather, options);
+      }
+    } catch (error) {
+      console.error('Fallback calculation failed:', error);
+    }
+    
     return [];
   };
 
