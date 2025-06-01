@@ -154,38 +154,37 @@ const AppHeader = ({
     if (masterFuelCalculations && masterFuelCalculations.stopCards) {
       console.log('🔄 AppHeader: Using MasterFuelManager global calculations');
       const realTimeCards = masterFuelCalculations.stopCards;
+      
+      if (realTimeCards && realTimeCards.length > 0) {
+        console.log('🔄 AppHeader: Using MasterFuelManager data');
         
-        if (realTimeCards && realTimeCards.length > 0) {
-          console.log('🔄 AppHeader: Using MasterFuelManager data');
-          
-          const rtDepartureCard = realTimeCards.find(card => card.isDeparture);
-          const rtDestinationCard = realTimeCards.find(card => card.isDestination);
-          
-          if (rtDestinationCard) {
-            totalDistance = rtDestinationCard.totalDistance || '0.0';
-            totalTime = typeof rtDestinationCard.totalTime === 'string' 
-              ? rtDestinationCard.totalTime 
-              : formatTime(rtDestinationCard.totalTime);
-          }
-          
-          if (rtDepartureCard) {
-            totalFuel = safeNumber(rtDepartureCard.totalFuel);
-            if (rtDepartureCard.fuelComponentsObject) {
-              tripFuel = safeNumber(rtDepartureCard.fuelComponentsObject.tripFuel);
-            }
-          }
-          
-          // Update passengers from MasterFuelManager calculation
-          passengers = realTimeCards
-            .filter(card => !card.isDestination && card.maxPassengers !== undefined)
-            .map(card => ({
-              id: card.id,
-              isDeparture: card.isDeparture,
-              maxPassengers: safeNumber(card.maxPassengers)
-            }));
+        const rtDepartureCard = realTimeCards.find(card => card.isDeparture);
+        const rtDestinationCard = realTimeCards.find(card => card.isDestination);
+        
+        if (rtDestinationCard) {
+          totalDistance = rtDestinationCard.totalDistance || '0.0';
+          totalTime = typeof rtDestinationCard.totalTime === 'string' 
+            ? rtDestinationCard.totalTime 
+            : formatTime(rtDestinationCard.totalTime);
         }
+        
+        if (rtDepartureCard) {
+          totalFuel = safeNumber(rtDepartureCard.totalFuel);
+          if (rtDepartureCard.fuelComponentsObject) {
+            tripFuel = safeNumber(rtDepartureCard.fuelComponentsObject.tripFuel);
+          }
+        }
+        
+        // Update passengers from MasterFuelManager calculation
+        passengers = realTimeCards
+          .filter(card => !card.isDestination && card.maxPassengers !== undefined)
+          .map(card => ({
+            id: card.id,
+            isDeparture: card.isDeparture,
+            maxPassengers: safeNumber(card.maxPassengers)
+          }));
+      }
     }
-  }
   }
   
   return (
