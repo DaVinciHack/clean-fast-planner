@@ -51,9 +51,10 @@ export class SimpleFuelPolicyManager {
     );
     if (typeMatch) return typeMatch;
 
-    // Look for registration match  
+    // Look for registration match using CLEAN registration
+    const cleanReg = aircraft.rawRegistration || aircraft.assetIdentifier || aircraft.registration;
     const regMatch = this.policies.find(p =>
-      p.name.toLowerCase().includes(aircraft.registration?.toLowerCase() || '')
+      p.name.toLowerCase().includes(cleanReg?.toLowerCase() || '')
     );
     if (regMatch) return regMatch;
 

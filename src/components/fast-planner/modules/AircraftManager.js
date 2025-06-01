@@ -208,7 +208,7 @@ class AircraftManager {
           
           // Log sample data to understand the structure
           if (response.data.length > 0) {
-            console.log('Sample aircraft data fields:', Object.keys(response.data[0]).join(', '));
+            // console.log('Sample aircraft data fields:', Object.keys(response.data[0]).join(', ')); // Silenced for debugging
           }
           
           // Process each aircraft and create standardized objects
@@ -229,16 +229,26 @@ class AircraftManager {
             // Create a display registration with both registration and region
             const displayRegistration = `${registration} (${region})`;
             
+            // Debug: Show what fields are actually available in OSDK data
+            console.log(`🔍 AIRCRAFT DEBUG: Available fields in OSDK aircraft data:`, Object.keys(aircraft));
+            console.log(`🔍 AIRCRAFT DEBUG: defaultFuelPolicyId value:`, aircraft.defaultFuelPolicyId);
+            console.log(`🔍 AIRCRAFT DEBUG: defaultFuelPolicyName value:`, aircraft.defaultFuelPolicyName);
+            console.log(`🔍 AIRCRAFT DEBUG: Full aircraft object:`, aircraft);
+            
             // Create standardized aircraft object
             return {
               assetId: aircraft.assetIdx || '',
               registration: displayRegistration, // Use the combined format
               rawRegistration: registration, // Keep the original registration
+              assetIdentifier: aircraft.assetIdentifier || registration, // ✅ CLEAN ID for searches
               modelName: modelName,
               modelType: modelType,
               maxPassengers: aircraft.maxPassengers || 0,
               cruiseSpeed: aircraft.cruseSpeed || 0,
               fuelBurn: aircraft.fuelBurn || 0,
+              flatPitchFuelBurnDeckFuel: aircraft.flatPitchFuelBurnDeckFuel, // ✅ CRITICAL: Deck fuel flow
+              defaultFuelPolicyName: aircraft.defaultFuelPolicyName, // ✅ CRITICAL: Policy name from OSDK
+              defaultFuelPolicyId: aircraft.defaultFuelPolicyId, // ✅ CRITICAL: Policy ID from OSDK  
               maxFuel: aircraft.maxFuelCapacity || 0,
               dryWeight: aircraft.dryOperatingWeightLbs || 0,
               usefulLoad: aircraft.usefulLoad || 0,
@@ -671,7 +681,7 @@ class AircraftManager {
     // Try to match with type map
     for (const [key, value] of Object.entries(typeMap)) {
       if (model.includes(key)) {
-        console.log(`Found type ${value} by matching key ${key} in ${modelName}`);
+        // console.log(`Found type ${value} by matching key ${key} in ${modelName}`); // Silenced for debugging
         return value;
       }
     }

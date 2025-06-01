@@ -253,48 +253,39 @@ class FuelPolicyService {
       return null;
     }
 
-    // Look for aircraft-specific policy first (by aircraft type)
-    if (aircraft?.aircraftType) {
-      const aircraftType = aircraft.aircraftType.toLowerCase();
-      console.log(`🔍 POLICY SEARCH: Looking for policies matching aircraft type: ${aircraftType}`);
+    // ✅ FIXED LOGIC: defaultFuelPolicyId actually contains the POLICY NAME, not ID
+    const policyName = aircraft?.defaultFuelPolicyName;
+    const policyNameFromId = aircraft?.defaultFuelPolicyId; // This field contains the name!
+    
+    // Use whichever field has a value (prioritize policyName, fallback to policyNameFromId)
+    const actualPolicyName = policyName || policyNameFromId;
+    
+    if (actualPolicyName && actualPolicyName !== 'undefined') {
+      console.log(`🔍 POLICY SEARCH: Aircraft specifies policy name: "${actualPolicyName}"`);
+      console.log(`🔍 POLICY SEARCH: Source field: ${policyName ? 'defaultFuelPolicyName' : 'defaultFuelPolicyId'}`);
       
-      const aircraftPolicy = policies.find(policy => 
-        policy.name.toLowerCase().includes(aircraftType)
+      // Search by exact name match
+      const specificPolicy = policies.find(policy => 
+        policy.name === actualPolicyName ||
+        policy.name.toLowerCase() === actualPolicyName.toLowerCase()
       );
-      if (aircraftPolicy) {
-        console.log(`✅ POLICY SEARCH: Found aircraft-specific policy: ${aircraftPolicy.name}`);
-        return aircraftPolicy;
-      }
-    }
-
-    // Look for aircraft-specific policy by registration
-    if (aircraft?.registration) {
-      const registration = aircraft.registration.toLowerCase();
-      console.log(`🔍 POLICY SEARCH: Looking for policies matching registration: ${registration}`);
       
-      const registrationPolicy = policies.find(policy => 
-        policy.name.toLowerCase().includes(registration)
-      );
-      if (registrationPolicy) {
-        console.log(`✅ POLICY SEARCH: Found registration-specific policy: ${registrationPolicy.name}`);
-        return registrationPolicy;
+      if (specificPolicy) {
+        console.log(`✅ POLICY SEARCH: Found aircraft's specified policy: "${specificPolicy.name}"`);
+        return specificPolicy;
+      } else {
+        console.log(`❌ POLICY SEARCH: Aircraft's specified policy "${actualPolicyName}" not found in region ${region}`);
+        console.log(`❌ POLICY SEARCH: Available policies: ${policies.map(p => `"${p.name}"`).join(', ')}`);
       }
+    } else {
+      console.log(`⚠️ POLICY SEARCH: Aircraft has no valid policy name specified`);
+      console.log(`⚠️ POLICY SEARCH: defaultFuelPolicyName: "${policyName}", defaultFuelPolicyId: "${policyNameFromId}"`);
     }
 
-    // Look for "Standard" or "Default" policy
-    console.log(`🔍 POLICY SEARCH: Looking for standard/default policy`);
-    const standardPolicy = policies.find(policy => 
-      policy.name.toLowerCase().includes('standard') || 
-      policy.name.toLowerCase().includes('default')
-    );
-    if (standardPolicy) {
-      console.log(`✅ POLICY SEARCH: Found standard/default policy: ${standardPolicy.name}`);
-      return standardPolicy;
-    }
-
-    // Return first policy as fallback
-    console.log(`✅ POLICY SEARCH: Using first available policy as fallback: ${policies[0].name}`);
-    return policies[0];
+    // ❌ NO FALLBACKS - Aviation safety requires specific policies
+    console.log(`❌ POLICY SEARCH: No specific policy found for aircraft. This is an error - no fallbacks allowed.`);
+    console.log(`❌ POLICY SEARCH: Aircraft should specify defaultFuelPolicyName from OSDK`);
+    return null;
   }
 
   /**
