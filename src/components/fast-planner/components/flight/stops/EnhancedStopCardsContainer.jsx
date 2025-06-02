@@ -108,16 +108,17 @@ const EnhancedStopCardsContainer = ({
   useEffect(() => {
     const overrides = {
       passengerWeight: Number(passengerWeight) || 220, // ✅ User input - safe default
-      taxiFuel: Number(taxiFuel) || 9999, // ⚠️ SAFETY: Obvious error if OSDK value missing
-      contingencyFlightLegs: Number(contingencyFuelPercent) || 9999, // ⚠️ CRITICAL: Must be real OSDK value
-      reserveFuel: Number(reserveFuel) || 9999, // ⚠️ SAFETY: Obvious error if OSDK value missing
-      deckTime: Number(deckTimePerStop) || 9999, // ⚠️ SAFETY: Obvious error if OSDK value missing
-      deckFuelFlow: Number(deckFuelFlow) || 9999 // ⚠️ SAFETY: Obvious error if OSDK value missing
+      // ✅ AVIATION SAFETY FIX: Respect 0 as valid OSDK policy value
+      taxiFuel: taxiFuel !== undefined ? Number(taxiFuel) : 9999,
+      // ❌ REMOVED: contingencyFuelPercent - This is POLICY data, not user override!
+      reserveFuel: reserveFuel !== undefined ? Number(reserveFuel) : 9999,
+      deckTime: deckTimePerStop !== undefined ? Number(deckTimePerStop) : 9999,
+      deckFuelFlow: deckFuelFlow !== undefined ? Number(deckFuelFlow) : 9999
     };
     
     console.log('⚙️ EnhancedStopCardsContainer: Applying user overrides to manager:', overrides);
     applyOverrides(overrides);
-  }, [passengerWeight, taxiFuel, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, applyOverrides]);
+  }, [passengerWeight, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow, applyOverrides]);
   
   // Update display when calculations change
   useEffect(() => {

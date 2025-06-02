@@ -26,8 +26,6 @@ import { RegionProvider, useRegion } from './context/region';
 
 // Import LoadingIndicator for status checking
 import LoadingIndicator from './modules/LoadingIndicator';
-// Import StopCardCalculator temporarily for fallback
-import StopCardCalculator from './modules/calculations/flight/StopCardCalculator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
 import useWeather from './hooks/useWeather';
@@ -38,6 +36,7 @@ import useUIControls from './hooks/useUIControls';
 import useMapLayers from './hooks/useMapLayers';
 import useWeatherSegments from './hooks/useWeatherSegments';
 import useFuelPolicy from './hooks/useFuelPolicy';
+import useMasterFuelManager from './hooks/useMasterFuelManager';
 
 /**
  * FastPlannerCore Component
@@ -64,6 +63,9 @@ const FastPlannerCore = ({
   
   // Initialize fuel policy management
   const fuelPolicy = useFuelPolicy();
+  
+  // Initialize MasterFuelManager - SINGLE SOURCE OF TRUTH
+  const masterFuel = useMasterFuelManager();
   
   // State for tracking actual loading status from LoadingIndicator
   const [isActuallyLoading, setIsActuallyLoading] = useState(false);
@@ -382,6 +384,48 @@ const FastPlannerCore = ({
     window.currentRouteStats = null;
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
+  // ===== MASTERFUELMANAGER TRIGGERS - SINGLE SOURCE OF TRUTH =====
+  
+  // Update MasterFuelManager when waypoints change
+  useEffect(() => {
+    if (waypoints && waypoints.length > 0) {
+      console.log('🎯 MasterFuelManager: Waypoints changed, updating', waypoints.length, 'waypoints');
+      masterFuel.updateWaypoints(waypoints);
+    }
+  }, [waypoints, masterFuel.updateWaypoints]);
+  
+  // Update MasterFuelManager when aircraft changes
+  useEffect(() => {
+    if (selectedAircraft) {
+      console.log('🎯 MasterFuelManager: Aircraft changed, updating', selectedAircraft.registration);
+      masterFuel.updateAircraft(selectedAircraft);
+    }
+  }, [selectedAircraft, masterFuel.updateAircraft]);
+  
+  // Update MasterFuelManager when fuel policy changes
+  useEffect(() => {
+    if (fuelPolicy.currentPolicy) {
+      console.log('🎯 MasterFuelManager: Fuel policy changed, updating', fuelPolicy.currentPolicy.name);
+      masterFuel.updatePolicy(fuelPolicy.currentPolicy);
+    }
+  }, [fuelPolicy.currentPolicy, masterFuel.updatePolicy]);
+  
+  // Update MasterFuelManager when weather changes
+  useEffect(() => {
+    if (weather) {
+      console.log('🎯 MasterFuelManager: Weather changed, updating wind', weather.windSpeed, 'kts');
+      masterFuel.updateWeather(weather);
+    }
+  }, [weather, masterFuel.updateWeather]);
+  
+  // Update MasterFuelManager when flight settings change (user overrides)
+  useEffect(() => {
+    if (flightSettings) {
+      console.log('🎯 MasterFuelManager: Flight settings changed, applying overrides');
+      masterFuel.applyOverrides(flightSettings);
+    }
+  }, [flightSettings, masterFuel.applyOverrides]);
+
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(location);
@@ -392,9 +436,9 @@ const FastPlannerCore = ({
 
   // ✅ SINGLE SOURCE OF TRUTH: Get stop cards from MasterFuelManager via global state
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    console.log('🎯 generateStopCardsData: Checking MasterFuelManager first, fallback if needed');
+    console.log('🎯 generateStopCardsData: Using MasterFuelManager only - no legacy fallbacks');
     
-    // Get stop cards from MasterFuelManager global state (preferred)
+    // Get stop cards from MasterFuelManager global state
     const masterFuelCalculations = window.masterFuelCalculations;
     
     if (masterFuelCalculations && masterFuelCalculations.stopCards) {
@@ -402,16 +446,8 @@ const FastPlannerCore = ({
       return masterFuelCalculations.stopCards;
     }
     
-    // TEMPORARY FALLBACK: Use old system if MasterFuelManager not ready
-    console.log('⚠️ generateStopCardsData: MasterFuelManager not ready, using fallback calculation');
-    try {
-      if (waypoints && waypoints.length >= 2 && selectedAircraft) {
-        return StopCardCalculator.calculateStopCards(waypoints, routeStats, selectedAircraft, weather, options);
-      }
-    } catch (error) {
-      console.error('Fallback calculation failed:', error);
-    }
-    
+    // No fallback - MasterFuelManager should handle all calculations
+    console.log('⏳ generateStopCardsData: MasterFuelManager calculations not ready yet');
     return [];
   };
 
