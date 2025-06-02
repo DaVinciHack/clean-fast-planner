@@ -79,9 +79,13 @@ class MasterFuelManager {
     this.state.policySettings = this.extractPolicyValues(policy);
     this.state.lastUpdate = Date.now();
     
-    // Invalidate calculations and notify subscribers
+    // Invalidate calculations and auto-calculate if ready
     this.invalidateCalculations();
-    this.notifySubscribers('policyUpdate', this.state.policySettings);
+    if (this.validateCalculationInputs()) {
+      console.log('🎯 MasterFuelManager: Policy loaded, all inputs ready - calculating now!');
+      this.calculateAllFuel();
+    }
+    this.notifySubscribers('policyUpdate', this.state.policySettings, this.state.calculations);
   }
   
   /**
