@@ -111,9 +111,33 @@ const AppHeader = ({
       totalFuel = safeNumber(departureCard.totalFuel);
       deckFuel = safeNumber(departureCard.deckFuel);
       
+      // 🔍 DETAILED HEADER FUEL LOGGING from Stop Cards
+      console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from Stop Cards:');
+      console.log('📊 AppHeader: Total Fuel:', totalFuel);
+      console.log('📊 AppHeader: Departure Card Full Object:', departureCard);
+      
       // Get fuel components if available
       if (departureCard.fuelComponentsObject) {
-        tripFuel = safeNumber(departureCard.fuelComponentsObject.tripFuel);
+        const components = departureCard.fuelComponentsObject;
+        tripFuel = safeNumber(components.tripFuel);
+        
+        console.log('📊 AppHeader: Fuel Components Breakdown:');
+        console.log('📊 AppHeader:   Trip Fuel:', safeNumber(components.tripFuel));
+        console.log('📊 AppHeader:   Contingency:', safeNumber(components.contingency));
+        console.log('📊 AppHeader:   Reserve:', safeNumber(components.reserve));
+        console.log('📊 AppHeader:   Taxi:', safeNumber(components.taxi));
+        console.log('📊 AppHeader:   Deck Time:', safeNumber(components.deckTime));
+        console.log('📊 AppHeader:   TOTAL CALCULATED:', 
+          safeNumber(components.tripFuel) + 
+          safeNumber(components.contingency) + 
+          safeNumber(components.reserve) + 
+          safeNumber(components.taxi) + 
+          safeNumber(components.deckTime)
+        );
+        
+        tripFuel = safeNumber(components.tripFuel);
+      } else {
+        console.log('📊 AppHeader: No fuelComponentsObject available in departure card');
       }
     }
     
@@ -170,8 +194,31 @@ const AppHeader = ({
         
         if (rtDepartureCard) {
           totalFuel = safeNumber(rtDepartureCard.totalFuel);
+          
+          // 🔍 DETAILED HEADER FUEL LOGGING
+          console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from MasterFuelManager:');
+          console.log('📊 AppHeader: Total Fuel:', totalFuel);
+          console.log('📊 AppHeader: Departure Card Full Object:', rtDepartureCard);
+          
           if (rtDepartureCard.fuelComponentsObject) {
-            tripFuel = safeNumber(rtDepartureCard.fuelComponentsObject.tripFuel);
+            const components = rtDepartureCard.fuelComponentsObject;
+            tripFuel = safeNumber(components.tripFuel);
+            
+            console.log('📊 AppHeader: Fuel Components Breakdown:');
+            console.log('📊 AppHeader:   Trip Fuel:', safeNumber(components.tripFuel));
+            console.log('📊 AppHeader:   Contingency:', safeNumber(components.contingency));
+            console.log('📊 AppHeader:   Reserve:', safeNumber(components.reserve));
+            console.log('📊 AppHeader:   Taxi:', safeNumber(components.taxi));
+            console.log('📊 AppHeader:   Deck Time:', safeNumber(components.deckTime));
+            console.log('📊 AppHeader:   TOTAL CALCULATED:', 
+              safeNumber(components.tripFuel) + 
+              safeNumber(components.contingency) + 
+              safeNumber(components.reserve) + 
+              safeNumber(components.taxi) + 
+              safeNumber(components.deckTime)
+            );
+          } else {
+            console.log('📊 AppHeader: No fuelComponentsObject available in departure card');
           }
         }
         

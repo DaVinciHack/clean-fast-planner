@@ -1,13 +1,15 @@
 // src/components/fast-planner/hooks/useRouteCalculation.js
 
 import { useEffect, useCallback } from 'react';
+// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
 // Import the calculator directly - never use fallbacks for aviation
-import ComprehensiveFuelCalculator from '../modules/calculations/fuel/ComprehensiveFuelCalculator';
+// import ComprehensiveFuelCalculator from '../modules/calculations/fuel/ComprehensiveFuelCalculator';
 
+// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
 // Ensure the calculator is available globally
-if (!window.ComprehensiveFuelCalculator) {
-  window.ComprehensiveFuelCalculator = ComprehensiveFuelCalculator;
-}
+// if (!window.ComprehensiveFuelCalculator) {
+//   window.ComprehensiveFuelCalculator = ComprehensiveFuelCalculator;
+// }
 
 /**
  * Custom hook for handling route and fuel calculations
@@ -118,12 +120,13 @@ const useRouteCalculation = ({
     
     console.log('⛽ useRouteCalculation: Aircraft validation passed, performing calculation');
 
+    // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
     // CRITICAL: Never use fallbacks for aviation calculations
-    if (!window.ComprehensiveFuelCalculator) {
-      console.error('⛽ useRouteCalculation: Skipping calculation - ComprehensiveFuelCalculator not available');
-      useRouteCalculation.calculationInProgress = false;
-      return; // Exit without attempting calculation
-    }
+    // if (!window.ComprehensiveFuelCalculator) {
+    //   console.error('⛽ useRouteCalculation: Skipping calculation - ComprehensiveFuelCalculator not available');
+    //   useRouteCalculation.calculationInProgress = false;
+    //   return; // Exit without attempting calculation
+    // }
 
     // Create a settings object with explicit numeric values
     const numericSettings = {
@@ -138,18 +141,20 @@ const useRouteCalculation = ({
 
     // Use a debounce to prevent too frequent calculations
     const debounceTimeoutId = setTimeout(() => {
+      // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
       // 🌬️ CRITICAL DEBUG: Log weather data being passed to ComprehensiveFuelCalculator
-      console.log('🌬️ useRouteCalculation: About to call ComprehensiveFuelCalculator with:');
-      console.log('🌬️   waypoints:', waypoints?.length);
-      console.log('🌬️   weather:', weather);
-      console.log('🌬️   numericSettings:', numericSettings);
+      // console.log('🌬️ useRouteCalculation: About to call ComprehensiveFuelCalculator with:');
+      // console.log('🌬️   waypoints:', waypoints?.length);
+      // console.log('🌬️   weather:', weather);
+      // console.log('🌬️   numericSettings:', numericSettings);
       
+      // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
       // Perform a single calculation attempt with proper error handling
-      try {
-        const result = window.ComprehensiveFuelCalculator.calculateAllFuelData(
-          waypoints,
-          selectedAircraft,
-          numericSettings,
+      // try {
+      //   const result = window.ComprehensiveFuelCalculator.calculateAllFuelData(
+      //     waypoints,
+      //     selectedAircraft,
+      //     numericSettings,
           weather
         );
         

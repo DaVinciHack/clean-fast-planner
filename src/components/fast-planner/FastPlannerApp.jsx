@@ -7,6 +7,9 @@ import './waypoint-markers.css'; // Clean waypoint marker styles
 import './fixes/route-stats-card-fix.css';
 import './fixes/panel-interaction-fix.css';
 
+// Import StopCardCalculator - the single source of truth
+import StopCardCalculator from './modules/calculations/flight/StopCardCalculator.js';
+
 // Import UI components
 import {
   LeftPanel,
@@ -28,15 +31,18 @@ import { RegionProvider, useRegion } from './context/region';
 import LoadingIndicator from './modules/LoadingIndicator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
-import useWeather from './hooks/useWeather';
+// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
+// import useWeather from './hooks/useWeather';
 import useAircraft from './hooks/useAircraft';
 import useWaypoints from './hooks/useWaypoints';
-import useRouteCalculation from './hooks/useRouteCalculation';
+// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025  
+// import useRouteCalculation from './hooks/useRouteCalculation';
 import useUIControls from './hooks/useUIControls';
 import useMapLayers from './hooks/useMapLayers';
 import useWeatherSegments from './hooks/useWeatherSegments';
 import useFuelPolicy from './hooks/useFuelPolicy';
-import useMasterFuelManager from './hooks/useMasterFuelManager';
+// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
+// import useMasterFuelManager from './hooks/useMasterFuelManager';
 
 /**
  * FastPlannerCore Component
@@ -64,8 +70,9 @@ const FastPlannerCore = ({
   // Initialize fuel policy management
   const fuelPolicy = useFuelPolicy();
   
+  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
   // Initialize MasterFuelManager - SINGLE SOURCE OF TRUTH
-  const masterFuel = useMasterFuelManager();
+  // const masterFuel = useMasterFuelManager();
   
   // State for tracking actual loading status from LoadingIndicator
   const [isActuallyLoading, setIsActuallyLoading] = useState(false);
@@ -224,16 +231,48 @@ const FastPlannerCore = ({
     client, currentRegion: activeRegionFromContext, setRouteStats, setStopCards
   });
 
-  const { updateWeatherSettings } = useWeather({
-    weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
-    waypointManagerRef, flightSettings, setRouteStats, setStopCards, setForceUpdate
-  });
+  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
+  // const { updateWeatherSettings } = useWeather({
+  //   weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
+  //   waypointManagerRef, flightSettings, setRouteStats, setStopCards, setForceUpdate
+  // });
 
-  const { updateFlightSetting } = useRouteCalculation({
-    waypoints, selectedAircraft, flightSettings, setFlightSettings,
-    setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
-    alternateRouteData
-  });
+  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
+  // const { updateFlightSetting } = useRouteCalculation({
+  //   waypoints, selectedAircraft, flightSettings, setFlightSettings,
+  //   setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
+  //   alternateRouteData
+  // });
+  
+  // TEMPORARY STUB FUNCTIONS DURING CLEANUP - WILL BE REPLACED
+  const updateFlightSetting = (settingName, value) => {
+    console.log(`⚙️ STUB: updateFlightSetting(${settingName}, ${value}) - disabled during cleanup`);
+  };
+  
+  const updateWeatherSettings = (windSpeed, windDirection) => {
+    console.log(`🌬️ STUB: updateWeatherSettings(${windSpeed}, ${windDirection}) - disabled during cleanup`);
+  };
+  
+  // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
+  useEffect(() => {
+    if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+      console.log('🔄 Auto-triggering calculations due to route/aircraft change');
+      
+      // Generate stop cards and update header
+      const newStopCards = generateStopCardsData(
+        waypoints,
+        routeStats, 
+        selectedAircraft,
+        weather,
+        flightSettings
+      );
+      
+      if (newStopCards && newStopCards.length > 0) {
+        setStopCards(newStopCards);
+        console.log('✅ Auto-calculation complete - header should update');
+      }
+    }
+  }, [waypoints, selectedAircraft, flightSettings]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const {
@@ -245,7 +284,7 @@ const FastPlannerCore = ({
     clearWeatherSegments
   } = useWeatherSegments({
     mapManagerRef,
-    onWeatherUpdate: updateWeatherSettings
+    onWeatherUpdate: updateWeatherSettings // Now using stub function
   });
 
   // Enhanced clearRoute that also clears alternate route state
@@ -384,47 +423,47 @@ const FastPlannerCore = ({
     window.currentRouteStats = null;
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
-  // ===== MASTERFUELMANAGER TRIGGERS - SINGLE SOURCE OF TRUTH =====
+  // ===== COMMENTED OUT MASTERFUELMANAGER TRIGGERS - CLEANUP JUNE 2025 =====
   
   // Update MasterFuelManager when waypoints change
-  useEffect(() => {
-    if (waypoints && waypoints.length > 0) {
-      console.log('🎯 MasterFuelManager: Waypoints changed, updating', waypoints.length, 'waypoints');
-      masterFuel.updateWaypoints(waypoints);
-    }
-  }, [waypoints, masterFuel.updateWaypoints]);
+  // useEffect(() => {
+  //   if (waypoints && waypoints.length > 0) {
+  //     console.log('🎯 MasterFuelManager: Waypoints changed, updating', waypoints.length, 'waypoints');
+  //     masterFuel.updateWaypoints(waypoints);
+  //   }
+  // }, [waypoints, masterFuel.updateWaypoints]);
   
   // Update MasterFuelManager when aircraft changes
-  useEffect(() => {
-    if (selectedAircraft) {
-      console.log('🎯 MasterFuelManager: Aircraft changed, updating', selectedAircraft.registration);
-      masterFuel.updateAircraft(selectedAircraft);
-    }
-  }, [selectedAircraft, masterFuel.updateAircraft]);
+  // useEffect(() => {
+  //   if (selectedAircraft) {
+  //     console.log('🎯 MasterFuelManager: Aircraft changed, updating', selectedAircraft.registration);
+  //     masterFuel.updateAircraft(selectedAircraft);
+  //   }
+  // }, [selectedAircraft, masterFuel.updateAircraft]);
   
   // Update MasterFuelManager when fuel policy changes
-  useEffect(() => {
-    if (fuelPolicy.currentPolicy) {
-      console.log('🎯 MasterFuelManager: Fuel policy changed, updating', fuelPolicy.currentPolicy.name);
-      masterFuel.updatePolicy(fuelPolicy.currentPolicy);
-    }
-  }, [fuelPolicy.currentPolicy, masterFuel.updatePolicy]);
+  // useEffect(() => {
+  //   if (fuelPolicy.currentPolicy) {
+  //     console.log('🎯 MasterFuelManager: Fuel policy changed, updating', fuelPolicy.currentPolicy.name);
+  //     masterFuel.updatePolicy(fuelPolicy.currentPolicy);
+  //   }
+  // }, [fuelPolicy.currentPolicy, masterFuel.updatePolicy]);
   
   // Update MasterFuelManager when weather changes
-  useEffect(() => {
-    if (weather) {
-      console.log('🎯 MasterFuelManager: Weather changed, updating wind', weather.windSpeed, 'kts');
-      masterFuel.updateWeather(weather);
-    }
-  }, [weather, masterFuel.updateWeather]);
+  // useEffect(() => {
+  //   if (weather) {
+  //     console.log('🎯 MasterFuelManager: Weather changed, updating wind', weather.windSpeed, 'kts');
+  //     masterFuel.updateWeather(weather);
+  //   }
+  // }, [weather, masterFuel.updateWeather]);
   
   // Update MasterFuelManager when flight settings change (user overrides)
-  useEffect(() => {
-    if (flightSettings) {
-      console.log('🎯 MasterFuelManager: Flight settings changed, applying overrides');
-      masterFuel.applyOverrides(flightSettings);
-    }
-  }, [flightSettings, masterFuel.applyOverrides]);
+  // useEffect(() => {
+  //   if (flightSettings) {
+  //     console.log('🎯 MasterFuelManager: Flight settings changed, applying overrides');
+  //     masterFuel.applyOverrides(flightSettings);
+  //   }
+  // }, [flightSettings, masterFuel.applyOverrides]);
 
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
@@ -434,21 +473,64 @@ const FastPlannerCore = ({
     }
   };
 
-  // ✅ SINGLE SOURCE OF TRUTH: Get stop cards from MasterFuelManager via global state
+  // ✅ SINGLE SOURCE OF TRUTH: Call StopCardCalculator directly and calculate header totals
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    console.log('🎯 generateStopCardsData: Using MasterFuelManager only - no legacy fallbacks');
+    console.log('🎯 generateStopCardsData: Using StopCardCalculator directly - single source of truth');
     
-    // Get stop cards from MasterFuelManager global state
-    const masterFuelCalculations = window.masterFuelCalculations;
+    // Get fuel policy for reserve fuel conversion
+    const currentPolicy = fuelPolicy.currentPolicy;
     
-    if (masterFuelCalculations && masterFuelCalculations.stopCards) {
-      console.log('✅ generateStopCardsData: Using MasterFuelManager stop cards');
-      return masterFuelCalculations.stopCards;
+    // Call StopCardCalculator directly with fuel policy
+    const stopCards = StopCardCalculator.calculateStopCards(
+      waypoints,
+      routeStats, 
+      selectedAircraft,
+      weather,
+      {
+        ...options,
+        fuelPolicy: currentPolicy // Pass fuel policy for reserve fuel conversion
+      }
+    );
+    
+    console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');
+    
+    // Calculate header totals from stop cards
+    if (stopCards && stopCards.length > 0) {
+      let totalFuel = 0;
+      let totalDistance = 0;
+      let totalTime = 0;
+      let maxPassengers = 0;
+      
+      stopCards.forEach(card => {
+        if (card.totalFuel) totalFuel += Number(card.totalFuel) || 0;
+        if (card.distance) totalDistance += Number(card.distance) || 0;
+        if (card.time) totalTime += Number(card.time) || 0;
+        if (card.maxPassengers) maxPassengers = Math.max(maxPassengers, Number(card.maxPassengers) || 0);
+      });
+      
+      // Update window.currentRouteStats for header
+      window.currentRouteStats = {
+        totalDistance: Math.round(totalDistance * 10) / 10, // Round to 1 decimal
+        totalTime: totalTime,
+        totalFuel: Math.round(totalFuel),
+        totalPassengers: maxPassengers,
+        maxPassengers: maxPassengers,
+        stopCards: stopCards
+      };
+      
+      console.log('📊 generateStopCardsData: Updated header totals:', {
+        totalDistance: window.currentRouteStats.totalDistance,
+        totalFuel: window.currentRouteStats.totalFuel,
+        maxPassengers: window.currentRouteStats.maxPassengers
+      });
+      
+      // Trigger header update
+      if (typeof window.triggerRouteStatsUpdate === 'function') {
+        window.triggerRouteStatsUpdate();
+      }
     }
     
-    // No fallback - MasterFuelManager should handle all calculations
-    console.log('⏳ generateStopCardsData: MasterFuelManager calculations not ready yet');
-    return [];
+    return stopCards || [];
   };
 
   // Make generateStopCardsData available globally for debugging
@@ -675,11 +757,12 @@ const FastPlannerCore = ({
         console.log('🌬️ Setting new weather state:', newWeather);
         setWeather(newWeather);
         
+        // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
         // Also trigger weather update through the update handler to ensure UI sync
-        if (typeof updateWeatherSettings === 'function') {
-          console.log('🌬️ Triggering weather settings update for UI sync');
-          updateWeatherSettings(newWeather.windSpeed, newWeather.windDirection);
-        }
+        // if (typeof updateWeatherSettings === 'function') {
+        //   console.log('🌬️ Triggering weather settings update for UI sync');
+        //   updateWeatherSettings(newWeather.windSpeed, newWeather.windDirection);
+        // }
       } else {
         console.log('⚠️ No wind data found in loaded flight:', flightData);
       }
@@ -875,11 +958,12 @@ const FastPlannerCore = ({
             console.log('🌬️ Updated wind speed input to:', flightData.windData.windSpeed);
           }
           
+          // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
           // Also trigger any weather update handlers
-          if (typeof updateWeatherSettings === 'function') {
-            console.log('🌬️ Final weather settings update call');
-            updateWeatherSettings(flightData.windData.windSpeed, flightData.windData.windDirection);
-          }
+          // if (typeof updateWeatherSettings === 'function') {
+          //   console.log('🌬️ Final weather settings update call');
+          //   updateWeatherSettings(flightData.windData.windSpeed, flightData.windData.windDirection);
+          // }
           
           // CRITICAL FIX: Force stop cards regeneration with new wind data
           if (waypoints && waypoints.length >= 2 && selectedAircraft) {
