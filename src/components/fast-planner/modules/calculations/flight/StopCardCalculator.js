@@ -79,15 +79,52 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     contingencyFuelPercent = 0, // Default to 0 to make missing settings obvious
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
-    deckFuelFlow = 0      // Default to 0 to make missing settings obvious
+    deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
+    fuelPolicy = null     // NEW: Fuel policy for reserve fuel type detection
   } = options;
+  
+  // ✅ RESERVE FUEL TIME-TO-FUEL CONVERSION (same logic as FlightSettings.jsx)
+  let calculatedReserveFuel = reserveFuel;
+  
+  console.log('🔍 StopCardCalculator: Reserve fuel conversion check:', {
+    reserveFuel,
+    hasFuelPolicy: !!fuelPolicy,
+    hasAircraft: !!selectedAircraft,
+    aircraftFuelBurn: selectedAircraft?.fuelBurn
+  });
+  
+  if (fuelPolicy && selectedAircraft?.fuelBurn) {
+    const reserveType = fuelPolicy.fuelTypes?.reserveFuel?.type || 'fixed';
+    const reservePolicyValue = fuelPolicy.fuelTypes?.reserveFuel?.default || reserveFuel;
+    
+    console.log('🔍 StopCardCalculator: Fuel policy details:', {
+      reserveType,
+      reservePolicyValue,
+      originalReserveFuel: reserveFuel
+    });
+    
+    if (reserveType === 'time') {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = reservePolicyValue;
+      const fuelFlowPerHour = selectedAircraft.fuelBurn;
+      calculatedReserveFuel = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      
+      console.log(`⛽ StopCardCalculator: Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${calculatedReserveFuel} lbs`);
+    } else {
+      // Fixed amount - use policy value as-is
+      calculatedReserveFuel = reservePolicyValue;
+      console.log(`⛽ StopCardCalculator: Using fixed reserve fuel: ${calculatedReserveFuel} lbs`);
+    }
+  } else {
+    console.log('⚠️ StopCardCalculator: No fuel policy or aircraft fuel burn - using raw reserve fuel:', reserveFuel);
+  }
   
   // Log all received values for debugging
   console.log('🧰 StopCardCalculator received raw values:', {
     taxiFuel,
     passengerWeight,
     contingencyFuelPercent,
-    reserveFuel,
+    reserveFuel: `${reserveFuel} → ${calculatedReserveFuel} (converted)`,
     deckTimePerStop,
     deckFuelFlow
   });
@@ -96,7 +133,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const taxiFuelValue = Number(taxiFuel);
   const passengerWeightValue = Number(passengerWeight);
   const contingencyFuelPercentValue = Number(contingencyFuelPercent);
-  const reserveFuelValue = Number(reserveFuel);
+  const reserveFuelValue = Number(calculatedReserveFuel); // ✅ Use converted reserve fuel
   const deckTimePerStopValue = Number(deckTimePerStop);
   const deckFuelFlowValue = Number(deckFuelFlow);
   

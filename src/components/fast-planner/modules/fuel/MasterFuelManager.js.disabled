@@ -376,6 +376,26 @@ class MasterFuelManager {
     // Apply user overrides
     const withOverrides = { ...base, ...overrides };
     
+    // ✅ RESERVE FUEL TIME-TO-FUEL CONVERSION (EXACT SAME LOGIC AS FlightSettings.jsx)
+    const reserveType = this.state.policy?.fuelTypes?.reserveFuel?.type || 'fixed';
+    const reservePolicyValue = this.state.policySettings?.reserveFuel || 0;
+    
+    if (reserveType === 'time' && this.state.aircraft?.fuelBurn) {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = reservePolicyValue;
+      const fuelFlowPerHour = this.state.aircraft.fuelBurn;
+      const calculatedReserveFuel = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      
+      console.log(`⛽ MasterFuelManager: Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${calculatedReserveFuel} lbs`);
+      
+      // Override the raw time value with calculated fuel amount
+      withOverrides.reserveFuel = calculatedReserveFuel;
+    } else {
+      // Fixed amount - use policy value as-is
+      console.log(`⛽ MasterFuelManager: Using fixed reserve fuel: ${reservePolicyValue} lbs`);
+      withOverrides.reserveFuel = reservePolicyValue;
+    }
+    
     // Add weather-based fuel
     if (weatherFuel) {
       withOverrides.araFuel = (withOverrides.araFuel || 0) + weatherFuel.totalAraFuel;
