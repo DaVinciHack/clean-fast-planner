@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useReserveFuel } from '../../../hooks/useReserveFuel';
 import RegionSelector from '../../controls/RegionSelector';
 import { SaveFlightButton, LoadFlightsButton } from '../../controls';
 import EnhancedStopCardsContainer from '../../flight/stops/EnhancedStopCardsContainer.jsx';
@@ -47,6 +48,9 @@ const MainCard = ({
   // Fuel policy for MasterFuelManager
   fuelPolicy = null,
 }) => {
+  // Use shared reserve fuel calculation hook
+  const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
+
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
     if (window.LoadingIndicator) {
@@ -428,7 +432,7 @@ const MainCard = ({
               <div className="icon">🔄</div>
               <div className="label">Reserve</div>
               <div className="value">
-                {reserveFuel}
+                {calculatedReserveFuel.fuel}
                 <span className="unit">lbs</span>
               </div>
             </div>
