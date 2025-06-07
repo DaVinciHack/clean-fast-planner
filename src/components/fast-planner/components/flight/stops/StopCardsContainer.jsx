@@ -228,16 +228,13 @@ const StopCardsContainer = ({
     prevWaypointsRef.current = [...waypoints];
     
     // IMPORTANT: Make the calculated stop cards available globally
-    // This ensures the RouteStatsCard can access the latest stop cards as the single source of truth
+    // 🚨 REMOVED: No cache operations - stop cards passed via React state only
     if (updatedCards && updatedCards.length > 0) {
-      console.log('⭐ StopCardsContainer: Publishing calculated stop cards as SINGLE SOURCE OF TRUTH');
+      console.log('⭐ StopCardsContainer: Stop cards calculated - passed via React state only');
       
-      // Initialize window.currentRouteStats if needed
-      if (!window.currentRouteStats) window.currentRouteStats = {};
+      // 🚨 REMOVED: No window.currentRouteStats initialization or manipulation
       
-      // IMPORTANT: Update immediately without setTimeout to ensure data is available right away
-      try {
-        // Deep clone to prevent reference issues
+      // 🚨 REMOVED: No cache writes - stop cards data will be passed via props/state
         const sanitizedCards = updatedCards.map(card => {
           // Make a deep copy of the card
           const cleanCard = JSON.parse(JSON.stringify(card));
