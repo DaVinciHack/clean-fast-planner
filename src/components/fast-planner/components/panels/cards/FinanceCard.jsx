@@ -45,6 +45,9 @@ const FinanceCard = ({
   const [gph, setGph] = useState(() => loadSetting('gph', 100)); // Gallons Per Hour
   const [includeFuelCost, setIncludeFuelCost] = useState(() => loadSetting('includeFuelCost', false)); // Toggle tax calculation
   
+  // State for forcing re-calculation when time type changes
+  const [costCalculationTrigger, setCostCalculationTrigger] = useState(0);
+
   // Save settings to localStorage when they change
   const saveSetting = (key, value) => {
     try {
@@ -211,7 +214,7 @@ const FinanceCard = ({
       
       // Extract data from selected source
       const distance = parseFloat(dataSource.totalDistance) || 0;
-      const flightTimeHours = parseFloat(dataSource.timeHours) || parseFloat(dataSource.flightTimeHours) || 0;
+      const flightTimeHours = parseFloat(dataSource.flightTimeHours) || parseFloat(dataSource.timeHours) || 0;
       const totalTimeHours = parseFloat(dataSource.totalTimeHours) || parseFloat(dataSource.timeHours) || 0;
       const fuelRequired = parseInt(dataSource.fuelRequired) || 0;
       
@@ -249,11 +252,11 @@ const FinanceCard = ({
     readRouteData();
   }, [routeStats, stopCards, selectedAircraft, waypoints]); // React to prop changes only
   
-  // CRITICAL FIX: Update when finance settings change - now handled by useMemo
+  // CRITICAL FIX: Force recalculation when time type changes
   useEffect(() => {
-    // This useEffect now just logs for debugging - useMemo handles the recalculation
     if (routeData.hasRoute) {
-      console.log('🎯 FinanceCard: Finance settings changed, useMemo will recalculate costs');
+      console.log('🎯 FinanceCard: Time type or settings changed - forcing cost recalculation');
+      setCostCalculationTrigger(prev => prev + 1);
     }
   }, [useFlightTime, hourlyRate, mileageRate, billingMethod, landingFee, includeLandingFees, 
       additionalCost, taxRate, includeTax, dayRate, useDayRate, fuelPricePerUnit, 
@@ -292,7 +295,17 @@ const FinanceCard = ({
         const timeHours = useFlightTime ? routeData.flightTimeHours : routeData.totalTimeHours;
         const timeDisplay = useFlightTime ? routeData.flightTime : routeData.totalTime;
         
+        // DEBUG: Log what values are being used
+        console.log('🔍 FinanceCard calculateCosts DEBUG:');
+        console.log('  useFlightTime:', useFlightTime);
+        console.log('  routeData.flightTimeHours:', routeData.flightTimeHours);
+        console.log('  routeData.totalTimeHours:', routeData.totalTimeHours);
+        console.log('  timeHours (selected):', timeHours);
+        console.log('  timeDisplay (selected):', timeDisplay);
+        console.log('  hourlyRate:', hourlyRate);
+        
         mainCost = timeHours * hourlyRate;
+        console.log('  mainCost calculated:', mainCost);
         
         // Subtotal before tax
         const subtotal = mainCost + dayRateCost + fuelCost + landingCost + extra;
@@ -353,18 +366,19 @@ const FinanceCard = ({
   
   // CRITICAL FIX: Make cost calculation reactive to all settings changes
   const costs = useMemo(() => {
-    console.log('🎯 FinanceCard: Recalculating costs due to settings change');
-    console.log('🎯 FinanceCard: useFlightTime =', useFlightTime);
-    console.log('🎯 FinanceCard: routeData =', routeData);
+    console.log('🎯 FinanceCard: Recalculating costs - useFlightTime =', useFlightTime);
+    console.log('🎯 FinanceCard: Route data flight time =', routeData.flightTimeHours, 'total time =', routeData.totalTimeHours);
     return calculateCosts();
   }, [
     // Route data fields explicitly
     routeData.hasRoute, routeData.flightTimeHours, routeData.totalTimeHours, 
     routeData.flightTime, routeData.totalTime, routeData.distance, routeData.fuelRequired, routeData.landings,
-    // Settings
+    // Settings including the trigger
     useFlightTime, hourlyRate, mileageRate, billingMethod, landingFee, 
     includeLandingFees, additionalCost, taxRate, includeTax, dayRate, useDayRate, 
-    fuelPricePerUnit, fuelUnit, gph, includeFuelCost
+    fuelPricePerUnit, fuelUnit, gph, includeFuelCost,
+    // Force recalculation trigger
+    costCalculationTrigger
   ]);
   
   // Remove the old direct call - now using useMemo above

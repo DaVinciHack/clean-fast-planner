@@ -846,6 +846,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         totalDistance: cumulativeDistance.toFixed(1),
         legTime: Number(legDetail.timeHours),
         totalTime: Number(cumulativeTime),
+        // Add flight time separately for FinanceCard toggle consistency
+        flightTime: Number(cumulativeTime), // Flight time only (no deck time for intermediate stops)
         legFuel: Number(legDetail.fuel),
         // The fuel shown is what's needed to continue from this point
         totalFuel: Number(fuelNeeded),
