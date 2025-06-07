@@ -23,7 +23,8 @@ const StopCardsContainer = ({
   taxiFuel,         // No default - must be provided
   weather, // No default - weather must be provided from parent
   alternateRouteData = null, // Alternate route data for alternate stop card
-  stopCards = [] // Kept for backward compatibility but not used
+  stopCards = [], // Kept for backward compatibility but not used
+  onRouteStatsUpdate = null // CRITICAL FIX: Callback to update parent's routeStats
 }) => {
   console.log('🎯 StopCardsContainer: Component mounted/rendered');
   
@@ -87,6 +88,7 @@ const StopCardsContainer = ({
   
   // Calculate stop cards data whenever relevant inputs change
   useEffect(() => {
+    console.log('🎯 StopCardsContainer useEffect triggered - waypoint count:', waypoints?.length || 0);
     console.log('🎯 StopCardsContainer useEffect triggered');
     console.log('🎯 Waypoints:', waypoints?.length || 0);
     console.log('🎯 Aircraft:', !!selectedAircraft);
@@ -226,6 +228,52 @@ const StopCardsContainer = ({
     
     // Update cards state
     setCalculatedStopCards(updatedCards);
+    
+    // CRITICAL FIX: Create routeStats object for FinanceCard from stop cards data
+    // Extract summary route statistics that FinanceCard and other components expect
+    const departureCard = updatedCards.find(card => card.isDeparture);
+    const destinationCard = updatedCards.find(card => card.isDestination);
+    
+    if (departureCard && destinationCard) {
+      // Convert time from hours to formatted strings for display
+      const totalTimeHours = parseFloat(destinationCard.totalTime) || 0;
+      const flightTimeHours = parseFloat(destinationCard.flightTime) || 0;
+      
+      const formatTime = (timeInHours) => {
+        const hours = Math.floor(timeInHours);
+        const minutes = Math.floor((timeInHours - hours) * 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
+      
+      const routeStatsForFinance = {
+        totalDistance: parseFloat(destinationCard.totalDistance) || 0,
+        timeHours: totalTimeHours, // Total time including deck time  
+        totalTimeHours: totalTimeHours,
+        flightTimeHours: flightTimeHours, // Flight time only
+        fuelRequired: parseInt(departureCard.totalFuel) || 0,
+        estimatedTime: formatTime(flightTimeHours), // Use flight time for "estimated time"
+        totalTimeFormatted: formatTime(totalTimeHours), // Total time formatted
+        tripFuel: parseInt(departureCard.tripFuel) || 0,
+        hasRoute: true
+      };
+      
+      // CLEAN: Use proper React callback only
+      if (onRouteStatsUpdate && typeof onRouteStatsUpdate === 'function') {
+        onRouteStatsUpdate(routeStatsForFinance);
+        console.log('🎯 StopCardsContainer: Updated parent routeStats via proper callback');
+      } else {
+        console.warn('🎯 StopCardsContainer: No onRouteStatsUpdate callback - FinanceCard will use stopCards fallback');
+      }
+      
+      console.log('🎯 StopCardsContainer: Created routeStats for FinanceCard:', {
+        totalDistance: routeStatsForFinance.totalDistance,
+        timeHours: routeStatsForFinance.timeHours,
+        flightTimeHours: routeStatsForFinance.flightTimeHours,
+        fuelRequired: routeStatsForFinance.fuelRequired,
+        estimatedTime: routeStatsForFinance.estimatedTime,
+        totalTimeFormatted: routeStatsForFinance.totalTimeFormatted
+      });
+    }
     
     // Update previous waypoints
     prevWaypointsRef.current = [...waypoints];
@@ -378,6 +426,7 @@ const StopCardsContainer = ({
         if (typeof window.triggerRouteStatsUpdate === 'function') {
           window.triggerRouteStatsUpdate();
         }
+        // REMOVED: Global event approach - using proper React callback instead
       }, 50);
     }
     

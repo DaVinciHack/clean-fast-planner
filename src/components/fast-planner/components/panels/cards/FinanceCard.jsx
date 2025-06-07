@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import BaseCard from './BaseCard';
 import './FinanceCard.css';
 import { PDFButton } from '../../../modules/pdf';
@@ -163,26 +163,64 @@ const FinanceCard = ({
     return hours + (minutes / 60);
   };
   
-  // Read route data from React props instead of DOM elements
+  // CLEAN: Use proper React props with enhanced stopCards fallback
   const readRouteData = () => {
     try {
-      // Use the React props that are passed to the component
-      if (!routeStats || !stopCards || stopCards.length === 0) {
+      let dataSource = null;
+      let sourceDescription = '';
+      
+      // Primary: Use React routeStats prop
+      if (routeStats && (routeStats.totalDistance > 0 || routeStats.timeHours > 0)) {
+        dataSource = routeStats;
+        sourceDescription = 'routeStats prop (primary)';
+      }
+      // Fallback: Extract directly from stopCards (this will be the main path now)
+      else if (stopCards && stopCards.length > 0) {
+        const departureCard = stopCards.find(card => card.isDeparture);
+        const destinationCard = stopCards.find(card => card.isDestination);
+        
+        if (departureCard && destinationCard) {
+          const totalTimeHours = parseFloat(destinationCard.totalTime) || 0;
+          const flightTimeHours = parseFloat(destinationCard.flightTime) || 0;
+          
+          const formatTime = (timeInHours) => {
+            const hours = Math.floor(timeInHours);
+            const minutes = Math.floor((timeInHours - hours) * 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+          };
+          
+          dataSource = {
+            totalDistance: parseFloat(destinationCard.totalDistance) || 0,
+            timeHours: totalTimeHours,
+            totalTimeHours: totalTimeHours,
+            flightTimeHours: flightTimeHours,
+            fuelRequired: parseInt(departureCard.totalFuel) || 0,
+            estimatedTime: formatTime(flightTimeHours),
+            totalTimeFormatted: formatTime(totalTimeHours)
+          };
+          sourceDescription = 'extracted from stopCards (fallback)';
+        }
+      }
+      
+      if (!dataSource) {
+        console.log('🎯 FinanceCard: No valid route data available');
         return false;
       }
       
-      // Extract data from routeStats prop
-      const distance = parseFloat(routeStats.totalDistance) || 0;
-      const flightTimeHours = parseFloat(routeStats.timeHours) || 0;
-      const totalTimeHours = parseFloat(routeStats.totalTimeHours) || 0;
-      const fuelRequired = parseInt(routeStats.fuelRequired) || 0;
+      console.log(`🎯 FinanceCard: Using route data from ${sourceDescription}`);
+      
+      // Extract data from selected source
+      const distance = parseFloat(dataSource.totalDistance) || 0;
+      const flightTimeHours = parseFloat(dataSource.timeHours) || parseFloat(dataSource.flightTimeHours) || 0;
+      const totalTimeHours = parseFloat(dataSource.totalTimeHours) || parseFloat(dataSource.timeHours) || 0;
+      const fuelRequired = parseInt(dataSource.fuelRequired) || 0;
       
       // Format times
-      const flightTime = routeStats.estimatedTime || '00:00';
-      const totalTime = routeStats.totalTimeFormatted || '00:00';
+      const flightTime = dataSource.estimatedTime || '00:00';
+      const totalTime = dataSource.totalTimeFormatted || dataSource.estimatedTime || '00:00';
       
-      // Count landings from stopCards
-      const landings = stopCards.length || 0;
+      // Count landings from stopCards if available
+      const landings = stopCards ? stopCards.length : 0;
       
       // Update route data if we found valid data
       if (distance > 0 || flightTimeHours > 0) {
@@ -206,19 +244,20 @@ const FinanceCard = ({
     }
   };
   
-  // Initialize and set up periodic checking for route data changes
+  // CRITICAL FIX: Proper React updates only - NO global events or polling
   useEffect(() => {
-    // Read data immediately
     readRouteData();
-    
-    // Set up interval to check for changes
-    const intervalId = setInterval(() => {
-      readRouteData();
-    }, 500);
-    
-    // Clean up interval on unmount
-    return () => clearInterval(intervalId);
-  }, []);
+  }, [routeStats, stopCards, selectedAircraft, waypoints]); // React to prop changes only
+  
+  // CRITICAL FIX: Update when finance settings change - now handled by useMemo
+  useEffect(() => {
+    // This useEffect now just logs for debugging - useMemo handles the recalculation
+    if (routeData.hasRoute) {
+      console.log('🎯 FinanceCard: Finance settings changed, useMemo will recalculate costs');
+    }
+  }, [useFlightTime, hourlyRate, mileageRate, billingMethod, landingFee, includeLandingFees, 
+      additionalCost, taxRate, includeTax, dayRate, useDayRate, fuelPricePerUnit, 
+      fuelUnit, gph, includeFuelCost]);
   
   // Calculate costs based on route data and settings
   const calculateCosts = () => {
@@ -312,8 +351,24 @@ const FinanceCard = ({
     }
   };
   
-  // Get calculated costs
-  const costs = calculateCosts();
+  // CRITICAL FIX: Make cost calculation reactive to all settings changes
+  const costs = useMemo(() => {
+    console.log('🎯 FinanceCard: Recalculating costs due to settings change');
+    console.log('🎯 FinanceCard: useFlightTime =', useFlightTime);
+    console.log('🎯 FinanceCard: routeData =', routeData);
+    return calculateCosts();
+  }, [
+    // Route data fields explicitly
+    routeData.hasRoute, routeData.flightTimeHours, routeData.totalTimeHours, 
+    routeData.flightTime, routeData.totalTime, routeData.distance, routeData.fuelRequired, routeData.landings,
+    // Settings
+    useFlightTime, hourlyRate, mileageRate, billingMethod, landingFee, 
+    includeLandingFees, additionalCost, taxRate, includeTax, dayRate, useDayRate, 
+    fuelPricePerUnit, fuelUnit, gph, includeFuelCost
+  ]);
+  
+  // Remove the old direct call - now using useMemo above
+  // const costs = calculateCosts();
   
   return (
     <BaseCard title="Finance Calculator" id={id}>
