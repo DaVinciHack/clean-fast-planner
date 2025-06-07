@@ -10,6 +10,9 @@ import './fixes/panel-interaction-fix.css';
 // Import StopCardCalculator - the single source of truth
 import StopCardCalculator from './modules/calculations/flight/StopCardCalculator.js';
 
+// Import extracted utilities
+import { generateStopCardsData as generateStopCardsUtil } from './utilities/FlightUtilities.js';
+
 // Import UI components
 import {
   LeftPanel,
@@ -31,18 +34,12 @@ import { RegionProvider, useRegion } from './context/region';
 import LoadingIndicator from './modules/LoadingIndicator';
 // Import custom hooks
 import useManagers from './hooks/useManagers';
-// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-// import useWeather from './hooks/useWeather';
 import useAircraft from './hooks/useAircraft';
 import useWaypoints from './hooks/useWaypoints';
-// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025  
-// import useRouteCalculation from './hooks/useRouteCalculation';
 import useUIControls from './hooks/useUIControls';
 import useMapLayers from './hooks/useMapLayers';
 import useWeatherSegments from './hooks/useWeatherSegments';
 import useFuelPolicy from './hooks/useFuelPolicy';
-// COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-// import useMasterFuelManager from './hooks/useMasterFuelManager';
 
 /**
  * FastPlannerCore Component
@@ -69,10 +66,6 @@ const FastPlannerCore = ({
   
   // Initialize fuel policy management
   const fuelPolicy = useFuelPolicy();
-  
-  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-  // Initialize MasterFuelManager - SINGLE SOURCE OF TRUTH
-  // const masterFuel = useMasterFuelManager();
   
   // State for tracking actual loading status from LoadingIndicator
   const [isActuallyLoading, setIsActuallyLoading] = useState(false);
@@ -230,19 +223,6 @@ const FastPlannerCore = ({
     waypointManagerRef, platformManagerRef, mapInteractionHandlerRef, setWaypoints,
     client, currentRegion: activeRegionFromContext, setRouteStats, setStopCards
   });
-
-  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-  // const { updateWeatherSettings } = useWeather({
-  //   weather, setWeather, waypoints, selectedAircraft, routeCalculatorRef,
-  //   waypointManagerRef, flightSettings, setRouteStats, setStopCards, setForceUpdate
-  // });
-
-  // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-  // const { updateFlightSetting } = useRouteCalculation({
-  //   waypoints, selectedAircraft, flightSettings, setFlightSettings,
-  //   setRouteStats, setStopCards, weather, waypointManagerRef, appSettingsManagerRef,
-  //   alternateRouteData
-  // });
   
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
@@ -434,48 +414,6 @@ const FastPlannerCore = ({
     // 🚨 REMOVED: No cache writes - regional change only clears route state
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
-  // ===== COMMENTED OUT MASTERFUELMANAGER TRIGGERS - CLEANUP JUNE 2025 =====
-  
-  // Update MasterFuelManager when waypoints change
-  // useEffect(() => {
-  //   if (waypoints && waypoints.length > 0) {
-  //     console.log('🎯 MasterFuelManager: Waypoints changed, updating', waypoints.length, 'waypoints');
-  //     masterFuel.updateWaypoints(waypoints);
-  //   }
-  // }, [waypoints, masterFuel.updateWaypoints]);
-  
-  // Update MasterFuelManager when aircraft changes
-  // useEffect(() => {
-  //   if (selectedAircraft) {
-  //     console.log('🎯 MasterFuelManager: Aircraft changed, updating', selectedAircraft.registration);
-  //     masterFuel.updateAircraft(selectedAircraft);
-  //   }
-  // }, [selectedAircraft, masterFuel.updateAircraft]);
-  
-  // Update MasterFuelManager when fuel policy changes
-  // useEffect(() => {
-  //   if (fuelPolicy.currentPolicy) {
-  //     console.log('🎯 MasterFuelManager: Fuel policy changed, updating', fuelPolicy.currentPolicy.name);
-  //     masterFuel.updatePolicy(fuelPolicy.currentPolicy);
-  //   }
-  // }, [fuelPolicy.currentPolicy, masterFuel.updatePolicy]);
-  
-  // Update MasterFuelManager when weather changes
-  // useEffect(() => {
-  //   if (weather) {
-  //     console.log('🎯 MasterFuelManager: Weather changed, updating wind', weather.windSpeed, 'kts');
-  //     masterFuel.updateWeather(weather);
-  //   }
-  // }, [weather, masterFuel.updateWeather]);
-  
-  // Update MasterFuelManager when flight settings change (user overrides)
-  // useEffect(() => {
-  //   if (flightSettings) {
-  //     console.log('🎯 MasterFuelManager: Flight settings changed, applying overrides');
-  //     masterFuel.applyOverrides(flightSettings);
-  //   }
-  // }, [flightSettings, masterFuel.applyOverrides]);
-
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(location);
@@ -484,91 +422,13 @@ const FastPlannerCore = ({
     }
   };
 
-  // ✅ SINGLE SOURCE OF TRUTH: Call StopCardCalculator directly and calculate header totals
+  // ✅ SINGLE SOURCE OF TRUTH: Wrapper for extracted generateStopCardsData utility
   const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    console.log('🎯 generateStopCardsData: Using StopCardCalculator directly - single source of truth');
-    
-    // Get fuel policy for reserve fuel conversion
-    const currentPolicy = fuelPolicy.currentPolicy;
-    
-    // 🔍 DEBUG: Log the actual fuel policy structure being passed
-    console.log('🔍 FUEL POLICY DEBUG: currentPolicy structure:', {
-      hasCurrentPolicy: !!currentPolicy,
-      policyName: currentPolicy?.name || 'NO_NAME',
-      hasFuelTypes: !!currentPolicy?.fuelTypes,
-      hasReserveFuel: !!currentPolicy?.fuelTypes?.reserveFuel,
-      reserveFuelType: currentPolicy?.fuelTypes?.reserveFuel?.type || 'NO_TYPE',
-      reserveFuelDefault: currentPolicy?.fuelTypes?.reserveFuel?.default || 'NO_DEFAULT',
-      fullPolicyStructure: currentPolicy ? Object.keys(currentPolicy) : 'NULL_POLICY'
-    });
-    
-    // Call StopCardCalculator directly with fuel policy
-    const stopCards = StopCardCalculator.calculateStopCards(
-      waypoints,
-      routeStats, 
-      selectedAircraft,
-      weather,
-      {
-        ...options,
-        fuelPolicy: currentPolicy // Pass fuel policy for reserve fuel conversion
-      }
-    );
-    
-    console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');
-    
-    // 🚨 AVIATION SAFETY: If StopCardCalculator returns empty array, CLEAR ALL FUEL DATA
-    if (!stopCards || stopCards.length === 0) {
-      console.error('🚨 CRITICAL SAFETY: StopCardCalculator returned no data - CLEARING ALL FUEL DISPLAYS');
-      return []; // Return empty array immediately
-    }
-    
-    // 🛡️ DEFENSIVE: Ensure stopCards is actually an array with valid objects
-    if (!Array.isArray(stopCards)) {
-      console.error('🚨 StopCardCalculator returned non-array:', typeof stopCards);
-      return [];
-    }
-    
-    // Calculate header totals from stop cards ONLY if we have valid data
-    if (stopCards && stopCards.length > 0) {
-      let totalFuel = 0;
-      let totalDistance = 0;
-      let totalTime = 0;
-      let maxPassengers = 0;
-      
-      stopCards.forEach((card, index) => {
-        if (!card) {
-          console.warn(`⚠️ Null card at index ${index}`);
-          return;
-        }
-        if (card.totalFuel) totalFuel += Number(card.totalFuel) || 0;
-        if (card.distance) totalDistance += Number(card.distance) || 0;
-        if (card.time) totalTime += Number(card.time) || 0;
-        if (card.maxPassengers) maxPassengers = Math.max(maxPassengers, Number(card.maxPassengers) || 0);
-      });
-      
-      // 🚨 REMOVED: No cache writes - data passed directly to components
-      // Header data will be passed via props or calculated directly from stopCards
-      
-      console.log('📊 generateStopCardsData: Updated header totals:', {
-        totalDistance: Math.round(totalDistance * 10) / 10,
-        totalFuel: Math.round(totalFuel),
-        maxPassengers: maxPassengers
-      });
-      
-      // Trigger header update
-      if (typeof window.triggerRouteStatsUpdate === 'function') {
-        window.triggerRouteStatsUpdate();
-      }
-    }
-    
-    return stopCards || [];
+    return generateStopCardsUtil(waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options);
   };
 
   // Make generateStopCardsData available globally for debugging
   window.generateStopCardsData = generateStopCardsData;
-
-  // ✅ REMOVED: No longer need StopCardCalculator globally - using MasterFuelManager only
-  // window.StopCardCalculator = StopCardCalculator;
 
   const handleRemoveFavoriteLocation = (locationId) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
@@ -788,12 +648,6 @@ const FastPlannerCore = ({
         console.log('🌬️ Setting new weather state:', newWeather);
         setWeather(newWeather);
         
-        // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-        // Also trigger weather update through the update handler to ensure UI sync
-        // if (typeof updateWeatherSettings === 'function') {
-        //   console.log('🌬️ Triggering weather settings update for UI sync');
-        //   updateWeatherSettings(newWeather.windSpeed, newWeather.windDirection);
-        // }
       } else {
         console.log('⚠️ No wind data found in loaded flight:', flightData);
       }
@@ -988,13 +842,6 @@ const FastPlannerCore = ({
             windSpeedInput.dispatchEvent(new Event('change', { bubbles: true }));
             console.log('🌬️ Updated wind speed input to:', flightData.windData.windSpeed);
           }
-          
-          // COMMENTED OUT UNUSED WRAPPER - CLEANUP JUNE 2025
-          // Also trigger any weather update handlers
-          // if (typeof updateWeatherSettings === 'function') {
-          //   console.log('🌬️ Final weather settings update call');
-          //   updateWeatherSettings(flightData.windData.windSpeed, flightData.windData.windDirection);
-          // }
           
           // CRITICAL FIX: Force stop cards regeneration with new wind data
           if (waypoints && waypoints.length >= 2 && selectedAircraft) {
@@ -1496,11 +1343,11 @@ const FastPlannerApp = () => {
   // Hoist states needed by useManagers or passed to FastPlannerCore
   const [flightSettings, setFlightSettings] = useState({
     passengerWeight: 220, // ✅ User input - safe default
-    contingencyFuelPercent: 9999, // ⚠️ CRITICAL SAFETY: Must come from OSDK policy, not defaults
-    taxiFuel: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
-    reserveFuel: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults  
-    deckTimePerStop: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
-    deckFuelFlow: 9999, // ⚠️ SAFETY: Must come from OSDK policy, not defaults
+    contingencyFuelPercent: null, // ✅ SAFETY: Will be populated from OSDK fuel policy
+    taxiFuel: null, // ✅ SAFETY: Will be populated from OSDK fuel policy
+    reserveFuel: null, // ✅ SAFETY: Will be populated from OSDK fuel policy  
+    deckTimePerStop: null, // ✅ SAFETY: Will be populated from OSDK fuel policy
+    deckFuelFlow: null, // ✅ SAFETY: Will be populated from OSDK fuel policy or aircraft data
     cargoWeight: 0, // ✅ User input - safe default
   });
 
