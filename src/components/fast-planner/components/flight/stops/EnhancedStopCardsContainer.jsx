@@ -40,38 +40,20 @@ const EnhancedStopCardsContainer = ({
   const [alternateStopCard, setAlternateStopCard] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   
-  // Calculate stop cards directly when inputs change - SINGLE SOURCE OF TRUTH
+  // 🚨 REMOVED: No duplicate calculations - use stopCards from props only
+  // EnhancedStopCardsContainer should DISPLAY stop cards, not calculate them
+  // All calculations should happen in FastPlannerApp and be passed via stopCards prop
+  
+  // Use the stopCards prop that was already calculated by FastPlannerApp
   useEffect(() => {
-    if (waypoints.length >= 2 && selectedAircraft) {
-      console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator directly');
-      
-      const calculatedCards = StopCardCalculator.calculateStopCards(
-        waypoints,
-        routeStats,
-        selectedAircraft,
-        weather,
-        {
-          passengerWeight,
-          taxiFuel,
-          reserveFuel,
-          contingencyFuelPercent,
-          deckTimePerStop,
-          deckFuelFlow,
-          fuelPolicy // Pass fuel policy for reserve fuel time conversion
-        }
-      );
-      
-      if (calculatedCards && calculatedCards.length > 0) {
-        console.log('📊 EnhancedStopCardsContainer: Calculated', calculatedCards.length, 'stop cards');
-        setDisplayStopCards(calculatedCards);
-      } else {
-        setDisplayStopCards([]);
-      }
+    if (stopCards && stopCards.length > 0) {
+      console.log('🎯 EnhancedStopCardsContainer: Using pre-calculated stopCards from props');
+      setDisplayStopCards(stopCards);
     } else {
-      console.log('⚠️ EnhancedStopCardsContainer: Insufficient data for calculation');
+      console.log('🎯 EnhancedStopCardsContainer: No stopCards provided via props');
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, passengerWeight, taxiFuel, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, fuelPolicy]);
+  }, [stopCards]);
   
   // Handle card click
   const handleCardClick = (index) => {

@@ -440,8 +440,7 @@ const useWaypoints = ({
           setStopCards([]);
         }
         
-        // Reset global state
-        window.currentRouteStats = null;
+        // 🚨 REMOVED: No cache manipulation - React state only
         
         console.log('✅ Route and alternate route cleared successfully');
       }, 0);

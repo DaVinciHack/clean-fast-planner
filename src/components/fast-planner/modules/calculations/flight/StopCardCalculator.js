@@ -83,21 +83,28 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     fuelPolicy = null     // NEW: Fuel policy for reserve fuel type detection
   } = options;
   
-  // ✅ RESERVE FUEL TIME-TO-FUEL CONVERSION (same logic as FlightSettings.jsx)
-  let calculatedReserveFuel = reserveFuel;
+  // ✅ AVIATION SAFETY: NO FALLBACKS - Either convert properly or FAIL SAFELY
+  let calculatedReserveFuel = null; // Start with null - no dangerous defaults
   
+  // ✅ ENHANCED DEBUG: Reserve fuel conversion with detailed logging
   console.log('🔍 StopCardCalculator: Reserve fuel conversion check:', {
     reserveFuel,
     hasFuelPolicy: !!fuelPolicy,
     hasAircraft: !!selectedAircraft,
-    aircraftFuelBurn: selectedAircraft?.fuelBurn
+    aircraftFuelBurn: selectedAircraft?.fuelBurn,
+    fuelPolicyStructure: fuelPolicy ? {
+      fuelTypes: !!fuelPolicy.fuelTypes,
+      reserveFuel: !!fuelPolicy.fuelTypes?.reserveFuel,
+      reserveType: fuelPolicy.fuelTypes?.reserveFuel?.type,
+      reserveDefault: fuelPolicy.fuelTypes?.reserveFuel?.default
+    } : 'NO_POLICY'
   });
   
-  if (fuelPolicy && selectedAircraft?.fuelBurn) {
-    const reserveType = fuelPolicy.fuelTypes?.reserveFuel?.type || 'fixed';
-    const reservePolicyValue = fuelPolicy.fuelTypes?.reserveFuel?.default || reserveFuel;
+  if (fuelPolicy && fuelPolicy.fuelTypes?.reserveFuel && selectedAircraft?.fuelBurn) {
+    const reserveType = fuelPolicy.fuelTypes.reserveFuel.type || 'fixed';
+    const reservePolicyValue = fuelPolicy.fuelTypes.reserveFuel.default || reserveFuel;
     
-    console.log('🔍 StopCardCalculator: Fuel policy details:', {
+    console.log('🔍 StopCardCalculator: Fuel policy details found:', {
       reserveType,
       reservePolicyValue,
       originalReserveFuel: reserveFuel
@@ -116,7 +123,23 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       console.log(`⛽ StopCardCalculator: Using fixed reserve fuel: ${calculatedReserveFuel} lbs`);
     }
   } else {
-    console.log('⚠️ StopCardCalculator: No fuel policy or aircraft fuel burn - using raw reserve fuel:', reserveFuel);
+    // 🚨 AVIATION SAFETY: NO CALCULATION WITHOUT PROPER DATA
+    console.error('🚨 CRITICAL ERROR: Reserve fuel conversion failed - STOPPING CALCULATION');
+    console.error('🚨 DETAILS:', {
+      hasFuelPolicy: !!fuelPolicy,
+      hasFuelTypes: !!fuelPolicy?.fuelTypes,
+      hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
+      hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn
+    });
+    
+    // Return empty array instead of dangerous calculations
+    return [];
+  }
+  
+  // 🚨 SAFETY CHECK: Ensure we have a valid converted value
+  if (calculatedReserveFuel === null || calculatedReserveFuel === undefined || isNaN(calculatedReserveFuel)) {
+    console.error('🚨 CRITICAL ERROR: Reserve fuel conversion produced invalid result:', calculatedReserveFuel);
+    return [];
   }
   
   // Log all received values for debugging

@@ -168,71 +168,8 @@ const AppHeader = ({
       }));
   }
   
-  // ✅ SINGLE SOURCE OF TRUTH: Get data from MasterFuelManager if no stopCards
-  if ((!stopCards || stopCards.length === 0) && waypoints && waypoints.length >= 2 && selectedAircraft && safeWeather) {
-    console.log('🔄 AppHeader: No stopCards available, checking MasterFuelManager global state');
-    
-    // Use MasterFuelManager calculations from global state
-    const masterFuelCalculations = window.masterFuelCalculations;
-    
-    if (masterFuelCalculations && masterFuelCalculations.stopCards) {
-      console.log('🔄 AppHeader: Using MasterFuelManager global calculations');
-      const realTimeCards = masterFuelCalculations.stopCards;
-      
-      if (realTimeCards && realTimeCards.length > 0) {
-        console.log('🔄 AppHeader: Using MasterFuelManager data');
-        
-        const rtDepartureCard = realTimeCards.find(card => card.isDeparture);
-        const rtDestinationCard = realTimeCards.find(card => card.isDestination);
-        
-        if (rtDestinationCard) {
-          totalDistance = rtDestinationCard.totalDistance || '0.0';
-          totalTime = typeof rtDestinationCard.totalTime === 'string' 
-            ? rtDestinationCard.totalTime 
-            : formatTime(rtDestinationCard.totalTime);
-        }
-        
-        if (rtDepartureCard) {
-          totalFuel = safeNumber(rtDepartureCard.totalFuel);
-          
-          // 🔍 DETAILED HEADER FUEL LOGGING
-          console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from MasterFuelManager:');
-          console.log('📊 AppHeader: Total Fuel:', totalFuel);
-          console.log('📊 AppHeader: Departure Card Full Object:', rtDepartureCard);
-          
-          if (rtDepartureCard.fuelComponentsObject) {
-            const components = rtDepartureCard.fuelComponentsObject;
-            tripFuel = safeNumber(components.tripFuel);
-            
-            console.log('📊 AppHeader: Fuel Components Breakdown:');
-            console.log('📊 AppHeader:   Trip Fuel:', safeNumber(components.tripFuel));
-            console.log('📊 AppHeader:   Contingency:', safeNumber(components.contingency));
-            console.log('📊 AppHeader:   Reserve:', safeNumber(components.reserve));
-            console.log('📊 AppHeader:   Taxi:', safeNumber(components.taxi));
-            console.log('📊 AppHeader:   Deck Time:', safeNumber(components.deckTime));
-            console.log('📊 AppHeader:   TOTAL CALCULATED:', 
-              safeNumber(components.tripFuel) + 
-              safeNumber(components.contingency) + 
-              safeNumber(components.reserve) + 
-              safeNumber(components.taxi) + 
-              safeNumber(components.deckTime)
-            );
-          } else {
-            console.log('📊 AppHeader: No fuelComponentsObject available in departure card');
-          }
-        }
-        
-        // Update passengers from MasterFuelManager calculation
-        passengers = realTimeCards
-          .filter(card => !card.isDestination && card.maxPassengers !== undefined)
-          .map(card => ({
-            id: card.id,
-            isDeparture: card.isDeparture,
-            maxPassengers: safeNumber(card.maxPassengers)
-          }));
-      }
-    }
-  }
+  // ✅ CLEANED UP: Only use StopCardCalculator data - no fallback to competing systems
+  // If no stopCards are available, we wait for them to be calculated by StopCardCalculator
   
   return (
     <div className="app-header">

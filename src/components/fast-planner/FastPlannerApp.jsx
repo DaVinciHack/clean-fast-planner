@@ -244,13 +244,25 @@ const FastPlannerCore = ({
   //   alternateRouteData
   // });
   
-  // TEMPORARY STUB FUNCTIONS DURING CLEANUP - WILL BE REPLACED
+  // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
-    console.log(`⚙️ STUB: updateFlightSetting(${settingName}, ${value}) - disabled during cleanup`);
+    console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
+    
+    setFlightSettings(prev => ({
+      ...prev,
+      [settingName]: value
+    }));
   };
   
+  // ✅ RESTORED: Proper weather update function
   const updateWeatherSettings = (windSpeed, windDirection) => {
-    console.log(`🌬️ STUB: updateWeatherSettings(${windSpeed}, ${windDirection}) - disabled during cleanup`);
+    console.log(`🌬️ RESTORED: updateWeatherSettings(${windSpeed}, ${windDirection})`);
+    
+    setWeather(prev => ({
+      ...prev,
+      windSpeed: Number(windSpeed) || 0,
+      windDirection: Number(windDirection) || 0
+    }));
   };
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
@@ -419,8 +431,7 @@ const FastPlannerCore = ({
     setRouteStats(null);
     setStopCards([]);
     
-    // Clear global state
-    window.currentRouteStats = null;
+    // 🚨 REMOVED: No cache writes - regional change only clears route state
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
   // ===== COMMENTED OUT MASTERFUELMANAGER TRIGGERS - CLEANUP JUNE 2025 =====
@@ -480,6 +491,17 @@ const FastPlannerCore = ({
     // Get fuel policy for reserve fuel conversion
     const currentPolicy = fuelPolicy.currentPolicy;
     
+    // 🔍 DEBUG: Log the actual fuel policy structure being passed
+    console.log('🔍 FUEL POLICY DEBUG: currentPolicy structure:', {
+      hasCurrentPolicy: !!currentPolicy,
+      policyName: currentPolicy?.name || 'NO_NAME',
+      hasFuelTypes: !!currentPolicy?.fuelTypes,
+      hasReserveFuel: !!currentPolicy?.fuelTypes?.reserveFuel,
+      reserveFuelType: currentPolicy?.fuelTypes?.reserveFuel?.type || 'NO_TYPE',
+      reserveFuelDefault: currentPolicy?.fuelTypes?.reserveFuel?.default || 'NO_DEFAULT',
+      fullPolicyStructure: currentPolicy ? Object.keys(currentPolicy) : 'NULL_POLICY'
+    });
+    
     // Call StopCardCalculator directly with fuel policy
     const stopCards = StopCardCalculator.calculateStopCards(
       waypoints,
@@ -494,34 +516,43 @@ const FastPlannerCore = ({
     
     console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');
     
-    // Calculate header totals from stop cards
+    // 🚨 AVIATION SAFETY: If StopCardCalculator returns empty array, CLEAR ALL FUEL DATA
+    if (!stopCards || stopCards.length === 0) {
+      console.error('🚨 CRITICAL SAFETY: StopCardCalculator returned no data - CLEARING ALL FUEL DISPLAYS');
+      return []; // Return empty array immediately
+    }
+    
+    // 🛡️ DEFENSIVE: Ensure stopCards is actually an array with valid objects
+    if (!Array.isArray(stopCards)) {
+      console.error('🚨 StopCardCalculator returned non-array:', typeof stopCards);
+      return [];
+    }
+    
+    // Calculate header totals from stop cards ONLY if we have valid data
     if (stopCards && stopCards.length > 0) {
       let totalFuel = 0;
       let totalDistance = 0;
       let totalTime = 0;
       let maxPassengers = 0;
       
-      stopCards.forEach(card => {
+      stopCards.forEach((card, index) => {
+        if (!card) {
+          console.warn(`⚠️ Null card at index ${index}`);
+          return;
+        }
         if (card.totalFuel) totalFuel += Number(card.totalFuel) || 0;
         if (card.distance) totalDistance += Number(card.distance) || 0;
         if (card.time) totalTime += Number(card.time) || 0;
         if (card.maxPassengers) maxPassengers = Math.max(maxPassengers, Number(card.maxPassengers) || 0);
       });
       
-      // Update window.currentRouteStats for header
-      window.currentRouteStats = {
-        totalDistance: Math.round(totalDistance * 10) / 10, // Round to 1 decimal
-        totalTime: totalTime,
-        totalFuel: Math.round(totalFuel),
-        totalPassengers: maxPassengers,
-        maxPassengers: maxPassengers,
-        stopCards: stopCards
-      };
+      // 🚨 REMOVED: No cache writes - data passed directly to components
+      // Header data will be passed via props or calculated directly from stopCards
       
       console.log('📊 generateStopCardsData: Updated header totals:', {
-        totalDistance: window.currentRouteStats.totalDistance,
-        totalFuel: window.currentRouteStats.totalFuel,
-        maxPassengers: window.currentRouteStats.maxPassengers
+        totalDistance: Math.round(totalDistance * 10) / 10,
+        totalFuel: Math.round(totalFuel),
+        maxPassengers: maxPassengers
       });
       
       // Trigger header update

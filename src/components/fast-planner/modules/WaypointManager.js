@@ -1518,59 +1518,19 @@ class WaypointManager {
       
       // Update global state - Make a proper deep copy to ensure data is preserved
       // But use setTimeout to prevent causing a React update cycle
-      if (!window.currentRouteStats) {
-        window.currentRouteStats = {};
-      }
+      // 🚨 REMOVED: No cache writes - route stats handled by components directly
+      // WaypointManager should not write to global cache
       
-      // Create a new object to avoid reference issues
-      const updatedStats = {...window.currentRouteStats};
+      // 🚨 REMOVED: No cache manipulation - data passed via proper React state channels
       
-      // Add important properties from routeStats
-      if (routeStats.timeHours) updatedStats.timeHours = routeStats.timeHours;
-      if (routeStats.estimatedTime) updatedStats.estimatedTime = routeStats.estimatedTime;
-      if (routeStats.tripFuel) updatedStats.tripFuel = routeStats.tripFuel;
-      if (routeStats.totalFuel) updatedStats.totalFuel = routeStats.totalFuel;
-      if (routeStats.aircraft) updatedStats.aircraft = routeStats.aircraft;
-      if (routeStats.legs) updatedStats.legs = [...routeStats.legs];
+      // 🚨 REMOVED: All cache operations - WaypointManager should not manage fuel data cache
       
-      // Use setTimeout to break the React update cycle
-      setTimeout(() => {
-        window.currentRouteStats = updatedStats;
-        
-        // Log the updated window.currentRouteStats for debugging
-        console.log("⭐ window.currentRouteStats updated:", {
-          timeHours: window.currentRouteStats.timeHours,
-          estimatedTime: window.currentRouteStats.estimatedTime,
-          tripFuel: window.currentRouteStats.tripFuel,
-          totalFuel: window.currentRouteStats.totalFuel,
-          hasAircraft: window.currentRouteStats.aircraft ? true : false,
-          hasLegs: window.currentRouteStats.legs ? window.currentRouteStats.legs.length : 0
-        });
-      }, 0);
-    } else if (window.currentRouteStats) {
-      // If using global state, ensure this also has zeros for safety
-      if (!window.currentRouteStats.aircraft) {
-        const updatedStats = {...window.currentRouteStats};
-        updatedStats.timeHours = 0;
-        updatedStats.estimatedTime = '00:00';
-        updatedStats.fuelRequired = 0;
-        updatedStats.tripFuel = 0;
-        
-        // Use setTimeout to avoid update cycles
-        setTimeout(() => {
-          window.currentRouteStats = updatedStats;
-        }, 0);
-      }
+      // Route stats will be handled through proper React state channels, not global cache
+      // 🚨 REMOVED: All cache operations - WaypointManager should not manage global state
+      // Route stats should be handled through proper React state channels
+      // routeStats parameter should contain all needed data
       
-      routeStats = window.currentRouteStats;
-      
-      // Log that we're using global state
-      console.log("⭐ WaypointManager.updateRoute using window.currentRouteStats:", {
-        hasAircraft: routeStats.aircraft ? true : false,
-        timeHours: routeStats.timeHours,
-        estimatedTime: routeStats.estimatedTime,
-        hasLegs: routeStats.legs ? routeStats.legs.length : 0
-      });
+      // 🚨 REMOVED: No global state usage in WaypointManager
     }
 
     const routeSourceId = 'route';
