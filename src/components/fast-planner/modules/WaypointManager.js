@@ -1018,21 +1018,17 @@ class WaypointManager {
             { units: 'nauticalmiles' }
           );
           
-          // Calculate time if we have routeStats with legs
+          // AVIATION SAFETY: Only use REAL calculated time data - NO fallbacks
           let legTime = null;
           if (routeStats && routeStats.legs && i < routeStats.legs.length) {
             legTime = routeStats.legs[i].time;
-            console.log(`Found time for segment ${i} from routeStats: ${legTime}`);
+            console.log(`Found REAL time for segment ${i} from routeStats: ${legTime}`);
           } 
           else if (window.currentRouteStats && window.currentRouteStats.legs && i < window.currentRouteStats.legs.length) {
             legTime = window.currentRouteStats.legs[i].time;
-            console.log(`Found time for segment ${i} from window.currentRouteStats: ${legTime}`);
+            console.log(`Found REAL time for segment ${i} from window.currentRouteStats: ${legTime}`);
           }
-          // As a last resort, calculate time based on aircraft speed
-          else if (window.currentRouteStats && window.currentRouteStats.aircraft && window.currentRouteStats.aircraft.cruiseSpeed) {
-            legTime = legDistance / window.currentRouteStats.aircraft.cruiseSpeed;
-            console.log(`Estimated time for segment ${i} based on aircraft speed: ${legTime}`);
-          }
+          // REMOVED: Dangerous fallback calculation - aviation safety requires real data only
           
           // Create label with distance and time (if available)
           const distanceText = `${legDistance.toFixed(1)} nm`;
@@ -1276,24 +1272,14 @@ class WaypointManager {
                   JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
                   JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
                 legTime = leg.time;
-                console.log(`Found time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
+                console.log(`Found REAL time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
                 break;
               }
             }
           }
-          // LAST RESORT: Calculate time based on aircraft cruise speed
-          else if (window.currentRouteStats && window.currentRouteStats.aircraft && 
-                  window.currentRouteStats.aircraft.cruiseSpeed) {
-            // Make sure we have valid cruise speed
-            const cruiseSpeed = parseFloat(window.currentRouteStats.aircraft.cruiseSpeed);
-            if (!isNaN(cruiseSpeed) && cruiseSpeed > 0) {
-              // Estimate time based on distance and aircraft speed
-              legTime = totalLegDistance / cruiseSpeed;
-              console.log(`Estimated time for leg ${legIdx} based on aircraft speed: ${legTime}`);
-            }
-          }
+          // REMOVED: Dangerous fallback calculation - aviation safety requires real data only
           
-          console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null'}`);
+          console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null (no real data available)'}`);
           
           // Create a line for the longest segment for label placement
           const line = turf.lineString([longestSegment.startCoords, longestSegment.endCoords]);

@@ -215,6 +215,9 @@ const StopCardsContainer = ({
       numericParams
     );
     
+    // The leg details are now stored globally by StopCardCalculator for WaypointManager
+    console.log('🎯 StopCardsContainer: Stop cards calculated, leg details stored for map display');
+    
     // Mark new cards
     const updatedCards = newCards.map(card => ({
       ...card,

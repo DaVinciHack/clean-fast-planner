@@ -983,6 +983,28 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       }
     }
 
+    // CRITICAL FIX: Store leg details globally for WaypointManager BEFORE returning stop cards
+    // This preserves the existing API while making leg data available
+    if (legDetails && legDetails.length > 0) {
+      // Store in window for WaypointManager to access real calculated times
+      if (!window.currentRouteStats) {
+        window.currentRouteStats = {};
+      }
+      
+      // Format for WaypointManager
+      window.currentRouteStats.legs = legDetails.map(leg => ({
+        from: leg.fromWaypoint?.coords || null,
+        to: leg.toWaypoint?.coords || null,
+        distance: leg.distance,
+        time: leg.timeHours, // Real wind-adjusted time
+        fuel: leg.fuel,
+        groundSpeed: leg.groundSpeed,
+        headwind: leg.headwind
+      }));
+      
+      console.log('🎯 StopCardCalculator: Stored real calculated leg times for WaypointManager');
+    }
+
     return finalCards;
 };
 
