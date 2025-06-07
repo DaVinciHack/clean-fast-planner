@@ -377,11 +377,11 @@ const FastPlannerCore = ({
     // Apply policy values to flightSettings, preserving user inputs
     setFlightSettings(currentSettings => ({
       ...currentSettings, // Preserve user inputs (passenger weight, cargo weight)
-      // Apply OSDK policy values (these are the authoritative source)
-      contingencyFuelPercent: policySettings.contingencyFlightLegs || currentSettings.contingencyFuelPercent || 5,
-      taxiFuel: policySettings.taxiFuel || currentSettings.taxiFuel || 50,
-      reserveFuel: policySettings.reserveFuel || currentSettings.reserveFuel || 600,
-      deckTimePerStop: policySettings.deckTime || currentSettings.deckTimePerStop || 5,
+      // Apply OSDK policy values (these are the authoritative source) - Use ?? to allow 0 values
+      contingencyFuelPercent: policySettings.contingencyFlightLegs ?? currentSettings.contingencyFuelPercent ?? 5,
+      taxiFuel: policySettings.taxiFuel ?? currentSettings.taxiFuel ?? 50,
+      reserveFuel: policySettings.reserveFuel ?? currentSettings.reserveFuel ?? 600,
+      deckTimePerStop: policySettings.deckTime ?? currentSettings.deckTimePerStop ?? 5,
       // deckFuelFlow could come from policy or aircraft, keep existing for now
       deckFuelFlow: currentSettings.deckFuelFlow || 400
     }));

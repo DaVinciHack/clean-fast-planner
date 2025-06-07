@@ -13,9 +13,10 @@ class PassengerCalculator {
    * @param {Object} aircraft - The aircraft object with usable load info
    * @param {number} fuelWeight - The total fuel weight required for this leg (lbs)
    * @param {number} passengerWeight - The weight per passenger (lbs)
+   * @param {number} cargoWeight - The cargo weight that reduces available passenger capacity (lbs)
    * @returns {number} - The maximum number of passengers (integer)
    */
-  static calculateMaxPassengers(aircraft, fuelWeight, passengerWeight) {
+  static calculateMaxPassengers(aircraft, fuelWeight, passengerWeight, cargoWeight = 0) {
     // Validate inputs
     if (!aircraft) {
       console.error('PassengerCalculator: Invalid aircraft data provided');
@@ -56,14 +57,14 @@ class PassengerCalculator {
     }
     // Then, try to use aircraft.usefulLoad property if it exists (from OSDK data)
     else if (aircraft.usefulLoad !== undefined) {
-      // Ensure we're properly subtracting fuel when using usefulLoad
-      usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum;
-      console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, '=', usableLoadWithoutFuel);
+      // Ensure we're properly subtracting fuel and cargo when using usefulLoad
+      usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum - (cargoWeight || 0);
+      console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, 'minus cargo:', (cargoWeight || 0), '=', usableLoadWithoutFuel);
     }
     // If not available, calculate it from maxTakeoffWeight and emptyWeight
     else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
-      usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum;
-      console.log('PassengerCalculator: Calculated usableLoad from weight data:', usableLoadWithoutFuel);
+      usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum - (cargoWeight || 0);
+      console.log('PassengerCalculator: Calculated usableLoad from weight data, minus fuel and cargo:', usableLoadWithoutFuel);
     } 
     // If neither option is available, return 0
     else {
