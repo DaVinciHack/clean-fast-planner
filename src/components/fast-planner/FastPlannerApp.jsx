@@ -264,7 +264,7 @@ const FastPlannerCore = ({
         console.log('✅ Auto-calculation complete - header should update');
       }
     }
-  }, [waypoints, selectedAircraft, flightSettings]);
+  }, [waypoints, selectedAircraft, flightSettings, weather]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const {

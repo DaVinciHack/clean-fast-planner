@@ -28,6 +28,7 @@ const MainCard = ({
   authUserName,
   onLogin,
   rigsLoading,
+  fuelPolicy = null,
 }) => {
   // Get aircraft context for accessing aircraft data
   const { 
@@ -39,6 +40,56 @@ const MainCard = ({
     aircraftLoading,
     forceUpdate
   } = useAircraft();
+  
+  // Calculate actual reserve fuel amount from policy
+  const calculatedReserveFuel = React.useMemo(() => {
+    // Get current fuel policy information
+    const currentPolicy = fuelPolicy?.currentPolicy;
+    
+    if (!currentPolicy || !selectedAircraft) {
+      // Fallback to the raw reserveFuel value if no policy/aircraft
+      return {
+        fuel: reserveFuel || 0,
+        time: 0,
+        method: 'fallback'
+      };
+    }
+
+    // Check if policy has the expected structure
+    if (!currentPolicy.fuelTypes || !currentPolicy.fuelTypes.reserveFuel) {
+      console.warn('🔧 MainCard: Policy missing fuelTypes.reserveFuel structure, using fallback');
+      return {
+        fuel: reserveFuel || 0,
+        time: 0,
+        method: 'fallback'
+      };
+    }
+
+    const reserveType = currentPolicy.fuelTypes.reserveFuel.type || 'fixed';
+    const policyValue = currentPolicy.fuelTypes.reserveFuel.default || 0;
+
+    if (reserveType === 'time' && selectedAircraft.fuelBurn) {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = policyValue;
+      const fuelFlowPerHour = selectedAircraft.fuelBurn;
+      const fuelAmount = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      
+      console.log(`🔧 MainCard Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${fuelAmount} lbs`);
+      
+      return {
+        fuel: fuelAmount,
+        time: timeMinutes,
+        method: 'time'
+      };
+    } else {
+      // Fixed amount - the policy value is already in lbs
+      return {
+        fuel: policyValue,
+        time: selectedAircraft.fuelBurn ? Math.round((policyValue * 60) / selectedAircraft.fuelBurn) : 0,
+        method: 'fixed'
+      };
+    }
+  }, [fuelPolicy?.currentPolicy, selectedAircraft?.fuelBurn, reserveFuel]);
   
   // Debug aircraft data
   useEffect(() => {
@@ -568,7 +619,7 @@ const MainCard = ({
               <div className="icon">🔄</div>
               <div className="label">Reserve</div>
               <div className="value">
-                {reserveFuel}
+                {calculatedReserveFuel.fuel}
                 <span className="unit">lbs</span>
               </div>
             </div>

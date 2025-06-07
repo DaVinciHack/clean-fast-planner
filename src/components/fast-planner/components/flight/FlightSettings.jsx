@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useReserveFuel } from '../../hooks/useReserveFuel';
 import './FlightSettings.css';
 
 const FlightSettings = ({
@@ -90,38 +91,8 @@ const FlightSettings = ({
     
   }, [filteredPolicies, selectedAircraft?.registration, currentPolicy?.uuid]); // Fixed dependencies
   
-  // Filter policies by current region
-  // Calculate reserve fuel based on policy type and aircraft
-  const calculateReserveFuel = React.useMemo(() => {
-    if (!currentPolicy || !selectedAircraft) {
-      return { fuel: 0, time: 0, method: 'fixed' };
-    }
-
-    const reserveType = currentPolicy.fuelTypes.reserveFuel.type || 'fixed';
-    const policyValue = currentPolicy.fuelTypes.reserveFuel.default || 0;
-
-    if (reserveType === 'time' && selectedAircraft.fuelBurn) {
-      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
-      const timeMinutes = policyValue;
-      const fuelFlowPerHour = selectedAircraft.fuelBurn;
-      const fuelAmount = Math.round((timeMinutes * fuelFlowPerHour) / 60);
-      
-      console.log(`🔧 Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${fuelAmount} lbs`);
-      
-      return {
-        fuel: fuelAmount,
-        time: timeMinutes,
-        method: 'time'
-      };
-    } else {
-      // Fixed amount
-      return {
-        fuel: policyValue,
-        time: selectedAircraft.fuelBurn ? Math.round((policyValue * 60) / selectedAircraft.fuelBurn) : 0,
-        method: 'fixed'
-      };
-    }
-  }, [currentPolicy, selectedAircraft?.fuelBurn]);
+  // Use shared reserve fuel calculation hook
+  const calculateReserveFuel = useReserveFuel(safeFuelPolicy, selectedAircraft);
 
   // Helper function to format contingency fuel display
   const formatContingencyFuel = React.useMemo(() => {
