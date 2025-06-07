@@ -1,7 +1,7 @@
 // src/components/fast-planner/hooks/useWaypoints.js
 
 import { useState, useEffect, useCallback } from 'react';
-import { interactionController } from '../cleanIntegration';
+import { interactionController } from '../modules/cleanIntegration';
 import { parseCoordinates, looksLikeCoordinates } from '../utils/coordinateParser';
 
 /**
