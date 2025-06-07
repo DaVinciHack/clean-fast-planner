@@ -80,8 +80,18 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
+    extraFuel = 0,        // Manual extra fuel override
+    cargoWeight = 0,      // Cargo weight for payload calculations
     fuelPolicy = null     // NEW: Fuel policy for reserve fuel type detection
   } = options;
+  
+  // 🔧 DEBUG: Log extraFuel value to see what we're getting
+  console.log('🔧 StopCardCalculator DEBUG: extraFuel value:', {
+    extraFuel,
+    extraFuelType: typeof extraFuel,
+    options: options,
+    allOptions: Object.keys(options)
+  });
   
   // ✅ AVIATION SAFETY: NO FALLBACKS - Either convert properly or FAIL SAFELY
   let calculatedReserveFuel = null; // Start with null - no dangerous defaults
@@ -607,7 +617,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         contingencyFuel: contingencyFuelValue,
         taxiFuel: taxiFuelValue,
         deckFuel: deckFuelValue,
-        reserveFuel: reserveFuelValue
+        reserveFuel: reserveFuelValue,
+        extraFuel: extraFuel || 0
       },
       // Add wind information to all cards
       windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
@@ -675,11 +686,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // At the final destination, you have reserve fuel and unused contingency
       // For potential landing fuel, we should show the total contingency (from departure)
       // not just the remaining contingency for this leg
-      fuelNeeded = reserveFuelValue + remainingContingencyFuel;
+      fuelNeeded = reserveFuelValue + remainingContingencyFuel + (extraFuel || 0);
       fuelComponents = {
         reserveFuel: reserveFuelValue,
         contingencyFuel: remainingContingencyFuel,
-        extraFuel: 0, // Can be used for alternate or holding fuel
+        extraFuel: extraFuel || 0, // Use actual extraFuel from settings
         // Add remaining fuel components with zero values for consistency
         tripFuel: 0,
         taxiFuel: 0,
@@ -694,9 +705,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         fuelComponents.contingencyFuel = routeStats.enhancedResults.auxiliaryFuel.contingencyFuel;
       }
 
-      // Calculate potential landing fuel (reserve + full unused contingency)
-      const potentialLandingFuel = reserveFuelValue + fullContingencyFuel;
-      fuelComponentsText = `Reserve:${reserveFuelValue} Extra:0 FullCont:${remainingContingencyFuel} (${reserveFuelValue}+${fullContingencyFuel}=${potentialLandingFuel})`;
+      // Calculate potential landing fuel (reserve + full unused contingency + extra fuel)
+      const potentialLandingFuel = reserveFuelValue + fullContingencyFuel + (extraFuel || 0);
+      fuelComponentsText = `Reserve:${reserveFuelValue}${extraFuel > 0 ? ` Extra:${extraFuel}` : ' Extra:0'} FullCont:${remainingContingencyFuel} (${reserveFuelValue}+${fullContingencyFuel}${extraFuel > 0 ? `+${extraFuel}` : ''}=${potentialLandingFuel})`;
       
       // Recalculate fuelNeeded as the sum of all components to ensure consistency
       fuelNeeded = Object.values(fuelComponents).reduce((sum, value) => sum + value, 0);
@@ -712,14 +723,32 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       });
     } else {
       // At intermediate stops, you need fuel for remaining legs, plus reserve
-      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue;
+      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue + (extraFuel || 0);
       fuelComponents = {
         remainingTripFuel: remainingTripFuel,
         contingencyFuel: remainingContingencyFuel,
         deckFuel: remainingDeckFuel,
-        reserveFuel: reserveFuelValue
+        reserveFuel: reserveFuelValue,
+        extraFuel: extraFuel || 0
       };
       fuelComponentsText = `Trip:${remainingTripFuel} Cont:${remainingContingencyFuel} Res:${reserveFuelValue}`;
+
+      // 🔧 DEBUG: Log extraFuel logic
+      console.log('🔧 ExtraFuel Debug - Intermediate stop:', {
+        extraFuel,
+        extraFuelType: typeof extraFuel,
+        extraFuelGreaterThanZero: extraFuel > 0,
+        extraFuelAsNumber: Number(extraFuel),
+        numberCheck: Number(extraFuel) > 0
+      });
+
+      // Add extra fuel text if present
+      if (Number(extraFuel) > 0) {
+        fuelComponentsText += ` Extra:${extraFuel}`;
+        console.log('🔧 ExtraFuel: Added to fuel components text');
+      } else {
+        console.log('🔧 ExtraFuel: NOT added - value is 0 or invalid');
+      }
 
       // Add deck fuel text only if there are remaining intermediate stops
       if (remainingDeckFuel > 0) {

@@ -248,7 +248,15 @@ const FastPlannerCore = ({
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
     if (waypoints && waypoints.length >= 2 && selectedAircraft) {
-      console.log('🔄 Auto-triggering calculations due to route/aircraft change');
+      console.log('🔄 Auto-triggering calculations due to route/aircraft/settings change');
+      console.log('🔧 EFFECT TRIGGERED - Current extraFuel:', flightSettings.extraFuel);
+      
+      // 🔧 DEBUG: Log flightSettings to see what we're passing
+      console.log('🔧 FastPlannerApp DEBUG: flightSettings being passed:', {
+        flightSettings,
+        extraFuel: flightSettings.extraFuel,
+        cargoWeight: flightSettings.cargoWeight
+      });
       
       // Generate stop cards and update header
       const newStopCards = generateStopCardsData(
@@ -1295,12 +1303,14 @@ const FastPlannerCore = ({
           onFlightLoad={handleFlightLoad} // Add flight loading handler
           deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
           passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
+          extraFuel={flightSettings.extraFuel}
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
           reserveFuel={flightSettings.reserveFuel} reserveMethod={reserveMethod}
           onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}
           onDeckFuelFlowChange={(value) => updateFlightSetting('deckFuelFlow', value)}
           onPassengerWeightChange={(value) => updateFlightSetting('passengerWeight', value)}
           onCargoWeightChange={(value) => updateFlightSetting('cargoWeight', value)}
+          onExtraFuelChange={(value) => updateFlightSetting('extraFuel', value)}
           onTaxiFuelChange={(value) => updateFlightSetting('taxiFuel', value)}
           onContingencyFuelPercentChange={(value) => updateFlightSetting('contingencyFuelPercent', value)}
           onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
@@ -1349,6 +1359,7 @@ const FastPlannerApp = () => {
     deckTimePerStop: null, // ✅ SAFETY: Will be populated from OSDK fuel policy
     deckFuelFlow: null, // ✅ SAFETY: Will be populated from OSDK fuel policy or aircraft data
     cargoWeight: 0, // ✅ User input - safe default
+    extraFuel: 0, // ✅ User input - safe default for manual fuel override
   });
 
   // 🔍 DEBUG: Track flightSettings changes to find when contingencyFuelPercent gets corrupted
