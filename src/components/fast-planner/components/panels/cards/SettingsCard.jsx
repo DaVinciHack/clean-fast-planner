@@ -13,6 +13,7 @@ const SettingsCard = ({
   deckFuelFlow = 400,
   passengerWeight = 220,
   cargoWeight = 0,
+  extraFuel = 0,
   taxiFuel = 50,
   contingencyFuelPercent = 10,
   reserveMethod = 'fixed',
@@ -22,6 +23,7 @@ const SettingsCard = ({
   onDeckFuelFlowChange = () => {},
   onPassengerWeightChange = () => {},
   onCargoWeightChange = () => {},
+  onExtraFuelChange = () => {},
   onTaxiFuelChange = () => {},
   onContingencyFuelPercentChange = () => {},
   onReserveMethodChange = () => {},
@@ -77,6 +79,16 @@ const SettingsCard = ({
       onContingencyFuelPercentChange(newSettings.contingencyFuelPercent);
     }
     
+    if (newSettings.cargoWeight !== undefined) {
+      console.log(`Calling onCargoWeightChange with:`, newSettings.cargoWeight);
+      onCargoWeightChange(newSettings.cargoWeight);
+    }
+    
+    if (newSettings.extraFuel !== undefined) {
+      console.log(`Calling onExtraFuelChange with:`, newSettings.extraFuel);
+      onExtraFuelChange(newSettings.extraFuel);
+    }
+    
     // Force update UI after settings change
     const event = new Event('settings-changed');
     window.dispatchEvent(event);
@@ -89,7 +101,9 @@ const SettingsCard = ({
     contingencyFuelPercent,
     deckTimePerStop,
     deckFuelFlow,
-    reserveFuel
+    reserveFuel,
+    cargoWeight,
+    extraFuel
   };
   
   return (

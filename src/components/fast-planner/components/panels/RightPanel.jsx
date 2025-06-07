@@ -76,6 +76,7 @@ const RightPanel = ({
   deckFuelFlow = 400,
   passengerWeight = 220,
   cargoWeight = 0,
+  extraFuel = 0,
   taxiFuel = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
   contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
   reserveMethod = 'fixed',
@@ -84,6 +85,7 @@ const RightPanel = ({
   onDeckFuelFlowChange = () => {},
   onPassengerWeightChange = () => {},
   onCargoWeightChange = () => {},
+  onExtraFuelChange = () => {},
   onTaxiFuelChange = () => {},
   onContingencyFuelPercentChange = () => {},
   onReserveMethodChange = () => {},
@@ -498,6 +500,7 @@ const RightPanel = ({
         deckFuelFlow={deckFuelFlow}
         passengerWeight={passengerWeight}
         cargoWeight={cargoWeight}
+        extraFuel={extraFuel}
         taxiFuel={taxiFuel}
         contingencyFuelPercent={contingencyFuelPercent}
         reserveMethod={reserveMethod}
@@ -507,6 +510,7 @@ const RightPanel = ({
         onDeckFuelFlowChange={onDeckFuelFlowChange}
         onPassengerWeightChange={onPassengerWeightChange}
         onCargoWeightChange={onCargoWeightChange}
+        onExtraFuelChange={onExtraFuelChange}
         onTaxiFuelChange={onTaxiFuelChange}
         onContingencyFuelPercentChange={onContingencyFuelPercentChange}
         onReserveMethodChange={onReserveMethodChange}

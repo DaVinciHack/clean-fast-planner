@@ -127,12 +127,14 @@ const AppHeader = ({
         console.log('📊 AppHeader:   Reserve:', safeNumber(components.reserve));
         console.log('📊 AppHeader:   Taxi:', safeNumber(components.taxi));
         console.log('📊 AppHeader:   Deck Time:', safeNumber(components.deckTime));
+        console.log('📊 AppHeader:   Extra Fuel:', safeNumber(components.extraFuel));
         console.log('📊 AppHeader:   TOTAL CALCULATED:', 
           safeNumber(components.tripFuel) + 
           safeNumber(components.contingency) + 
           safeNumber(components.reserve) + 
           safeNumber(components.taxi) + 
-          safeNumber(components.deckTime)
+          safeNumber(components.deckTime) + 
+          safeNumber(components.extraFuel)
         );
         
         tripFuel = safeNumber(components.tripFuel);
