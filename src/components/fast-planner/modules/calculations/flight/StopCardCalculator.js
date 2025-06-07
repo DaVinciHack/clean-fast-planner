@@ -577,7 +577,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       departureMaxPassengers = PassengerCalculator.calculateMaxPassengers(
         selectedAircraft, 
         departureFuelNeeded, 
-        passengerWeightValue
+        passengerWeightValue,
+        cargoWeight
       );
     }
     
@@ -774,7 +775,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       maxPassengers = PassengerCalculator.calculateMaxPassengers(
         selectedAircraft, 
         fuelNeeded, 
-        passengerWeightValue
+        passengerWeightValue,
+        cargoWeight
       );
     }
 
@@ -1248,7 +1250,8 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     maxPassengers = PassengerCalculator.calculateMaxPassengers(
       selectedAircraft, 
       totalAlternateFuel, 
-      passengerWeightValue
+      passengerWeightValue,
+      cargoWeight
     );
   }
   
