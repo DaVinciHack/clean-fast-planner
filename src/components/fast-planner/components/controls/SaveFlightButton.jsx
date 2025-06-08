@@ -206,6 +206,12 @@ const SaveFlightButton = ({
    * @param {Object} flightData - The flight data from the modal form
    */
   const handleFlightFormSubmit = async (flightData) => {
+    console.log('=== SAVE FLIGHT DEBUG START ===');
+    console.log('selectedAircraft:', selectedAircraft);
+    console.log('waypoints received:', waypoints);
+    console.log('waypoints.length:', waypoints ? waypoints.length : 'undefined/null');
+    console.log('=== SAVE FLIGHT DEBUG END ===');
+    
     if (!selectedAircraft || !waypoints || waypoints.length < 2) {
       onError('Cannot save flight: Missing aircraft or waypoints');
       return;
@@ -273,23 +279,60 @@ const SaveFlightButton = ({
         regionCode: regionCode
       });
       
-      // Prepare waypoints with leg structure
-      // Group waypoints by leg if available, otherwise put all in leg 0
-      // CRITICAL FIX: Include waypoint type information to distinguish navigation waypoints from stops
-      const waypointsWithLegs = waypoints.map((wp, index) => {
-        return {
-          legIndex: wp.legIndex || 0,
-          name: wp.name || `Waypoint ${index + 1}`,
-          coords: wp.coords,
-          id: wp.id,
-          // IMPORTANT: Include type classification properties so Palantir knows these are waypoints, not stops
-          type: wp.type,
-          pointType: wp.pointType,
-          isWaypoint: wp.isWaypoint
-        };
-      });
+      // DEBUG: Check what waypoints we actually have
+      console.log('Total waypoints received:', waypoints ? waypoints.length : 'undefined/null');
+      console.log('Waypoints array:', waypoints);
       
-      // Prepare parameters for the new createFlightWithWaypoints function
+      // DEBUG: Let's see what properties each waypoint actually has
+      if (waypoints && waypoints.length > 0) {
+        console.log('=== WAYPOINT DEBUG INFO ===');
+        waypoints.forEach((wp, index) => {
+          console.log(`Waypoint ${index} (${wp.name}):`, {
+            name: wp.name,
+            type: wp.type,
+            pointType: wp.pointType,
+            isWaypoint: wp.isWaypoint,
+            coords: wp.coords,
+            id: wp.id
+          });
+        });
+        console.log('=== END WAYPOINT DEBUG ===');
+        
+        // Prepare waypoints with leg structure - ONLY include navigation waypoints, NOT stops
+        // Filter out stops/landing points before sending to Palantir
+        const navigationWaypoints = waypoints.filter(wp => {
+          // Use the SAME logic as the left panel to determine waypoint type
+          const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+          
+          // Debug: Log waypoint properties to understand classification
+          console.log(`Filtering waypoint ${wp.name}: isWaypoint=${wp.isWaypoint}, type=${wp.type}, classified as navigation waypoint=${isWaypointType}`);
+          
+          // Only include if it's a NAVIGATION waypoint (not a landing stop)
+          return isWaypointType;
+        });
+        
+        console.log(`Filtered ${waypoints.length} total waypoints down to ${navigationWaypoints.length} navigation waypoints`);
+        
+        // Group waypoints by leg if available, otherwise put all in leg 0
+        // CRITICAL FIX: Include waypoint type information to distinguish navigation waypoints from stops
+        var waypointsWithLegs = navigationWaypoints.map((wp, index) => {
+          return {
+            legIndex: wp.legIndex || 0,
+            name: wp.name || `Waypoint ${index + 1}`,
+            coords: wp.coords,
+            id: wp.id,
+            // IMPORTANT: Include type classification properties so Palantir knows these are waypoints, not stops
+            type: wp.type,
+            pointType: wp.pointType,
+            isWaypoint: wp.isWaypoint
+          };
+        });
+      } else {
+        console.log('No waypoints provided - this should result in displayWaypoints: null');
+        const waypointsWithLegs = [];
+      }
+      
+      // Prepare parameters for the API
       const apiParams = {
         // Basic parameters
         flightName: flightData.flightName,
@@ -300,7 +343,10 @@ const SaveFlightButton = ({
         locations: locations,
         alternateLocation: flightData.alternateLocation || "",
         
-        // Structured waypoints for the new API
+        // Add flight ID if this is an update (flight already exists)
+        ...(flightData.flightId ? { flightId: flightData.flightId } : {}),
+        
+        // Structured waypoints for the API
         waypoints: waypointsWithLegs,
         
         // Crew member IDs

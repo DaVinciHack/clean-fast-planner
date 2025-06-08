@@ -163,7 +163,11 @@ const RightPanel = ({
           legIndex: wp.legIndex || 0,
           name: wp.name || `Waypoint ${index + 1}`,
           coords: wp.coords,
-          id: wp.id
+          id: wp.id,
+          // Preserve type classification properties for Palantir waypoint processing
+          type: wp.type,
+          pointType: wp.pointType,
+          isWaypoint: wp.isWaypoint
         };
       });
       
