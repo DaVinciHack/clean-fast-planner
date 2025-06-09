@@ -21,6 +21,7 @@ const EnhancedStopCardsContainer = ({
   deckTimePerStop,
   deckFuelFlow,
   taxiFuel,
+  extraFuel,  // 🔧 ADDED: Missing extraFuel parameter
   weather,
   alternateRouteData = null,
   fuelPolicy = null, // Fuel policy for reserve fuel conversion
@@ -100,7 +101,8 @@ const EnhancedStopCardsContainer = ({
           contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
           deckTimePerStop: Number(deckTimePerStop) || 0,
           deckFuelFlow: Number(deckFuelFlow) || 0,
-          taxiFuel: Number(taxiFuel) || 0
+          taxiFuel: Number(taxiFuel) || 0,
+          extraFuel: Number(extraFuel) || 0  // 🔧 ADDED: Missing extraFuel parameter
         };
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(

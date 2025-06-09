@@ -553,10 +553,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const departureWaypoint = waypoints[0];
     
     // Total fuel needed for entire journey at departure
-    const departureFuelNeeded = totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue;
+    const departureFuelNeeded = totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue + (extraFuel || 0);
     
     // Create fuel components text for departure
-    const departureFuelComponentsText = `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue}`;
+    const departureFuelComponentsText = extraFuel > 0 
+      ? `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue} Extra:${extraFuel}`
+      : `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue}`;
     
     // DEBUG: Log the fuel components for departure
     console.log('🔥 DEPARTURE CARD FUEL COMPONENTS (DETAILED):', {
@@ -1052,7 +1054,8 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     contingencyFuelPercent = 0, // Default to 0 to make missing settings obvious
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
-    deckFuelFlow = 0      // Default to 0 to make missing settings obvious
+    deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
+    extraFuel = 0         // 🔧 ADDED: Missing extraFuel parameter
   } = options;
   
   // Convert all calculation parameters to proper numeric values
@@ -1062,6 +1065,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   const reserveFuelValue = Number(reserveFuel) || 0;
   const deckTimePerStopValue = Number(deckTimePerStop) || 0;
   const deckFuelFlowValue = Number(deckFuelFlow) || 0;
+  const extraFuelValue = Number(extraFuel) || 0;
   
   console.log('🟠 AlternateStopCard: Using same settings as normal stop cards:', {
     taxiFuelValue,
@@ -1069,7 +1073,9 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     contingencyFuelPercentValue,
     reserveFuelValue,
     deckTimePerStopValue,
-    deckFuelFlowValue
+    deckFuelFlowValue,
+    extraFuelValue,  // 🔧 DEBUG: Check if extraFuel is being received
+    extraFuelRaw: extraFuel  // 🔧 DEBUG: Check raw extraFuel parameter
   });
   
   // Find the split point in the waypoints
@@ -1267,7 +1273,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   });
   
   // Calculate total fuel required for alternate route
-  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + alternateDeckFuel + reserveFuelValue;
+  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + alternateDeckFuel + reserveFuelValue + extraFuelValue;
   
   // Calculate max passengers using same logic as normal stop cards
   let maxPassengers = 0;
@@ -1280,8 +1286,26 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     );
   }
   
+  // 🔧 DEBUG: Check extraFuelValue before creating fuel components text
+  console.log('🔧 AlternateStopCard: Before creating fuel components text:', {
+    extraFuelValue: extraFuelValue,
+    extraFuelType: typeof extraFuelValue,
+    extraFuelRaw: extraFuel,
+    extraFuelRawType: typeof extraFuel,
+    extraFuelGreaterThanZero: extraFuelValue > 0,
+    taxiFuelValue,
+    totalAlternateTripFuel,
+    alternateContingencyFuel,
+    alternateDeckFuel,
+    reserveFuelValue
+  });
+
   // Create fuel components text
-  const fuelComponentsText = `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue}`;
+  const fuelComponentsText = extraFuelValue > 0 
+    ? `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue} Extra:${extraFuelValue}`
+    : `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue}`;
+  
+  console.log('🔧 AlternateStopCard: Final fuel components text:', fuelComponentsText);
   
   // Create route description
   const alternateDestination = alternateRouteData.name ? 

@@ -618,6 +618,7 @@ const RightPanel = ({
         weather={weather}
         onWeatherUpdate={onWeatherUpdate}
         cargoWeight={cargoWeight}
+        extraFuel={extraFuel} // 🔧 ADDED: Missing extraFuel prop
         alternateRouteData={alternateRouteData}
         stopCards={stopCards}
         fuelPolicy={fuelPolicy}
