@@ -1301,6 +1301,8 @@ const FastPlannerCore = ({
           stopCards={stopCards} waypoints={waypoints} onRemoveWaypoint={removeWaypoint} isAuthenticated={isAuthenticated}
           authUserName={userName} rigsLoading={rigsLoading} onLogin={login}
           onFlightLoad={handleFlightLoad} // Add flight loading handler
+          toggleWaypointMode={toggleWaypointMode} // Add waypoint mode toggle
+          waypointModeActive={waypointModeActive} // Add waypoint mode state
           deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
           passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
           extraFuel={flightSettings.extraFuel}

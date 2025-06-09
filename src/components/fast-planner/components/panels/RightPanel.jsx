@@ -70,6 +70,8 @@ const RightPanel = ({
   rigsLoading,
   onLogin,
   onFlightLoad, // Callback for when a flight is loaded
+  toggleWaypointMode, // Function to toggle waypoint mode
+  waypointModeActive, // Current waypoint mode state
   // Flight settings props
   deckTimePerStop = 5,
   deckFuelPerStop = 100,
@@ -242,6 +244,87 @@ const RightPanel = ({
                 if (window.LoadingIndicator) {
                   window.LoadingIndicator.updateStatusIndicator('Flight automation completed successfully', 'success');
                 }
+                
+                // AUTO-RELOAD: Load the flight back into the planner after automation completes
+                console.log('🔄 AUTO-RELOAD: Starting auto-reload process...');
+                console.log('🔄 AUTO-RELOAD: Flight ID:', flightId);
+                console.log('🔄 AUTO-RELOAD: onFlightLoad available:', typeof onFlightLoad);
+                console.log('🔄 AUTO-RELOAD: waypointModeActive:', waypointModeActive);
+                console.log('🔄 AUTO-RELOAD: toggleWaypointMode available:', typeof toggleWaypointMode);
+                
+                // Switch to stops mode if currently in waypoint mode (for proper display)
+                if (waypointModeActive && toggleWaypointMode) {
+                  console.log('🔄 AUTO-RELOAD: Switching from waypoint mode to stops mode...');
+                  toggleWaypointMode();
+                }
+                
+                // Load all flights to find our newly created flight
+                try {
+                  const FlightService = (await import('../../services/FlightService')).default;
+                  const currentRegionCode = currentRegion?.osdkRegion || "GULF OF MEXICO";
+                  const flightsResult = await FlightService.loadFlights(currentRegionCode, 200);
+                  
+                  if (flightsResult.success && flightsResult.flights) {
+                    console.log('🔄 AUTO-RELOAD: Loaded flights list, searching for flight ID:', flightId);
+                    console.log('🔄 AUTO-RELOAD: Available flight IDs:', flightsResult.flights.map(f => f.id));
+                    
+                    // Find our specific flight by ID
+                    const targetFlight = flightsResult.flights.find(f => f.id === flightId);
+                    
+                    if (targetFlight) {
+                      console.log('🔄 AUTO-RELOAD: Found target flight:', targetFlight.name);
+                      console.log('🔄 AUTO-RELOAD: Target flight object keys:', Object.keys(targetFlight));
+                      console.log('🔄 AUTO-RELOAD: Raw flight available:', !!targetFlight._rawFlight);
+                      
+                      // DEBUG: Check what's in the raw flight object
+                      if (targetFlight._rawFlight) {
+                        const rawFlight = targetFlight._rawFlight;
+                        console.log('🔄 AUTO-RELOAD: Raw flight object keys:', Object.keys(rawFlight));
+                        console.log('🔄 AUTO-RELOAD: alternateSplitPoint:', rawFlight.alternateSplitPoint);
+                        console.log('🔄 AUTO-RELOAD: alternateName:', rawFlight.alternateName);
+                        console.log('🔄 AUTO-RELOAD: alternateFullRouteGeoShape:', !!rawFlight.alternateFullRouteGeoShape);
+                        console.log('🔄 AUTO-RELOAD: alternateLegIds:', rawFlight.alternateLegIds);
+                        console.log('🔄 AUTO-RELOAD: alternateGeoPoint:', rawFlight.alternateGeoPoint);
+                        
+                        // Check wind data too
+                        console.log('🌬️ AUTO-RELOAD: Wind data check:');
+                        console.log('🌬️ AUTO-RELOAD: avgWindSpeed:', rawFlight.avgWindSpeed);
+                        console.log('🌬️ AUTO-RELOAD: avgWindDirection:', rawFlight.avgWindDirection);
+                        console.log('🌬️ AUTO-RELOAD: windSpeed:', rawFlight.windSpeed);
+                        console.log('🌬️ AUTO-RELOAD: windDirection:', rawFlight.windDirection);
+                      }
+                      
+                      if (onFlightLoad) {
+                        // Call the flight load callback to update the map and UI
+                        onFlightLoad(targetFlight);
+                        
+                        // Final success message
+                        setTimeout(() => {
+                          if (window.LoadingIndicator) {
+                            window.LoadingIndicator.updateStatusIndicator(`Flight "${flightData.flightName}" saved, automated, and loaded successfully!`, 'success');
+                          }
+                        }, 1000);
+                      }
+                      
+                    } else {
+                      console.error('🔄 AUTO-RELOAD: Flight not found in loaded flights list. Flight ID:', flightId);
+                      if (window.LoadingIndicator) {
+                        window.LoadingIndicator.updateStatusIndicator('Automation completed but flight not found for auto-reload', 'warning');
+                      }
+                    }
+                  } else {
+                    console.error('🔄 AUTO-RELOAD: Failed to load flights list:', flightsResult.error);
+                    if (window.LoadingIndicator) {
+                      window.LoadingIndicator.updateStatusIndicator('Automation completed but auto-reload failed', 'warning');
+                    }
+                  }
+                } catch (loadError) {
+                  console.error('🔄 AUTO-RELOAD: Error loading flights:', loadError);
+                  if (window.LoadingIndicator) {
+                    window.LoadingIndicator.updateStatusIndicator('Automation completed but auto-reload failed', 'warning');
+                  }
+                }
+                
               } catch (automationError) {
                 console.error('Automation failed:', automationError);
                 if (window.LoadingIndicator) {
@@ -494,6 +577,9 @@ const RightPanel = ({
         alternateRouteData={alternateRouteData}
         stopCards={stopCards}
         fuelPolicy={fuelPolicy}
+        onFlightLoad={onFlightLoad}
+        toggleWaypointMode={toggleWaypointMode}
+        waypointModeActive={waypointModeActive}
       />
       
       {/* Settings Card */}

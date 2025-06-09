@@ -338,7 +338,7 @@ class FlightService {
    * @param {number} limit - Maximum number of flights to return (default: 50)
    * @returns {Promise<Object>} Result with flights array
    */
-  static async loadFlights(region = null, limit = 50) {
+  static async loadFlights(region = null, limit = 200) {
     try {
       console.log(`FlightService: Loading flights for region: ${region || 'ALL'}`);
       
@@ -352,20 +352,31 @@ class FlightService {
         throw new Error(`MainFlightObjectFp2 not found in SDK. Available objects: ${Object.keys(sdk).join(', ')}`);
       }
       
-      console.log('FlightService: Querying flights from MainFlightObjectFp2...');
+      console.log('FlightService: Building query with server-side region filtering...');
       
       // Build the query using client like other managers do
-      const query = client(MainFlightObjectFp2);
+      let query = client(MainFlightObjectFp2);
       
-      // Fetch the data with appropriate page size
+      // SERVER-SIDE REGION FILTERING using correct Palantir OSDK syntax
+      if (region && region !== 'ALL') {
+        console.log(`FlightService: Adding server-side filter for region: "${region}"`);
+        query = query.where({
+          region: { $eq: region }
+        });
+      }
+      
+      console.log(`FlightService: ${region ? `Fetching flights for region: ${region}` : 'Fetching ALL flights'}`);
+      
+      // Fetch flights with high page size
       const response = await query.fetchPage({
-        $pageSize: limit
+        $pageSize: 500
       });
       
       console.log('FlightService: Query response:', {
         dataLength: response.data?.length || 0,
         totalCount: response.totalCount || 'unknown',
-        hasMore: response.hasMore || false
+        hasMore: response.hasMore || false,
+        regionFilter: region || 'NONE'
       });
       
       if (!response || !response.data) {
@@ -373,28 +384,51 @@ class FlightService {
         return { success: true, flights: [] };
       }
       
-      console.log(`FlightService: Found ${response.data.length} total flights`);
+      console.log(`FlightService: Found ${response.data.length} flights for region: ${region || 'ALL'}`);
       
-      // Debug: Log the regions we find in the data
-      const regionsFound = [...new Set(response.data.map(flight => flight.region).filter(Boolean))];
-      console.log(`FlightService: Regions found in flights:`, regionsFound);
-      
-      // Filter by region if specified (client-side filtering)
-      let flights = response.data;
-      if (region && region !== 'ALL') {
-        // Debug: Log exactly what we're filtering for
-        console.log(`FlightService: Filtering for region: "${region}"`);
-        
-        flights = flights.filter(flight => {
-          const flightRegion = flight.region;
-          console.log(`Checking flight ${flight.flightNumber || flight.flightId}: region="${flightRegion}"`);
-          
-          // Try exact match first, then case-insensitive match
-          return flightRegion === region || 
-                 (flightRegion && flightRegion.toUpperCase() === region.toUpperCase());
-        });
-        console.log(`FlightService: Filtered to ${flights.length} flights for region: ${region}`);
+      // If we hit the limit and there are more flights, warn about it
+      if (response.hasMore) {
+        console.warn(`FlightService: WARNING - Hit page limit of ${limit}. There are more flights available. Consider increasing limit or implementing pagination.`);
       }
+      
+      // Debug: Check what region we're filtering for vs what exists
+      const regionsFound = [...new Set(response.data.map(flight => flight.region).filter(Boolean))];
+      console.log(`FlightService: REGION DEBUG - Filtering for: "${region}"`);
+      console.log(`FlightService: REGION DEBUG - Regions found in data:`, regionsFound);
+      
+      // Debug: Show all flights from today to see their region codes (fix timezone issue)
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+      const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000); // Start of tomorrow
+      
+      const todaysFlights = response.data.filter(flight => {
+        const flightDate = new Date(flight.createdAt);
+        return flightDate >= todayStart && flightDate < tomorrowStart;
+      });
+      
+      console.log(`FlightService: TODAY'S FLIGHTS (${todaysFlights.length}) - between ${todayStart.toISOString()} and ${tomorrowStart.toISOString()}:`, 
+        todaysFlights.map(f => ({
+          flightNumber: f.flightNumber,
+          region: f.region,
+          createdAt: f.createdAt
+        }))
+      );
+      
+      let flights = response.data;
+      
+      // Server-side filtering should handle it, but keep client-side as backup
+      console.log(`FlightService: Server-side query returned ${flights.length} flights`);
+      
+      // Client-side sorting by creation date (newest first) since server-side sorting failed
+      flights.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB - dateA; // Newest first
+      });
+      
+      console.log(`FlightService: Sorted ${flights.length} flights by creation date. Newest flight: ${flights[0]?.flightNumber} (${flights[0]?.createdAt})`);
+      
+      console.log(`FlightService: Returning ${flights.length} flights for region: ${region || 'ALL'}`);
       
       // Process flights into a simplified format for the UI
       const processedFlights = flights.map(flight => {
