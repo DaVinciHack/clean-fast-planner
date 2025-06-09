@@ -15,7 +15,6 @@ const EnhancedStopCardsContainer = ({
   routeStats = null,
   selectedAircraft = null,
   passengerWeight,
-  cargoWeight, // 🟠 ADDED: Missing cargoWeight prop
   reserveFuel,
   contingencyFuelPercent,
   deckTimePerStop,
@@ -58,88 +57,6 @@ const EnhancedStopCardsContainer = ({
       setDisplayStopCards([]);
     }
   }, [stopCards]);
-  
-  // 🟠 ADDED: Restore alternate card from persistent storage on mount
-  useEffect(() => {
-    if (window.currentAlternateCard && !alternateStopCard) {
-      console.log('🟠 EnhancedStopCardsContainer: Restoring alternate card from persistent storage:', window.currentAlternateCard);
-      setAlternateStopCard(window.currentAlternateCard);
-    }
-  }, []);
-  
-  // 🟠 ADDED: Persist alternate card to survive component unmount/remount
-  useEffect(() => {
-    if (alternateStopCard) {
-      console.log('🟠 EnhancedStopCardsContainer: Persisting alternate card to window storage:', alternateStopCard);
-      window.currentAlternateCard = alternateStopCard;
-    } else if (alternateStopCard === null) {
-      console.log('🟠 EnhancedStopCardsContainer: Clearing persisted alternate card');
-      window.currentAlternateCard = null;
-    }
-  }, [alternateStopCard]);
-  
-  // 🟠 ADDED: Calculate alternate stop card when alternate route data exists
-  useEffect(() => {
-    // Only calculate if we have the necessary data
-    if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather) {
-      console.log('🟠 EnhancedStopCardsContainer: Calculating alternate stop card with data:', {
-        splitPoint: alternateRouteData.splitPoint,
-        name: alternateRouteData.name,
-        coordinatesLength: alternateRouteData.coordinates?.length || 0,
-        hasWaypoints: waypoints.length >= 2,
-        hasSelectedAircraft: !!selectedAircraft
-      });
-      
-      try {
-        // Prepare parameters for StopCardCalculator (same as StopCardsContainer)
-        const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
-        const numericParams = {
-          passengerWeight: Number(passengerWeight) || 220,
-          cargoWeight: Number(cargoWeight) || 0, // 🟠 ADDED: Missing cargoWeight parameter
-          reserveFuel: Number(reserveFuel) || 0,
-          contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
-          deckTimePerStop: Number(deckTimePerStop) || 0,
-          deckFuelFlow: Number(deckFuelFlow) || 0,
-          taxiFuel: Number(taxiFuel) || 0
-        };
-        
-        const alternateCard = StopCardCalculator.calculateAlternateStopCard(
-          waypoints,
-          alternateRouteData,
-          routeStats,
-          selectedAircraft,
-          safeWeather,
-          numericParams
-        );
-        
-        if (alternateCard) {
-          console.log('🟠 EnhancedStopCardsContainer: Alternate stop card calculated successfully:', {
-            totalFuel: alternateCard.totalFuel,
-            maxPassengers: alternateCard.maxPassengers,
-            routeDescription: alternateCard.routeDescription
-          });
-          setAlternateStopCard(alternateCard);
-        } else {
-          console.log('🟠 EnhancedStopCardsContainer: No alternate stop card generated (calculation returned null)');
-          setAlternateStopCard(null);
-        }
-        
-      } catch (error) {
-        console.error('🟠 EnhancedStopCardsContainer: Error calculating alternate stop card:', error);
-        setAlternateStopCard(null);
-      }
-      
-    } else {
-      // Clear alternate card if conditions not met
-      console.log('🟠 EnhancedStopCardsContainer: Clearing alternate card - missing required data:', {
-        hasAlternateRouteData: !!alternateRouteData,
-        hasSelectedAircraft: !!selectedAircraft,
-        waypointCount: waypoints.length,
-        hasWeather: !!weather
-      });
-      setAlternateStopCard(null);
-    }
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel]);
   
   // Handle card click
   const handleCardClick = (index) => {

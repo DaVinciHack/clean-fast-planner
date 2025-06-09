@@ -373,7 +373,19 @@ const RightPanel = ({
   
   // Handle loading a flight from LoadFlightsCard
   const handleLoadFlight = (flight) => {
-    console.log('Load flight data from card:', flight);
+    console.log('🟠 RIGHTPANEL LOAD: Load flight data from card:', flight);
+    console.log('🟠 RIGHTPANEL LOAD: Raw flight available:', !!flight._rawFlight);
+    
+    // DEBUG: Check for alternate data in the loaded flight
+    if (flight._rawFlight) {
+      const rawFlight = flight._rawFlight;
+      console.log('🟠 RIGHTPANEL LOAD: Checking raw flight for alternate data...');
+      console.log('🟠 RIGHTPANEL LOAD: alternateSplitPoint:', rawFlight.alternateSplitPoint);
+      console.log('🟠 RIGHTPANEL LOAD: alternateName:', rawFlight.alternateName);
+      console.log('🟠 RIGHTPANEL LOAD: alternateFullRouteGeoShape:', !!rawFlight.alternateFullRouteGeoShape);
+      console.log('🟠 RIGHTPANEL LOAD: alternateLegIds:', rawFlight.alternateLegIds);
+      console.log('🟠 RIGHTPANEL LOAD: alternateGeoPoint:', rawFlight.alternateGeoPoint);
+    }
     
     try {
       // Extract flight data for the main application
@@ -406,6 +418,38 @@ const RightPanel = ({
         etd: flight.date,
         region: flight.region,
         alternateLocation: flight.alternateLocation,
+        
+        // 🟠 CRITICAL FIX: Extract full alternate route data from raw flight
+        alternateRouteData: (() => {
+          if (flight._rawFlight?.alternateFullRouteGeoShape) {
+            console.log('🟠 RIGHTPANEL LOAD: ✅ Extracting alternate route data for FastPlannerApp');
+            
+            const rawFlight = flight._rawFlight;
+            const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
+              rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
+            
+            if (alternateGeoShape?.coordinates) {
+              const alternateData = {
+                coordinates: alternateGeoShape.coordinates,
+                splitPoint: rawFlight.alternateSplitPoint || null,
+                name: rawFlight.alternateName || 'Alternate Route',
+                geoPoint: rawFlight.alternateGeoPoint || null,
+                legIds: rawFlight.alternateLegIds || []
+              };
+              
+              console.log('🟠 RIGHTPANEL LOAD: ✅ Created alternateRouteData:', {
+                coordinateCount: alternateData.coordinates.length,
+                splitPoint: alternateData.splitPoint,
+                name: alternateData.name
+              });
+              
+              return alternateData;
+            }
+          }
+          
+          console.log('🟠 RIGHTPANEL LOAD: ❌ No alternate route data found');
+          return null;
+        })(),
         
         // Include raw flight for reference
         _rawFlight: flight._rawFlight

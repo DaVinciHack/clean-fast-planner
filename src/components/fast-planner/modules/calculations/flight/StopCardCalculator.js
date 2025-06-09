@@ -1047,6 +1047,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   // Extract same settings as normal stop cards - using 0 for missing values to show problems immediately
   const {
     passengerWeight = 0,  // Default to 0 to make missing settings obvious
+    cargoWeight = 0,      // 🟠 ADDED: Missing cargoWeight parameter
     taxiFuel = 0,         // Default to 0 to make missing settings obvious
     contingencyFuelPercent = 0, // Default to 0 to make missing settings obvious
     reserveFuel = 0,      // Default to 0 to make missing settings obvious

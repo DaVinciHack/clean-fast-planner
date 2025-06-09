@@ -34,6 +34,7 @@ const MainCard = ({
   // Waypoints for stop cards
   waypoints = [],
   passengerWeight = 0,
+  cargoWeight = 0, // 🟠 ADDED: Missing cargoWeight prop
   deckTimePerStop = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
   deckFuelFlow = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK  
   contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
@@ -505,6 +506,7 @@ const MainCard = ({
             routeStats={routeStats}
             selectedAircraft={selectedAircraft}
             passengerWeight={passengerWeight}
+            cargoWeight={cargoWeight} // 🟠 ADDED: Missing cargoWeight prop
             reserveFuel={reserveFuel}
             contingencyFuelPercent={contingencyFuelPercent}
             deckTimePerStop={deckTimePerStop}

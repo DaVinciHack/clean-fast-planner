@@ -27,6 +27,15 @@ const StopCardsContainer = ({
   onRouteStatsUpdate = null // CRITICAL FIX: Callback to update parent's routeStats
 }) => {
   console.log('🎯 StopCardsContainer: Component mounted/rendered');
+  console.log('🟠 StopCardsContainer: Props received:', {
+    hasAlternateRouteData: !!alternateRouteData,
+    alternateRouteName: alternateRouteData?.name,
+    alternateRouteCoords: alternateRouteData?.coordinates?.length,
+    hasSelectedAircraft: !!selectedAircraft,
+    aircraftName: selectedAircraft?.name || selectedAircraft?.aircraftName,
+    waypointsCount: waypoints?.length || 0
+  });
+  console.log('🎯 DEBUG TEST: StopCardsContainer is being used!');
   
   const [calculatedStopCards, setCalculatedStopCards] = useState([]);
   const [alternateStopCard, setAlternateStopCard] = useState(null);
@@ -441,6 +450,15 @@ const StopCardsContainer = ({
       });
       
       try {
+        // 🟠 CRITICAL DEBUG: Check alternate data flow with waypoints
+        console.log('🟠 ALTERNATE DEBUG - Before calculation:', {
+          hasAlternateRouteData: !!alternateRouteData,
+          waypointCount: waypoints?.length || 0,
+          alternateRouteKeys: alternateRouteData ? Object.keys(alternateRouteData) : 'none',
+          alternateRouteName: alternateRouteData?.name,
+          alternateCoordinates: alternateRouteData?.coordinates?.length || 0
+        });
+        
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
           waypoints,
           alternateRouteData,
