@@ -289,6 +289,9 @@ const FastPlannerCore = ({
 
   // Enhanced clearRoute that also clears alternate route state
   const clearRoute = useCallback(() => {
+    console.log('🟠 CLEAR ROUTE DEBUG: clearRoute() called');
+    console.log('🟠 CLEAR ROUTE DEBUG: About to clear alternateRouteData - current value:', alternateRouteData);
+    console.log('🟠 CLEAR ROUTE DEBUG: Stack trace:', new Error().stack);
     console.log('🧹 FastPlannerApp: Clearing route and alternate route');
     
     // Call the hook's clearRoute function
@@ -306,7 +309,7 @@ const FastPlannerCore = ({
     window.currentAlternateCard = null;
     
     console.log('✅ FastPlannerApp: Route and alternate route cleared');
-  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments]);
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData]);
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
 
@@ -989,14 +992,21 @@ const FastPlannerCore = ({
           }
           
           // Extract alternate route data if available
-          if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
-            console.log('DEBUG: Found alternateFullRouteGeoShape, extracting alternate route data...');
+          // First check if alternate data was passed directly from RightPanel
+          if (flightData.alternateRouteData) {
+            console.log('🟠 FASTPLANNER LOAD: Using alternate data passed from RightPanel:', flightData.alternateRouteData);
+            alternateRouteData = flightData.alternateRouteData;
+          }
+          // Otherwise extract from raw flight (for auto-reload cases)
+          else if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
+            console.log('🟠 FLIGHT LOAD DEBUG: Found alternateFullRouteGeoShape, extracting alternate route data...');
+            console.log('🟠 FLIGHT LOAD DEBUG: Current waypoint count:', waypoints?.length || 0);
             
             // Extract alternate route coordinates
             const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
               rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
               
-            console.log('DEBUG: Alternate GeoShape:', alternateGeoShape);
+            console.log('🟠 FLIGHT LOAD DEBUG: Alternate GeoShape:', alternateGeoShape);
             
             if (alternateGeoShape && alternateGeoShape.coordinates) {
               alternateRouteData = {
@@ -1007,27 +1017,43 @@ const FastPlannerCore = ({
                 legIds: rawFlight.alternateLegIds || []
               };
               
-              console.log(`DEBUG: Found alternate route with ${alternateRouteData.coordinates.length} coordinate points`);
-              console.log('DEBUG: Alternate split point:', alternateRouteData.splitPoint);
-              console.log('DEBUG: Alternate name:', alternateRouteData.name);
-              console.log('DEBUG: Alternate coordinates:', alternateRouteData.coordinates);
+              console.log('🟠 FLIGHT LOAD DEBUG: Successfully created alternateRouteData:', {
+                coordinateCount: alternateRouteData.coordinates.length,
+                splitPoint: alternateRouteData.splitPoint,
+                name: alternateRouteData.name
+              });
             } else {
-              console.warn('DEBUG: No coordinates found in alternate geoShape');
+              console.warn('🟠 FLIGHT LOAD DEBUG: No coordinates found in alternate geoShape');
             }
           } else {
-            console.log('DEBUG: No alternateFullRouteGeoShape found in raw flight');
+            console.log('🟠 FLIGHT LOAD DEBUG: No alternate route data found');
+            console.log('🟠 FLIGHT LOAD DEBUG: flightData.alternateRouteData:', !!flightData.alternateRouteData);
+            console.log('🟠 FLIGHT LOAD DEBUG: rawFlight.alternateFullRouteGeoShape:', !!rawFlight?.alternateFullRouteGeoShape);
           }
           
           // Store alternate route data in state for rendering
           if (alternateRouteData) {
-            console.log('DEBUG: Storing alternate route data in component state');
+            console.log('🟠 STATE DEBUG: Storing alternate route data in component state');
+            console.log('🟠 STATE DEBUG: About to store alternateRouteData:', {
+              hasCoordinates: !!alternateRouteData.coordinates,
+              coordinateCount: alternateRouteData.coordinates?.length,
+              name: alternateRouteData.name,
+              splitPoint: alternateRouteData.splitPoint
+            });
             setAlternateRouteData(alternateRouteData);
             
+            // 🚁 CRITICAL FIX: Trigger map update to render alternate route after flight loading
+            console.log('🟠 FLIGHT LOAD: Triggering map update to render loaded alternate route');
+            if (appManagers.waypointManagerRef?.current) {
+              // Use current routeStats (will be calculated) and the loaded alternateRouteData
+              appManagers.waypointManagerRef.current.updateRoute(routeStats, alternateRouteData);
+            }
+            
             // Also populate the alternate route input field with the current alternate name
-            console.log('DEBUG: Setting alternate route input to:', alternateRouteData.name);
+            console.log('🟠 STATE DEBUG: Setting alternate route input to:', alternateRouteData.name);
             setAlternateRouteInput(alternateRouteData.name);
           } else {
-            console.log('DEBUG: Clearing alternate route data (no alternate route in flight)');
+            console.log('🟠 STATE DEBUG: Clearing alternate route data (no alternate route in flight)');
             setAlternateRouteData(null);
             setAlternateRouteInput(''); // Clear input field too
           }

@@ -193,7 +193,7 @@ class PlatformManager {
             // Removed filter: locationType: { $ne: "REPORTING POINT OFFSHORE" }
           })
           .fetchPage({
-            $pageSize: 5000, // Increased to make sure we get everything
+            $pageSize: 20000, // Increased to handle 14K+ objects in Gulf of Mexico
             // Removed additional filter: no longer excluding reporting points
           });
         
@@ -342,7 +342,7 @@ class PlatformManager {
               region: regionName,
               // We'll filter by type on the client side instead
             })
-            .fetchPage({ $pageSize: 3000 }); // Increased from 2000 to ensure we get all airports
+            .fetchPage({ $pageSize: 20000 }); // Increased to handle 14K+ airports in Gulf of Mexico
             
           // Filter for airports on client side
           let airports = [];
@@ -396,7 +396,7 @@ class PlatformManager {
         try {
           // Map of critical locations to the regions they should be in
           const criticalLocationsByRegion = {
-            "GULF OF MEXICO": ["KHUM"],
+            "GULF OF MEXICO": [], // Removed KHUM - should now load properly with increased pageSize
             "NORWAY": ["ENZV", "SVG", "STAVANGER", "SOLA"]
           };
           
@@ -2155,7 +2155,7 @@ class PlatformManager {
             region: regionName,
             locationType: { $in: waypointLocationTypes }
           })
-          .fetchPage({ $pageSize: 5000 });
+          .fetchPage({ $pageSize: 20000 });
         
         console.log(`PlatformManager: First query returned ${result1?.data?.length || 0} results`);
         
@@ -2163,7 +2163,7 @@ class PlatformManager {
         console.log(`PlatformManager: Second Norway query without locationType filter`);
         const result2 = await client(locationObject)
           .where({ region: regionName })
-          .fetchPage({ $pageSize: 5000 });
+          .fetchPage({ $pageSize: 20000 });
         
         console.log(`PlatformManager: Second query returned ${result2?.data?.length || 0} results`);
         
@@ -2214,7 +2214,7 @@ class PlatformManager {
             region: regionName,
             locationType: { $in: waypointLocationTypes }
           })
-          .fetchPage({ $pageSize: 5000 });
+          .fetchPage({ $pageSize: 20000 });
         
         console.log(`PlatformManager: OSDK query returned ${result?.data?.length || 0} raw results`);
       }
