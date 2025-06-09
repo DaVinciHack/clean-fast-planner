@@ -24,7 +24,17 @@ const SaveFlightModal = ({
   const [soId, setSoId] = useState('');
   const [rswId, setRswId] = useState('');
   const [enableAutomation, setEnableAutomation] = useState(runAutomation);
+  const [useOnlyProvidedWaypoints, setUseOnlyProvidedWaypoints] = useState(false); // Default to false = let Palantir auto-generate
   const flightNameInitializedRef = useRef(false);
+  
+  // DEBUG: Log state to see if checkbox is working
+  console.log('🔍 SaveFlightModal state:', {
+    useOnlyProvidedWaypoints,
+    enableAutomation
+  });
+  
+  // DEBUG: Force component refresh indicator
+  console.log('🚀 SAVEFLIGHTMODAL COMPONENT RENDERED AT:', new Date().toISOString());
   
   // Effect to set ETD and enableAutomation when modal opens or runAutomation prop changes
   useEffect(() => {
@@ -71,7 +81,8 @@ const SaveFlightModal = ({
       medicId: medicId || null,
       soId: soId || null,
       rswId: rswId || null,
-      runAutomation: enableAutomation // Add the automation flag
+      runAutomation: enableAutomation, // Add the automation flag
+      useOnlyProvidedWaypoints: useOnlyProvidedWaypoints // Add the waypoint handling flag
     };
     
     onSave(flightData);
@@ -297,46 +308,108 @@ const SaveFlightModal = ({
         </div>
         
         {/* Add automation toggle checkbox */}
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: '#2a2a2a',
-            padding: '10px',
-            borderRadius: '4px',
-            border: '1px solid #444'
-          }}>
-            <input
-              type="checkbox"
-              id="enable-automation"
-              checked={enableAutomation}
-              onChange={() => setEnableAutomation(!enableAutomation)}
-              style={{
-                width: '18px',
-                height: '18px',
-                marginRight: '10px'
-              }}
-            />
-            <label 
-              htmlFor="enable-automation"
-              style={{
-                cursor: 'pointer',
-                fontWeight: 'normal',
-                fontSize: '14px',
-                color: enableAutomation ? '#4caf50' : '#ccc'
-              }}
-            >
-              Run automation after saving 
-              <span style={{ 
-                fontSize: '12px', 
-                marginLeft: '5px', 
-                opacity: 0.7, 
-                display: 'block'
-              }}>
-                Will find best runway, calculate wind effects, find alternates, optimize fuel and passenger count
-              </span>
-            </label>
-          </div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '15px',
+          backgroundColor: '#2a2a2a',
+          padding: '10px',
+          borderRadius: '4px',
+          border: '3px solid red' // CHANGED: Make this red so we can see it
+        }}>
+          <input
+            type="checkbox"
+            id="enable-automation"
+            checked={enableAutomation}
+            onChange={() => setEnableAutomation(!enableAutomation)}
+            style={{
+              width: '18px',
+              height: '18px',
+              marginRight: '10px'
+            }}
+          />
+          <label 
+            htmlFor="enable-automation"
+            style={{
+              cursor: 'pointer',
+              fontWeight: 'normal',
+              fontSize: '14px',
+              color: enableAutomation ? '#4caf50' : '#ccc'
+            }}
+          >
+            Run automation after saving 
+            <span style={{ 
+              fontSize: '12px', 
+              marginLeft: '5px', 
+              opacity: 0.7, 
+              display: 'block'
+            }}>
+              Will find best runway, calculate wind effects, find alternates, optimize fuel and passenger count
+            </span>
+          </label>
+        </div>
+        
+        {/* SIMPLE TEST: Just a basic div right after automation */}
+        <div style={{ backgroundColor: 'yellow', padding: '10px', color: 'black' }}>
+          🟡 SIMPLE TEST BOX RIGHT AFTER AUTOMATION
+        </div>
+        
+        {/* TEST: Simple div to see if anything can render here */}
+        <div style={{
+          backgroundColor: 'red',
+          color: 'white',
+          padding: '10px',
+          marginBottom: '10px',
+          fontSize: '14px'
+        }}>
+          🔴 TEST: If you can see this red box, the area is rendering
+        </div>
+        
+        {/* Waypoint Handling Checkbox - Now properly separated */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          marginBottom: '20px',
+          backgroundColor: '#2a2a2a',
+          padding: '10px',
+          borderRadius: '4px',
+          border: '1px solid #444'
+        }}>
+          <input
+            type="checkbox"
+            id="use-only-provided-waypoints"
+            checked={useOnlyProvidedWaypoints}
+            onChange={() => {
+              console.log('🔍 WAYPOINT CHECKBOX CLICKED:', !useOnlyProvidedWaypoints);
+              setUseOnlyProvidedWaypoints(!useOnlyProvidedWaypoints);
+            }}
+            style={{
+              width: '18px',
+              height: '18px',
+              marginRight: '10px'
+            }}
+          />
+          <label 
+            htmlFor="use-only-provided-waypoints"
+            style={{
+              cursor: 'pointer',
+              fontWeight: 'normal',
+              fontSize: '14px',
+              color: useOnlyProvidedWaypoints ? '#ff9800' : '#ccc'
+            }}
+          >
+            Use only Fast Planner waypoints
+            <span style={{ 
+              fontSize: '12px', 
+              marginLeft: '5px', 
+              opacity: 0.7, 
+              display: 'block'
+            }}>
+              {useOnlyProvidedWaypoints 
+                ? "✓ Palantir will use ONLY your waypoints, no auto-generation" 
+                : "○ Palantir can add waypoints if needed for safety/routing"}
+            </span>
+          </label>
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>

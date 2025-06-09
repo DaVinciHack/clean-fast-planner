@@ -26,6 +26,7 @@ const SaveFlightCard = ({
   const [soId, setSoId] = useState('');
   const [rswId, setRswId] = useState('');
   const [enableAutomation, setEnableAutomation] = useState(runAutomation);
+  const [useOnlyProvidedWaypoints, setUseOnlyProvidedWaypoints] = useState(false); // Add waypoint handling state
   
   // Set up initial values when card is shown
   useEffect(() => {
@@ -62,7 +63,8 @@ const SaveFlightCard = ({
       medicId: medicId || null,
       soId: soId || null,
       rswId: rswId || null,
-      runAutomation: enableAutomation // Add the automation flag
+      runAutomation: enableAutomation, // Add the automation flag
+      useOnlyProvidedWaypoints: useOnlyProvidedWaypoints // Add the waypoint handling flag
     };
     
     onSave(flightData);
@@ -304,6 +306,31 @@ const SaveFlightCard = ({
             Run automation after saving 
             <span style={styles.checkboxDescription}>
               Will find best runway, calculate wind effects, find alternates, optimize fuel and passenger count
+            </span>
+          </label>
+        </div>
+        
+        {/* Add waypoint handling checkbox */}
+        <div style={styles.checkboxContainer}>
+          <input
+            type="checkbox"
+            id="use-only-provided-waypoints"
+            checked={useOnlyProvidedWaypoints}
+            onChange={() => setUseOnlyProvidedWaypoints(!useOnlyProvidedWaypoints)}
+            style={styles.checkbox}
+          />
+          <label 
+            htmlFor="use-only-provided-waypoints"
+            style={{
+              ...styles.checkboxLabel,
+              color: useOnlyProvidedWaypoints ? '#ff9800' : '#ccc'
+            }}
+          >
+            Use only Fast Planner waypoints
+            <span style={styles.checkboxDescription}>
+              {useOnlyProvidedWaypoints 
+                ? "✓ Palantir will use ONLY your waypoints, no auto-generation" 
+                : "○ Palantir can add waypoints if needed for safety/routing"}
             </span>
           </label>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import SaveFlightModal from './SaveFlightModal';
+// import SaveFlightModal from './SaveFlightModal'; // REMOVED - dead code, using SaveFlightCard instead
 import PalantirFlightService from '../../services/PalantirFlightService';
 import AutomationService from '../../services/AutomationService';
 import { usePanelContext } from '../../context/PanelContext';
@@ -17,6 +17,9 @@ const SaveFlightButton = ({
   routeStats,
   onSuccess,
   onError,
+  onFlightLoad = () => {}, // Callback to reload flight after automation
+  toggleWaypointMode = () => {}, // Function to toggle waypoint mode
+  waypointModeActive = false, // Current waypoint mode state
   runAutomation = true, // New prop to determine if automation should run after save
   ...props // Add rest parameter to capture style and other props
 }) => {
@@ -24,6 +27,13 @@ const SaveFlightButton = ({
   const [isAutomating, setIsAutomating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [savedFlightId, setSavedFlightId] = useState(null);
+  
+  // DEBUG: Log props to see if they're being passed correctly
+  console.log('🔍 SaveFlightButton props:', {
+    toggleWaypointMode: typeof toggleWaypointMode,
+    waypointModeActive,
+    onFlightLoad: typeof onFlightLoad
+  });
   
   // Access the panel context for card navigation
   const panelContext = usePanelContext();
@@ -153,6 +163,73 @@ const SaveFlightButton = ({
         window.LoadingIndicator.updateStatusIndicator('Flight automation completed successfully', 'success');
       }
       
+      // 🎯 AUTO-RELOAD: Load the enhanced flight back into Fast Planner
+      console.log('🔄 Auto-reloading enhanced flight back into Fast Planner...');
+      
+      // 🚨 CRITICAL FIX: Ensure we're in STOPS mode before reloading flight
+      if (waypointModeActive) {
+        console.log('⚠️  Currently in waypoint mode - switching to stops mode for proper flight loading');
+        toggleWaypointMode(); // Switch from waypoint mode to stops mode
+        
+        // Wait a moment for the mode switch to complete
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log('✅ Switched to stops mode for flight loading');
+      } else {
+        console.log('✅ Already in stops mode - ready for flight loading');
+      }
+      
+      try {
+        // Import FlightService to load the flight data
+        const FlightService = await import('../../services/FlightService').then(module => module.default);
+        
+        // Load the specific flight that was just automated
+        const loadResult = await FlightService.loadSpecificFlight(flightId);
+        
+        if (loadResult.success && loadResult.flight) {
+          console.log('✅ Successfully loaded enhanced flight data:', loadResult.flight);
+          
+          // Update loading indicator
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator('Loading enhanced flight with weather and alternates...', 'info');
+          }
+          
+          // Call the flight load callback to update Fast Planner
+          await onFlightLoad(loadResult.flight);
+          
+          console.log('🎉 Enhanced flight loaded into Fast Planner with weather and alternates!');
+          
+          // Final success message
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              'Flight automated and reloaded with weather data and best alternates!', 
+              'success'
+            );
+          }
+          
+        } else {
+          console.warn('⚠️ Could not load enhanced flight data:', loadResult.error);
+          
+          // Still show success for automation, just note the reload issue
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              'Automation completed, but could not auto-reload flight. Use Load Flights to see results.', 
+              'warning'
+            );
+          }
+        }
+        
+      } catch (reloadError) {
+        console.error('❌ Error during auto-reload:', reloadError);
+        
+        // Still show success for automation, just note the reload issue
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            'Automation completed, but auto-reload failed. Use Load Flights to see results.', 
+            'warning'
+          );
+        }
+      }
+      
       // Call success callback if provided
       if (onSuccess) {
         onSuccess(`Flight saved and automated successfully`);
@@ -227,6 +304,14 @@ const SaveFlightButton = ({
       
       // Get the region code from context
       const regionCode = currentRegion?.osdkRegion || "NORWAY";
+      
+      // DEBUG: Critical region debugging
+      console.log('🌍 REGION DEBUG:', {
+        currentRegion,
+        regionCode,
+        osdkRegion: currentRegion?.osdkRegion,
+        regionName: currentRegion?.name
+      });
       
       // DEBUG: Let's see what properties each waypoint actually has
       console.log('=== WAYPOINT DEBUG INFO ===');
@@ -348,6 +433,9 @@ const SaveFlightButton = ({
         
         // Structured waypoints for the API
         waypoints: waypointsWithLegs,
+        
+        // Waypoint handling preference
+        useOnlyProvidedWaypoints: flightData.useOnlyProvidedWaypoints || false,
         
         // Crew member IDs
         captainId: flightData.captainId || null,
@@ -607,16 +695,7 @@ const SaveFlightButton = ({
         {buttonText}
       </button>
       
-      {/* Using our modular SaveFlightModal component */}
-      <SaveFlightModal 
-        isOpen={showModal}
-        onClose={closeModal}
-        onSave={handleFlightFormSubmit}
-        isSaving={isSaving || isAutomating}
-        waypoints={waypoints}
-        onRunDiagnostic={runDiagnosticMode}
-        runAutomation={runAutomation} // Pass runAutomation flag to modal
-      />
+      {/* REMOVED: SaveFlightModal - now using SaveFlightCard in RightPanel instead */}
       
       {/* Add loading animation */}
       <style>

@@ -47,6 +47,11 @@ const MainCard = ({
   stopCards = [],
   // Fuel policy for MasterFuelManager
   fuelPolicy = null,
+  // Flight loading callback
+  onFlightLoad = () => {},
+  // Waypoint mode controls
+  toggleWaypointMode = () => {},
+  waypointModeActive = false,
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
@@ -100,6 +105,9 @@ const MainCard = ({
             routeStats={routeStats}
             onSuccess={handleSaveSuccess}
             onError={handleSaveError}
+            onFlightLoad={onFlightLoad}
+            toggleWaypointMode={toggleWaypointMode}
+            waypointModeActive={waypointModeActive}
             style={{ flex: 1, margin: 0 }}
           />
           <LoadFlightsButton 
