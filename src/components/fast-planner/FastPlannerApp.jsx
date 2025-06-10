@@ -10,6 +10,9 @@ import './fixes/panel-interaction-fix.css';
 // Import StopCardCalculator - the single source of truth
 import StopCardCalculator from './modules/calculations/flight/StopCardCalculator.js';
 
+// Import WeatherFuelAnalyzer for weather-based fuel calculations
+import WeatherFuelAnalyzer from './modules/fuel/weather/WeatherFuelAnalyzer.js';
+
 // Import extracted utilities
 import { generateStopCardsData as generateStopCardsUtil } from './utilities/FlightUtilities.js';
 
@@ -73,6 +76,9 @@ const FastPlannerCore = ({
   
   // State for tracking current loaded flight for weather segments
   const [currentFlightId, setCurrentFlightId] = useState(null);
+  
+  // State for weather-based fuel calculations
+  const [weatherFuel, setWeatherFuel] = useState({ araFuel: 0, approachFuel: 0 });
   
   // Check LoadingIndicator status periodically
   useEffect(() => {
@@ -286,6 +292,107 @@ const FastPlannerCore = ({
     mapManagerRef,
     onWeatherUpdate: updateWeatherSettings // Now using stub function
   });
+
+  // Calculate weather-based fuel requirements whenever dependencies change
+  useEffect(() => {
+    // DEBUG: Always log what we have
+    console.log('🔍 WEATHER FUEL CHECK:', {
+      hasWeatherSegments: !!weatherSegments,
+      weatherSegmentsLength: weatherSegments?.length || 0,
+      hasWaypoints: !!waypoints,
+      waypointsLength: waypoints?.length || 0,
+      hasFuelPolicy: !!fuelPolicy,
+      // Get actual fuel policy settings
+      actualFuelPolicy: fuelPolicy?.getCurrentPolicySettings ? fuelPolicy.getCurrentPolicySettings() : 'No getCurrentPolicySettings method',
+      currentPolicy: fuelPolicy?.currentPolicy,
+    });
+    
+    // RACE CONDITION FIX: Add proper checks and prevent infinite loops
+    if (weatherSegments && 
+        Array.isArray(weatherSegments) && 
+        weatherSegments.length > 0 && 
+        waypoints && 
+        waypoints.length >= 2 && 
+        fuelPolicy && 
+        fuelPolicy.getCurrentPolicySettings) {
+      
+      // Get actual fuel policy settings
+      const actualFuelPolicy = fuelPolicy.getCurrentPolicySettings();
+      console.log('🔍 ACTUAL FUEL POLICY:', actualFuelPolicy);
+      
+      if (actualFuelPolicy && 
+          actualFuelPolicy.araFuel?.default !== undefined && 
+          actualFuelPolicy.approachFuel?.default !== undefined) {
+      
+      try {
+        console.log('🔍 DEBUG: Starting weather fuel analysis with:', {
+          weatherSegments: weatherSegments.length,
+          waypoints: waypoints.map(wp => wp.name || wp),
+          araFuelDefault: actualFuelPolicy.araFuel.default,
+          approachFuelDefault: actualFuelPolicy.approachFuel.default
+        });
+        
+        const weatherAnalyzer = new WeatherFuelAnalyzer();
+        const weatherAnalysis = weatherAnalyzer.analyzeWeatherForFuel(
+          weatherSegments,
+          waypoints,
+          {
+            araFuelDefault: actualFuelPolicy.araFuel.default || 0,
+            approachFuelDefault: actualFuelPolicy.approachFuel.default || 0
+          }
+        );
+        
+        console.log('🔍 DEBUG: Weather analysis result:', {
+          totalAraFuel: weatherAnalysis.totalAraFuel,
+          totalApproachFuel: weatherAnalysis.totalApproachFuel,
+          araRequirements: weatherAnalysis.araRequirements,
+          approachRequirements: weatherAnalysis.approachRequirements,
+          rigStops: weatherAnalysis.rigStops
+        });
+        
+        const calculatedAraFuel = weatherAnalysis.totalAraFuel || 0;
+        const calculatedApproachFuel = weatherAnalysis.totalApproachFuel || 0;
+        
+        // Only update state if values actually changed to prevent infinite loops
+        setWeatherFuel(prevFuel => {
+          if (prevFuel.araFuel !== calculatedAraFuel || prevFuel.approachFuel !== calculatedApproachFuel) {
+            console.log('🌤️ Weather fuel updated:', {
+              araFuel: calculatedAraFuel,
+              approachFuel: calculatedApproachFuel,
+              weatherSegments: weatherSegments.length,
+              waypoints: waypoints.length
+            });
+            return {
+              araFuel: calculatedAraFuel,
+              approachFuel: calculatedApproachFuel
+            };
+          }
+          return prevFuel; // No change, prevent re-render
+        });
+        
+      } catch (error) {
+        console.error('❌ Weather fuel calculation error:', error);
+        setWeatherFuel(prevFuel => {
+          if (prevFuel.araFuel !== 0 || prevFuel.approachFuel !== 0) {
+            return { araFuel: 0, approachFuel: 0 };
+          }
+          return prevFuel;
+        });
+      }
+      } else {
+        console.log('🔍 Fuel policy missing ARA/Approach values:', actualFuelPolicy);
+      }
+    } else {
+      // Only reset if currently not zero to prevent infinite loops
+      setWeatherFuel(prevFuel => {
+        if (prevFuel.araFuel !== 0 || prevFuel.approachFuel !== 0) {
+          console.log('🌤️ Weather fuel reset - missing dependencies');
+          return { araFuel: 0, approachFuel: 0 };
+        }
+        return prevFuel;
+      });
+    }
+  }, [weatherSegments, waypoints, fuelPolicy?.araFuelDefault, fuelPolicy?.approachFuelDefault]);
 
   // Enhanced clearRoute that also clears alternate route state
   const clearRoute = useCallback(() => {
@@ -641,6 +748,7 @@ const FastPlannerCore = ({
 
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
+    console.log('🚨 FLIGHT LOAD STARTED - handleFlightLoad function called');
     try {
       console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
       console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
@@ -766,6 +874,19 @@ const FastPlannerCore = ({
             // Make stop cards globally available for debugging
             window.debugStopCards = newStopCards;
             console.log('Stop cards available at window.debugStopCards');
+            
+            // 🌤️ CRITICAL: Auto-load weather segments for loaded flight
+            console.log('🌤️ Auto-loading weather segments for flight...');
+            if (loadWeatherSegments && flightData.flightId) {
+              try {
+                await loadWeatherSegments(flightData.flightId);
+                console.log('🌤️ Weather segments loaded successfully for flight');
+              } catch (weatherError) {
+                console.error('🌤️ Failed to load weather segments:', weatherError);
+              }
+            } else {
+              console.warn('🌤️ Cannot load weather segments - missing loadWeatherSegments function or flightId');
+            }
             
             // Update loading indicator with success
             if (window.LoadingIndicator) {
@@ -1317,6 +1438,7 @@ const FastPlannerCore = ({
           onClearRoute={clearRoute} onToggleChart={togglePlatformsVisibility} chartsVisible={platformsVisible}
           onToggleWaypointMode={toggleWaypointMode} waypointModeActive={waypointModeActive}
         />
+        
         <RightPanel
           visible={rightPanelVisible} onToggleVisibility={toggleRightPanel} onClearRoute={clearRoute}
           onLoadRigData={reloadPlatformData} onToggleChart={togglePlatformsVisibility}
@@ -1332,6 +1454,8 @@ const FastPlannerCore = ({
           deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
           passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
           extraFuel={flightSettings.extraFuel}
+          araFuel={weatherFuel.araFuel} // Use calculated weather fuel from state
+          approachFuel={weatherFuel.approachFuel} // Use calculated weather fuel from state
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
           reserveFuel={flightSettings.reserveFuel} reserveMethod={reserveMethod}
           onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}

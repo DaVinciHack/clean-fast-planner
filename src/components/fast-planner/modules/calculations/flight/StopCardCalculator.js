@@ -82,6 +82,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
     extraFuel = 0,        // Manual extra fuel override
     cargoWeight = 0,      // Cargo weight for payload calculations
+    araFuel = 0,          // ARA fuel from weather analysis
+    approachFuel = 0,     // Approach fuel from weather analysis
     fuelPolicy = null     // NEW: Fuel policy for reserve fuel type detection
   } = options;
   
@@ -546,19 +548,39 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   });
 
   // Calculate total fuel required for the entire trip
-  const totalFuelRequired = taxiFuelValue + totalTripFuel + contingencyFuelValue + reserveFuelValue + deckFuelValue;
+  const totalFuelRequired = taxiFuelValue + totalTripFuel + contingencyFuelValue + araFuel + deckFuelValue + approachFuel + reserveFuelValue;
 
   // Create a departure card first
   if (waypoints.length >= 2) {
     const departureWaypoint = waypoints[0];
     
     // Total fuel needed for entire journey at departure
-    const departureFuelNeeded = totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue + (extraFuel || 0);
+    const departureFuelNeeded = taxiFuelValue + totalTripFuel + contingencyFuelValue + araFuel + deckFuelValue + approachFuel + reserveFuelValue + (extraFuel || 0);
     
-    // Create fuel components text for departure
-    const departureFuelComponentsText = extraFuel > 0 
-      ? `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue} Extra:${extraFuel}`
-      : `Trip:${totalTripFuel} Cont:${contingencyFuelValue} Taxi:${taxiFuelValue} Deck:${deckFuelValue} Res:${reserveFuelValue}`;
+    // Create fuel components text for departure - only show non-zero weather fuel
+    let fuelComponentsParts = [
+      `Taxi:${taxiFuelValue}`,
+      `Trip:${totalTripFuel}`,
+      `Cont:${contingencyFuelValue}`
+    ];
+    
+    if (araFuel > 0) {
+      fuelComponentsParts.push(`ARA:${araFuel}`);
+    }
+    
+    fuelComponentsParts.push(`Deck:${deckFuelValue}`);
+    
+    if (approachFuel > 0) {
+      fuelComponentsParts.push(`Approach:${approachFuel}`);
+    }
+    
+    fuelComponentsParts.push(`Res:${reserveFuelValue}`);
+    
+    if (extraFuel > 0) {
+      fuelComponentsParts.push(`Extra:${extraFuel}`);
+    }
+    
+    const departureFuelComponentsText = fuelComponentsParts.join(' ');
     
     // DEBUG: Log the fuel components for departure
     console.log('🔥 DEPARTURE CARD FUEL COMPONENTS (DETAILED):', {
@@ -619,7 +641,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         tripFuel: totalTripFuel,
         contingencyFuel: contingencyFuelValue,
         taxiFuel: taxiFuelValue,
+        araFuel: araFuel,
         deckFuel: deckFuelValue,
+        approachFuel: approachFuel,
         reserveFuel: reserveFuelValue,
         extraFuel: extraFuel || 0
       },
@@ -697,7 +721,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         // Add remaining fuel components with zero values for consistency
         tripFuel: 0,
         taxiFuel: 0,
-        deckFuel: 0
+        araFuel: 0,  // TODO: Smart distribution logic
+        deckFuel: 0,
+        approachFuel: 0  // TODO: Smart distribution logic
       };
 
       // Get the original full contingency amount (from departure)
@@ -726,15 +752,33 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       });
     } else {
       // At intermediate stops, you need fuel for remaining legs, plus reserve
-      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue + (extraFuel || 0);
+      fuelNeeded = remainingTripFuel + remainingContingencyFuel + araFuel + remainingDeckFuel + approachFuel + reserveFuelValue + (extraFuel || 0);
       fuelComponents = {
         remainingTripFuel: remainingTripFuel,
         contingencyFuel: remainingContingencyFuel,
+        araFuel: araFuel,  // TODO: Smart distribution logic
         deckFuel: remainingDeckFuel,
+        approachFuel: approachFuel,  // TODO: Smart distribution logic
         reserveFuel: reserveFuelValue,
         extraFuel: extraFuel || 0
       };
-      fuelComponentsText = `Trip:${remainingTripFuel} Cont:${remainingContingencyFuel} Res:${reserveFuelValue}`;
+      
+      // Create fuel components text - only show non-zero weather fuel
+      let intermediateParts = [`Trip:${remainingTripFuel}`, `Cont:${remainingContingencyFuel}`];
+      
+      if (araFuel > 0) {
+        intermediateParts.push(`ARA:${araFuel}`);
+      }
+      
+      intermediateParts.push(`Deck:${remainingDeckFuel}`);
+      
+      if (approachFuel > 0) {
+        intermediateParts.push(`Approach:${approachFuel}`);
+      }
+      
+      intermediateParts.push(`Res:${reserveFuelValue}`);
+      
+      fuelComponentsText = intermediateParts.join(' ');
 
       // 🔧 DEBUG: Log extraFuel logic
       console.log('🔧 ExtraFuel Debug - Intermediate stop:', {
@@ -826,7 +870,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           // Always include these with zero values for consistency
           tripFuel: 0,
           taxiFuel: 0,
-          deckFuel: 0
+          araFuel: 0,  // TODO: Smart distribution logic
+          deckFuel: 0,
+          approachFuel: 0  // TODO: Smart distribution logic
         },
         // Add wind information to all cards
         windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
@@ -1055,7 +1101,9 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
-    extraFuel = 0         // 🔧 ADDED: Missing extraFuel parameter
+    extraFuel = 0,        // 🔧 ADDED: Missing extraFuel parameter
+    araFuel = 0,          // 🔧 FIXED: Missing araFuel parameter (was causing error)
+    approachFuel = 0      // 🔧 FIXED: Missing approachFuel parameter (was causing error)
   } = options;
   
   // Convert all calculation parameters to proper numeric values
@@ -1273,7 +1321,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   });
   
   // Calculate total fuel required for alternate route
-  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + alternateDeckFuel + reserveFuelValue + extraFuelValue;
+  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + araFuel + alternateDeckFuel + approachFuel + reserveFuelValue + extraFuelValue;
   
   // Calculate max passengers using same logic as normal stop cards
   let maxPassengers = 0;
@@ -1300,10 +1348,30 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     reserveFuelValue
   });
 
-  // Create fuel components text
-  const fuelComponentsText = extraFuelValue > 0 
-    ? `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue} Extra:${extraFuelValue}`
-    : `Taxi:${taxiFuelValue} Trip:${totalAlternateTripFuel} Cont:${alternateContingencyFuel} Deck:${alternateDeckFuel} Res:${reserveFuelValue}`;
+  // Create fuel components text - only show non-zero weather fuel
+  let alternateParts = [
+    `Taxi:${taxiFuelValue}`,
+    `Trip:${totalAlternateTripFuel}`,
+    `Cont:${alternateContingencyFuel}`
+  ];
+  
+  if (araFuel > 0) {
+    alternateParts.push(`ARA:${araFuel}`);
+  }
+  
+  alternateParts.push(`Deck:${alternateDeckFuel}`);
+  
+  if (approachFuel > 0) {
+    alternateParts.push(`Approach:${approachFuel}`);
+  }
+  
+  alternateParts.push(`Res:${reserveFuelValue}`);
+  
+  if (extraFuelValue > 0) {
+    alternateParts.push(`Extra:${extraFuelValue}`);
+  }
+  
+  const fuelComponentsText = alternateParts.join(' ');
   
   console.log('🔧 AlternateStopCard: Final fuel components text:', fuelComponentsText);
   
@@ -1352,7 +1420,9 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       tripFuel: totalAlternateTripFuel,
       contingencyFuel: alternateContingencyFuel,
       taxiFuel: taxiFuelValue,
+      araFuel: araFuel,  // Include weather fuel for alternate
       deckFuel: alternateDeckFuel,
+      approachFuel: approachFuel,  // Include weather fuel for alternate
       reserveFuel: reserveFuelValue
     },
     isDeparture: false,
