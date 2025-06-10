@@ -56,9 +56,19 @@ const MainCard = ({
   // Waypoint mode controls
   toggleWaypointMode = () => {},
   waypointModeActive = false,
+  // Weather segments for rig detection
+  weatherSegments = null,
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
+  
+  // 🔍 DEBUG: Log weather fuel values received by MainCard
+  console.log('🔍 MainCard: Weather fuel values received:', {
+    araFuel,
+    approachFuel,
+    araFuelType: typeof araFuel,
+    approachFuelType: typeof approachFuel
+  });
 
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
@@ -521,7 +531,7 @@ const MainCard = ({
             weather={weather}
             alternateRouteData={alternateRouteData}
             fuelPolicy={fuelPolicy}
-            weatherSegments={null} // TODO: Connect weather segments
+            weatherSegments={weatherSegments}
             stopCards={stopCards}
           />
         )}

@@ -39,7 +39,12 @@ const EnhancedStopCardsContainer = ({
     hasWeather: !!weather,
     hasAlternateRouteData: !!alternateRouteData,
     alternateRouteName: alternateRouteData?.name,
-    alternateRouteCoords: alternateRouteData?.coordinates?.length
+    alternateRouteCoords: alternateRouteData?.coordinates?.length,
+    // 🔍 DEBUG: Check weather fuel props
+    araFuel: araFuel,
+    approachFuel: approachFuel,
+    araFuelType: typeof araFuel,
+    approachFuelType: typeof approachFuel
   });
   
   // State for displaying stop cards
@@ -47,20 +52,52 @@ const EnhancedStopCardsContainer = ({
   const [alternateStopCard, setAlternateStopCard] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   
-  // 🚨 REMOVED: No duplicate calculations - use stopCards from props only
-  // EnhancedStopCardsContainer should DISPLAY stop cards, not calculate them
-  // All calculations should happen in FastPlannerApp and be passed via stopCards prop
-  
-  // Use the stopCards prop that was already calculated by FastPlannerApp
+  // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
-    if (stopCards && stopCards.length > 0) {
-      console.log('🎯 EnhancedStopCardsContainer: Using pre-calculated stopCards from props');
-      setDisplayStopCards(stopCards);
+    if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy) {
+      console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator (ONE SOURCE OF TRUTH)');
+      console.log('🎯 EnhancedStopCardsContainer: Using weather fuel values:', { araFuel, approachFuel });
+      console.log('🎯 EnhancedStopCardsContainer: Fuel policy structure:', fuelPolicy);
+      
+      try {
+        const stopCardOptions = {
+          passengerWeight: Number(passengerWeight) || 0,
+          cargoWeight: Number(cargoWeight) || 0,
+          contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
+          reserveFuel: Number(reserveFuel) || 0,
+          deckTimePerStop: Number(deckTimePerStop) || 0,
+          deckFuelFlow: Number(deckFuelFlow) || 0,
+          taxiFuel: Number(taxiFuel) || 0,
+          extraFuel: Number(extraFuel) || 0,
+          araFuel: Number(araFuel) || 0,      // 🔧 Weather fuel
+          approachFuel: Number(approachFuel) || 0,  // 🔧 Weather fuel
+          fuelPolicy: fuelPolicy?.currentPolicy  // 🔧 FIXED: Use currentPolicy like FlightUtilities
+        };
+        
+        console.log('🎯 EnhancedStopCardsContainer: Stop card options:', stopCardOptions);
+        
+        const calculatedStopCards = StopCardCalculator.calculateStopCards(
+          waypoints,
+          routeStats,
+          selectedAircraft,
+          weather,
+          stopCardOptions,
+          weatherSegments
+        );
+        
+        if (calculatedStopCards && calculatedStopCards.length > 0) {
+          console.log(`🎯 EnhancedStopCardsContainer: Generated ${calculatedStopCards.length} stop cards with weather fuel`);
+          setDisplayStopCards(calculatedStopCards);
+        }
+      } catch (error) {
+        console.error('🎯 EnhancedStopCardsContainer: Error calculating stop cards:', error);
+        setDisplayStopCards([]);
+      }
     } else {
-      console.log('🎯 EnhancedStopCardsContainer: No stopCards provided via props');
+      console.log('🎯 EnhancedStopCardsContainer: Missing required data for stop card calculation');
       setDisplayStopCards([]);
     }
-  }, [stopCards]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel]);
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {

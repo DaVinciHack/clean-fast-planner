@@ -6,7 +6,7 @@ import StopCardCalculator from '../modules/calculations/flight/StopCardCalculato
 /**
  * Generate stop cards data using StopCardCalculator - single source of truth
  */
-export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options = {}) => {
+export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options = {}, weatherSegments = null) => {
   console.log('🎯 generateStopCardsData: Using StopCardCalculator directly - single source of truth');
   
   // Get fuel policy for reserve fuel conversion
@@ -21,7 +21,8 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
     {
       ...options,
       fuelPolicy: currentPolicy
-    }
+    },
+    weatherSegments
   );
   
   console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');

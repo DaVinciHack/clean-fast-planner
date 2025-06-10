@@ -23,7 +23,7 @@ const useWeatherSegments = ({
       const result = await WeatherSegmentsService.loadWeatherSegmentsForFlight(targetFlightId);
       
       if (result.success) {
-        setWeatherSegments(result);
+        setWeatherSegments(result.segments);
         
         const windData = WeatherSegmentsService.extractWindDataForRoute(result.segments);
         
