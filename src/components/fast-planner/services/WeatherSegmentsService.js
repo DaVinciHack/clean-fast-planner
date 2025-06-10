@@ -173,6 +173,13 @@ class WeatherSegmentsService {
       warnings: segment.warnings,
       notams: segment.notams,
       deckReport: segment.deckReport,
+      // 🔧 CRITICAL: Include ranking2 for fuel calculations
+      ranking2: segment.ranking2,
+      // Include other rankings for completeness
+      ranking1: segment.ranking1,
+      ranking3: segment.ranking3,
+      ranking4: segment.ranking4,
+      ranking5: segment.ranking5,
       color: this.getSegmentColor(segment),
       priority: this.getSegmentPriority(segment)
     };

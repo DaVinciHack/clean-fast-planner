@@ -29,7 +29,12 @@ class WeatherFuelAnalyzer {
     const araFuelAmount = settings.araFuelDefault || this.defaults.araFuelDefault;
     const approachFuelAmount = settings.approachFuelDefault || this.defaults.approachFuelDefault;
     
-    console.log(`Analyzing weather for ${weatherSegments.length} segments and ${waypoints.length} waypoints`);
+    console.log(`🟠 WeatherFuelAnalyzer: Analyzing weather for ${weatherSegments.length} segments and ${waypoints.length} waypoints`);
+    
+    // DEBUG: Log the first weather segment structure to understand the data
+    if (weatherSegments.length > 0) {
+      console.log('🟠 WeatherFuelAnalyzer: First segment structure:', JSON.stringify(weatherSegments[0], null, 2));
+    }
     
     // Create sets of actual flight stops for filtering
     const actualFlightStops = new Set();
@@ -177,7 +182,8 @@ class WeatherFuelAnalyzer {
       return true;
     }
     
-    // Check ranking2 for values that trigger ARA fuel (same as Palantir logic)
+    // Check segment 2 ranking for values that trigger ARA fuel (same as Palantir logic)
+    // The ranking is stored in segment.ranking2 property, which corresponds to "segment 2"
     return segment.ranking2 === 8 || segment.ranking2 === 5;
   }
   

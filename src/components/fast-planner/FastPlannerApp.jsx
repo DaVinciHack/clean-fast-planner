@@ -270,7 +270,11 @@ const FastPlannerCore = ({
         routeStats, 
         selectedAircraft,
         weather,
-        flightSettings
+        {
+          ...flightSettings,
+          araFuel: weatherFuel.araFuel,
+          approachFuel: weatherFuel.approachFuel
+        }
       );
       
       if (newStopCards && newStopCards.length > 0) {
@@ -278,7 +282,7 @@ const FastPlannerCore = ({
         console.log('✅ Auto-calculation complete - header should update');
       }
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather]);
+  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const {
@@ -289,6 +293,7 @@ const FastPlannerCore = ({
     toggleWeatherLayer,
     clearWeatherSegments
   } = useWeatherSegments({
+    flightId: currentFlightId, // Pass current flight ID to enable weather loading
     mapManagerRef,
     onWeatherUpdate: updateWeatherSettings // Now using stub function
   });
@@ -321,15 +326,15 @@ const FastPlannerCore = ({
       console.log('🔍 ACTUAL FUEL POLICY:', actualFuelPolicy);
       
       if (actualFuelPolicy && 
-          actualFuelPolicy.araFuel?.default !== undefined && 
-          actualFuelPolicy.approachFuel?.default !== undefined) {
+          actualFuelPolicy.araFuel !== undefined && 
+          actualFuelPolicy.approachFuel !== undefined) {
       
       try {
         console.log('🔍 DEBUG: Starting weather fuel analysis with:', {
           weatherSegments: weatherSegments.length,
           waypoints: waypoints.map(wp => wp.name || wp),
-          araFuelDefault: actualFuelPolicy.araFuel.default,
-          approachFuelDefault: actualFuelPolicy.approachFuel.default
+          araFuelDefault: actualFuelPolicy.araFuel,
+          approachFuelDefault: actualFuelPolicy.approachFuel
         });
         
         const weatherAnalyzer = new WeatherFuelAnalyzer();
@@ -337,8 +342,8 @@ const FastPlannerCore = ({
           weatherSegments,
           waypoints,
           {
-            araFuelDefault: actualFuelPolicy.araFuel.default || 0,
-            approachFuelDefault: actualFuelPolicy.approachFuel.default || 0
+            araFuelDefault: actualFuelPolicy.araFuel || 0,
+            approachFuelDefault: actualFuelPolicy.approachFuel || 0
           }
         );
         
@@ -541,8 +546,8 @@ const FastPlannerCore = ({
   };
 
   // ✅ SINGLE SOURCE OF TRUTH: Wrapper for extracted generateStopCardsData utility
-  const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
-    return generateStopCardsUtil(waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options);
+  const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegmentsParam = null) => {
+    return generateStopCardsUtil(waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options, weatherSegmentsParam || weatherSegments);
   };
 
   // Make generateStopCardsData available globally for debugging
@@ -749,9 +754,39 @@ const FastPlannerCore = ({
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
     console.log('🚨 FLIGHT LOAD STARTED - handleFlightLoad function called');
+    
+    // 🔍 DEBUG: Log the complete flightData structure to find flight ID
+    console.log('🔍 COMPLETE FLIGHT DATA STRUCTURE:', JSON.stringify(flightData, null, 2));
+    console.log('🔍 FLIGHT DATA KEYS:', Object.keys(flightData));
+    console.log('🔍 LOOKING FOR FLIGHT ID:', {
+      flightId: flightData.flightId,
+      id: flightData.id,
+      uuid: flightData.uuid,
+      flightUuid: flightData.flightUuid,
+      flightNumber: flightData.flightNumber
+    });
+    
     try {
       console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
       console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
+      
+      // 🚨 CRITICAL: Set current flight ID and load weather segments
+      if (flightData.flightId) {
+        console.log('🚨 Setting currentFlightId for weather loading:', flightData.flightId);
+        setCurrentFlightId(flightData.flightId);
+        
+        // Manually trigger weather loading
+        if (loadWeatherSegments) {
+          console.log('🌤️ MANUAL: Loading weather segments for flight:', flightData.flightId);
+          loadWeatherSegments(flightData.flightId)
+            .then(result => {
+              console.log('🌤️ MANUAL: Weather segments loaded successfully');
+            })
+            .catch(error => {
+              console.error('🌤️ MANUAL: Failed to load weather segments:', error);
+            });
+        }
+      }
       
       // CRITICAL FIX: Apply wind data from loaded flight if available
       if (flightData.windData) {
@@ -864,8 +899,57 @@ const FastPlannerCore = ({
             processedWaypoints, 
             currentRouteStats, 
             selectedAircraft, 
-            weather
+            weather,
+            {
+              ...flightSettings,
+              araFuel: weatherFuel.araFuel,
+              approachFuel: weatherFuel.approachFuel
+            }
           );
+          
+          // 🌤️ CRITICAL: Auto-load weather segments for loaded flight using OSDK directly
+          // MOVED OUTSIDE stop cards condition to ensure it always runs
+          console.log('🌤️ Auto-loading weather segments for flight:', flightData.flightId);
+          if (flightData.flightId) {
+            try {
+              console.log('🌤️ Loading OSDK weather data for flight:', flightData.flightId);
+              
+              // Use the EXACT WeatherCard method to fetch weather segments
+              const sdk = await import('@flight-app/sdk');
+              
+              if (!sdk.NorwayWeatherSegments) {
+                throw new Error('NorwayWeatherSegments not found in SDK');
+              }
+              
+              console.log('🌤️ Fetching NorwayWeatherSegments directly like WeatherCard...');
+              
+              // Import client from correct path (src/client.ts)
+              const { default: client } = await import('../../client');
+              
+              // Fetch exactly like WeatherCard does
+              const weatherResult = await client(sdk.NorwayWeatherSegments)
+                .where({ flightUuid: flightData.flightId })
+                .fetchPage({ $pageSize: 1000 });
+                
+              const loadedWeatherSegments = weatherResult.data || [];
+              console.log(`🌤️ Fetched ${loadedWeatherSegments.length} NorwayWeatherSegments directly`);
+              
+              if (loadedWeatherSegments.length > 0) {
+                console.log("🌤️ First weather segment structure:", JSON.stringify(loadedWeatherSegments[0], null, 2));
+                
+                // TODO: Set weather segments state for fuel calculations
+                // This needs to integrate with the useWeatherSegments hook
+                window.loadedWeatherSegments = loadedWeatherSegments; // Temporary for debugging
+              }
+              
+              console.log('🌤️ Weather segments loaded successfully for flight');
+            } catch (weatherError) {
+              console.error('🌤️ Failed to load weather segments:', weatherError);
+              console.error('🌤️ Weather error details:', weatherError.message);
+            }
+          } else {
+            console.warn('🌤️ Cannot load weather segments - missing flightId');
+          }
           
           if (newStopCards && newStopCards.length > 0) {
             console.log(`Generated ${newStopCards.length} stop cards for loaded flight`);
@@ -874,18 +958,46 @@ const FastPlannerCore = ({
             // Make stop cards globally available for debugging
             window.debugStopCards = newStopCards;
             console.log('Stop cards available at window.debugStopCards');
-            
-            // 🌤️ CRITICAL: Auto-load weather segments for loaded flight
-            console.log('🌤️ Auto-loading weather segments for flight...');
-            if (loadWeatherSegments && flightData.flightId) {
+            console.log('🌤️ Auto-loading weather segments for flight:', flightData.flightId);
+            if (flightData.flightId) {
               try {
-                await loadWeatherSegments(flightData.flightId);
+                console.log('🌤️ Loading OSDK weather data for flight:', flightData.flightId);
+                
+                // Use the EXACT WeatherCard method to fetch weather segments
+                const sdk = await import('@flight-app/sdk');
+                
+                if (!sdk.NorwayWeatherSegments) {
+                  throw new Error('NorwayWeatherSegments not found in SDK');
+                }
+                
+                console.log('🌤️ Fetching NorwayWeatherSegments directly like WeatherCard...');
+                
+                // Import client from correct path (src/client.ts)
+                const { default: client } = await import('../../client');
+                
+                // Fetch exactly like WeatherCard does
+                const weatherResult = await client(sdk.NorwayWeatherSegments)
+                  .where({ flightUuid: flightData.flightId })
+                  .fetchPage({ $pageSize: 1000 });
+                  
+                const loadedWeatherSegments = weatherResult.data || [];
+                console.log(`🌤️ Fetched ${loadedWeatherSegments.length} NorwayWeatherSegments directly`);
+                
+                if (loadedWeatherSegments.length > 0) {
+                  console.log("🌤️ First weather segment structure:", JSON.stringify(loadedWeatherSegments[0], null, 2));
+                  
+                  // TODO: Set weather segments state for fuel calculations
+                  // This needs to integrate with the useWeatherSegments hook
+                  window.loadedWeatherSegments = loadedWeatherSegments; // Temporary for debugging
+                }
+                
                 console.log('🌤️ Weather segments loaded successfully for flight');
               } catch (weatherError) {
                 console.error('🌤️ Failed to load weather segments:', weatherError);
+                console.error('🌤️ Weather error details:', weatherError.message);
               }
             } else {
-              console.warn('🌤️ Cannot load weather segments - missing loadWeatherSegments function or flightId');
+              console.warn('🌤️ Cannot load weather segments - missing flightId');
             }
             
             // Update loading indicator with success
@@ -993,12 +1105,9 @@ const FastPlannerCore = ({
               selectedAircraft,
               updatedWeather,
               {
-                passengerWeight: flightSettings.passengerWeight,
-                taxiFuel: flightSettings.taxiFuel,
-                contingencyFuelPercent: flightSettings.contingencyFuelPercent,
-                reserveFuel: flightSettings.reserveFuel,
-                deckTimePerStop: flightSettings.deckTimePerStop,
-                deckFuelFlow: flightSettings.deckFuelFlow
+                ...flightSettings,
+                araFuel: weatherFuel.araFuel,
+                approachFuel: weatherFuel.approachFuel
               }
             );
             
@@ -1492,6 +1601,7 @@ const FastPlannerCore = ({
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
+          weatherSegments={weatherSegments} // Pass weather segments for rig detection
         />
       </div>
     </>

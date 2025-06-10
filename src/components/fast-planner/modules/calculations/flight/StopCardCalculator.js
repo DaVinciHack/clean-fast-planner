@@ -21,9 +21,10 @@ import PassengerCalculator from '../passengers/PassengerCalculator';
  * @param {Object} selectedAircraft - Selected aircraft with performance data
  * @param {Object} weather - Weather data (windSpeed, windDirection)
  * @param {Object} options - Optional calculation parameters
+ * @param {Array} weatherSegments - Weather segments data for rig detection
  * @returns {Array} Array of stop card objects
  */
-const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}) => {
+const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null) => {
   console.log('⭐ StopCardCalculator: Starting with routeStats?', !!routeStats);
   
   // First, verify we have the necessary input data
@@ -86,6 +87,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     approachFuel = 0,     // Approach fuel from weather analysis
     fuelPolicy = null     // NEW: Fuel policy for reserve fuel type detection
   } = options;
+  
   
   // 🔧 DEBUG: Log extraFuel value to see what we're getting
   console.log('🔧 StopCardCalculator DEBUG: extraFuel value:', {
@@ -721,9 +723,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         // Add remaining fuel components with zero values for consistency
         tripFuel: 0,
         taxiFuel: 0,
-        araFuel: 0,  // TODO: Smart distribution logic
+        araFuel: 0,  // 🎯 SMART: No ARA fuel at destination (all consumed)
         deckFuel: 0,
-        approachFuel: 0  // TODO: Smart distribution logic
+        approachFuel: 0  // 🎯 SMART: No approach fuel at destination (consumed during approach)
       };
 
       // Get the original full contingency amount (from departure)
@@ -751,29 +753,63 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         finalFuelNeeded: fuelNeeded
       });
     } else {
+      // 🎯 SMART CONSUMPTION LOGIC: Calculate remaining weather fuel needed
+      
+      // Check weather segments to see if this location is a rig
+      const weatherSegmentForLocation = weatherSegments?.find(segment => 
+        segment.locationName === toWaypoint.name || 
+        segment.location === toWaypoint.name ||
+        segment.airportIcao === toWaypoint.name ||
+        segment.uniqueId === toWaypoint.name
+      );
+      const isRigFromWeather = weatherSegmentForLocation?.isRig || false;
+      
+      
+      // Check if this location consumes ARA fuel (for rigs)
+      const currentLocationConsumesAra = isRigFromWeather;
+      
+      // Check if this location consumes approach fuel (for airports - not rigs) 
+      const currentLocationConsumesApproach = !isRigFromWeather;
+      
+      // Calculate remaining ARA fuel needed after this stop
+      let remainingAraFuel = araFuel;
+      if (currentLocationConsumesAra) {
+        // This location consumes ARA fuel - reduce remaining amount
+        remainingAraFuel = Math.max(0, araFuel - 200); // Consume 200 lbs per rig
+        console.log(`🎯 CONSUMPTION: ${toWaypoint.name} consumes ARA fuel, remaining: ${remainingAraFuel}`);
+      }
+      
+      // Calculate remaining approach fuel needed after this stop  
+      let remainingApproachFuel = approachFuel;
+      if (currentLocationConsumesApproach) {
+        // This location consumes approach fuel - reduce remaining amount
+        remainingApproachFuel = Math.max(0, approachFuel - 200); // Consume 200 lbs per airport
+        console.log(`🎯 CONSUMPTION: ${toWaypoint.name} consumes approach fuel, remaining: ${remainingApproachFuel}`);
+      }
+      
       // At intermediate stops, you need fuel for remaining legs, plus reserve
-      fuelNeeded = remainingTripFuel + remainingContingencyFuel + araFuel + remainingDeckFuel + approachFuel + reserveFuelValue + (extraFuel || 0);
+      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingAraFuel + remainingDeckFuel + remainingApproachFuel + reserveFuelValue + (extraFuel || 0);
       fuelComponents = {
         remainingTripFuel: remainingTripFuel,
         contingencyFuel: remainingContingencyFuel,
-        araFuel: araFuel,  // TODO: Smart distribution logic
+        araFuel: remainingAraFuel,  // 🎯 SMART: Reduced after consumption
         deckFuel: remainingDeckFuel,
-        approachFuel: approachFuel,  // TODO: Smart distribution logic
+        approachFuel: remainingApproachFuel,  // 🎯 SMART: Reduced after consumption
         reserveFuel: reserveFuelValue,
         extraFuel: extraFuel || 0
       };
       
-      // Create fuel components text - only show non-zero weather fuel
+      // Create fuel components text - only show non-zero weather fuel (using remaining amounts)
       let intermediateParts = [`Trip:${remainingTripFuel}`, `Cont:${remainingContingencyFuel}`];
       
-      if (araFuel > 0) {
-        intermediateParts.push(`ARA:${araFuel}`);
+      if (remainingAraFuel > 0) {
+        intermediateParts.push(`ARA:${remainingAraFuel}`);
       }
       
       intermediateParts.push(`Deck:${remainingDeckFuel}`);
       
-      if (approachFuel > 0) {
-        intermediateParts.push(`Approach:${approachFuel}`);
+      if (remainingApproachFuel > 0) {
+        intermediateParts.push(`Approach:${remainingApproachFuel}`);
       }
       
       intermediateParts.push(`Res:${reserveFuelValue}`);

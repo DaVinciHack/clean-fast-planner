@@ -98,6 +98,7 @@ const RightPanel = ({
   onWeatherUpdate = () => {},
   // Flight ID for weather segments
   currentFlightId = null,
+  weatherSegments = null,
   // Fuel policy props
   fuelPolicy = null
 }) => {
@@ -629,6 +630,7 @@ const RightPanel = ({
         onFlightLoad={onFlightLoad}
         toggleWaypointMode={toggleWaypointMode}
         waypointModeActive={waypointModeActive}
+        weatherSegments={weatherSegments}
       />
       
       {/* Settings Card */}

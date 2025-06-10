@@ -37,6 +37,68 @@ Before making ANY changes to this codebase:
 - Every weather integration must use verified data
 - Test extensively before any changes go live
 
+## 🛩️ WEATHER-FUEL INTEGRATION SYSTEM
+
+### Current Implementation Status (WORKING)
+
+The weather-fuel integration system is now fully implemented and working correctly. Here's how it operates:
+
+#### Architecture Overview:
+1. **Single Source of Truth**: `StopCardCalculator.js` is the ONLY place where fuel calculations happen
+2. **Weather Analysis**: `WeatherFuelAnalyzer.js` analyzes weather segments and determines ARA/approach fuel requirements
+3. **Data Flow**: Weather segments → Fuel analysis → Stop card calculations → UI display
+
+#### Weather-Fuel Flow:
+1. **Weather Segments Loading**: 
+   - `useWeatherSegments` hook loads weather data for flights
+   - Weather segments contain `isRig` boolean and location identifiers (`airportIcao`, `uniqueId`)
+
+2. **Fuel Analysis**:
+   - `WeatherFuelAnalyzer` processes weather segments to determine fuel requirements
+   - Calculates total ARA fuel needed (for rigs with poor weather)
+   - Calculates total approach fuel needed (for airports with poor weather)
+
+3. **Fuel Consumption Logic**:
+   - **ARA Fuel**: Required on departure, consumed during approach to rigs
+   - **Approach Fuel**: Required on departure, consumed during approach to airports
+   - **Consumption Detection**: Uses weather segments `isRig` property to identify rigs vs airports
+
+#### Data Flow Chain:
+```
+FastPlannerApp (weatherSegments) 
+  → RightPanel (weatherSegments)
+    → MainCard (weatherSegments) 
+      → EnhancedStopCardsContainer (weatherSegments)
+        → StopCardCalculator (weatherSegments)
+```
+
+#### Weather Segment Matching:
+Weather segments are matched to waypoints using:
+- `segment.airportIcao === waypoint.name` (PRIMARY - works for ENLE)
+- `segment.locationName === waypoint.name`
+- `segment.location === waypoint.name`
+- `segment.uniqueId === waypoint.name`
+
+#### Fuel Calculation Results:
+- **Departure Card**: Shows total fuel including ARA/approach fuel (e.g., ARA:200)
+- **Intermediate Stops**: Show remaining fuel after consumption (e.g., ENLE shows ARA:0, not displayed)
+- **Final Card**: Shows only reserve fuel (ARA/approach fuel consumed)
+
+### ⚠️ KNOWN ISSUES TO ADDRESS:
+
+1. **Header Totals**: Header not using single source of truth - missing ARA/approach fuel
+2. **Fuel Capacity Limits**: Need to handle when required fuel > aircraft capacity
+3. **Passenger Calculations**: Currently uses total fuel regardless of aircraft limits
+4. **UI Limitations**: Need detailed fuel breakdown display (card rollover or dedicated fuel card)
+
+### ✅ WORKING CORRECTLY:
+- Weather segment loading and matching
+- Rig detection using `isRig` property
+- ARA fuel consumption at rigs
+- Approach fuel consumption at airports
+- Stop card fuel display
+- Aviation safety principles maintained
+
 ## Development Commands
 
 ```bash
