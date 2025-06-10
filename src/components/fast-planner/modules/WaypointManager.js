@@ -84,7 +84,6 @@ class WaypointManager {
     const isWaypoint = isWaypointOption || isWaypointGlobal;
     const pointType = isWaypoint ? 'NAVIGATION_WAYPOINT' : 'LANDING_STOP';
     
-    console.log(`WaypointManager.addWaypoint: Adding ${pointType} at [${coords}] with name: ${name || 'Unnamed'}`);
     
     // Create unique ID for this waypoint
     const id = `waypoint-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -421,7 +420,6 @@ class WaypointManager {
           waypointData.coordinates : 
           [waypointData.longitude || waypointData.lng, waypointData.latitude || waypointData.lat];
           
-        console.log(`Found coordinates for ${waypointName}:`, coords);
         
         // Add the waypoint using the found coordinates
         return this.addWaypoint(coords, waypointName, options);
@@ -481,7 +479,6 @@ class WaypointManager {
     const isWaypoint = isWaypointOption || isWaypointGlobal;
     const pointType = isWaypoint ? 'NAVIGATION_WAYPOINT' : 'LANDING_STOP';
     
-    console.log(`WaypointManager.addWaypointAtIndex: Adding ${pointType} at index ${index} at [${coords}] with name: ${name || 'Unnamed'}`);
     
     // Create unique ID for this waypoint
     const id = `waypoint-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -993,7 +990,6 @@ class WaypointManager {
         // Log the complete, sorted leg boundaries for debugging
         console.log(`⭐ Sorted leg boundaries at indices:`, legBoundaries);
         
-        console.log(`⭐ Found ${legBoundaries.length} leg boundaries at indices:`, legBoundaries);
       }
     }
     
@@ -1022,11 +1018,9 @@ class WaypointManager {
           let legTime = null;
           if (routeStats && routeStats.legs && i < routeStats.legs.length) {
             legTime = routeStats.legs[i].time;
-            console.log(`Found REAL time for segment ${i} from routeStats: ${legTime}`);
           } 
           else if (window.currentRouteStats && window.currentRouteStats.legs && i < window.currentRouteStats.legs.length) {
             legTime = window.currentRouteStats.legs[i].time;
-            console.log(`Found REAL time for segment ${i} from window.currentRouteStats: ${legTime}`);
           }
           // REMOVED: Dangerous fallback calculation - aviation safety requires real data only
           
@@ -1156,7 +1150,6 @@ class WaypointManager {
     } 
     // Process by legs (stop to stop)
     else {
-      console.log("⭐ Processing labels by legs (stop to stop)");
       
       // Process each leg (between consecutive leg boundaries)
       for (let legIdx = 0; legIdx < legBoundaries.length - 1; legIdx++) {
@@ -1241,13 +1234,11 @@ class WaypointManager {
           // FIRST OPTION: Try to get time directly from routeStats legs by index
           if (routeStats && routeStats.legs && legIdx < routeStats.legs.length) {
             legTime = routeStats.legs[legIdx].time;
-            console.log(`Found time for leg ${legIdx} directly from routeStats: ${legTime}`);
           }
           // SECOND OPTION: Try from window.currentRouteStats by index
           else if (window.currentRouteStats && window.currentRouteStats.legs && 
                   legIdx < window.currentRouteStats.legs.length) {
             legTime = window.currentRouteStats.legs[legIdx].time;
-            console.log(`Found time for leg ${legIdx} from window.currentRouteStats: ${legTime}`);
           }
           // THIRD OPTION: Try coordinate matching from routeStats
           else if (routeStats && routeStats.legs) {
@@ -1258,7 +1249,6 @@ class WaypointManager {
                   JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
                   JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
                 legTime = leg.time;
-                console.log(`Found time for leg ${legIdx} by coordinate match in routeStats: ${legTime}`);
                 break;
               }
             }
@@ -1272,7 +1262,6 @@ class WaypointManager {
                   JSON.stringify(leg.from) === JSON.stringify(legStartCoords) && 
                   JSON.stringify(leg.to) === JSON.stringify(legEndCoords)) {
                 legTime = leg.time;
-                console.log(`Found REAL time for leg ${legIdx} by coordinate match in window.currentRouteStats: ${legTime}`);
                 break;
               }
             }
@@ -1404,7 +1393,6 @@ class WaypointManager {
     }
     
     console.log(`⭐ Created ${features.length} route labels`);
-    console.log("Sample feature:", features.length > 0 ? JSON.stringify(features[0].properties) : "No features created");
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -1527,7 +1515,6 @@ class WaypointManager {
     const routeArrowsLayerId = 'route-arrows';
     const legLabelsLayerId = 'leg-labels';
     
-    console.log("DEBUG: Updating route with", routeStats, "and", this.waypoints.length, "waypoints");
 
     if (this.waypoints.length >= 2) {
       const coordinates = this.waypoints.map(wp => wp.coords);
@@ -1559,7 +1546,6 @@ class WaypointManager {
       // Debug the arrows data
       console.log("⭐ Arrow data features:", arrowsData.features ? arrowsData.features.length : 0);
       if (arrowsData.features && arrowsData.features.length > 0) {
-        console.log("⭐ Sample feature:", JSON.stringify(arrowsData.features[0].properties));
       }
 
       // Update or add route sources and layers
@@ -1669,7 +1655,6 @@ class WaypointManager {
 
       // Render alternate route if available
       if (activeAlternateRouteData && activeAlternateRouteData.coordinates) {
-        console.log('⭐ Rendering alternate route with', activeAlternateRouteData.coordinates.length, 'coordinates');
         console.log('⭐ Using alternate route data:', activeAlternateRouteData.name || 'No name');
         this.renderAlternateRoute(activeAlternateRouteData, map);
       } else {
@@ -1718,7 +1703,6 @@ class WaypointManager {
           
           // Add the image to the map
           const imageData = ctx.getImageData(0, 0, pillWidth, pillHeight);
-          console.log("⭐ Adding pill image. Width:", pillWidth, "Height:", pillHeight);
           
           // Remove existing image if there is one
           if (map.hasImage('pill-image')) {
@@ -2137,7 +2121,6 @@ class WaypointManager {
       
       // Log detailed information about the closest segment for debugging
       if (closestSegmentInfo) {
-        console.log(`Found closest path segment between waypoints ${closestSegmentInfo.segmentStart} and ${closestSegmentInfo.segmentEnd}`);
         console.log(`Distance to nearest point: ${closestSegmentInfo.distance.toFixed(2)} nautical miles`);
         console.log(`Insertion index will be: ${insertIndex}`);
       } else {
@@ -2197,7 +2180,6 @@ class WaypointManager {
   setupRouteDragging(onRoutePointAdded) {
     const map = this.mapManager.getMap();
     if (!map) return;
-    console.log('Setting up route dragging functionality...');
     
     // Clean up any existing handlers to prevent duplicates
     if (this._routeDragHandlers) {
@@ -2214,7 +2196,6 @@ class WaypointManager {
     
     // Create a wrapped handler that ensures insertion happens directly
     const wrappedHandler = (insertIndex, coords, dragData = {}) => {
-      console.log(`WaypointManager.setupRouteDragging -> wrappedHandler called with insertIndex=${insertIndex}, coords: ${JSON.stringify(coords)}, dragData: ${JSON.stringify(dragData)}`);
       
       // The `onRoutePointAdded` is `MapInteractionHandler.handleRouteDragComplete`.
       // Let `MapInteractionHandler` be responsible for all logic related to determining

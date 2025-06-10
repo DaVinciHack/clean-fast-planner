@@ -12,7 +12,6 @@ class PlatformManager {
    * @returns {Array} - Array of waypoint objects
    */
   processWaypointResults(result) {
-    console.log(`PlatformManager: Processing ${result?.data?.length || 0} waypoint results`);
     
     if (!result || !result.data || result.data.length === 0) {
       console.log("PlatformManager: No waypoint data to process");
@@ -123,7 +122,6 @@ class PlatformManager {
       // Reset the flag for next time
       this.skipNextClear = false;
     }
-    console.log(`Loading platforms for region: ${regionName}`);
     
     // Validate region name
     if (!regionName) {
@@ -197,7 +195,6 @@ class PlatformManager {
             // Removed additional filter: no longer excluding reporting points
           });
         
-        console.log(`Found ${result.data ? result.data.length : 0} total items for region ${regionName}`);
         
         // Then filter for fixed platforms on the client side to catch all variations
         if (result.data && result.data.length > 0) {
@@ -293,17 +290,14 @@ class PlatformManager {
           } 
           // Check for platforms in Gulf of Mexico
           else if (regionName === "GULF OF MEXICO") {
-            console.log(`Gulf of Mexico platform count: ${result.data.filter(item => !item.ISAIRPORT && !item.isAirport).length}`);
             // Log a sample of platform names
             const samplePlatforms = result.data
               .filter(item => !item.ISAIRPORT && !item.isAirport)
               .slice(0, 5)
               .map(item => item.locName || "Unknown");
-            console.log(`Sample Gulf of Mexico platforms: ${samplePlatforms.join(", ")}`);
           }
         }
         
-        console.log(`Found ${result.data ? result.data.length : 0} items for region: ${regionName}`);
         
         // Double-check that we're getting the right region
         if (result.data && result.data.length > 0) {
@@ -314,10 +308,8 @@ class PlatformManager {
               regionCount[item.region] = (regionCount[item.region] || 0) + 1;
             }
           });
-          console.log("Region distribution in results:", regionCount);
         }
           
-        console.log(`Query returned ${result.data ? result.data.length : 0} results`);
         
         // Always run specific queries for our key locations regardless of other results
         console.log("Running specific queries for critical locations...");
@@ -368,10 +360,8 @@ class PlatformManager {
           }
             
           if (airports.length > 0) {
-            console.log(`Found ${airports.length} airports in region ${regionName}`);
             
             // Log some sample airports
-            console.log("Sample airports:", airports.slice(0, 5).map(a => a.locName || 'Unknown'));
             
             // Combine results
             if (!result.data) {
@@ -422,7 +412,6 @@ class PlatformManager {
                   .fetchPage({ $pageSize: 10 });
                   
                 if (specificResult.data && specificResult.data.length > 0) {
-                  console.log(`Found ${locName} in ${regionName}!`);
                   
                   if (!result.data) {
                     result.data = [];
@@ -456,8 +445,6 @@ class PlatformManager {
         // Log the structure of the data to understand what we're working with
         if (result.data.length > 0) {
           const sample = result.data[0];
-          console.log("Sample data structure:", Object.keys(sample));
-          console.log("Sample item:", sample);
           
           // Try to identify potential coordinate fields
           const potentialCoordFields = [];
@@ -768,7 +755,6 @@ class PlatformManager {
           } else if (isBlocks) {
             blocksCount++;
             // Debug: Log ALL blocks found (temporarily increase limit)
-            // console.log(`Block found: "${name}" with type: "${type}"`);  // Silenced for debugging
           } else if (isBases) {
             basesCount++;
             // Debug: Log ALL bases found with their isBase field value
@@ -813,7 +799,6 @@ class PlatformManager {
         
         // Check if we have at least some locations
         if (locations.length > 0) {
-          console.log(`Adding ${locations.length} locations to map`);
           this.addPlatformsToMap(locations);
           
           // Hide loading indicator after adding to map (the map loading will show its own indicator)
@@ -999,7 +984,6 @@ class PlatformManager {
         return;
       }
 
-      console.log(`PlatformManager: Adding/updating ${platforms.length} platforms on map.`);
       this.platforms = platforms; // Store the platforms
 
       const sourceId = 'major-platforms';
@@ -1419,7 +1403,6 @@ class PlatformManager {
       
       // Add new source
       try {
-        console.log(`PlatformManager: Adding source ${sourceId}`);
         map.addSource(sourceId, {
           type: 'geojson',
           data: geoJsonData,
@@ -1795,7 +1778,6 @@ class PlatformManager {
     // Just set visibility property instead of removing layers
     platformLayerIds.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`PlatformManager: Layer ${layerId} found. Setting visibility to ${visibility}.`);
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
           console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
@@ -1828,7 +1810,6 @@ class PlatformManager {
     let layersFound = false;
     waypointLayers.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`PlatformManager: Layer ${layerId} found. Setting visibility to ${visibility}.`);
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
           console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
@@ -1892,7 +1873,6 @@ class PlatformManager {
           );
         }
       } else {
-        console.log("PlatformManager: No waypoints loaded yet. Loading from OSDK...");
         
         // Validate client and region name
         if (!client) {
@@ -1941,7 +1921,6 @@ class PlatformManager {
           regionName = regionName.toUpperCase();
         }
         
-        console.log(`PlatformManager: Loading waypoints for ${regionName} using OSDK client...`);
         
         // Show loading message
         if (window.LoadingIndicator) {
@@ -2065,7 +2044,6 @@ class PlatformManager {
       }
     }
     
-    console.log(`PlatformManager: Loading OSDK waypoints for region: ${regionName}`);
     
     // Show loading indicator
     const loaderId = LoadingIndicator.show('.route-stats-title', 
@@ -2400,7 +2378,6 @@ class PlatformManager {
       });
       
       if (minDistance <= maxDistance) {
-        // console.log(`PlatformManager: Found nearest OSDK waypoint ${nearestWaypoint.name} at distance ${nearestWaypoint.distance.toFixed(2)} nm`);
         return nearestWaypoint;
       } else if (nearestWaypoint) {
         // console.log(`PlatformManager: Nearest OSDK waypoint ${nearestWaypoint.name} is too far (${nearestWaypoint.distance.toFixed(2)} nm > ${maxDistance} nm)`);
@@ -2464,7 +2441,6 @@ class PlatformManager {
       
       // Only return if within reasonable distance
       if (minDistance <= maxDistance) {
-        console.log(`PlatformManager: Found nearest platform ${nearestPlatform.name} at distance ${nearestPlatform.distance.toFixed(2)} nm`);
         return nearestPlatform;
       } else if (nearestPlatform) {
         console.log(`PlatformManager: Nearest platform ${nearestPlatform.name} is too far (${nearestPlatform.distance.toFixed(2)} nm > ${maxDistance} nm)`);
@@ -2606,7 +2582,6 @@ class PlatformManager {
     }
     
     if (platform) {
-      console.log(`PlatformManager: Found platform "${platform.name}" at coordinates [${platform.coordinates}]`);
       return platform;
     } else {
       console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
@@ -2646,15 +2621,12 @@ class PlatformManager {
           
           // 🚁 DISABLED FOR DEMO - Keep original beautiful styling intact
           const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
-          console.log(`🔍 DEBUG: Current style is: ${currentStyle} - 3D disabled for demo`);
           
           // COMMENTED OUT 3D functionality to preserve demo-ready 2D styling
           /*
           if (currentStyle === '3d' || currentStyle === 'satellite') {
             console.log(`🚁 ADDING 3D rigs ON TOP of existing beautiful layers for style: ${currentStyle}`);
-            console.log(`🔍 DEBUG: Platforms available: ${this.platforms?.length || 0}`);
             setTimeout(() => {
-              console.log(`🔍 DEBUG: Adding 3D models WITHOUT disturbing original styling`);
               // ADD 3D models without touching the original beautiful 2D layers
               this.add3DRigsOnTopOfExistingLayers();
             }, 100);
@@ -2784,7 +2756,6 @@ class PlatformManager {
     }
     this._addingBasicLayers = true;
 
-    console.log('🔄 Adding basic platform layers (style-safe)');
     
     const sourceId = 'major-platforms';
     const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
@@ -2877,15 +2848,12 @@ class PlatformManager {
    * 🚁 ADD 3D RIG MODELS - The magic happens here!
    */
   add3DRigModels() {
-    console.log(`🔍 DEBUG: add3DRigModels() called`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ DEBUG: No map available`);
       return;
     }
 
-    console.log(`✅ DEBUG: Map is available`);
 
     // CRITICAL: Prevent infinite loop by checking if 3D layer already exists
     if (map.getLayer('3d-rigs-layer')) {
@@ -2894,7 +2862,6 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ DEBUG: No existing 3D layer found`);
 
     // CRITICAL: Add flag to prevent multiple simultaneous calls
     if (this._adding3DModels) {
@@ -2903,7 +2870,6 @@ class PlatformManager {
     }
     this._adding3DModels = true;
 
-    console.log('🛢️ Adding 3D rig models...');
 
     // Check if Three.js is available
     if (typeof THREE === 'undefined') {
@@ -2912,8 +2878,6 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ DEBUG: Three.js is available: ${THREE.REVISION}`);
-    console.log(`🔍 DEBUG: Available platforms: ${this.platforms?.length || 0}`);
 
     // Get platforms that should have 3D models
     const rigsFor3D = this.platforms.filter(p => 
@@ -2922,10 +2886,7 @@ class PlatformManager {
     );
 
     console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs`);
-    console.log(`🔍 DEBUG: Total platforms: ${this.platforms.length}`);
-    console.log(`🔍 DEBUG: Sample platform:`, this.platforms[0]);
     if (rigsFor3D.length > 0) {
-      console.log(`🔍 DEBUG: Sample rig for 3D:`, rigsFor3D[0]);
     }
 
     if (rigsFor3D.length === 0) {
@@ -2937,7 +2898,6 @@ class PlatformManager {
         notAirfieldOrBases: this.platforms.filter(p => !p.isAirfield && !p.isBases).length,
         hasCoordinates: this.platforms.filter(p => p.coordinates && p.coordinates.length === 2).length
       };
-      console.log(`🔍 DEBUG: Platform breakdown:`, breakdown);
       this._adding3DModels = false;
       return;
     }
@@ -3075,8 +3035,6 @@ class PlatformManager {
           const massiveScale = scale * 10000; // 10,000x bigger - impossible to miss!
           rigGroup.scale.set(massiveScale, massiveScale, massiveScale);
 
-          console.log(`🔍 DEBUG: Rig ${rig.name} positioned at [${lng}, ${lat}] with MASSIVE scale ${massiveScale.toFixed(8)}`);
-          console.log(`🔍 DEBUG: Mercator coords: x=${mercatorCoord.x}, y=${mercatorCoord.y}, z=${mercatorCoord.z}`);
 
           this.scene.add(rigGroup);
           console.log(`✅ Added MASSIVE 3D model ${index + 1} for ${rig.name}`);
@@ -3124,11 +3082,9 @@ class PlatformManager {
    * 🚁 ADD SIMPLE 3D-LOOKING MARKERS - Simpler approach that will definitely work
    */
   addSimple3DMarkers() {
-    console.log(`🔍 DEBUG: addSimple3DMarkers() called`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ DEBUG: No map available`);
       return;
     }
 
@@ -3248,11 +3204,9 @@ class PlatformManager {
    * 🛢️ ADD REAL 3D RIG MODELS - Using Mapbox native 3D extrusion instead of Three.js
    */
   addReal3DRigModels() {
-    console.log(`🔍 DEBUG: addReal3DRigModels() called - NATIVE MAPBOX 3D APPROACH`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ DEBUG: No map available`);
       return;
     }
 
@@ -3314,7 +3268,6 @@ class PlatformManager {
       features: features
     };
 
-    console.log(`🔍 DEBUG: Created ${features.length} polygon features for 3D extrusion`);
 
     // Add source for real 3D rigs
     map.addSource('real-3d-rigs-source', {

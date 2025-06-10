@@ -99,6 +99,7 @@ const RightPanel = ({
   // Flight ID for weather segments
   currentFlightId = null,
   weatherSegments = null,
+  weatherSegmentsHook = null, // Full weather segments hook for layer controls
   // Fuel policy props
   fuelPolicy = null
 }) => {
@@ -120,7 +121,6 @@ const RightPanel = ({
       
       // Get waypoint locations for the API - ONLY include landing stops, NOT navigation waypoints
       // DEBUG: Check waypoint structure to understand types
-      console.log('=== WAYPOINT DEBUG INFO (RightPanel) ===');
       waypoints.forEach((wp, index) => {
         console.log(`Waypoint ${index} (${wp.name}):`, {
           name: wp.name,
@@ -131,7 +131,6 @@ const RightPanel = ({
           id: wp.id
         });
       });
-      console.log('=== END WAYPOINT DEBUG ===');
       
       const locations = waypoints
         .filter(wp => {
@@ -150,7 +149,7 @@ const RightPanel = ({
         });
       
       // DEBUG: Check waypoint structure to understand types
-      console.log('DEBUG: Waypoint objects structure:', waypoints.map(wp => ({
+      console.log('Debug waypoint types:', waypoints.map((wp, index) => ({
         name: wp.name,
         type: wp.type,
         isWaypoint: wp.isWaypoint,
@@ -269,13 +268,11 @@ const RightPanel = ({
                   
                   if (flightsResult.success && flightsResult.flights) {
                     console.log('🔄 AUTO-RELOAD: Loaded flights list, searching for flight ID:', flightId);
-                    console.log('🔄 AUTO-RELOAD: Available flight IDs:', flightsResult.flights.map(f => f.id));
                     
                     // Find our specific flight by ID
                     const targetFlight = flightsResult.flights.find(f => f.id === flightId);
                     
                     if (targetFlight) {
-                      console.log('🔄 AUTO-RELOAD: Found target flight:', targetFlight.name);
                       console.log('🔄 AUTO-RELOAD: Target flight object keys:', Object.keys(targetFlight));
                       console.log('🔄 AUTO-RELOAD: Raw flight available:', !!targetFlight._rawFlight);
                       
@@ -382,7 +379,6 @@ const RightPanel = ({
     // DEBUG: Check for alternate data in the loaded flight
     if (flight._rawFlight) {
       const rawFlight = flight._rawFlight;
-      console.log('🟠 RIGHTPANEL LOAD: Checking raw flight for alternate data...');
       console.log('🟠 RIGHTPANEL LOAD: alternateSplitPoint:', rawFlight.alternateSplitPoint);
       console.log('🟠 RIGHTPANEL LOAD: alternateName:', rawFlight.alternateName);
       console.log('🟠 RIGHTPANEL LOAD: alternateFullRouteGeoShape:', !!rawFlight.alternateFullRouteGeoShape);
@@ -514,7 +510,6 @@ const RightPanel = ({
           }
           
           // This is a navigation waypoint
-          console.log(`Adding waypoint: ${cleanName}`);
           waypoints.push({
             name: cleanName,
             type: 'waypoint',
@@ -707,6 +702,7 @@ const RightPanel = ({
         toggleBlocksVisibility={toggleBlocksVisibility} // New prop
         toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
         toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
+        weatherSegmentsHook={weatherSegmentsHook} // Pass weather segments hook for layer controls
       />
       
       {/* Save Flight Card */}

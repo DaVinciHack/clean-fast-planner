@@ -41,7 +41,6 @@ class WaypointModeHandler {
     try {
       // CRITICAL ADDITION: Force global flag to true
       window.isWaypointModeActive = true;
-      console.log("CRITICAL FIX: Setting global waypoint mode flag to TRUE");
       
       // CRITICAL FIX: First check and store original methods if they haven't been already
       if (this.waypointManager && this.waypointManager.addWaypoint && !this._originalAddWaypoint) {
@@ -102,7 +101,6 @@ class WaypointModeHandler {
       map.off('mouseup');
       
       // STEP 2: Set up our dedicated waypoint click handler
-      console.log("CRITICAL FIX: Setting up dedicated waypoint click handler");
       this.clickHandler = this.handleMapClick.bind(this);
       map.on('click', this.clickHandler);
       
@@ -276,7 +274,6 @@ class WaypointModeHandler {
           type: 'WAYPOINT'
         };
         
-        console.log("DIRECT FIX: Adding clicked waypoint with forced waypoint flag", waypointData);
         
         // Add to route with explicit isWaypoint flag
         this.addWaypointToRoute(coordinates, name, true);
@@ -300,14 +297,12 @@ class WaypointModeHandler {
       );
       
       if (nearestWaypoint) {
-        console.log(`DIRECT FIX: Found nearest waypoint: ${nearestWaypoint.name} (${nearestWaypoint.distance.toFixed(2)} nm)`);
         
         // Add to the route with forced isWaypoint flag
         const waypointCoordinates = nearestWaypoint.coordinates || 
                                       nearestWaypoint.coords || 
                                       [nearestWaypoint.lng, nearestWaypoint.lat];
                                       
-        console.log("DIRECT FIX: Adding nearest waypoint with forced waypoint flag");
         this.addWaypointToRoute(
           waypointCoordinates, 
           nearestWaypoint.name,
@@ -346,7 +341,6 @@ class WaypointModeHandler {
    * @param {Object} map - The map instance
    */
   setupRouteDragHandlers(map) {
-    console.log("WaypointModeHandler: Setting up route drag handlers");
     
     let isDragging = false;
     let draggedLineCoordinates = [];
@@ -572,7 +566,6 @@ class WaypointModeHandler {
         );
         
         if (nearestWaypoint) {
-          console.log(`WaypointModeHandler: Found nearest waypoint after drag: ${nearestWaypoint.name}`);
           
           // Insert the waypoint at the correct index
           this.addWaypointToRouteAtIndex(
@@ -661,7 +654,6 @@ class WaypointModeHandler {
       };
       
       // Add the waypoint with the isWaypoint flag
-      console.log(`DIRECT FIX: Adding waypoint with explicit metadata:`, forceWaypointMetadata);
       const newWaypoint = this.waypointManager.addWaypoint(coordinates, name, forceWaypointMetadata);
       
       console.log(`WaypointModeHandler: Successfully added waypoint ${name}`);
@@ -705,7 +697,6 @@ class WaypointModeHandler {
       };
       
       // Add the waypoint with the isWaypoint flag at the specified index
-      console.log(`DIRECT FIX: Adding waypoint at index ${index} with explicit metadata:`, forceWaypointMetadata);
       const newWaypoint = this.waypointManager.addWaypointAtIndex(
         coordinates, 
         name,

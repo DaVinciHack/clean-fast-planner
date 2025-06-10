@@ -183,6 +183,9 @@ const FastPlannerCore = ({
     }
   }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length]);
 
+  // 🚫 DISABLED: Manual route auto-zoom was causing unwanted second zoom during flight loading
+  // Only keep the flight loading auto-zoom (after direct coordinate placement)
+
   // Memoize the region change handler to maintain stable reference
   const handleRegionChange = useCallback((event) => {
     if (event.detail && event.detail.region) {
@@ -285,6 +288,12 @@ const FastPlannerCore = ({
   }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
+  const weatherSegmentsHook = useWeatherSegments({
+    flightId: currentFlightId, // Pass current flight ID to enable weather loading
+    mapManagerRef,
+    onWeatherUpdate: updateWeatherSettings // Now using stub function
+  });
+  
   const {
     weatherSegments,
     weatherSegmentsLoading,
@@ -292,11 +301,7 @@ const FastPlannerCore = ({
     loadWeatherSegments,
     toggleWeatherLayer,
     clearWeatherSegments
-  } = useWeatherSegments({
-    flightId: currentFlightId, // Pass current flight ID to enable weather loading
-    mapManagerRef,
-    onWeatherUpdate: updateWeatherSettings // Now using stub function
-  });
+  } = weatherSegmentsHook;
 
   // Calculate weather-based fuel requirements whenever dependencies change
   useEffect(() => {
@@ -781,6 +786,48 @@ const FastPlannerCore = ({
           loadWeatherSegments(flightData.flightId)
             .then(result => {
               console.log('🌤️ MANUAL: Weather segments loaded successfully');
+              
+              // Store weather segments and auto-show circles if data is available
+              if (result && result.segments && result.segments.length > 0) {
+                console.log('🌤️ MANUAL: Weather segments loaded, storing and auto-showing circles');
+                console.log('🌤️ MANUAL: Loaded segments:', result.segments.length);
+                
+                // Store the segments for toggle to use
+                window.loadedWeatherSegments = result.segments;
+                console.log('🌤️ MANUAL: Weather segments stored in window.loadedWeatherSegments');
+                
+                // AUTO-SHOW: Create weather circles immediately with loaded flight data
+                setTimeout(() => {
+                  try {
+                    console.log('🌤️ AUTO-SHOW: Creating weather circles for loaded flight');
+                    
+                    // Import and create weather circles layer
+                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                      if (mapManagerRef?.current?.map) {
+                        console.log('🌤️ AUTO-SHOW: Creating WeatherCirclesLayer with loaded data');
+                        
+                        // Clean up any existing layer first
+                        if (window.currentWeatherCirclesLayer) {
+                          try {
+                            window.currentWeatherCirclesLayer.removeWeatherCircles();
+                          } catch (cleanupError) {
+                            console.warn('🌤️ AUTO-SHOW: Error during cleanup:', cleanupError);
+                          }
+                        }
+                        
+                        const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                        weatherCirclesLayer.addWeatherCircles(result.segments);
+                        window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                        console.log('🌤️ AUTO-SHOW: Weather circles automatically displayed for loaded flight');
+                      }
+                    }).catch(importError => {
+                      console.error('🌤️ AUTO-SHOW: Error importing WeatherCirclesLayer:', importError);
+                    });
+                  } catch (autoShowError) {
+                    console.error('🌤️ AUTO-SHOW: Error auto-showing weather circles:', autoShowError);
+                  }
+                }, 1000); // Wait 1 second for map to be ready
+              }
             })
             .catch(error => {
               console.error('🌤️ MANUAL: Failed to load weather segments:', error);
@@ -958,6 +1005,10 @@ const FastPlannerCore = ({
             // Make stop cards globally available for debugging
             window.debugStopCards = newStopCards;
             console.log('Stop cards available at window.debugStopCards');
+            
+            // 🛢️ RIG WEATHER: Make current waypoints globally available for weather circle coordinate lookup
+            window.currentWaypoints = processedWaypoints;
+            console.log('🛢️ RIG WEATHER: Current waypoints made globally available for weather circles:', processedWaypoints.length);
             console.log('🌤️ Auto-loading weather segments for flight:', flightData.flightId);
             if (flightData.flightId) {
               try {
@@ -999,6 +1050,9 @@ const FastPlannerCore = ({
             } else {
               console.warn('🌤️ Cannot load weather segments - missing flightId');
             }
+            
+            // 🚫 REMOVED: Second auto-zoom was happening too late and zooming too close without alternates
+            // The first auto-zoom (after direct coordinate loading) is perfect - keep only that one
             
             // Update loading indicator with success
             if (window.LoadingIndicator) {
@@ -1349,6 +1403,36 @@ const FastPlannerCore = ({
             
             console.log('All flight waypoints and stops loaded successfully');
             
+            // 🛢️ RIG WEATHER: Make waypoints globally available for weather circle coordinate lookup
+            const waypointObjects = routeCoordinates.map((coords, index) => ({
+              name: displayWaypoints[index]?.replace(/\s*\([^)]*\)\s*$/, '').trim() || `Point ${index + 1}`,
+              lng: coords[0],
+              lat: coords[1],
+              coordinates: coords
+            }));
+            window.currentWaypoints = waypointObjects;
+            console.log('🛢️ RIG WEATHER: Direct coordinate waypoints made globally available:', waypointObjects.length);
+            
+            // 🎯 AUTO-ZOOM: Immediately trigger auto-zoom after direct coordinate loading
+            setTimeout(() => {
+              if (mapManagerRef?.current && routeCoordinates && routeCoordinates.length > 0) {
+                console.log('🎯 AUTO-ZOOM: Triggering auto-zoom after direct coordinate loading');
+                
+                const zoomSuccess = mapManagerRef.current.autoZoomToFlight(waypointObjects, {
+                  padding: 150,          // More generous padding around flight
+                  maxZoom: 8,            // Much less close zoom
+                  duration: 2000,        // Fast 2 second animation
+                  animate: true
+                });
+                
+                if (zoomSuccess) {
+                  console.log('🎯 AUTO-ZOOM: Successfully auto-zoomed to loaded flight coordinates');
+                } else {
+                  console.warn('🎯 AUTO-ZOOM: Failed to auto-zoom to loaded flight coordinates');
+                }
+              }
+            }, 500); // Small delay to allow waypoint rendering
+            
             // Update loading indicator
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator(
@@ -1602,6 +1686,7 @@ const FastPlannerCore = ({
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
+          weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
         />
       </div>
     </>
@@ -1648,7 +1733,7 @@ const FastPlannerApp = () => {
 
   // Define addWaypointDirect and its implementation here, so they can be passed to useManagers
   // and then the implementation to FastPlannerCore
-  const addWaypointDirectRef = useRef(async (waypointData) => {
+  const addWaypointDirectRef = useRef(async () => {
     // Initial placeholder, implementation will be set by addWaypointDirectImpl
     // Ensure appManagers is defined before trying to access its properties
     if (appManagers && appManagers.waypointManagerRef && appManagers.waypointManagerRef.current) {
