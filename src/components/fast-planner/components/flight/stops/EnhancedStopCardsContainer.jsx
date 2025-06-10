@@ -22,6 +22,8 @@ const EnhancedStopCardsContainer = ({
   deckFuelFlow,
   taxiFuel,
   extraFuel,  // 🔧 ADDED: Missing extraFuel parameter
+  araFuel = 0,  // 🔧 ADDED: ARA fuel from weather analysis
+  approachFuel = 0,  // 🔧 ADDED: Approach fuel from weather analysis
   weather,
   alternateRouteData = null,
   fuelPolicy = null, // Fuel policy for reserve fuel conversion
@@ -102,7 +104,9 @@ const EnhancedStopCardsContainer = ({
           deckTimePerStop: Number(deckTimePerStop) || 0,
           deckFuelFlow: Number(deckFuelFlow) || 0,
           taxiFuel: Number(taxiFuel) || 0,
-          extraFuel: Number(extraFuel) || 0  // 🔧 ADDED: Missing extraFuel parameter
+          extraFuel: Number(extraFuel) || 0,  // 🔧 ADDED: Missing extraFuel parameter
+          araFuel: Number(araFuel) || 0,      // 🔧 ADDED: ARA fuel from weather
+          approachFuel: Number(approachFuel) || 0  // 🔧 ADDED: Approach fuel from weather
         };
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(

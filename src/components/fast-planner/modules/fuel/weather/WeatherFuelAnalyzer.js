@@ -25,7 +25,9 @@ class WeatherFuelAnalyzer {
    * @returns {Object} Analysis results with fuel requirements
    */
   analyzeWeatherForFuel(weatherSegments, waypoints, settings = {}) {
-    const config = { ...this.defaults, ...settings };
+    // Get fuel amounts directly from settings (matching fuel policy field names)
+    const araFuelAmount = settings.araFuelDefault || this.defaults.araFuelDefault;
+    const approachFuelAmount = settings.approachFuelDefault || this.defaults.approachFuelDefault;
     
     console.log(`Analyzing weather for ${weatherSegments.length} segments and ${waypoints.length} waypoints`);
     
@@ -99,9 +101,18 @@ class WeatherFuelAnalyzer {
       }
     });
     
-    // Calculate total fuel requirements
-    const totalAraFuel = araRequirements.length * config.araFuelDefault;
-    const totalApproachFuel = approachRequirements.length * config.approachFuelDefault;
+    // Calculate total fuel requirements with professional display format
+    const totalAraFuel = araRequirements.length * araFuelAmount;
+    const totalApproachFuel = approachRequirements.length * approachFuelAmount;
+    
+    // Create clean display text for fuel breakdown
+    const araDisplayText = araRequirements.length > 1 ? 
+      `ARA(${araRequirements.length}x):${totalAraFuel}` : 
+      `ARA:${totalAraFuel}`;
+    
+    const approachDisplayText = approachRequirements.length > 1 ? 
+      `Approach(${approachRequirements.length}x):${totalApproachFuel}` : 
+      `Approach:${totalApproachFuel}`;
     
     console.log("Weather fuel analysis complete:", {
       araRequirements: araRequirements.length,
@@ -116,6 +127,9 @@ class WeatherFuelAnalyzer {
       rigStops,
       totalAraFuel,
       totalApproachFuel,
+      // Professional display text for fuel breakdown
+      araDisplayText,
+      approachDisplayText,
       fuelComponents: {
         araFuel: totalAraFuel,
         approachFuel: totalApproachFuel
