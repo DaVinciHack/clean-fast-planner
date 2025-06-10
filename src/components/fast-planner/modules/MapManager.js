@@ -1003,6 +1003,175 @@ class MapManager {
   }
 
   /**
+   * Auto-zoom map to fit current flight waypoints
+   * @param {Array} waypoints - Array of waypoint objects with lat/lng coordinates
+   * @param {Object} options - Zoom options
+   * @returns {boolean} - Success status
+   */
+  autoZoomToFlight(waypoints, options = {}) {
+    if (!this.map || !this._isLoaded) {
+      console.warn('MapManager: Cannot auto-zoom - map is not initialized or loaded');
+      return false;
+    }
+    
+    if (!waypoints || !Array.isArray(waypoints) || waypoints.length === 0) {
+      console.warn('MapManager: Cannot auto-zoom - no valid waypoints provided');
+      return false;
+    }
+    
+    try {
+      console.log(`🎯 MapManager: Auto-zooming to fit ${waypoints.length} waypoints`);
+      
+      // Extract coordinates from waypoints
+      const coordinates = [];
+      
+      waypoints.forEach((waypoint, index) => {
+        let lat, lng;
+        
+        // Handle different coordinate formats
+        if (waypoint.lat !== undefined && waypoint.lng !== undefined) {
+          lat = waypoint.lat;
+          lng = waypoint.lng;
+        } else if (waypoint.latitude !== undefined && waypoint.longitude !== undefined) {
+          lat = waypoint.latitude;
+          lng = waypoint.longitude;
+        } else if (waypoint.coordinates && Array.isArray(waypoint.coordinates)) {
+          lng = waypoint.coordinates[0];
+          lat = waypoint.coordinates[1];
+        } else if (waypoint.coords && Array.isArray(waypoint.coords)) {
+          lng = waypoint.coords[0];
+          lat = waypoint.coords[1];
+        }
+        
+        // Validate coordinates
+        if (lat !== undefined && lng !== undefined && 
+            typeof lat === 'number' && typeof lng === 'number' &&
+            lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+            lat !== 0 && lng !== 0) { // Filter out placeholder coordinates
+          coordinates.push([lng, lat]); // GeoJSON format
+          console.log(`🎯 Added waypoint ${index}: ${waypoint.name || 'Unknown'} at [${lng.toFixed(4)}, ${lat.toFixed(4)}]`);
+        } else {
+          console.warn(`🎯 Skipped waypoint ${index}: ${waypoint.name || 'Unknown'} - invalid coordinates`, { lat, lng });
+        }
+      });
+      
+      if (coordinates.length === 0) {
+        console.warn('MapManager: No valid coordinates found in waypoints');
+        return false;
+      }
+      
+      // Calculate bounds
+      let minLng = coordinates[0][0];
+      let maxLng = coordinates[0][0];
+      let minLat = coordinates[0][1];
+      let maxLat = coordinates[0][1];
+      
+      coordinates.forEach(([lng, lat]) => {
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      });
+      
+      // Create bounds array for Mapbox (southwest, northeast corners)
+      const bounds = [[minLng, minLat], [maxLng, maxLat]];
+      
+      console.log(`🎯 MapManager: Calculated bounds:`, bounds);
+      
+      // Handle single point case
+      if (coordinates.length === 1) {
+        console.log('🎯 MapManager: Single waypoint - centering and zooming');
+        this.map.flyTo({
+          center: coordinates[0],
+          zoom: options.singlePointZoom || 10,
+          animate: options.hasOwnProperty('animate') ? options.animate : true,
+          duration: options.duration || 2000,
+          essential: true
+        });
+        return true;
+      }
+      
+      // Fit map to bounds with enhanced options
+      const fitOptions = {
+        padding: options.padding || 80, // More generous padding
+        maxZoom: options.maxZoom || 12, // Reasonable max zoom
+        animate: options.hasOwnProperty('animate') ? options.animate : true,
+        duration: options.duration || 2500, // Slightly longer for smooth effect
+        essential: options.hasOwnProperty('essential') ? options.essential : true
+      };
+      
+      console.log(`🎯 MapManager: Fitting to bounds with options:`, fitOptions);
+      
+      this.map.fitBounds(bounds, fitOptions);
+      
+      // Auto-load weather circles if flight has weather data
+      setTimeout(() => {
+        this.autoLoadWeatherCircles();
+      }, fitOptions.duration + 500); // Wait for zoom animation to complete
+      
+      return true;
+    } catch (error) {
+      console.error('MapManager: Error auto-zooming to flight:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Auto-load weather circles if weather data is available
+   * @returns {boolean} - Success status
+   */
+  autoLoadWeatherCircles() {
+    try {
+      console.log('🌤️ MapManager: Checking for weather data to auto-load weather circles');
+      
+      // Find available weather data
+      let weatherData = null;
+      let dataSource = 'none';
+      
+      if (window.loadedWeatherSegments?.length > 0) {
+        weatherData = window.loadedWeatherSegments;
+        dataSource = 'window.loadedWeatherSegments';
+      }
+      
+      console.log(`🌤️ MapManager: Found weather data from ${dataSource}, segments:`, weatherData?.length || 0);
+      
+      if (weatherData && weatherData.length > 0) {
+        // Import and create weather circles layer
+        import('./layers/WeatherCirclesLayer.js').then(module => {
+          const WeatherCirclesLayer = module.default;
+          
+          // Clean up existing layer first
+          if (window.currentWeatherCirclesLayer) {
+            try {
+              window.currentWeatherCirclesLayer.removeWeatherCircles();
+            } catch (cleanupError) {
+              console.warn('🌤️ Auto-load cleanup error:', cleanupError);
+            }
+          }
+          
+          // Create new weather circles layer
+          console.log('🌤️ MapManager: Auto-creating weather circles for new flight');
+          const weatherCirclesLayer = new WeatherCirclesLayer(this.map);
+          weatherCirclesLayer.addWeatherCircles(weatherData);
+          window.currentWeatherCirclesLayer = weatherCirclesLayer;
+          
+          console.log('🌤️ MapManager: Weather circles auto-loaded successfully');
+          return true;
+        }).catch(error => {
+          console.error('🌤️ MapManager: Error auto-loading weather circles:', error);
+          return false;
+        });
+      } else {
+        console.log('🌤️ MapManager: No weather data available for auto-loading');
+        return false;
+      }
+    } catch (error) {
+      console.error('🌤️ MapManager: Error in autoLoadWeatherCircles:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get current map style ID
    * @returns {string} - Current style identifier
    */

@@ -28,12 +28,15 @@ const MapLayersCard = ({
   toggleMovablePlatformsVisibility,
   toggleBlocksVisibility, // New function for blocks
   toggleBasesVisibility, // New function for bases
-  toggleFuelAvailableVisibility // New function for fuel available
+  toggleFuelAvailableVisibility, // New function for fuel available
+  // Weather segments props
+  weatherSegmentsHook // Pass the entire weather segments hook
 }) => {
   const { currentRegion } = useRegion();
   const [layers, setLayers] = useState({
     gulfCoastHeli: false,
     weather: false,
+    weatherCircles: true, // Default ON - weather circles auto-show with flights
     vfrCharts: false,
     grid: true,
     platforms: true, // Fixed platforms (enhanced category)
@@ -61,6 +64,75 @@ const MapLayersCard = ({
       fuelAvailable: fuelAvailableVisible
     }));
   }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible, blocksVisible, basesVisible, fuelAvailableVisible]);
+
+  // Auto-enable weather circles when weather data becomes available
+  useEffect(() => {
+    const checkAndAutoEnableWeatherCircles = () => {
+      // Check if weather data is available
+      const hasWeatherData = (weatherSegmentsHook?.weatherSegments?.length > 0) || 
+                            (window.loadedWeatherSegments?.length > 0);
+      
+      if (hasWeatherData && !layers.weatherCircles && !window.currentWeatherCirclesLayer) {
+        console.log('🌤️ AUTO-ENABLE: Weather data detected, auto-enabling weather circles');
+        
+        // Auto-enable weather circles
+        setLayers(prev => ({ ...prev, weatherCircles: true }));
+        
+        // Trigger the weather circles creation
+        setTimeout(() => {
+          try {
+            // Find the best weather data source
+            let weatherData = null;
+            let dataSource = 'none';
+            
+            if (weatherSegmentsHook?.weatherSegments?.length > 0) {
+              weatherData = weatherSegmentsHook.weatherSegments;
+              dataSource = 'hook';
+            } else if (window.loadedWeatherSegments?.length > 0) {
+              weatherData = window.loadedWeatherSegments;
+              dataSource = 'loaded';
+            }
+            
+            console.log(`🌤️ AUTO-ENABLE: Creating weather circles from ${dataSource}, segments:`, weatherData?.length || 0);
+            
+            if (weatherData && weatherData.length > 0 && mapManagerRef?.current?.map) {
+              import('../../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                // Clean up any existing layer first
+                if (window.currentWeatherCirclesLayer) {
+                  try {
+                    window.currentWeatherCirclesLayer.removeWeatherCircles();
+                  } catch (cleanupError) {
+                    console.warn('🌤️ AUTO-ENABLE: Error during cleanup:', cleanupError);
+                  }
+                }
+                
+                console.log('🌤️ AUTO-ENABLE: Creating WeatherCirclesLayer automatically');
+                const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                weatherCirclesLayer.addWeatherCircles(weatherData);
+                window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                console.log('🌤️ AUTO-ENABLE: Weather circles automatically enabled and displayed');
+              }).catch(error => {
+                console.error('🌤️ AUTO-ENABLE: Error importing WeatherCirclesLayer:', error);
+                // Reset state on error
+                setLayers(prev => ({ ...prev, weatherCircles: false }));
+              });
+            }
+          } catch (error) {
+            console.error('🌤️ AUTO-ENABLE: Error auto-enabling weather circles:', error);
+            setLayers(prev => ({ ...prev, weatherCircles: false }));
+          }
+        }, 500); // Small delay to ensure map is ready
+      }
+    };
+    
+    // Check immediately
+    checkAndAutoEnableWeatherCircles();
+    
+    // Set up interval to check for new weather data
+    const interval = setInterval(checkAndAutoEnableWeatherCircles, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(interval);
+  }, [weatherSegmentsHook?.weatherSegments?.length, layers.weatherCircles, mapManagerRef]);
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -169,6 +241,99 @@ const MapLayersCard = ({
           if (weatherLayerRef?.current) {
             const isVisible = await weatherLayerRef.current.toggle();
             setLayers(prev => ({ ...prev, weather: isVisible }));
+          }
+          break;
+          
+        case 'weatherCircles':
+          try {
+            console.log('🔘 TOGGLE: Weather circles clicked, current state:', layers.weatherCircles);
+            
+            // RACE CONDITION FIX: Use a single consistent approach with proper async handling
+            
+            // Step 1: Always clean up existing layers first (synchronous)
+            if (window.currentWeatherCirclesLayer) {
+              console.log('🔘 TOGGLE: Removing existing global weather circles layer');
+              try {
+                window.currentWeatherCirclesLayer.removeWeatherCircles();
+              } catch (cleanupError) {
+                console.warn('🔘 TOGGLE: Error during cleanup:', cleanupError);
+              }
+              window.currentWeatherCirclesLayer = null;
+            }
+            
+            // Step 2: If toggling OFF, just set state and stop
+            if (layers.weatherCircles) {
+              console.log('🔘 TOGGLE: Turning weather circles OFF');
+              setLayers(prev => ({ ...prev, weatherCircles: false }));
+              return; // Early return to prevent further execution
+            }
+            
+            // Step 3: If toggling ON, create new layer with available data
+            console.log('🔘 TOGGLE: Turning weather circles ON');
+            
+            // Find the best weather data source
+            let weatherData = null;
+            let dataSource = 'none';
+            
+            if (weatherSegmentsHook?.weatherSegments?.length > 0) {
+              weatherData = weatherSegmentsHook.weatherSegments;
+              dataSource = 'hook';
+            } else if (window.loadedWeatherSegments?.length > 0) {
+              weatherData = window.loadedWeatherSegments;
+              dataSource = 'loaded';
+            }
+            
+            console.log(`🔘 TOGGLE: Using weather data from ${dataSource}, segments:`, weatherData?.length || 0);
+            
+            // Check map availability before proceeding
+            if (!mapManagerRef?.current?.map) {
+              console.error('🔘 TOGGLE: Map not available for weather circles');
+              return;
+            }
+            
+            if (weatherData && weatherData.length > 0) {
+              // ASYNC FIX: Use async/await to prevent race conditions
+              const createWeatherCircles = async () => {
+                try {
+                  const { default: WeatherCirclesLayer } = await import('../../../modules/layers/WeatherCirclesLayer');
+                  
+                  // Double-check map is still available after async import
+                  if (mapManagerRef?.current?.map) {
+                    console.log('🔘 TOGGLE: Creating new WeatherCirclesLayer with real data');
+                    const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                    
+                    // Add circles and store layer reference
+                    weatherCirclesLayer.addWeatherCircles(weatherData);
+                    window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                    console.log('🔘 TOGGLE: Real weather circles added successfully');
+                  } else {
+                    console.error('🔘 TOGGLE: Map became unavailable during async operation');
+                  }
+                } catch (importError) {
+                  console.error('🔘 TOGGLE: Error importing or creating weather circles layer:', importError);
+                }
+              };
+              
+              createWeatherCircles();
+            } else {
+              // Fallback to test circles
+              console.log('🔘 TOGGLE: No real data available, using test circles');
+              if (weatherSegmentsHook?.addTestWeatherCircles) {
+                try {
+                  weatherSegmentsHook.addTestWeatherCircles();
+                } catch (testError) {
+                  console.error('🔘 TOGGLE: Error adding test circles:', testError);
+                }
+              }
+            }
+            
+            // Update state only after successful setup
+            setLayers(prev => ({ ...prev, weatherCircles: true }));
+            
+          } catch (error) {
+            console.error('🔘 TOGGLE: Error toggling weather circles:', error);
+            // Reset state on error
+            setLayers(prev => ({ ...prev, weatherCircles: false }));
           }
           break;
           
@@ -320,6 +485,7 @@ const MapLayersCard = ({
         <div className="layer-section">
           <h4>Aviation Layers</h4>
           {renderLayerToggle('weather', 'Weather Overlay', !!weatherLayerRef?.current)}
+          {renderLayerToggle('weatherCircles', 'Weather Circles', !!weatherSegmentsHook)}
           {renderLayerToggle('vfrCharts', 'VFR Charts', !!vfrChartsRef?.current)}
         </div>
         

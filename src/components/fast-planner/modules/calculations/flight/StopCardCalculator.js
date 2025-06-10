@@ -46,7 +46,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     return !isWaypoint;
   });
   
-  console.log(`StopCardCalculator: Processing ${landingStopsOnly.length} landing stops out of ${waypoints.length} total waypoints`);
   
   // If we've filtered out ALL waypoints, we need to keep at least first and last as landing stops
   if (landingStopsOnly.length === 0 && waypoints.length >= 2) {
@@ -90,7 +89,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   
   
   // 🔧 DEBUG: Log extraFuel value to see what we're getting
-  console.log('🔧 StopCardCalculator DEBUG: extraFuel value:', {
+  console.log('🔧 StopCardCalculator extraFuel debug:', {
     extraFuel,
     extraFuelType: typeof extraFuel,
     options: options,
@@ -345,7 +344,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         legWaypoints.push(fromWaypoint, toWaypoint);
       }
       
-      console.log(`StopCardCalculator: Processing leg ${i+1} with ${legWaypoints.length} waypoints (including navigation waypoints)`);
       
       // Calculate the total leg distance by summing all segments
       let legDistance = 0;
@@ -485,7 +483,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   console.log(`StopCardCalculator: Calculating deck time for ${intermediateStops} intermediate stops out of ${landingStopsCount} total landing stops`);
   
   // 🔍 DEBUG: Check what fuel flow data we have from aircraft
-  console.log('🔍 AIRCRAFT FUEL FLOW DEBUG:', {
+  console.log('🔍 FUEL FLOW DEBUG:', {
     selectedAircraft_available: !!aircraft,
     aircraft_fuelFlow: aircraft?.fuelFlow,
     aircraft_fuelBurn: aircraft?.fuelBurn, 
@@ -1180,7 +1178,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   
   // Find split point index in landing stops
   console.log('🟠 AlternateStopCard: Looking for split point:', splitPointName);
-  console.log('🟠 AlternateStopCard: Available landing stops:', landingStopsOnly.map(wp => ({
+  console.log('🟠 AlternateStopCard: Landing stops debug:', landingStopsOnly.map(wp => ({
     name: wp.name,
     id: wp.id,
     pointType: wp.pointType,
@@ -1201,7 +1199,6 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     );
     
     if (allWaypointsIndex !== -1) {
-      console.log('🟠 AlternateStopCard: Found split point in all waypoints at index:', allWaypointsIndex);
       
       // Find the corresponding landing stop index
       // Count how many landing stops come before this waypoint

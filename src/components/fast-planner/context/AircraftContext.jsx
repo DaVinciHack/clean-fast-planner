@@ -204,7 +204,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
       
       // ALWAYS load aircraft data - don't use global flag
       // This is critical for the application to work correctly
-      console.log('AircraftContext: Loading all aircraft from OSDK');
       
       // Reset the global flag to force a load
       window.aircraftLoadedGlobally = false;
@@ -230,7 +229,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
               
               // Get aircraft for the current region
               const aircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
-              console.log(`Found ${aircraftInRegion.length} aircraft in ${currentRegion.name}`);
               
               // Create buckets for all standard types
               const allTypes = {
@@ -318,7 +316,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
       try {
         // Get the aircraft by region
         const aircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
-        console.log(`AircraftContext: Found ${aircraftInRegion.length} aircraft in region ${currentRegion.id}`);
         
         // IMPORTANT: Create an object with ALL possible aircraft types (empty arrays)
         // This is the key trick from the original component - always show all types
@@ -502,7 +499,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           
           // Get all aircraft of this type in the current region
           const filteredAircraft = aircraftManagerInstance.filterAircraft(currentRegion.id, type);
-          console.log(`Found ${filteredAircraft.length} aircraft of type ${type}`);
           
           // Put them in the correct bucket
           allTypes[type] = filteredAircraft;
@@ -568,7 +564,6 @@ export const AircraftProvider = ({ children, client, currentRegion }) => {
           try {
             // Get ALL aircraft in current region
             const allAircraftInRegion = aircraftManagerInstance.getAircraftByRegion(currentRegion.id);
-            console.log(`Found ${allAircraftInRegion.length} aircraft in region ${currentRegion.name}`);
             
             // Create empty buckets for ALL standard types - crucial for dropdown to work correctly
             const allTypes = {

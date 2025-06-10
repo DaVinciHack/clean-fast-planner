@@ -53,14 +53,12 @@ const useWaypoints = ({
     
     // CRITICAL: Handle multiple waypoints separated by spaces (e.g., "ENFL ENOW ENOR ENPL")
     if (typeof waypointData === 'string' && waypointData.includes(' ')) {
-      console.log('🌐 MULTIPLE WAYPOINTS DETECTED: Processing route string with multiple waypoints');
       const waypointNames = waypointData.trim().split(/\s+/).filter(name => name.length > 0);
       console.log(`🌐 Split into ${waypointNames.length} individual waypoints:`, waypointNames);
       
       // Process each waypoint individually
       for (let i = 0; i < waypointNames.length; i++) {
         const waypointName = waypointNames[i];
-        console.log(`🌐 Processing waypoint ${i + 1}/${waypointNames.length}: ${waypointName}`);
         
         try {
           // Recursively call addWaypoint for each individual waypoint
@@ -114,7 +112,6 @@ const useWaypoints = ({
             const nearestWaypoint = platformManagerRef.current.findNearestOsdkWaypoint(coords[1], coords[0], 5);
             
             if (nearestWaypoint && nearestWaypoint.distance <= 5) {
-              console.log(`🌐 Found nearby waypoint ${nearestWaypoint.name} (${nearestWaypoint.distance.toFixed(2)}nm away)`);
               coords = nearestWaypoint.coordinates;
               name = nearestWaypoint.name;
               isWaypoint = true;
@@ -135,7 +132,6 @@ const useWaypoints = ({
             const nearestPlatform = platformManagerRef.current.findNearestPlatform(coords[1], coords[0], 5);
             
             if (nearestPlatform && nearestPlatform.distance <= 5) {
-              console.log(`🌐 Found nearby platform ${nearestPlatform.name} (${nearestPlatform.distance.toFixed(2)}nm away)`);
               coords = nearestPlatform.coordinates;
               name = nearestPlatform.name;
               
@@ -151,11 +147,9 @@ const useWaypoints = ({
           }
         }
       } else if (typeof waypointData === 'string') {
-        console.log('🌐 Processing string input:', waypointData);
         name = waypointData;
         
         // NEW: Check if the string looks like coordinates
-        console.log('🌐 Checking if input looks like coordinates...');
         const looksLike = looksLikeCoordinates(waypointData);
         console.log('🌐 looksLikeCoordinates result:', looksLike);
         
@@ -196,7 +190,6 @@ const useWaypoints = ({
             if (platform) {
               coords = platform.coordinates;
               name = platform.name;
-              console.log(`🌐 Found platform by name: ${name} at [${coords}]`);
             } else {
               console.log(`🌐 Platform "${waypointData}" not found in database`);
               
@@ -300,7 +293,6 @@ const useWaypoints = ({
         isWaypoint = true;
       }
       
-      console.log(`🌐 Adding ${isWaypoint ? 'waypoint' : 'stop'} at [${coords}] with name: "${name || 'Unnamed'}"`);
       
       waypointManagerRef.current.addWaypoint(coords, name, { 
         isWaypoint: isWaypoint,
@@ -395,7 +387,6 @@ const useWaypoints = ({
    * Updates the name of a waypoint
    */
   const updateWaypointName = useCallback((index, name) => {
-    console.log(`Updating waypoint name at index ${index} to: ${name}`);
     
     if (waypointManagerRef.current) {
       waypointManagerRef.current.updateWaypointName(index, name);

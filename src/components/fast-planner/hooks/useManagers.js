@@ -254,25 +254,20 @@ const useManagers = ({
 
     // Initialize the AppSettingsManager
     if (!appSettingsManagerRef.current) {
-      console.log("FastPlannerApp: Creating AppSettingsManager instance");
       appSettingsManagerRef.current = new AppSettingsManager();
 
       // Set callbacks for settings changes
       appSettingsManagerRef.current.setCallback('onRegionChange', (regionId) => {
-        console.log(`AppSettingsManager: Region changed to ${regionId}`);
       });
 
       appSettingsManagerRef.current.setCallback('onAircraftChange', (aircraft) => {
-        console.log(`AppSettingsManager: Aircraft changed to ${aircraft.type} ${aircraft.registration}`);
       });
 
       appSettingsManagerRef.current.setCallback('onFlightSettingsChange', (settings) => {
-        console.log('AppSettingsManager: Flight settings changed');
-        console.log('📥 AppSettingsManager: Settings from storage:', settings);
         // ✅ CRITICAL FIX: Merge AppSettingsManager values with existing flightSettings
         // Only user inputs from AppSettingsManager, preserve OSDK policy values
         setFlightSettings(currentSettings => {
-          console.log('🔍 AppSettingsManager: Current settings before merge:', {
+          console.log('AppSettingsManager flightSettings change:', {
             contingencyFuelPercent: currentSettings.contingencyFuelPercent,
             passengerWeight: currentSettings.passengerWeight,
             taxiFuel: currentSettings.taxiFuel
@@ -281,7 +276,7 @@ const useManagers = ({
             ...currentSettings, // Preserve existing OSDK policy values
             ...settings         // Apply only user inputs from AppSettingsManager
           };
-          console.log('🔍 AppSettingsManager: Merged settings result:', {
+          console.log('Merged settings:', {
             contingencyFuelPercent: merged.contingencyFuelPercent,
             passengerWeight: merged.passengerWeight,
             taxiFuel: merged.taxiFuel
@@ -291,7 +286,6 @@ const useManagers = ({
       });
 
       appSettingsManagerRef.current.setCallback('onUISettingsChange', (uiSettings) => {
-        console.log('AppSettingsManager: UI settings changed');
       });
 
       // Load any saved settings
@@ -391,7 +385,6 @@ const useManagers = ({
                 );
                 
                 if (nearestWp) {
-                  console.log(`🛣️ Found nearby waypoint for route click: ${nearestWp.name} (${nearestWp.distance.toFixed(2)}nm away)`);
                   clickData.nearestWaypoint = nearestWp;
                 }
               }
@@ -411,7 +404,6 @@ const useManagers = ({
                 );
                 
                 if (nearestPlatform) {
-                  console.log(`🛣️ Found nearby platform for route click: ${nearestPlatform.name} (${nearestPlatform.distance.toFixed(2)}nm away)`);
                   clickData.nearestRig = nearestPlatform;
                 }
               }
@@ -423,7 +415,6 @@ const useManagers = ({
           // IMPROVED: Use 5nm snapping radius instead of 2nm/1nm
           // If in waypoint mode and we have a nearest waypoint available, use that
           if (isWaypointMode && clickData.nearestWaypoint && clickData.nearestWaypoint.distance < 5) {
-            console.log('🛣️ Adding navigation waypoint at route click:', clickData.nearestWaypoint.name);
             
             // Show user feedback
             if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -444,7 +435,6 @@ const useManagers = ({
           // If not in waypoint mode and we have a nearest rig and it's close (now using 5nm)
           else if (!isWaypointMode && clickData.nearestRig && clickData.nearestRig.distance < 5) {
             // Add the rig instead of the clicked point
-            console.log('🛣️ Adding rig at route click:', clickData.nearestRig.name);
             
             // Show user feedback
             if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -463,7 +453,6 @@ const useManagers = ({
             );
           } else {
             // Add the clicked point - no nearby facility found
-            console.log(`🛣️ Adding ${isWaypointMode ? 'waypoint' : 'stop'} at route click`);
             waypointManagerRef.current.addWaypointAtIndex(
               [clickData.lngLat.lng, clickData.lngLat.lat],
               null,
@@ -481,7 +470,6 @@ const useManagers = ({
             setTimeout(resolve, 0);
           });
 
-          console.log('🛣️ Waypoints updated. Centralized useEffect will recalculate fuel.');
           
           // Add a small delay to prevent rapid-fire clicks
           await new Promise(resolve => setTimeout(resolve, 300));
@@ -519,7 +507,6 @@ const useManagers = ({
     };
 
     const handleSettingsChanged = () => {
-      console.log("Settings changed event received. Centralized useEffect should handle updates.");
     };
 
     // Add event listeners
@@ -539,7 +526,6 @@ const useManagers = ({
   // Effect to handle flightSettings changes
   useEffect(() => {
     if (flightSettings && flightCalculationsRef.current) {
-      console.log("useManagers: flightSettings changed, updating flightCalculationsRef config.");
       flightCalculationsRef.current.updateConfig({
         passengerWeight: flightSettings.passengerWeight,
         contingencyFuelPercent: flightSettings.contingencyFuelPercent,

@@ -86,10 +86,67 @@ Weather segments are matched to waypoints using:
 
 ### ⚠️ KNOWN ISSUES TO ADDRESS:
 
-1. **Header Totals**: Header not using single source of truth - missing ARA/approach fuel
+1. ~~**Header Totals**: Header not using single source of truth - missing ARA/approach fuel~~ ✅ FIXED
 2. **Fuel Capacity Limits**: Need to handle when required fuel > aircraft capacity
 3. **Passenger Calculations**: Currently uses total fuel regardless of aircraft limits
 4. **UI Limitations**: Need detailed fuel breakdown display (card rollover or dedicated fuel card)
+
+## 🎨 VISUAL ENHANCEMENTS - NEXT IMPLEMENTATION
+
+### Weather Visualization System (IN PROGRESS)
+
+#### **Goal**: Add 3D weather circles and dotted alternate lines for instant visual weather assessment
+
+#### **Implementation Plan**:
+
+##### **1. 3D Weather Circles (Ground Level)**
+- **Location**: Modify `/src/components/fast-planner/modules/WaypointManager.js`
+- **Type**: MapBox `fill` layer with circular polygons
+- **Z-Layer**: Sort-key `-3` (underneath everything - on the ground)
+- **Colors**: Use existing `getAviationRankingColor()` from `WeatherCard.jsx`:
+  ```javascript
+  case 5:  '#D32F2F'  // Red - Below minimums
+  case 8:  '#8E24AA'  // Purple - ARA fuel needed
+  case 10: '#F57C00'  // Orange - Warning conditions  
+  case 15: '#66BB6A'  // Green - Good conditions
+  case 20: '#616161'  // Grey - Not applicable
+  ```
+- **Size**: Slightly bigger than airport pins, zoom-responsive
+- **Style**: Semi-transparent, lying flat on ground under all other elements
+
+##### **2. Dotted Alternate Lines**
+- **Location**: Extend existing alternate route system in `WaypointManager.js`
+- **Style**: Light grey (#CCCCCC), 1px width, dashed `[3,3]` pattern
+- **Z-Layer**: Sort-key `2.8` (above main route, below main alternate)
+- **Data Source**: Use weather segment coordinates or calculate from lat/lng
+- **Curves**: Same curved line system as existing routes
+
+##### **Current Z-Layer System**:
+```
+-3: Weather circles (NEW - ground level)
+-2: Route shadows
+-1: Alternate shadows  
+ 1: Route glow
+ 2: Main routes
+2.5: Alternate glow
+2.8: Weather alternate lines (NEW - dotted)
+ 3: Main alternate routes
+10: Interactions
+```
+
+##### **Key Files**:
+- `WaypointManager.js` - Main rendering logic
+- `WeatherCard.jsx` - Color system (already implemented)
+- `WeatherSegmentsService.js` - Coordinate data extraction
+- Weather segments contain: `geoPoint`, `alternateGeoShape`, ranking data
+
+##### **Implementation Steps**:
+1. Start with weather circles (simpler)
+2. Add dotted alternate lines
+3. Adjust sizing and colors based on visual feedback
+4. Ensure proper z-layer ordering (circles → lines → pins)
+
+**Result**: Instant visual weather assessment - one glance shows weather conditions across entire route and all alternate options.
 
 ### ✅ WORKING CORRECTLY:
 - Weather segment loading and matching

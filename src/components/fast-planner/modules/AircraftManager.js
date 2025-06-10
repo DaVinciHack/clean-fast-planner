@@ -200,7 +200,6 @@ class AircraftManager {
           $pageSize: 1000 // Increased to get all aircraft in one request
         });
         
-        console.log(`Query returned ${response.data ? response.data.length : 0} aircraft`);
         
         // Process the response
         if (response && response.data) {
@@ -208,7 +207,6 @@ class AircraftManager {
           
           // Log sample data to understand the structure
           if (response.data.length > 0) {
-            // console.log('Sample aircraft data fields:', Object.keys(response.data[0]).join(', ')); // Silenced for debugging
           }
           
           // Process each aircraft and create standardized objects
@@ -230,10 +228,6 @@ class AircraftManager {
             const displayRegistration = `${registration} (${region})`;
             
             // Debug: Show what fields are actually available in OSDK data
-            console.log(`🔍 AIRCRAFT DEBUG: Available fields in OSDK aircraft data:`, Object.keys(aircraft));
-            console.log(`🔍 AIRCRAFT DEBUG: defaultFuelPolicyId value:`, aircraft.defaultFuelPolicyId);
-            console.log(`🔍 AIRCRAFT DEBUG: defaultFuelPolicyName value:`, aircraft.defaultFuelPolicyName);
-            console.log(`🔍 AIRCRAFT DEBUG: Full aircraft object:`, aircraft);
             
             // Create standardized aircraft object
             return {
@@ -366,7 +360,7 @@ class AircraftManager {
     
     // Log a sample aircraft to check structure
     if (this.aircraftList.length > 0) {
-      console.log("Sample aircraft data:", {
+      console.log('Sample aircraft structure:', {
         region: this.aircraftList[0].region,
         type: this.aircraftList[0].modelType,
         registration: this.aircraftList[0].registration
@@ -445,7 +439,6 @@ class AircraftManager {
           aircraft.registration.includes(reg)
         );
         
-        console.log(`${reg}: Found ${matches.length} matches`);
         
         matches.forEach(aircraft => {
           console.log(`  - Registration: ${aircraft.registration}`);
@@ -462,7 +455,6 @@ class AircraftManager {
         this.regionsMatch(aircraft.region, 'GULF OF MEXICO')
       );
       
-      console.log(`Found ${s92AircraftInGOM.length} S92 aircraft in Gulf of Mexico`);
       
       // Print the details of each S92 aircraft
       s92AircraftInGOM.forEach(aircraft => {
@@ -674,14 +666,12 @@ class AircraftManager {
     // e.g. extract S92 from "N228BJ (GULF OF MEXICO) | S92"
     const regExMatch = model.match(/\| (\w+\d+\w*)$/);
     if (regExMatch && regExMatch[1]) {
-      console.log(`Found type ${regExMatch[1]} via regex from ${modelName}`);
       return regExMatch[1];
     }
     
     // Try to match with type map
     for (const [key, value] of Object.entries(typeMap)) {
       if (model.includes(key)) {
-        // console.log(`Found type ${value} by matching key ${key} in ${modelName}`); // Silenced for debugging
         return value;
       }
     }
@@ -742,7 +732,6 @@ class AircraftManager {
     
     // Format region for consistency
     const formattedRegion = this.formatRegionForOSDK(region);
-    console.log(`Getting aircraft for region: ${formattedRegion}`);
     
     // Special handling for Gulf of Mexico - log all aircraft in this region
     if (formattedRegion === 'GULF OF MEXICO') {
@@ -764,7 +753,6 @@ class AircraftManager {
     // Check if we have pre-organized data for this region
     if (this.aircraftByRegion[formattedRegion]) {
       const result = this.aircraftByRegion[formattedRegion].all;
-      console.log(`Found ${result.length} aircraft in ${formattedRegion} from organized data`);
       return result;
     }
     
@@ -790,7 +778,6 @@ class AircraftManager {
       return this.regionsMatch(displayedRegion, formattedRegion);
     });
     
-    console.log(`Found ${matchedAircraft.length} aircraft in ${formattedRegion} using flexible matching`);
     
     // Store the results for future use
     if (matchedAircraft.length > 0 && !this.aircraftByRegion[formattedRegion]) {
@@ -831,7 +818,6 @@ class AircraftManager {
     
     // Format region for consistency
     const formattedRegion = this.formatRegionForOSDK(region);
-    console.log(`Getting available types for region: ${formattedRegion}`);
     
     // Get from pre-calculated data if available
     if (this.typesByRegion[formattedRegion]) {
@@ -843,7 +829,6 @@ class AircraftManager {
         return hasAircraft;
       });
       
-      console.log(`Found ${typesWithAircraft.length} types with aircraft in ${formattedRegion}:`, typesWithAircraft);
       return typesWithAircraft;
     }
     
@@ -853,7 +838,6 @@ class AircraftManager {
     // Try each known region and check if it matches
     for (const knownRegion of Object.keys(this.typesByRegion)) {
       if (this.regionsMatch(knownRegion, formattedRegion)) {
-        console.log(`Found matching region: ${knownRegion} matches ${formattedRegion}`);
         
         // Filter to only include types that actually have aircraft
         const typesWithAircraft = this.typesByRegion[knownRegion].filter(type => {
@@ -863,7 +847,6 @@ class AircraftManager {
           return hasAircraft;
         });
         
-        console.log(`Found ${typesWithAircraft.length} types with aircraft in ${knownRegion} (match for ${formattedRegion}):`, typesWithAircraft);
         
         // Store for future use
         this.typesByRegion[formattedRegion] = typesWithAircraft;
@@ -918,7 +901,6 @@ class AircraftManager {
         let matchFound = false;
         for (const knownRegion of Object.keys(this.aircraftByRegion)) {
           if (this.regionsMatch(knownRegion, formattedRegion)) {
-            console.log(`Found matching region: "${knownRegion}" matches "${formattedRegion}"`);
             filtered = [...this.aircraftByRegion[knownRegion].all];
             console.log(`Using data from matched region: ${filtered.length} aircraft in ${knownRegion}`);
             
@@ -962,7 +944,6 @@ class AircraftManager {
         const directMatches = filtered.filter(aircraft => aircraft.modelType === type);
         
         if (directMatches.length > 0) {
-          console.log(`Found ${directMatches.length} direct type matches for ${type}`);
           filtered = directMatches;
         } else {
           // Fall back to flexible type matching
@@ -983,7 +964,6 @@ class AircraftManager {
                   (aircraft.modelName && this.typesMatch(aircraft.modelName, type));
           });
           
-          console.log(`Found ${filtered.length} aircraft using flexible type matching`);
         }
       }
     }
@@ -1130,7 +1110,6 @@ class AircraftManager {
     
     // Format region for consistency
     const formattedRegion = this.formatRegionForOSDK(region);
-    console.log(`Getting aircraft counts by type for region: ${formattedRegion}`);
     
     // Use the pre-organized data if available
     if (this.aircraftByRegion[formattedRegion]) {
