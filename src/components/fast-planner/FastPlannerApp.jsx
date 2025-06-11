@@ -596,8 +596,33 @@ const FastPlannerCore = ({
 
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
-      appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(location);
-      const updatedFavorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocations();
+      // Get current region with enhanced detection
+      let currentRegion = appManagers.regionManagerRef?.current?.getCurrentRegion();
+      
+      // Fallback: try to detect region from activeRegionFromContext
+      if (!currentRegion || !currentRegion.id) {
+        console.log('FastPlannerApp: No region from RegionManager, trying activeRegionFromContext:', activeRegionFromContext);
+        currentRegion = activeRegionFromContext;
+      }
+      
+      // Convert region name to ID if needed
+      let regionId = currentRegion?.id || currentRegion?.name || 'unknown';
+      if (regionId && typeof regionId === 'string') {
+        regionId = regionId.toLowerCase().replace(/\s+/g, '-');
+      }
+      
+      console.log('FastPlannerApp: Adding favorite location to region:', regionId, location);
+      console.log('FastPlannerApp: Region detection details:', {
+        fromRegionManager: appManagers.regionManagerRef?.current?.getCurrentRegion(),
+        fromContext: activeRegionFromContext,
+        finalRegionId: regionId
+      });
+      
+      // Add to the correct region
+      appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(regionId, location);
+      
+      // Update UI with favorites for current region
+      const updatedFavorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
       setFavoriteLocations(updatedFavorites);
     }
   };
@@ -610,10 +635,109 @@ const FastPlannerCore = ({
   // Make generateStopCardsData available globally for debugging
   window.generateStopCardsData = generateStopCardsData;
 
+  // Make addToFavorites available globally for popup heart icons
+  window.addToFavorites = (name, coords) => {
+    console.log('Global addToFavorites called:', { name, coords });
+    
+    // Create location object in the format expected by handleAddFavoriteLocation
+    const location = {
+      name: name,
+      coords: coords
+    };
+    
+    handleAddFavoriteLocation(location);
+  };
+
+  // Debug function to check localStorage
+  window.checkFavoritesStorage = () => {
+    const stored = localStorage.getItem('fastPlannerFavorites_v2');
+    console.log('Raw localStorage content:', stored);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        console.log('Parsed localStorage favorites:', parsed);
+      } catch (e) {
+        console.error('Error parsing favorites:', e);
+      }
+    } else {
+      console.log('No favorites found in localStorage');
+    }
+  };
+
+  // Debug function to check current region
+  window.checkCurrentRegion = () => {
+    const currentRegion = appManagers.regionManagerRef?.current?.getCurrentRegion();
+    console.log('Current region from RegionManager:', currentRegion);
+    return currentRegion;
+  };
+
+  // Debug function to force load favorites for a region
+  window.loadFavoritesForRegion = (regionId) => {
+    if (appManagers.favoriteLocationsManagerRef?.current) {
+      const favorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
+      console.log(`Favorites for region ${regionId}:`, favorites);
+      setFavoriteLocations(favorites);
+      return favorites;
+    }
+    return [];
+  };
+
+  // Load favorites on app startup (fallback if other loading doesn't work)
+  useEffect(() => {
+    if (appManagers.favoriteLocationsManagerRef?.current) {
+      // Enhanced region detection for loading
+      let currentRegion = appManagers.regionManagerRef?.current?.getCurrentRegion();
+      
+      // Fallback to activeRegionFromContext if RegionManager doesn't have it
+      if (!currentRegion || !currentRegion.id) {
+        currentRegion = activeRegionFromContext;
+      }
+      
+      if (currentRegion) {
+        // Convert region name to ID if needed
+        let regionId = currentRegion.id || currentRegion.name || 'unknown';
+        if (regionId && typeof regionId === 'string') {
+          regionId = regionId.toLowerCase().replace(/\s+/g, '-');
+        }
+        
+        const regionFavorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
+        console.log(`FastPlannerApp: Loading ${regionFavorites.length} favorites for region ${regionId} on startup`, regionFavorites);
+        console.log('FastPlannerApp: Region loading details:', {
+          fromRegionManager: appManagers.regionManagerRef?.current?.getCurrentRegion(),
+          fromContext: activeRegionFromContext,
+          finalRegionId: regionId
+        });
+        setFavoriteLocations(regionFavorites);
+      } else {
+        console.log('FastPlannerApp: No region available for loading favorites');
+      }
+    }
+  }, [appManagers.favoriteLocationsManagerRef, appManagers.regionManagerRef, activeRegionFromContext]);
+
   const handleRemoveFavoriteLocation = (locationId) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
-      appManagers.favoriteLocationsManagerRef.current.removeFavoriteLocation(locationId);
-      setFavoriteLocations(appManagers.favoriteLocationsManagerRef.current.getFavoriteLocations());
+      // Enhanced region detection for removal
+      let currentRegion = appManagers.regionManagerRef?.current?.getCurrentRegion();
+      
+      // Fallback to activeRegionFromContext
+      if (!currentRegion || !currentRegion.id) {
+        currentRegion = activeRegionFromContext;
+      }
+      
+      // Convert region name to ID if needed
+      let regionId = currentRegion?.id || currentRegion?.name || 'unknown';
+      if (regionId && typeof regionId === 'string') {
+        regionId = regionId.toLowerCase().replace(/\s+/g, '-');
+      }
+      
+      console.log('FastPlannerApp: Removing favorite location from region:', regionId, locationId);
+      
+      // Remove from the correct region
+      appManagers.favoriteLocationsManagerRef.current.removeFavoriteLocation(regionId, locationId);
+      
+      // Update UI with favorites for current region
+      const updatedFavorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
+      setFavoriteLocations(updatedFavorites);
     }
   };
 

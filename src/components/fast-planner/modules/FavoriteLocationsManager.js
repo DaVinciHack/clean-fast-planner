@@ -14,12 +14,17 @@ class FavoriteLocationsManager {
       onChange: null, // Callback when the list of favorites changes
     };
 
+    console.log('FavoriteLocationsManager: Constructor called, checking localStorage...');
+
     // Load from localStorage if available
     this.loadFromLocalStorage();
 
     // If no data was loaded, use default static data
     if (Object.keys(this.favoriteLocations).length === 0) {
+      console.log('FavoriteLocationsManager: No data in localStorage, loading static defaults');
       this.loadStaticData();
+    } else {
+      console.log('FavoriteLocationsManager: Loaded existing data from localStorage:', this.favoriteLocations);
     }
   }
 
@@ -50,13 +55,15 @@ class FavoriteLocationsManager {
    */
   loadFromLocalStorage() {
     try {
-      const savedFavorites = localStorage.getItem('fastPlannerFavorites');
+      const savedFavorites = localStorage.getItem('fastPlannerFavorites_v2');
       if (savedFavorites) {
         this.favoriteLocations = JSON.parse(savedFavorites);
-        console.log('Loaded favorites from localStorage:', this.favoriteLocations);
+        console.log('FavoriteLocationsManager: Loaded favorites from localStorage:', this.favoriteLocations);
+      } else {
+        console.log('FavoriteLocationsManager: No saved favorites found, will load static data');
       }
     } catch (error) {
-      console.error('Error loading favorites from localStorage:', error);
+      console.error('FavoriteLocationsManager: Error loading favorites from localStorage:', error);
       // Fall back to static data
       this.loadStaticData();
     }
@@ -67,10 +74,10 @@ class FavoriteLocationsManager {
    */
   saveToLocalStorage() {
     try {
-      localStorage.setItem('fastPlannerFavorites', JSON.stringify(this.favoriteLocations));
-      console.log('Saved favorites to localStorage');
+      localStorage.setItem('fastPlannerFavorites_v2', JSON.stringify(this.favoriteLocations));
+      console.log('FavoriteLocationsManager: Saved favorites to localStorage');
     } catch (error) {
-      console.error('Error saving favorites to localStorage:', error);
+      console.error('FavoriteLocationsManager: Error saving favorites to localStorage:', error);
     }
   }
 
@@ -79,7 +86,7 @@ class FavoriteLocationsManager {
    * In a real application, this would load from user preferences/storage.
    */
   loadStaticData() {
-    console.log('Loading static favorites data');
+    console.log('FavoriteLocationsManager: Loading static favorites data (fallback)');
     this.favoriteLocations = {
       'gulf-of-mexico': [
         { id: 'khou', name: 'Houston Hobby', coords: [-95.2789, 29.6451] },
