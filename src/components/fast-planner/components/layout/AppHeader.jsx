@@ -241,7 +241,7 @@ const AppHeader = ({
                                     fill={iconColor} />
                                 </svg>
                               </div>
-                              <span style={{ fontSize: '12px' }}>{passenger.maxPassengers}</span>
+                              <span style={{ fontSize: '10px' }}>{passenger.maxPassengers}</span>
                             </div>
                           );
                         })}
@@ -257,7 +257,7 @@ const AppHeader = ({
                         fill="#3498db" />
                     </svg>
                   </div>
-                  <span style={{ fontSize: '12px' }}>0</span>
+                  <span style={{ fontSize: '10px' }}>0</span>
                 </div>
               )}
             </span>
