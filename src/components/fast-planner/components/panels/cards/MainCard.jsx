@@ -138,6 +138,99 @@ const MainCard = ({
             }}
           />
         </div>
+      </div>
+      
+      {/* Map Control buttons - Slim, on separate line */}
+      <div className="control-section" style={{ display: 'flex', width: '100%', marginBottom: '15px' }}>
+        <div style={{ display: 'flex', width: '100%', gap: '7px' }}>
+          <button 
+            onClick={onClearRoute}
+            style={{
+              flex: 1,
+              background: 'linear-gradient(to bottom, #1f2937, #111827)',
+              color: '#ffffff',
+              border: '1px solid #dc2626',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#dc2626';
+              e.target.style.borderColor = '#dc2626';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'linear-gradient(to bottom, #1f2937, #111827)';
+              e.target.style.borderColor = '#dc2626';
+            }}
+          >
+            Clear Route
+          </button>
+          <button 
+            onClick={() => {
+              console.log('🔄 TOGGLE ALL: Button clicked, current state:', chartsVisible);
+              
+              // Call the original toggle function
+              onToggleChart();
+              
+              // Emit global events to notify MapLayersCard about the state change
+              const newState = !chartsVisible;
+              console.log(`🔄 TOGGLE ALL: Emitting events for new state: ${newState}`);
+              
+              // List of layer types that should be affected by "Show/Hide All Layers"
+              const layerTypes = [
+                'platforms', 'airfields', 'movablePlatforms', 'blocks', 
+                'bases', 'fuelAvailable', 'grid'
+              ];
+              
+              // Emit events for each layer type
+              layerTypes.forEach(layerType => {
+                const event = new CustomEvent('layer-visibility-changed', {
+                  detail: { layerType, visible: newState }
+                });
+                window.dispatchEvent(event);
+                console.log(`🔄 TOGGLE ALL: Emitted event for ${layerType}: ${newState}`);
+              });
+            }}
+            style={{
+              flex: 1,
+              background: 'linear-gradient(to bottom, #1f2937, #111827)',
+              color: '#ffffff',
+              border: chartsVisible ? '1px solid #3b82f6' : '1px solid #6b7280',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              fontSize: '11px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onMouseOver={(e) => {
+              if (chartsVisible) {
+                e.target.style.background = '#3b82f6';
+                e.target.style.borderColor = '#3b82f6';
+              } else {
+                e.target.style.background = '#6b7280';
+                e.target.style.borderColor = '#6b7280';
+              }
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'linear-gradient(to bottom, #1f2937, #111827)';
+              e.target.style.borderColor = chartsVisible ? '#3b82f6' : '#6b7280';
+            }}
+          >
+            {chartsVisible ? 'Hide All Layers' : 'Show All Layers'}
+          </button>
+        </div>
         {/* Manual reload button - hidden by default but useful for development */}
         <button 
           id="reload-data" 

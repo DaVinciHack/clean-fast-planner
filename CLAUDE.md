@@ -187,6 +187,16 @@ main.tsx → App.jsx → FastPlannerPage.jsx → FastPlannerApp.jsx → FastPlan
 - Handles OSDK authentication and data loading
 - Provides state to `FastPlannerCore` via props
 
+### Save Flight Flow (ACTUAL)
+```
+User clicks "Save Flight" → SaveFlightCard (RightPanel) → RightPanel.handleSaveFlightSubmit → Automation (if enabled)
+```
+
+**Important**: `SaveFlightButton.jsx` is NOT used in the main application flow. The actual save functionality is:
+1. **SaveFlightCard.jsx** - UI form in the right panel
+2. **RightPanel.handleSaveFlightSubmit** - Main save logic with automation
+3. Weather circles and alternate lines auto-enable logic is in RightPanel.jsx lines 331-419
+
 ## Fuel System Architecture - ONE SOURCE OF TRUTH
 
 **PRIMARY FUEL CALCULATION ENGINE:** `StopCardCalculator.js`
