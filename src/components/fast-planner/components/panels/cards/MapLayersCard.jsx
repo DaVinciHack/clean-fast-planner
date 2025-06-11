@@ -36,7 +36,7 @@ const MapLayersCard = ({
   const [layers, setLayers] = useState({
     gulfCoastHeli: false,
     weather: false,
-    weatherCircles: true, // Default ON - weather circles auto-show with flights
+    weatherCircles: false, // Default OFF - user can toggle on when needed
     vfrCharts: false,
     grid: true,
     platforms: true, // Fixed platforms (enhanced category)
@@ -121,95 +121,16 @@ const MapLayersCard = ({
     return () => clearInterval(interval);
   }, [layers.grid, layers.gulfCoastHeli, layers.weatherCircles, mapManagerRef, gulfCoastMapRef]);
 
-  // Auto-enable weather circles when weather data becomes available
-  useEffect(() => {
-    const checkAndAutoEnableWeatherCircles = () => {
-      // Check if weather data is available
-      const hasWeatherData = (weatherSegmentsHook?.weatherSegments?.length > 0) || 
-                            (window.loadedWeatherSegments?.length > 0);
-      
-      // Enhanced debugging for loaded flights
-      console.log('🔍 AUTO-ENABLE CHECK:', {
-        hasWeatherData,
-        hookSegments: weatherSegmentsHook?.weatherSegments?.length || 0,
-        loadedSegments: window.loadedWeatherSegments?.length || 0,
-        currentCirclesState: layers.weatherCircles,
-        existingLayer: !!window.currentWeatherCirclesLayer,
-        mapAvailable: !!mapManagerRef?.current?.map
-      });
-      
-      if (hasWeatherData && !layers.weatherCircles && !window.currentWeatherCirclesLayer) {
-        console.log('🌤️ AUTO-ENABLE: Weather data detected, auto-enabling weather circles');
-        
-        // Auto-enable weather circles
-        setLayers(prev => ({ ...prev, weatherCircles: true }));
-        
-        // Trigger the weather circles creation
-        setTimeout(() => {
-          try {
-            // Find the best weather data source
-            let weatherData = null;
-            let dataSource = 'none';
-            
-            if (weatherSegmentsHook?.weatherSegments?.length > 0) {
-              weatherData = weatherSegmentsHook.weatherSegments;
-              dataSource = 'hook';
-            } else if (window.loadedWeatherSegments?.length > 0) {
-              weatherData = window.loadedWeatherSegments;
-              dataSource = 'loaded';
-            }
-            
-            console.log(`🌤️ AUTO-ENABLE: Creating weather circles from ${dataSource}, segments:`, weatherData?.length || 0);
-            
-            if (weatherData && weatherData.length > 0 && mapManagerRef?.current?.map) {
-              import('../../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                // Clean up any existing layer first
-                if (window.currentWeatherCirclesLayer) {
-                  try {
-                    window.currentWeatherCirclesLayer.removeWeatherCircles();
-                  } catch (cleanupError) {
-                    console.warn('🌤️ AUTO-ENABLE: Error during cleanup:', cleanupError);
-                  }
-                }
-                
-                console.log('🌤️ AUTO-ENABLE: Creating WeatherCirclesLayer automatically');
-                const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
-                weatherCirclesLayer.addWeatherCircles(weatherData);
-                window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                console.log('🌤️ AUTO-ENABLE: Weather circles automatically enabled and displayed');
-              }).catch(error => {
-                console.error('🌤️ AUTO-ENABLE: Error importing WeatherCirclesLayer:', error);
-                // Reset state on error
-                setLayers(prev => ({ ...prev, weatherCircles: false }));
-              });
-            }
-          } catch (error) {
-            console.error('🌤️ AUTO-ENABLE: Error auto-enabling weather circles:', error);
-            setLayers(prev => ({ ...prev, weatherCircles: false }));
-          }
-        }, 500); // Small delay to ensure map is ready
-      }
-    };
-    
-    // Check immediately
-    checkAndAutoEnableWeatherCircles();
-    
-    // Set up interval to check for new weather data
-    const interval = setInterval(checkAndAutoEnableWeatherCircles, 2000); // Check every 2 seconds
-    
-    return () => clearInterval(interval);
-  }, [weatherSegmentsHook?.weatherSegments?.length, layers.weatherCircles, mapManagerRef]);
+  // DISABLED: Auto-enable weather circles - these were the ugly discs!
+  // useEffect(() => {
+  //   // Weather circles auto-enable disabled - user can manually toggle them
+  //   console.log('🚫 Weather circles auto-enable DISABLED');
+  // }, []);
 
-  // Listen for force-enable events from flight loading
-  useEffect(() => {
-    const handleForceEnable = () => {
-      console.log('🌤️ FORCE-ENABLE: Received weather circles force-enable event');
-      setLayers(prev => ({ ...prev, weatherCircles: true }));
-    };
-
-    window.addEventListener('weather-circles-force-enabled', handleForceEnable);
-    return () => window.removeEventListener('weather-circles-force-enabled', handleForceEnable);
-  }, []);
+  // DISABLED: Force-enable events for weather circles
+  // useEffect(() => {
+  //   console.log('🚫 Weather circles force-enable events DISABLED');
+  // }, []);
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -322,97 +243,35 @@ const MapLayersCard = ({
           break;
           
         case 'weatherCircles':
-          try {
-            console.log('🔘 TOGGLE: Weather circles clicked, current state:', layers.weatherCircles);
-            
-            // RACE CONDITION FIX: Use a single consistent approach with proper async handling
-            
-            // Step 1: Always clean up existing layers first (synchronous)
-            if (window.currentWeatherCirclesLayer) {
-              console.log('🔘 TOGGLE: Removing existing global weather circles layer');
-              try {
-                window.currentWeatherCirclesLayer.removeWeatherCircles();
-              } catch (cleanupError) {
-                console.warn('🔘 TOGGLE: Error during cleanup:', cleanupError);
-              }
+          console.log('🌤️ WEATHER CIRCLES: Toggling weather visualization...');
+          
+          if (window.currentWeatherCirclesLayer) {
+            // Remove existing weather circles
+            try {
+              window.currentWeatherCirclesLayer.removeWeatherCircles();
               window.currentWeatherCirclesLayer = null;
-            }
-            
-            // Step 2: If toggling OFF, just set state and stop
-            if (layers.weatherCircles) {
-              console.log('🔘 TOGGLE: Turning weather circles OFF');
+              console.log('🧹 Removed weather circles');
               setLayers(prev => ({ ...prev, weatherCircles: false }));
-              return; // Early return to prevent further execution
+            } catch (error) {
+              console.warn('Error removing weather circles:', error);
             }
-            
-            // Step 3: If toggling ON, create new layer with available data
-            console.log('🔘 TOGGLE: Turning weather circles ON');
-            
-            // Find the best weather data source
-            let weatherData = null;
-            let dataSource = 'none';
-            
-            if (weatherSegmentsHook?.weatherSegments?.length > 0) {
-              weatherData = weatherSegmentsHook.weatherSegments;
-              dataSource = 'hook';
-            } else if (window.loadedWeatherSegments?.length > 0) {
-              weatherData = window.loadedWeatherSegments;
-              dataSource = 'loaded';
-            }
-            
-            console.log(`🔘 TOGGLE: Using weather data from ${dataSource}, segments:`, weatherData?.length || 0);
-            
-            // Check map availability before proceeding
-            if (!mapManagerRef?.current?.map) {
-              console.error('🔘 TOGGLE: Map not available for weather circles');
-              return;
-            }
-            
-            if (weatherData && weatherData.length > 0) {
-              // ASYNC FIX: Use async/await to prevent race conditions
-              const createWeatherCircles = async () => {
-                try {
-                  const { default: WeatherCirclesLayer } = await import('../../../modules/layers/WeatherCirclesLayer');
-                  
-                  // Double-check map is still available after async import
-                  if (mapManagerRef?.current?.map) {
-                    console.log('🔘 TOGGLE: Creating new WeatherCirclesLayer with real data');
-                    const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
-                    
-                    // Add circles and store layer reference
-                    weatherCirclesLayer.addWeatherCircles(weatherData);
-                    window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                    console.log('🔘 TOGGLE: Real weather circles added successfully');
-                  } else {
-                    console.error('🔘 TOGGLE: Map became unavailable during async operation');
-                  }
-                } catch (importError) {
-                  console.error('🔘 TOGGLE: Error importing or creating weather circles layer:', importError);
-                }
-              };
-              
-              createWeatherCircles();
+          } else {
+            // Create weather circles
+            if (weatherSegmentsHook?.segments && weatherSegmentsHook.segments.length > 0) {
+              try {
+                const { default: WeatherCirclesLayer } = await import('../../../modules/layers/WeatherCirclesLayer');
+                const weatherLayer = new WeatherCirclesLayer(mapManagerRef?.current);
+                
+                await weatherLayer.createWeatherCircles(weatherSegmentsHook.segments);
+                window.currentWeatherCirclesLayer = weatherLayer;
+                console.log('✅ Created weather circles');
+                setLayers(prev => ({ ...prev, weatherCircles: true }));
+              } catch (error) {
+                console.error('Error creating weather circles:', error);
+              }
             } else {
-              // Enhanced debugging for missing weather data
-              console.error('🔘 TOGGLE: No weather data available for weather circles');
-              console.log('🔘 DEBUG: Weather data check:', {
-                hookSegments: weatherSegmentsHook?.weatherSegments?.length || 0,
-                loadedSegments: window.loadedWeatherSegments?.length || 0,
-                hookObject: !!weatherSegmentsHook,
-                loadedArray: Array.isArray(window.loadedWeatherSegments)
-              });
-              
-              // Reset state since we can't create circles
-              setLayers(prev => ({ ...prev, weatherCircles: false }));
+              console.warn('No weather segments available for circles');
             }
-            
-            // Update state only after successful setup
-            setLayers(prev => ({ ...prev, weatherCircles: true }));
-            
-          } catch (error) {
-            console.error('🔘 TOGGLE: Error toggling weather circles:', error);
-            // Reset state on error
-            setLayers(prev => ({ ...prev, weatherCircles: false }));
           }
           break;
           
@@ -636,11 +495,11 @@ const MapLayersCard = ({
               className="map-3d-toggle-button"
               onClick={async () => {
                 try {
-                  console.log('🗺️ Testing 3D map style switch...');
+                  console.log('🗺️ Switching map view...');
                   
                   const mapManager = mapManagerRef?.current;
                   if (!mapManager) {
-                    alert('Map manager not available');
+                    console.error('Map manager not available');
                     return;
                   }
                   
@@ -651,16 +510,28 @@ const MapLayersCard = ({
                   console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
                   
                   await mapManager.switchMapStyle(newStyle);
-                  alert(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : 'Dark'} style!`);
+                  
+                  // CRITICAL: Reset camera to top-down view when switching back to 2D
+                  const map = mapManager.getMap();
+                  if (newStyle === 'dark' && map) {
+                    console.log('📐 Resetting camera to top-down 2D view');
+                    map.easeTo({
+                      pitch: 0,     // Top-down view
+                      bearing: 0,   // North up
+                      duration: 800 // Smooth transition
+                    });
+                  }
+                  
+                  console.log(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
                   
                 } catch (error) {
                   console.error('3D map switch failed:', error);
-                  alert('3D map switch failed: ' + error.message);
                 }
               }}
             >
               🗺️ Toggle 3D Map
             </button>
+            
           </div>
         </div>
         
