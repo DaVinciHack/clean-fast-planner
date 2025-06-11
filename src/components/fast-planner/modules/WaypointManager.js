@@ -872,14 +872,16 @@ class WaypointManager {
     const curvedPoints = [];
     
     // IMPROVED: Curve height based on distance with better scaling for short segments
-    // Shorter segments get proportionally less curve
+    // Shorter segments get proportionally less curve - REDUCED for closer points
     let maxCurveOffset;
-    if (distance < 10) {
-      maxCurveOffset = distance * 0.002; // Very subtle for short hops
+    if (distance < 5) {
+      maxCurveOffset = distance * 0.0005; // Extremely subtle for very close points
+    } else if (distance < 15) {
+      maxCurveOffset = distance * 0.001; // Very subtle for short hops
     } else if (distance < 50) {
-      maxCurveOffset = distance * 0.004; // Moderate for medium distances
+      maxCurveOffset = distance * 0.003; // Moderate for medium distances
     } else {
-      maxCurveOffset = Math.min(0.1, distance * 0.006); // Max for long distances
+      maxCurveOffset = Math.min(0.08, distance * 0.005); // Slightly reduced max for long distances
     }
     
     console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);

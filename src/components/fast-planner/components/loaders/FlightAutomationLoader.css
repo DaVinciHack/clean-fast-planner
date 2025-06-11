@@ -1,0 +1,231 @@
+/* FlightAutomationLoader.css - Streamlined popup matching site card styling */
+
+.flight-automation-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6); /* Darker background as requested */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.flight-automation-popup {
+  /* Match the site's card styling */
+  background: linear-gradient(to bottom, 
+    rgba(60, 60, 60, 0.95) 0%, 
+    rgba(45, 45, 45, 0.85) 30%, 
+    rgba(35, 35, 35, 0.75) 60%, 
+    rgba(25, 25, 25, 0.4) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 10px;
+  padding: 25px;
+  max-width: 500px; /* Bigger as requested */
+  width: 90%;
+  
+  /* Card shadow to match site cards */
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+  
+  color: white;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  animation: popIn 0.3s ease-out;
+}
+
+/* Current Step Styling - Prominent display at top */
+.current-step {
+  padding: 15px 20px;
+  background: rgba(30, 143, 254, 0.15);
+  border: 1px solid rgba(30, 143, 254, 0.3);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.step-info {
+  flex: 1;
+}
+
+.step-info h3 {
+  margin: 0 0 5px 0;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.step-info p {
+  margin: 0 0 12px 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+}
+
+.step-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.step-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #1e8ffe, #3ba0ff);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(30, 143, 254, 0.6);
+}
+
+/* Steps List - Much more compact */
+.steps-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  line-height: 1.1;
+}
+
+.step-item.completed {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+.step-item.active {
+  background: rgba(30, 143, 254, 0.15);
+  border-color: rgba(30, 143, 254, 0.4);
+  color: #60a5fa;
+}
+
+.step-item.pending {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.step-marker {
+  min-width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Checkmark for completed steps - Smaller */
+.step-checkmark {
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 8px;
+  font-weight: bold;
+}
+
+/* Mini loader for active step - Smaller */
+.step-loader {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(30, 143, 254, 0.3);
+  border-top: 1.5px solid #1e8ffe;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty circle for pending steps - Smaller */
+.step-circle {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.step-name {
+  flex: 1;
+  font-weight: 400;
+  line-height: 1.1;
+  font-size: 0.7rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+
+@keyframes popIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.8) translateY(20px);
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .flight-automation-popup {
+    margin: 15px;
+    padding: 20px;
+    max-width: none;
+  }
+  
+  .current-step {
+    padding: 12px 15px;
+    margin-bottom: 15px;
+  }
+  
+  .step-info h3 {
+    font-size: 1.1rem;
+  }
+  
+  .step-info p {
+    font-size: 0.85rem;
+  }
+  
+  /* Single column on mobile - Keep compact */
+  .steps-list {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  
+  .step-item {
+    padding: 6px 8px;
+    font-size: 0.65rem;
+  }
+  
+  .step-name {
+    line-height: 1.1;
+    font-size: 0.65rem;
+  }
+}

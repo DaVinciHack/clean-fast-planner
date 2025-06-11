@@ -1070,14 +1070,14 @@ class PlatformManager {
               // Responsive size based on zoom level
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                6, 1,      // Smaller at low zoom
-                9, 2,     // Smaller at medium zoom 
-                12, 3,     // Smaller at high zoom
-                15, 5      // Very large dots at very high zoom
+                6, 0.8,    // Reduced from 1
+                9, 1.5,    // Reduced from 2 
+                12, 2.5,   // Reduced from 3
+                15, 4      // Reduced from 5
               ],
-              'circle-color': '#0F172A',       // Darker blue center
+              'circle-color': '#0a0f1e',       // Halfway between original and darker blue
               'circle-stroke-width': 2,
-              'circle-stroke-color': '#3B82F6', // Teal ring
+              'circle-stroke-color': '#2563eb', // Halfway between original and darker blue stroke
               'circle-opacity': 1
             },
             layout: { // Add visibility toggle
@@ -1097,14 +1097,14 @@ class PlatformManager {
               // Responsive size based on zoom level
               'circle-radius': [
                 'interpolate', ['linear'], ['zoom'],
-                8, 3,      // Bigger at low zoom
-                11, 4,     // Bigger at medium zoom 
-                14, 5,     // Bigger at high zoom
-                17, 7      // Very large dots at very high zoom
+                8, 2.5,    // Reduced from 3
+                11, 3.5,   // Reduced from 4
+                14, 4.5,   // Reduced from 5
+                17, 6      // Reduced from 7
               ],
-              'circle-color': '#ad0303',       // Dark red center
+              'circle-color': '#961212',       // Halfway between original and darker red
               'circle-stroke-width': 1,
-              'circle-stroke-color': '#f2efef', // Light ring
+              'circle-stroke-color': '#e5e7eb', // Halfway between original and darker light ring
               'circle-opacity': 1
             },
             layout: { // Add visibility toggle
@@ -1122,10 +1122,10 @@ class PlatformManager {
               'icon-image': map.hasImage('airport-icon') ? 'airport-icon' : 'airport-15', // Logic from backup
               'icon-size': [
                 'interpolate', ['linear'], ['zoom'],
-                7, 0.8,    // Small icon at low zoom
-                10, 1.0,   // Normal size at medium zoom 
-                13, 1.2,   // Larger icon at high zoom
-                16, 1.5    // Very large icon at very high zoom
+                7, 0.7,    // Reduced from 0.8
+                10, 0.9,   // Reduced from 1.0
+                13, 1.1,   // Reduced from 1.2
+                16, 1.3    // Reduced from 1.5
               ],
               'icon-allow-overlap': true,
               'icon-anchor': 'bottom', // From backup for pin-style
@@ -1262,12 +1262,12 @@ class PlatformManager {
               'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                8, 6,      // Tiny at zoom 8
-                9, 6.5,    // Very small at zoom 9
-                10, 7,     // Small at zoom 10     // Very small text at zoom 10
-                11, 8,     // Small text at zoom 11
-                13, 9,     // Medium text at zoom 13
-                16, 11     // Larger text at high zoom     // Smaller text even at high zoom
+                8, 6.5,    // Just a fraction bigger at zoom 8
+                9, 7,      // Just a fraction bigger at zoom 9
+                10, 7.5,   // Just a fraction bigger at zoom 10
+                11, 8.5,   // Just a fraction bigger at zoom 11
+                13, 9.5,   // Just a fraction bigger at zoom 13
+                16, 11.5   // Just a fraction bigger at high zoom
               ],
               'text-offset': [0, 0.8],  // Closer to the tiny dots
               'text-anchor': 'top',
@@ -1318,20 +1318,21 @@ class PlatformManager {
             filter: ['all', ['==', ['get', 'platformType'], 'bases']],
             layout: {
               'text-field': ['get', 'name'],
-              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                11, 11,    // Start at zoom 11
-                13, 13,    // Medium text
-                16, 15     // Larger text at high zoom
+                8, 7,      // Very small at zoom 8
+                9, 8,      // Small at zoom 9
+                10, 9,     // Small text at zoom 10
+                12, 11,    // Medium text at zoom 12
+                15, 13     // Larger text at high zoom
               ],
-              'text-offset': [0, 1.5],  // Position below the ring
+              'text-offset': [0, 1.2],  // Position below the ring
               'text-anchor': 'top',
-              'visibility': this.basesVisible ? 'visible' : 'none',
-              'min-zoom': 11  // Show bases labels at zoom 11+
+              'visibility': this.basesVisible ? 'visible' : 'none'
             },
             paint: {
-              'text-color': '#FF00FF',    // Bright magenta text
+              'text-color': '#FFFFFF',    // White text
               'text-halo-color': '#000000',
               'text-halo-width': 1
             }
@@ -1361,23 +1362,26 @@ class PlatformManager {
             }
           });
 
-          // Labels for Fuel Available (show "FUEL" text)
+          // Labels for Fuel Available (show platform name)
           map.addLayer({
             id: 'fuel-available-labels',
             type: 'symbol',
             source: sourceId,
             filter: ['all', ['==', ['get', 'hasFuel'], true]],
             layout: {
-              'text-field': 'FUEL',
-              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+              'text-field': ['get', 'name'],  // Show platform name
+              'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
               'text-size': [
                 'interpolate', ['linear'], ['zoom'],
-                13, 8,     // Start showing only at zoom 13+
-                16, 10     // Smaller text even at high zoom
+                8, 7,      // Very small at zoom 8
+                9, 8,      // Small at zoom 9
+                10, 9,     // Small text at zoom 10
+                12, 11,    // Medium text at zoom 12
+                15, 13     // Larger text at high zoom
               ],
               'text-offset': [0, -1.2],  // Position above the marker
               'text-anchor': 'bottom',
-              'visibility': 'none'  // Hide fuel labels as requested
+              'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
             },
             paint: {
               'text-color': '#B8860B',    // Darker gold text (less bright)
@@ -1624,10 +1628,10 @@ class PlatformManager {
     this.fuelAvailableVisible = visible !== undefined ? visible : !this.fuelAvailableVisible;
     
     try {
-      // FUEL RINGS ONLY - Remove fuel labels from toggle to keep them hidden
+      // FUEL RINGS AND LABELS - Show both when fuel layer is enabled
       const fuelAvailableLayers = [
-        'fuel-available-layer'        // Only the fuel rings, NOT the labels
-        // 'fuel-available-labels' - Removed: Keep fuel labels permanently hidden
+        'fuel-available-layer',        // Fuel rings
+        'fuel-available-labels'        // Fuel labels (now show platform names)
       ];
       
       const visibility = this.fuelAvailableVisible ? 'visible' : 'none';
@@ -1638,12 +1642,7 @@ class PlatformManager {
         }
       });
       
-      // ALWAYS keep fuel labels hidden regardless of fuel ring visibility
-      if (map.getLayer('fuel-available-labels')) {
-        map.setLayoutProperty('fuel-available-labels', 'visibility', 'none');
-      }
-      
-      console.log(`Fuel available overlay visibility set to: ${visibility} (labels remain hidden)`);
+      console.log(`Fuel available overlay and labels visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling fuel available visibility:', error);
     }

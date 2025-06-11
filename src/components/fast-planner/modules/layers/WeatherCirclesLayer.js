@@ -24,9 +24,44 @@ class WeatherCirclesLayer {
       return;
     }
     
+    // RACE CONDITION PROTECTION: Check if another process is already creating weather circles
+    const lockStartTime = Date.now();
+    if (window.weatherCirclesCreationInProgress) {
+      const lockAge = Date.now() - (window.weatherCirclesLockTime || 0);
+      console.log(`🔄 WeatherCirclesLayer: Creation lock active for ${lockAge}ms, checking if stale...`);
+      
+      // If lock is older than 15 seconds, consider it stale and clear it
+      if (lockAge > 15000) {
+        console.log('🔓 WeatherCirclesLayer: Clearing stale lock (older than 15s)');
+        window.weatherCirclesCreationInProgress = false;
+        window.weatherCirclesLockTime = null;
+      } else {
+        console.log('🔄 WeatherCirclesLayer: Fresh lock detected, skipping duplicate request');
+        return;
+      }
+    }
+    
+    // Set the lock with timestamp
+    window.weatherCirclesCreationInProgress = true;
+    window.weatherCirclesLockTime = lockStartTime;
+    console.log(`🔒 WeatherCirclesLayer: Setting creation lock at ${lockStartTime}`);
+    
+    // Clear the lock after completion (with failsafe timeout)
+    const clearLock = () => {
+      if (window.weatherCirclesCreationInProgress) {
+        window.weatherCirclesCreationInProgress = false;
+        window.weatherCirclesLockTime = null;
+        console.log(`🔓 WeatherCirclesLayer: Clearing creation lock (held for ${Date.now() - lockStartTime}ms)`);
+      }
+    };
+    
+    // Failsafe: Clear lock after 8 seconds if something goes wrong
+    setTimeout(clearLock, 8000);
+    
     // RACE CONDITION FIX: Ensure map is fully loaded
     if (!this.map.loaded()) {
       console.log('🟡 WeatherCirclesLayer: Map not loaded yet, retrying in 500ms...');
+      clearLock(); // Clear lock before retry
       setTimeout(() => {
         this.addWeatherCircles(weatherSegments);
       }, 500);
@@ -44,10 +79,13 @@ class WeatherCirclesLayer {
     weatherSegments.forEach((segment, index) => {
       console.log(`🔍 Segment ${index}:`, {
         airportIcao: segment.airportIcao,
+        locationName: segment.locationName,
         isRig: segment.isRig,
         alternateGeoShape: segment.alternateGeoShape,
         ranking2: segment.ranking2,
-        hasAlternateCoords: !!(segment.alternateGeoShape?.coordinates?.length >= 2)
+        hasAlternateCoords: !!(segment.alternateGeoShape?.coordinates?.length >= 2),
+        hasGeoPoint: !!segment.geoPoint,
+        geoPoint: segment.geoPoint
       });
       
       const hasValidRanking = (segment.ranking2 !== undefined && segment.ranking2 !== null);
@@ -74,6 +112,7 @@ class WeatherCirclesLayer {
         };
         validSegments.push(alternateSegment);
         console.log(`✅ Alternate ${index}: ${segment.airportIcao} at ${JSON.stringify(segment.alternateGeoShape.coordinates[1])} with ranking ${ranking}`);
+        console.log(`🚨 COORDINATE DEBUG: Full alternateGeoShape.coordinates for ${segment.airportIcao}:`, JSON.stringify(segment.alternateGeoShape.coordinates, null, 2));
         
         // SKIP split point circles - they were creating unwanted rig weather
         console.log(`⏭️ Skipping split point for ${segment.airportIcao} - only showing alternate destination`);
@@ -149,8 +188,76 @@ class WeatherCirclesLayer {
         } else {
           console.log(`❌ Rig ${segment.airportIcao}: Could not find coordinates in any source`);
         }
+      
+      // Handle DESTINATIONS (airports that are not rigs)
+      } else if (!segment.isRig) {
+        console.log(`✈️ Processing destination weather: ${segment.airportIcao || segment.locationName}`);
+        
+        // Try to get destination coordinates from multiple sources
+        let destinationCoordinates = null;
+        
+        // Method 1: Try geoPoint first if available
+        if (segment.geoPoint) {
+          destinationCoordinates = this.parseGeoPoint(segment.geoPoint);
+          if (destinationCoordinates) {
+            console.log(`✈️ Found destination ${segment.airportIcao} coordinates from geoPoint:`, destinationCoordinates);
+          }
+        }
+        
+        // Method 2: Check current waypoints if geoPoint failed
+        if (!destinationCoordinates && window.currentWaypoints && Array.isArray(window.currentWaypoints)) {
+          const matchingWaypoint = window.currentWaypoints.find(wp => 
+            wp.name === segment.airportIcao || 
+            wp.name?.toUpperCase() === segment.airportIcao?.toUpperCase()
+          );
+          if (matchingWaypoint && matchingWaypoint.lng && matchingWaypoint.lat) {
+            destinationCoordinates = [matchingWaypoint.lng, matchingWaypoint.lat];
+            console.log(`✈️ Found destination ${segment.airportIcao} coordinates from currentWaypoints:`, destinationCoordinates);
+          }
+        }
+        
+        // Method 3: Check waypoint manager
+        if (!destinationCoordinates && window.waypointManager?.getWaypoints) {
+          const waypoints = window.waypointManager.getWaypoints();
+          const matchingWaypoint = waypoints.find(wp => 
+            wp.name === segment.airportIcao || 
+            wp.name?.toUpperCase() === segment.airportIcao?.toUpperCase()
+          );
+          if (matchingWaypoint && matchingWaypoint.lng && matchingWaypoint.lat) {
+            destinationCoordinates = [matchingWaypoint.lng, matchingWaypoint.lat];
+            console.log(`✈️ Found destination ${segment.airportIcao} coordinates from waypointManager:`, destinationCoordinates);
+          }
+        }
+        
+        // Method 4: Check stop cards for coordinates
+        if (!destinationCoordinates && window.debugStopCards && Array.isArray(window.debugStopCards)) {
+          const matchingStopCard = window.debugStopCards.find(card => 
+            card.name === segment.airportIcao || 
+            card.name?.toUpperCase() === segment.airportIcao?.toUpperCase() ||
+            card.stop === segment.airportIcao ||
+            card.stop?.toUpperCase() === segment.airportIcao?.toUpperCase()
+          );
+          if (matchingStopCard && matchingStopCard.coordinates) {
+            destinationCoordinates = matchingStopCard.coordinates;
+            console.log(`✈️ Found destination ${segment.airportIcao} coordinates from stopCards:`, destinationCoordinates);
+          }
+        }
+        
+        if (destinationCoordinates) {
+          const destinationSegment = {
+            ...segment,
+            ranking2: segment.ranking2,
+            extractedCoordinates: destinationCoordinates,
+            circleType: 'destination'
+          };
+          validSegments.push(destinationSegment);
+          console.log(`✅ Destination ${segment.airportIcao || segment.locationName}: Found coordinates ${JSON.stringify(destinationCoordinates)} with ranking ${segment.ranking2}`);
+        } else {
+          console.log(`❌ Destination ${segment.airportIcao || segment.locationName}: Could not find coordinates from any source (geoPoint: ${segment.geoPoint})`);
+        }
+      
       } else {
-        console.log(`❌ Segment ${index} has no coordinates and is not a rig`);
+        console.log(`❌ Segment ${index} (${segment.airportIcao || segment.locationName}) has no coordinates and is not a rig or destination`);
       }
     });
     
@@ -161,6 +268,7 @@ class WeatherCirclesLayer {
     
     if (deduplicatedSegments.length === 0) {
       console.log('🔴 No valid segments found, adding test circles instead');
+      clearLock(); // Clear lock before test circles
       this.addTestCircles();
       return;
     }
@@ -176,13 +284,14 @@ class WeatherCirclesLayer {
     
     if (outerFeatures.length === 0) {
       console.log('🔴 No valid ring features created');
+      clearLock(); // Clear lock on error
       return;
     }
     
     console.log(`🟢 Created ${outerFeatures.length} concentric ring sets`);
     
-    // Also add dotted lines to alternate destinations if available (use original segments for lines)
-    this.addAlternateLines(validSegments);
+    // Also add dotted lines to alternate destinations if available (use ORIGINAL segments for lines)
+    this.addAlternateLines(weatherSegments);
     
     // Add sources for each ring layer (MORE RINGS!)
     this.map.addSource(this.sourceId + '-outermost', {
@@ -318,7 +427,7 @@ class WeatherCirclesLayer {
       console.log('WeatherCirclesLayer: Added 5 concentric ring layers');
       
       // Add hover popups for weather info
-      this.addWeatherHoverPopups();
+      this.addWeatherHoverPopups(deduplicatedSegments);
     }
     
     if (hasPointGeometry) {
@@ -388,8 +497,8 @@ class WeatherCirclesLayer {
     this.isVisible = true;
     console.log('WeatherCirclesLayer: Added', outerFeatures.length, 'weather circles');
     
-    // ALWAYS add hover popups regardless of geometry type
-    this.addWeatherHoverPopups(deduplicatedSegments);
+    // Clear the creation lock on successful completion
+    clearLock();
     
     // Debug: Check if layer was actually added
     setTimeout(() => {
@@ -575,6 +684,13 @@ class WeatherCirclesLayer {
    * Remove weather circles from map
    */
   removeWeatherCircles() {
+    // Clear any creation lock when removing
+    if (window.weatherCirclesCreationInProgress) {
+      console.log('🔓 WeatherCirclesLayer: Clearing creation lock during removal');
+      window.weatherCirclesCreationInProgress = false;
+      window.weatherCirclesLockTime = null;
+    }
+    
     try {
       // Remove all ring layers (polygon-based) - MORE RINGS!
       const ringLayers = ['-outermost', '-outer', '-middle', '-inner', '-innermost'];
@@ -697,6 +813,31 @@ class WeatherCirclesLayer {
   addAlternateLines(validSegments) {
     console.log('🔗 Adding curved dotted lines for weather alternate routes');
     
+    // CRITICAL FIX: Get correct split point from flight data, not weather segments
+    const flightAlternateData = window.flightAlternateData;
+    let correctSplitPoint = null;
+    
+    if (flightAlternateData && flightAlternateData.splitPoint) {
+      // Parse the split point from flight data
+      if (typeof flightAlternateData.splitPoint === 'string') {
+        const parts = flightAlternateData.splitPoint.split(',');
+        if (parts.length === 2) {
+          const lat = parseFloat(parts[0].trim());
+          const lng = parseFloat(parts[1].trim());
+          correctSplitPoint = [lng, lat]; // GeoJSON format: [lng, lat]
+          console.log('🎯 CORRECT SPLIT POINT: Using flight data split point:', correctSplitPoint);
+        }
+      } else if (Array.isArray(flightAlternateData.splitPoint)) {
+        correctSplitPoint = flightAlternateData.splitPoint;
+        console.log('🎯 CORRECT SPLIT POINT: Using flight data split point array:', correctSplitPoint);
+      }
+    }
+    
+    if (!correctSplitPoint) {
+      console.warn('🎯 WARNING: No correct split point available from flight data - alternate lines may be incorrect');
+      console.warn('🎯 Available flight alternate data:', flightAlternateData);
+    }
+    
     // Create curved line features for each weather segment with coordinates
     const lineFeatures = [];
     
@@ -704,19 +845,22 @@ class WeatherCirclesLayer {
       if (segment.alternateGeoShape && segment.alternateGeoShape.coordinates && 
           segment.alternateGeoShape.coordinates.length >= 2) {
         
-        const splitPoint = segment.alternateGeoShape.coordinates[0]; // Start point
+        // Use correct split point from flight data, fallback to segment data if unavailable
+        const splitPoint = correctSplitPoint || segment.alternateGeoShape.coordinates[0];
         const destination = segment.alternateGeoShape.coordinates[1]; // End point
         
         console.log(`🔗 Creating curved line from split ${JSON.stringify(splitPoint)} to ${segment.airportIcao} ${JSON.stringify(destination)}`);
+        console.log(`🎯 SPLIT POINT SOURCE: ${correctSplitPoint ? 'Flight Data (CORRECT)' : 'Weather Segment (FALLBACK)'}`);
+        console.log(`🚨 LINE DEBUG: Full coordinates array for ${segment.airportIcao}:`, JSON.stringify(segment.alternateGeoShape.coordinates, null, 2));
         
-        // Create curved line using the same logic as route curves
-        const curvedCoordinates = this.createCurvedLine(splitPoint, destination);
+        // Create straight line for alternate routes (cleaner look)
+        const straightCoordinates = [splitPoint, destination];
         
         const lineFeature = {
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: curvedCoordinates
+            coordinates: straightCoordinates
           },
           properties: {
             type: 'weather-alternate-line',
@@ -1260,11 +1404,30 @@ class WeatherCirclesLayer {
   createStraightShadowLines(validSegments) {
     const shadowFeatures = [];
     
+    // CRITICAL FIX: Get correct split point from flight data for shadows too
+    const flightAlternateData = window.flightAlternateData;
+    let correctSplitPoint = null;
+    
+    if (flightAlternateData && flightAlternateData.splitPoint) {
+      // Parse the split point from flight data
+      if (typeof flightAlternateData.splitPoint === 'string') {
+        const parts = flightAlternateData.splitPoint.split(',');
+        if (parts.length === 2) {
+          const lat = parseFloat(parts[0].trim());
+          const lng = parseFloat(parts[1].trim());
+          correctSplitPoint = [lng, lat]; // GeoJSON format: [lng, lat]
+        }
+      } else if (Array.isArray(flightAlternateData.splitPoint)) {
+        correctSplitPoint = flightAlternateData.splitPoint;
+      }
+    }
+    
     validSegments.forEach(segment => {
       if (segment.alternateGeoShape && segment.alternateGeoShape.coordinates && 
           segment.alternateGeoShape.coordinates.length >= 2) {
         
-        const splitPoint = segment.alternateGeoShape.coordinates[0];
+        // Use correct split point from flight data, fallback to segment data if unavailable
+        const splitPoint = correctSplitPoint || segment.alternateGeoShape.coordinates[0];
         const destination = segment.alternateGeoShape.coordinates[1];
         
         // Create STRAIGHT line for shadow (3D effect)
@@ -1309,8 +1472,8 @@ class WeatherCirclesLayer {
     const deltaLat = endLat - startLat;
     const distance = Math.sqrt(deltaLng * deltaLng + deltaLat * deltaLat);
     
-    // Curve offset proportional to distance (REDUCED curve height by half)
-    const curveOffset = distance * 0.075; // Reduced from 0.15 to 0.075 (half the height)
+    // Curve offset proportional to distance (MUCH LOWER curve for weather alternate lines)
+    const curveOffset = distance * 0.035; // Reduced from 0.075 to 0.035 (much flatter curves)
     
     // FIXED: Always curve upward/right - ensure positive direction
     // Calculate perpendicular direction and force it upward
@@ -1433,6 +1596,32 @@ window.refreshWeatherCircles = () => {
   } else {
     console.error('🔄 REFRESH: Map not available for refresh');
     return false;
+  }
+};
+
+// Global function to clear stuck locks
+window.clearWeatherCirclesLock = () => {
+  if (window.weatherCirclesCreationInProgress) {
+    const lockAge = Date.now() - (window.weatherCirclesLockTime || 0);
+    console.log(`🔓 MANUAL: Clearing weather circles lock (was active for ${lockAge}ms)`);
+    window.weatherCirclesCreationInProgress = false;
+    window.weatherCirclesLockTime = null;
+    return true;
+  } else {
+    console.log('🔓 MANUAL: No active lock to clear');
+    return false;
+  }
+};
+
+// Global function to check lock status
+window.checkWeatherCirclesLock = () => {
+  if (window.weatherCirclesCreationInProgress) {
+    const lockAge = Date.now() - (window.weatherCirclesLockTime || 0);
+    console.log(`🔒 LOCK STATUS: Active for ${lockAge}ms (set at ${new Date(window.weatherCirclesLockTime).toLocaleTimeString()})`);
+    return { active: true, ageMs: lockAge, setAt: window.weatherCirclesLockTime };
+  } else {
+    console.log('🔓 LOCK STATUS: No active lock');
+    return { active: false };
   }
 };
 

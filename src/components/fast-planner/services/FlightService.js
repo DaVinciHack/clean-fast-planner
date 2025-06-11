@@ -332,6 +332,87 @@ class FlightService {
     return structuredWaypoints;
   }
   /**
+   * Load a specific flight by ID from Palantir
+   * 
+   * Note: This function was created for SaveFlightButton automation but is not currently used
+   * in the main application flow. RightPanel uses loadFlights() + array filtering instead.
+   * Keeping this function as it may be useful for future direct flight loading scenarios.
+   * 
+   * @param {string} flightId - Flight ID to load
+   * @returns {Promise<Object>} Result with flight object
+   */
+  static async loadSpecificFlight(flightId) {
+    try {
+      console.log(`FlightService: Loading specific flight: ${flightId}`);
+      
+      // Import the SDK to get MainFlightObjectFp2
+      const sdk = await import('@flight-app/sdk');
+      
+      // Get the MainFlightObjectFp2 object from SDK
+      const MainFlightObjectFp2 = sdk.MainFlightObjectFp2;
+      
+      if (!MainFlightObjectFp2) {
+        throw new Error(`MainFlightObjectFp2 not found in SDK`);
+      }
+      
+      // Query for specific flight by ID
+      const query = client(MainFlightObjectFp2).where({
+        flightId: { $eq: flightId }
+      });
+      
+      const response = await query.fetchPage({
+        $pageSize: 1
+      });
+      
+      if (!response || !response.data || response.data.length === 0) {
+        console.log(`FlightService: Flight ${flightId} not found`);
+        return { success: false, error: 'Flight not found' };
+      }
+      
+      const flight = response.data[0];
+      console.log(`FlightService: Found flight ${flightId}:`, flight);
+      
+      // Process the flight into the same format as loadFlights
+      const extractedDisplayWaypoints = this.extractDisplayWaypoints(flight);
+      
+      const processedFlight = {
+        id: flight.flightId,
+        name: flight.flightNumber || 'Unknown Flight',
+        flightNumber: flight.flightNumber,
+        date: flight.etd || flight.createdAt,
+        status: flight.isCompleted ? 'Completed' : flight.isInProgress ? 'In Progress' : 'Planned',
+        region: flight.region,
+        stops: flight.stopsArray || [],
+        displayWaypoints: extractedDisplayWaypoints,
+        combinedWaypoints: flight.combinedWaypoints || [],
+        aircraftId: flight.aircraftId,
+        captainId: flight.captainId,
+        copilotId: flight.copilotId,
+        medicId: flight.medicId,
+        soId: flight.soId,
+        rswId: flight.rswId,
+        windSpeed: flight.avgWindSpeed || flight.windSpeed || 0,
+        windDirection: flight.avgWindDirection || flight.windDirection || 0,
+        alternateLocation: flight.alternateSplitPoint ? 
+          `${flight.alternateSplitPoint} ${flight.alternateName || ''}` : null,
+        // Include raw flight object for detailed loading
+        _rawFlight: flight
+      };
+      
+      console.log(`FlightService: Processed flight ${flightId} successfully`);
+      return { success: true, flight: processedFlight };
+      
+    } catch (error) {
+      console.error(`FlightService: Error loading flight ${flightId}:`, error);
+      return { 
+        success: false, 
+        error: error.message || 'Unknown error loading flight',
+        details: error
+      };
+    }
+  }
+
+  /**
    * Load flights from Palantir filtered by region
    * 
    * @param {string} region - Region code to filter flights (optional)

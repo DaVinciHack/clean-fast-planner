@@ -404,12 +404,12 @@ const FastPlannerCore = ({
     }
   }, [weatherSegments, waypoints, fuelPolicy?.araFuelDefault, fuelPolicy?.approachFuelDefault]);
 
-  // Enhanced clearRoute that also clears alternate route state
+  // AGGRESSIVE clearRoute that flushes all system state 
   const clearRoute = useCallback(() => {
     console.log('🟠 CLEAR ROUTE DEBUG: clearRoute() called');
     console.log('🟠 CLEAR ROUTE DEBUG: About to clear alternateRouteData - current value:', alternateRouteData);
     console.log('🟠 CLEAR ROUTE DEBUG: Stack trace:', new Error().stack);
-    console.log('🧹 FastPlannerApp: Clearing route and alternate route');
+    console.log('🧹 FastPlannerApp: AGGRESSIVE CLEARING - Flushing all system state');
     
     // Call the hook's clearRoute function
     hookClearRoute();
@@ -422,11 +422,63 @@ const FastPlannerCore = ({
     setCurrentFlightId(null);
     clearWeatherSegments();
     
-    // CRITICAL FIX: Clear persistent alternate card storage
+    // AGGRESSIVE CLEANUP: Clear all persistent window state
     window.currentAlternateCard = null;
+    window.loadedWeatherSegments = null;
+    window.currentWeatherSegments = null;
+    window.currentFlightData = null;
+    window.currentWeatherAnalysis = null;
+    window.debugStopCards = null;
+    window.globalWaypoints = null;
+    window.flightAlternateData = null;
     
-    console.log('✅ FastPlannerApp: Route and alternate route cleared');
-  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData]);
+    // Clear weather circles and any stuck locks
+    if (window.currentWeatherCirclesLayer) {
+      try {
+        window.currentWeatherCirclesLayer.removeWeatherCircles();
+        window.currentWeatherCirclesLayer = null;
+      } catch (e) {
+        console.warn('🧹 CLEAR: Error removing weather circles:', e.message);
+      }
+    }
+    
+    // Force clear any stuck weather circles locks
+    window.weatherCirclesCreationInProgress = false;
+    window.weatherCirclesLockTime = null;
+    
+    // Clear automation loader state if needed
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator('Route cleared', 'success');
+    }
+    
+    // Reset weather fuel state
+    setWeatherFuel({ araFuel: 0, approachFuel: 0 });
+    
+    console.log('✅ FastPlannerApp: AGGRESSIVE CLEAR COMPLETE - All system state flushed');
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel]);
+  
+  // Make aggressive clear available globally for debugging
+  useEffect(() => {
+    window.aggressiveClearAll = () => {
+      console.log('🧹 GLOBAL: Performing aggressive system clear');
+      clearRoute();
+      
+      // Additional cleanup that might not be in regular clear
+      localStorage.removeItem('fastPlannerCache');
+      sessionStorage.removeItem('flightData');
+      
+      // Force garbage collection if possible
+      if (window.gc) {
+        window.gc();
+      }
+      
+      console.log('🧹 GLOBAL: Aggressive clear complete');
+    };
+    
+    return () => {
+      delete window.aggressiveClearAll;
+    };
+  }, [clearRoute]);
 
   useEffect(() => { import('./modules/waypoints/waypoint-styles.css'); }, []);
 
@@ -984,9 +1036,166 @@ const FastPlannerCore = ({
               if (loadedWeatherSegments.length > 0) {
                 console.log("🌤️ First weather segment structure:", JSON.stringify(loadedWeatherSegments[0], null, 2));
                 
-                // TODO: Set weather segments state for fuel calculations
-                // This needs to integrate with the useWeatherSegments hook
-                window.loadedWeatherSegments = loadedWeatherSegments; // Temporary for debugging
+                // Set weather segments globally and trigger auto-loading
+                window.loadedWeatherSegments = loadedWeatherSegments;
+                console.log('🌤️ STORED: Weather segments stored in window.loadedWeatherSegments for auto-loading');
+                
+                // CRITICAL FIX: Store alternate route data for correct split point coordinates
+                if (alternateRouteData && alternateRouteData.splitPoint) {
+                  window.flightAlternateData = alternateRouteData;
+                  console.log('🎯 STORED: Flight alternate data with correct split point:', {
+                    splitPoint: alternateRouteData.splitPoint,
+                    name: alternateRouteData.name,
+                    coordinateCount: alternateRouteData.coordinates?.length || 0
+                  });
+                } else {
+                  console.warn('🎯 WARNING: No alternate route data available for correct split point');
+                }
+                
+                // PROFESSIONAL SOLUTION: Dispatch proper data-ready event instead of timeouts
+                console.log('🎯 PROFESSIONAL: Dispatching weather-data-ready event for proper event-driven triggers');
+                window.dispatchEvent(new CustomEvent('weather-data-ready', {
+                  detail: {
+                    weatherSegments: loadedWeatherSegments,
+                    flightAlternateData: alternateRouteData,
+                    timestamp: Date.now(),
+                    source: 'flight-load-complete'
+                  }
+                }));
+                
+                // COMPREHENSIVE DEBUG: Let's see what's actually happening
+                console.log('🚨 DEBUG: Flight load complete - starting comprehensive debug');
+                console.log('🚨 DEBUG: loadedWeatherSegments:', loadedWeatherSegments?.length || 0);
+                console.log('🚨 DEBUG: alternateRouteData:', !!alternateRouteData);
+                console.log('🚨 DEBUG: window.mapManager:', !!window.mapManager);
+                console.log('🚨 DEBUG: window.mapManagerRef:', !!window.mapManagerRef);
+                console.log('🚨 DEBUG: Map available:', !!(window.mapManager?.map || window.mapManagerRef?.current?.map));
+                
+                // Store debug data globally for inspection
+                window.debugWeatherData = {
+                  loadedWeatherSegments,
+                  alternateRouteData,
+                  mapManager: window.mapManager,
+                  mapManagerRef: window.mapManagerRef,
+                  timestamp: Date.now()
+                };
+                
+                // DIRECT FIX: Force create weather circles immediately after data is available
+                setTimeout(() => {
+                  console.log('🚨 DEBUG TIMEOUT: Starting 1-second delayed creation');
+                  const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
+                  console.log('🚨 DEBUG TIMEOUT: Map check:', !!hasMap);
+                  console.log('🚨 DEBUG TIMEOUT: Weather segments check:', loadedWeatherSegments?.length || 0);
+                  
+                  if (loadedWeatherSegments && loadedWeatherSegments.length > 0 && hasMap) {
+                    console.log('🎯 DIRECT: Creating weather circles immediately with loaded data');
+                    console.log('🎯 DIRECT: First few weather segments:', loadedWeatherSegments.slice(0, 3));
+                    
+                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                      console.log('🎯 DIRECT: WeatherCirclesLayer imported successfully');
+                      
+                      // Clean up existing layer
+                      if (window.currentWeatherCirclesLayer) {
+                        try {
+                          window.currentWeatherCirclesLayer.removeWeatherCircles();
+                          console.log('🎯 DIRECT: Cleaned up existing layer');
+                        } catch (e) { 
+                          console.warn('🎯 DIRECT: Cleanup warning:', e.message); 
+                        }
+                      }
+                      
+                      // Create new layer
+                      console.log('🎯 DIRECT: Creating new WeatherCirclesLayer with map:', !!hasMap);
+                      const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
+                      console.log('🎯 DIRECT: WeatherCirclesLayer instance created');
+                      
+                      weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
+                      window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                      console.log('🎯 DIRECT: Weather circles created immediately after flight load - SUCCESS');
+                      
+                      // Extra verification
+                      setTimeout(() => {
+                        console.log('🎯 VERIFY: Checking if weather circles are visible on map');
+                        console.log('🎯 VERIFY: currentWeatherCirclesLayer exists:', !!window.currentWeatherCirclesLayer);
+                        console.log('🎯 VERIFY: Layer visible state:', window.currentWeatherCirclesLayer?.isVisible);
+                      }, 500);
+                      
+                    }).catch(error => {
+                      console.error('🎯 DIRECT: Error importing/creating weather circles:', error);
+                    });
+                  } else {
+                    console.log('🚨 DEBUG TIMEOUT: Failed checks:');
+                    console.log('🚨 DEBUG TIMEOUT: - Has weather segments:', !!(loadedWeatherSegments && loadedWeatherSegments.length > 0));
+                    console.log('🚨 DEBUG TIMEOUT: - Has map:', !!hasMap);
+                    console.log('🚨 DEBUG TIMEOUT: - Weather segments value:', loadedWeatherSegments);
+                  }
+                }, 1000); // 1 second after flight data is loaded
+                
+                // ADDITIONAL DEBUG: Multiple timing attempts
+                setTimeout(() => {
+                  console.log('🚨 DEBUG 3s: Checking data availability at 3 seconds');
+                  console.log('🚨 DEBUG 3s: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
+                  console.log('🚨 DEBUG 3s: window.flightAlternateData:', !!window.flightAlternateData);
+                }, 3000);
+                
+                setTimeout(() => {
+                  console.log('🚨 DEBUG 5s: Checking data availability at 5 seconds');
+                  console.log('🚨 DEBUG 5s: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
+                  console.log('🚨 DEBUG 5s: window.flightAlternateData:', !!window.flightAlternateData);
+                }, 5000);
+                
+                // GLOBAL DEBUG FUNCTION: Make manual testing available
+                window.debugWeatherCircles = () => {
+                  console.log('🔧 MANUAL DEBUG: Running manual weather circles creation');
+                  console.log('🔧 MANUAL DEBUG: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
+                  console.log('🔧 MANUAL DEBUG: window.flightAlternateData:', !!window.flightAlternateData);
+                  console.log('🔧 MANUAL DEBUG: window.mapManager:', !!window.mapManager);
+                  
+                  const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
+                  const weatherData = window.loadedWeatherSegments;
+                  
+                  if (weatherData && weatherData.length > 0 && hasMap) {
+                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                      if (window.currentWeatherCirclesLayer) {
+                        window.currentWeatherCirclesLayer.removeWeatherCircles();
+                      }
+                      const layer = new WeatherCirclesLayer(hasMap);
+                      layer.addWeatherCircles(weatherData);
+                      window.currentWeatherCirclesLayer = layer;
+                      console.log('🔧 MANUAL DEBUG: Weather circles created manually - SUCCESS');
+                    });
+                  } else {
+                    console.log('🔧 MANUAL DEBUG: FAILED - missing data or map');
+                  }
+                };
+                
+                // 🌤️ FORCE AUTO-ENABLE: Trigger weather circles creation after weather data is loaded
+                setTimeout(() => {
+                  console.log('🌤️ FORCE: Attempting to auto-create weather circles after data load');
+                  if (mapManagerRef?.current?.map && loadedWeatherSegments.length > 0) {
+                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                      // Clean up any existing layer first
+                      if (window.currentWeatherCirclesLayer) {
+                        try {
+                          window.currentWeatherCirclesLayer.removeWeatherCircles();
+                        } catch (cleanupError) {
+                          console.warn('🌤️ FORCE: Cleanup error:', cleanupError);
+                        }
+                      }
+                      
+                      console.log('🌤️ FORCE: Creating WeatherCirclesLayer with loaded flight data');
+                      const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                      weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
+                      window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                      console.log('🌤️ FORCE: Weather circles force-created for loaded flight');
+                      
+                      // Also dispatch an event to update MapLayersCard state
+                      window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
+                    }).catch(error => {
+                      console.error('🌤️ FORCE: Error force-creating weather circles:', error);
+                    });
+                  }
+                }, 2000); // Wait 2 seconds for map to be ready
               }
               
               console.log('🌤️ Weather segments loaded successfully for flight');

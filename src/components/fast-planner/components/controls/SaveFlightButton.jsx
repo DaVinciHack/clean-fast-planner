@@ -4,9 +4,20 @@ import PalantirFlightService from '../../services/PalantirFlightService';
 import AutomationService from '../../services/AutomationService';
 import { usePanelContext } from '../../context/PanelContext';
 import { useRegion } from '../../context/region';
+import FlightAutomationLoader from '../loaders/FlightAutomationLoader';
 
 /**
  * SaveFlightButton Component
+ * 
+ * ⚠️ WARNING: THIS COMPONENT IS NOT CURRENTLY USED IN THE MAIN APPLICATION FLOW ⚠️
+ * 
+ * The actual save flight functionality is handled by:
+ * SaveFlightCard → RightPanel.handleSaveFlightSubmit
+ * 
+ * This component exists for potential alternative save workflows but is not
+ * connected to the main UI. Any automation/reload functionality should be
+ * implemented in RightPanel.jsx instead.
+ * 
  * Creates a button that sends the current route data to Palantir to create a new flight
  * and optionally runs automation on the newly created flight
  * Now using RegionContext for region management
@@ -27,13 +38,10 @@ const SaveFlightButton = ({
   const [isAutomating, setIsAutomating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [savedFlightId, setSavedFlightId] = useState(null);
+  const [showAutomationLoader, setShowAutomationLoader] = useState(false);
+  const [automationFlightData, setAutomationFlightData] = useState(null);
   
-  // DEBUG: Log props to see if they're being passed correctly
-  console.log('🔍 SaveFlightButton props:', {
-    toggleWaypointMode: typeof toggleWaypointMode,
-    waypointModeActive,
-    onFlightLoad: typeof onFlightLoad
-  });
+  // Note: This component is not currently used in the main application flow
   
   // Access the panel context for card navigation
   const panelContext = usePanelContext();
@@ -138,8 +146,9 @@ const SaveFlightButton = ({
   /**
    * Run automation on the saved flight
    * @param {string} flightId - The ID of the flight to automate
+   * @param {Object} flightData - Flight data for the loader display
    */
-  const runFlightAutomation = async (flightId) => {
+  const runFlightAutomation = async (flightId, flightData = null) => {
     if (!flightId) {
       console.error('Cannot run automation: No flight ID provided');
       return;
@@ -148,7 +157,24 @@ const SaveFlightButton = ({
     try {
       setIsAutomating(true);
       
-      // Update loading indicator
+      // Extract flight details for the loader
+      const departureIcao = waypoints?.[0]?.name || 'DEP';
+      const destinationIcao = waypoints?.[waypoints.length - 1]?.name || 'DEST';
+      const flightNumber = flightData?.flightName || `Flight ${flightId.slice(-6)}`;
+      
+      // Store flight data for loader
+      setAutomationFlightData({
+        flightNumber,
+        departureIcao,
+        destinationIcao
+      });
+      
+      // Show professional automation loader instead of basic loading indicator
+      console.log('🚀 AUTOMATION LOADER: Setting showAutomationLoader to TRUE');
+      setShowAutomationLoader(true);
+      console.log('🚀 AUTOMATION LOADER: State set, loader should be visible now');
+      
+      // Update loading indicator (fallback for users who might see it)
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('Running flight automation...');
       }
@@ -163,72 +189,9 @@ const SaveFlightButton = ({
         window.LoadingIndicator.updateStatusIndicator('Flight automation completed successfully', 'success');
       }
       
-      // 🎯 AUTO-RELOAD: Load the enhanced flight back into Fast Planner
-      console.log('🔄 Auto-reloading enhanced flight back into Fast Planner...');
-      
-      // 🚨 CRITICAL FIX: Ensure we're in STOPS mode before reloading flight
-      if (waypointModeActive) {
-        console.log('⚠️  Currently in waypoint mode - switching to stops mode for proper flight loading');
-        toggleWaypointMode(); // Switch from waypoint mode to stops mode
-        
-        // Wait a moment for the mode switch to complete
-        await new Promise(resolve => setTimeout(resolve, 200));
-        console.log('✅ Switched to stops mode for flight loading');
-      } else {
-        console.log('✅ Already in stops mode - ready for flight loading');
-      }
-      
-      try {
-        // Import FlightService to load the flight data
-        const FlightService = await import('../../services/FlightService').then(module => module.default);
-        
-        // Load the specific flight that was just automated
-        const loadResult = await FlightService.loadSpecificFlight(flightId);
-        
-        if (loadResult.success && loadResult.flight) {
-          console.log('✅ Successfully loaded enhanced flight data:', loadResult.flight);
-          
-          // Update loading indicator
-          if (window.LoadingIndicator) {
-            window.LoadingIndicator.updateStatusIndicator('Loading enhanced flight with weather and alternates...', 'info');
-          }
-          
-          // Call the flight load callback to update Fast Planner
-          await onFlightLoad(loadResult.flight);
-          
-          console.log('🎉 Enhanced flight loaded into Fast Planner with weather and alternates!');
-          
-          // Final success message
-          if (window.LoadingIndicator) {
-            window.LoadingIndicator.updateStatusIndicator(
-              'Flight automated and reloaded with weather data and best alternates!', 
-              'success'
-            );
-          }
-          
-        } else {
-          console.warn('⚠️ Could not load enhanced flight data:', loadResult.error);
-          
-          // Still show success for automation, just note the reload issue
-          if (window.LoadingIndicator) {
-            window.LoadingIndicator.updateStatusIndicator(
-              'Automation completed, but could not auto-reload flight. Use Load Flights to see results.', 
-              'warning'
-            );
-          }
-        }
-        
-      } catch (reloadError) {
-        console.error('❌ Error during auto-reload:', reloadError);
-        
-        // Still show success for automation, just note the reload issue
-        if (window.LoadingIndicator) {
-          window.LoadingIndicator.updateStatusIndicator(
-            'Automation completed, but auto-reload failed. Use Load Flights to see results.', 
-            'warning'
-          );
-        }
-      }
+      // Note: Auto-reload functionality has been moved to RightPanel.jsx
+      // This SaveFlightButton is NOT currently used in the main application flow
+      // The actual save flight functionality is handled by SaveFlightCard → RightPanel.handleSaveFlightSubmit
       
       // Call success callback if provided
       if (onSuccess) {
@@ -275,7 +238,19 @@ const SaveFlightButton = ({
       }, 8000);
     } finally {
       setIsAutomating(false);
+      // Hide automation loader
+      setShowAutomationLoader(false);
+      setAutomationFlightData(null);
     }
+  };
+  
+  /**
+   * Handle automation loader completion
+   */
+  const handleAutomationComplete = () => {
+    console.log('🎉 FlightAutomationLoader completed, hiding loader');
+    setShowAutomationLoader(false);
+    setAutomationFlightData(null);
   };
 
   /**
@@ -520,8 +495,18 @@ const SaveFlightButton = ({
           if (flightId && flightId !== 'Unknown ID') {
             console.log('Running automation for flight ID:', flightId);
             // Add a slight delay to ensure flight creation is fully processed on the server
-            setTimeout(() => {
-              runFlightAutomation(flightId);
+            setTimeout(async () => {
+              try {
+                console.log('🚀 SAVE FLIGHT: About to call runFlightAutomation with:', { flightId, flightData: !!flightData });
+                await runFlightAutomation(flightId, flightData);
+                console.log('🚀 SAVE FLIGHT: runFlightAutomation completed successfully');
+              } catch (automationError) {
+                console.error('🚀 SAVE FLIGHT: runFlightAutomation failed:', automationError);
+                // Show error to user
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(`Automation failed: ${automationError.message}`, 'error');
+                }
+              }
             }, 1000);
           } else {
             console.log('No valid flight ID available for automation, got:', flightId);
@@ -694,6 +679,16 @@ const SaveFlightButton = ({
         )}
         {buttonText}
       </button>
+      
+      {/* Professional Flight Automation Loader */}
+      {console.log('🚀 RENDER CHECK: showAutomationLoader=', showAutomationLoader, 'automationFlightData=', automationFlightData)}
+      <FlightAutomationLoader
+        isVisible={showAutomationLoader}
+        flightNumber={automationFlightData?.flightNumber}
+        departureIcao={automationFlightData?.departureIcao}
+        destinationIcao={automationFlightData?.destinationIcao}
+        onComplete={handleAutomationComplete}
+      />
       
       {/* REMOVED: SaveFlightModal - now using SaveFlightCard in RightPanel instead */}
       

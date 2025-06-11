@@ -14,6 +14,7 @@ import {
 import '../../FastPlannerStyles.css';
 import { PanelProvider } from '../../context/PanelContext';
 import { useRegion } from '../../context/region'; // Import region context
+import FlightAutomationLoader from '../loaders/FlightAutomationLoader';
 
 /**
  * Right Panel Component
@@ -106,9 +107,47 @@ const RightPanel = ({
   // Get current region from context
   const { currentRegion } = useRegion();
   
+  // Flight automation loader state
+  const [showAutomationLoader, setShowAutomationLoader] = useState(false);
+  const [automationFlightData, setAutomationFlightData] = useState(null);
+  
+  // Handle automation loader completion
+  const handleAutomationComplete = () => {
+    console.log('🎉 RightPanel: FlightAutomationLoader completed, hiding loader');
+    setShowAutomationLoader(false);
+    setAutomationFlightData(null);
+  };
+  
+  // AGGRESSIVE CLEANUP: Reset automation loader when clearing flights
+  const resetAutomationLoader = useCallback(() => {
+    console.log('🧹 RightPanel: Resetting automation loader state');
+    setShowAutomationLoader(false);
+    setAutomationFlightData(null);
+  }, []);
+  
   // Handle saving flight from SaveFlightCard
   const handleSaveFlightSubmit = async (flightData) => {
     console.log('Save flight data from card:', flightData);
+    
+    // 🎯 IMMEDIATE POPUP: Show automation loader immediately if automation is enabled
+    if (flightData.runAutomation) {
+      console.log('🚀 RIGHTPANEL: Showing automation loader IMMEDIATELY on save');
+      
+      // Extract flight details for the loader
+      const departureIcao = waypoints?.[0]?.name || 'DEP';
+      const destinationIcao = waypoints?.[waypoints.length - 1]?.name || 'DEST';
+      const flightNumber = flightData?.flightName || 'Flight Plan';
+      
+      // Store flight data for loader
+      setAutomationFlightData({
+        flightNumber,
+        departureIcao,
+        destinationIcao
+      });
+      
+      // Show automation loader immediately
+      setShowAutomationLoader(true);
+    }
     
     // Import the PalantirFlightService
     try {
@@ -232,7 +271,9 @@ const RightPanel = ({
           try {
             const AutomationService = (await import('../../services/AutomationService')).default;
             
-            // Update loading indicator for automation
+            // Loader already shown at the beginning of save process
+            
+            // Update loading indicator for automation (fallback)
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator('Running flight automation...');
             }
@@ -295,15 +336,74 @@ const RightPanel = ({
                       }
                       
                       if (onFlightLoad) {
-                        // Call the flight load callback to update the map and UI
-                        onFlightLoad(targetFlight);
+                        // ✅ CRITICAL FIX: Use the same handleLoadFlight function that manual loading uses
+                        console.log('🔄 AUTOMATION: Using handleLoadFlight (same as manual loading)');
+                        handleLoadFlight(targetFlight);
                         
                         // Final success message
                         setTimeout(() => {
                           if (window.LoadingIndicator) {
                             window.LoadingIndicator.updateStatusIndicator(`Flight "${flightData.flightName}" saved, automated, and loaded successfully!`, 'success');
                           }
-                        }, 1000);
+                        }, 5000); // Wait longer to show after layers are created
+                        
+                        // PROFESSIONAL SOLUTION: Listen for actual data-ready event instead of timeouts
+                        console.log('🎯 PROFESSIONAL: Setting up weather-data-ready event listener for automation');
+                        
+                        const handleWeatherDataReady = (event) => {
+                          console.log('🎯 PROFESSIONAL: Received weather-data-ready event:', event.detail);
+                          
+                          const { weatherSegments, flightAlternateData } = event.detail;
+                          const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
+                          
+                          if (weatherSegments && weatherSegments.length > 0 && hasMap) {
+                            console.log('🎯 PROFESSIONAL: All data ready, creating weather circles immediately');
+                            
+                            // Dispatch force-enable event to MapLayersCard
+                            window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
+                            
+                            // Create weather circles with proper data
+                            import('../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                              // Clean up existing layer
+                              if (window.currentWeatherCirclesLayer) {
+                                try {
+                                  window.currentWeatherCirclesLayer.removeWeatherCircles();
+                                  console.log('🎯 PROFESSIONAL: Cleaned up existing weather layer');
+                                } catch (e) { 
+                                  console.warn('🎯 PROFESSIONAL: Cleanup warning (non-fatal):', e.message);
+                                }
+                              }
+                              
+                              // Create new layer with complete data
+                              console.log('🎯 PROFESSIONAL: Creating WeatherCirclesLayer with', weatherSegments.length, 'segments');
+                              const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
+                              weatherCirclesLayer.addWeatherCircles(weatherSegments);
+                              window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                              console.log('🎯 PROFESSIONAL: Weather circles created successfully via event-driven trigger!');
+                              
+                              // Remove the event listener as it's no longer needed
+                              window.removeEventListener('weather-data-ready', handleWeatherDataReady);
+                              
+                            }).catch(error => {
+                              console.error('🎯 PROFESSIONAL: Error creating weather circles:', error);
+                            });
+                          } else {
+                            console.warn('🎯 PROFESSIONAL: Data not ready yet:', {
+                              hasWeatherSegments: !!(weatherSegments && weatherSegments.length > 0),
+                              hasMap: !!hasMap,
+                              weatherCount: weatherSegments?.length || 0
+                            });
+                          }
+                        };
+                        
+                        // Set up the event listener
+                        window.addEventListener('weather-data-ready', handleWeatherDataReady);
+                        
+                        // Clean up listener after reasonable time (failsafe)
+                        setTimeout(() => {
+                          window.removeEventListener('weather-data-ready', handleWeatherDataReady);
+                          console.log('🎯 PROFESSIONAL: Cleaned up weather-data-ready event listener');
+                        }, 60000); // 60 seconds failsafe
                       }
                       
                     } else {
@@ -330,11 +430,17 @@ const RightPanel = ({
                 if (window.LoadingIndicator) {
                   window.LoadingIndicator.updateStatusIndicator(`Flight saved but automation failed: ${automationError.message}`, 'warning');
                 }
+              } finally {
+                // Note: Loader will be hidden by onComplete callback from FlightAutomationLoader
+                console.log('🚀 RIGHTPANEL: Automation finally block (loader will be hidden by onComplete callback)');
               }
             }, 1000);
             
           } catch (importError) {
             console.error('Failed to import AutomationService:', importError);
+            // Hide automation loader on import error
+            setShowAutomationLoader(false);
+            setAutomationFlightData(null);
           }
         } else if (flightData.runAutomation && (!flightId || flightId === 'Unknown ID')) {
           console.log('Automation requested but no valid flight ID available');
@@ -724,6 +830,15 @@ const RightPanel = ({
         currentRegion={currentRegion?.osdkRegion || currentRegion?.id} // Pass OSDK region for filtering
       />
     </RightPanelContainer>
+    
+    {/* Professional Flight Automation Loader */}
+    <FlightAutomationLoader
+      isVisible={showAutomationLoader}
+      flightNumber={automationFlightData?.flightNumber}
+      departureIcao={automationFlightData?.departureIcao}
+      destinationIcao={automationFlightData?.destinationIcao}
+      onComplete={handleAutomationComplete}
+    />
     </PanelProvider>
   );
 };

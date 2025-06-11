@@ -554,45 +554,6 @@ const LeftPanel = ({
           </button>
         </div>
 
-        {/* Route Control Buttons - Full Width Side by Side */}
-        <div style={{ 
-          display: "flex", 
-          width: "100%", 
-          gap: "7px",
-        }}>
-          <button 
-            id="clear-route" 
-            className="control-button" 
-            onClick={onClearRoute}
-            style={{
-              flex: 1,
-              padding: "6px 0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "14px",
-              height: "32px"
-            }}
-          >
-            Clear Route
-          </button>
-          <button 
-            id="toggle-chart" 
-            className="control-button" 
-            onClick={onToggleChart}
-            style={{
-              flex: 1,
-              padding: "6px 0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "14px",
-              height: "32px"
-            }}
-          >
-            {chartsVisible ? 'Hide Rigs' : 'Show Rigs'}
-          </button>
-        </div>
         
         {/* Favorite Locations Section */}
         <div style={{ marginTop: "20px" }}>

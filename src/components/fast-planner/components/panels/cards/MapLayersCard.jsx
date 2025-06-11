@@ -53,6 +53,15 @@ const MapLayersCard = ({
   
   // Update layer states when references or visibility props change
   useEffect(() => {
+    console.log('🔄 SYNC: Updating layer states from props:', {
+      platforms: platformsVisible,
+      airfields: airfieldsVisible,
+      movablePlatforms: movablePlatformsVisible,
+      blocks: blocksVisible,
+      bases: basesVisible,
+      fuelAvailable: fuelAvailableVisible
+    });
+    
     setLayers(prev => ({
       ...prev,
       platforms: platformsVisible,
@@ -65,12 +74,69 @@ const MapLayersCard = ({
     }));
   }, [platformsVisible, airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible, blocksVisible, basesVisible, fuelAvailableVisible]);
 
+  // Periodic sync to ensure toggles match actual layer state
+  useEffect(() => {
+    const syncLayerStates = () => {
+      // Check if map manager is available
+      if (!mapManagerRef?.current?.map) return;
+      
+      const map = mapManagerRef.current.map;
+      
+      // Sync grid state with actual map layers
+      const gridLayers = ['latitude-lines', 'longitude-lines', 'grid-labels'];
+      const gridVisible = gridLayers.some(layerId => {
+        const layer = map.getLayer(layerId);
+        return layer && map.getLayoutProperty(layerId, 'visibility') !== 'none';
+      });
+      
+      // Only update if there's a mismatch
+      if (gridVisible !== layers.grid) {
+        console.log('🔄 SYNC: Grid state mismatch detected, correcting:', { current: layers.grid, actual: gridVisible });
+        setLayers(prev => ({ ...prev, grid: gridVisible }));
+      }
+      
+      // Sync Gulf Coast map state
+      if (gulfCoastMapRef?.current) {
+        const gulfCoastVisible = gulfCoastMapRef.current.isDisplayed;
+        if (gulfCoastVisible !== layers.gulfCoastHeli) {
+          console.log('🔄 SYNC: Gulf Coast state mismatch detected, correcting:', { current: layers.gulfCoastHeli, actual: gulfCoastVisible });
+          setLayers(prev => ({ ...prev, gulfCoastHeli: gulfCoastVisible }));
+        }
+      }
+      
+      // Sync weather circles state
+      const weatherCirclesVisible = !!window.currentWeatherCirclesLayer;
+      if (weatherCirclesVisible !== layers.weatherCircles) {
+        console.log('🔄 SYNC: Weather circles state mismatch detected, correcting:', { current: layers.weatherCircles, actual: weatherCirclesVisible });
+        setLayers(prev => ({ ...prev, weatherCircles: weatherCirclesVisible }));
+      }
+    };
+    
+    // Sync immediately
+    syncLayerStates();
+    
+    // Set up interval to sync every 3 seconds
+    const interval = setInterval(syncLayerStates, 3000);
+    
+    return () => clearInterval(interval);
+  }, [layers.grid, layers.gulfCoastHeli, layers.weatherCircles, mapManagerRef, gulfCoastMapRef]);
+
   // Auto-enable weather circles when weather data becomes available
   useEffect(() => {
     const checkAndAutoEnableWeatherCircles = () => {
       // Check if weather data is available
       const hasWeatherData = (weatherSegmentsHook?.weatherSegments?.length > 0) || 
                             (window.loadedWeatherSegments?.length > 0);
+      
+      // Enhanced debugging for loaded flights
+      console.log('🔍 AUTO-ENABLE CHECK:', {
+        hasWeatherData,
+        hookSegments: weatherSegmentsHook?.weatherSegments?.length || 0,
+        loadedSegments: window.loadedWeatherSegments?.length || 0,
+        currentCirclesState: layers.weatherCircles,
+        existingLayer: !!window.currentWeatherCirclesLayer,
+        mapAvailable: !!mapManagerRef?.current?.map
+      });
       
       if (hasWeatherData && !layers.weatherCircles && !window.currentWeatherCirclesLayer) {
         console.log('🌤️ AUTO-ENABLE: Weather data detected, auto-enabling weather circles');
@@ -133,6 +199,17 @@ const MapLayersCard = ({
     
     return () => clearInterval(interval);
   }, [weatherSegmentsHook?.weatherSegments?.length, layers.weatherCircles, mapManagerRef]);
+
+  // Listen for force-enable events from flight loading
+  useEffect(() => {
+    const handleForceEnable = () => {
+      console.log('🌤️ FORCE-ENABLE: Received weather circles force-enable event');
+      setLayers(prev => ({ ...prev, weatherCircles: true }));
+    };
+
+    window.addEventListener('weather-circles-force-enabled', handleForceEnable);
+    return () => window.removeEventListener('weather-circles-force-enabled', handleForceEnable);
+  }, []);
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -316,15 +393,17 @@ const MapLayersCard = ({
               
               createWeatherCircles();
             } else {
-              // Fallback to test circles
-              console.log('🔘 TOGGLE: No real data available, using test circles');
-              if (weatherSegmentsHook?.addTestWeatherCircles) {
-                try {
-                  weatherSegmentsHook.addTestWeatherCircles();
-                } catch (testError) {
-                  console.error('🔘 TOGGLE: Error adding test circles:', testError);
-                }
-              }
+              // Enhanced debugging for missing weather data
+              console.error('🔘 TOGGLE: No weather data available for weather circles');
+              console.log('🔘 DEBUG: Weather data check:', {
+                hookSegments: weatherSegmentsHook?.weatherSegments?.length || 0,
+                loadedSegments: window.loadedWeatherSegments?.length || 0,
+                hookObject: !!weatherSegmentsHook,
+                loadedArray: Array.isArray(window.loadedWeatherSegments)
+              });
+              
+              // Reset state since we can't create circles
+              setLayers(prev => ({ ...prev, weatherCircles: false }));
             }
             
             // Update state only after successful setup
@@ -363,6 +442,14 @@ const MapLayersCard = ({
               });
               
               setLayers(prev => ({ ...prev, grid: gridVisible }));
+              
+              // Emit event to notify other components
+              setTimeout(() => {
+                const event = new CustomEvent('layer-visibility-changed', {
+                  detail: { layerType: 'grid', visible: gridVisible }
+                });
+                window.dispatchEvent(event);
+              }, 100);
             }
           }
           break;
@@ -370,10 +457,23 @@ const MapLayersCard = ({
         // Handle all platform-related toggles using the new functions
         case 'platforms':
           togglePlatformsVisibility();
+          // Emit event to notify other components
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'platforms', visible: !layers.platforms }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         case 'airfields':
           toggleAirfieldsVisibility();
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'airfields', visible: !layers.airfields }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         case 'fixedPlatforms':
@@ -382,18 +482,42 @@ const MapLayersCard = ({
           
         case 'movablePlatforms':
           toggleMovablePlatformsVisibility();
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'movablePlatforms', visible: !layers.movablePlatforms }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         case 'blocks':
           toggleBlocksVisibility();
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'blocks', visible: !layers.blocks }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         case 'bases':
           toggleBasesVisibility();
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'bases', visible: !layers.bases }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         case 'fuelAvailable':
           toggleFuelAvailableVisibility();
+          setTimeout(() => {
+            const event = new CustomEvent('layer-visibility-changed', {
+              detail: { layerType: 'fuelAvailable', visible: !layers.fuelAvailable }
+            });
+            window.dispatchEvent(event);
+          }, 100);
           break;
           
         default:
@@ -404,9 +528,25 @@ const MapLayersCard = ({
     }
   };
   
+  // Listen for global layer state changes from other components
+  useEffect(() => {
+    const handleGlobalLayerChange = (event) => {
+      console.log('🔄 SYNC: Received global layer change event:', event.detail);
+      const { layerType, visible } = event.detail;
+      
+      // Update our state to match the global change
+      if (layers.hasOwnProperty(layerType)) {
+        setLayers(prev => ({ ...prev, [layerType]: visible }));
+      }
+    };
+
+    window.addEventListener('layer-visibility-changed', handleGlobalLayerChange);
+    return () => window.removeEventListener('layer-visibility-changed', handleGlobalLayerChange);
+  }, []);
+
   // Render layer toggle button
   const renderLayerToggle = (id, label, isAvailable = true) => {
-    console.log(`MapLayersCard: Rendering toggle for ${id}, available: ${isAvailable}, ` +
+    console.log(`MapLayersCard: Rendering toggle for ${id}, state: ${layers[id]}, available: ${isAvailable}, ` +
                 `current region: ${currentRegion?.id || 'unknown'}`);
     
     return (
