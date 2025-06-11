@@ -89,10 +89,30 @@ const useManagers = ({
       favoriteLocationsManagerRef.current = new FavoriteLocationsManager();
 
       // Set up callback for when favorites change
-      favoriteLocationsManagerRef.current.setCallback('onChange', (favorites) => {
-        console.log(`Favorites changed, updating UI`);
-        setFavoriteLocations(favorites);
+      favoriteLocationsManagerRef.current.setCallback('onChange', (data) => {
+        console.log(`Favorites changed for region ${data.region}:`, data.favorites);
+        // Only update UI if this is for the current region
+        const currentRegion = regionManagerRef?.current?.getCurrentRegion();
+        if (currentRegion && data.region === currentRegion.id) {
+          setFavoriteLocations(data.favorites);
+        }
       });
+
+      // Load favorites for initial region (use timeout to ensure region is loaded)
+      setTimeout(() => {
+        if (regionManagerRef?.current) {
+          const currentRegion = regionManagerRef.current.getCurrentRegion();
+          if (currentRegion) {
+            const regionFavorites = favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(currentRegion.id);
+            setFavoriteLocations(regionFavorites);
+            console.log(`useManagers: Loaded ${regionFavorites.length} favorites for region ${currentRegion.id}`, regionFavorites);
+          } else {
+            console.log('useManagers: No current region found for favorites loading');
+          }
+        } else {
+          console.log('useManagers: RegionManager not available for favorites loading');
+        }
+      }, 500);
     }
 
     // Create PlatformManager
