@@ -2621,20 +2621,27 @@ class PlatformManager {
           // 🚁 DISABLED FOR DEMO - Keep original beautiful styling intact
           const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
           
-          // COMMENTED OUT 3D functionality to preserve demo-ready 2D styling
-          /*
-          if (currentStyle === '3d' || currentStyle === 'satellite') {
-            console.log(`🚁 ADDING 3D rigs ON TOP of existing beautiful layers for style: ${currentStyle}`);
-            setTimeout(() => {
-              // ADD 3D models without touching the original beautiful 2D layers
-              this.add3DRigsOnTopOfExistingLayers();
-            }, 100);
-          } else {
-            console.log(`ℹ️ In 2D mode - keeping original beautiful styling - style is: ${currentStyle}`);
-          }
-          */
+          // 🚁 DISABLED 3D RIGS - Keep normal 2D rigs in all modes for now
+          console.log(`🔍 STYLE CHECK: Current style is "${currentStyle}", keeping 2D rigs in all modes`);
           
-          console.log(`ℹ️ 3D functionality disabled for demo - preserving original beautiful 2D styling`);
+          // AGGRESSIVE CLEANUP: Remove ALL possible 3D layers
+          this.removeAll3DLayers();
+          
+          // Always clean up any existing 3D rigs and keep normal 2D rigs visible  
+          const map = this.mapManager.getMap();
+          if (map) {
+            
+            // Always show the normal circle layers (2D rigs) regardless of map style
+            const circleLayers = ['platforms-fixed-layer', 'platforms-movable-layer'];
+            circleLayers.forEach(layerId => {
+              if (map.getLayer(layerId)) {
+                console.log(`ℹ️ Keeping circle layer visible: ${layerId} in ${currentStyle} mode`);
+                map.setLayoutProperty(layerId, 'visibility', this.isVisible ? 'visible' : 'none');
+              }
+            });
+          }
+          
+          console.log(`🚁 3D functionality disabled - keeping normal 2D rigs in all modes`);
           
         } catch (error) {
           console.error('❌ Error restoring platform layers:', error);
@@ -2657,6 +2664,26 @@ class PlatformManager {
         }
       }, 300);
     }
+  }
+
+  /**
+   * Enhanced 3D platform layer restoration - for 3D map styles
+   */
+  _restorePlatformLayersFor3D() {
+    const map = this.mapManager.getMap();
+    if (!map || !this.platforms || this.platforms.length === 0) return;
+
+    console.log('🎯 3D Enhanced platform layer restoration');
+    
+    // Use the enhanced 3D rendering for beautiful rigs
+    this.addBasicPlatformLayers();
+    
+    // 🚁 DISABLED: 3D rigs functionality - keeping normal 2D rigs for now
+    // setTimeout(() => {
+    //   console.log('🚁 Adding 3D rigs on top for enhanced 3D mode');
+    //   this.add3DRigsOnTopOfExistingLayers();
+    // }, 500);
+    console.log('🚁 3D rigs disabled - keeping normal 2D platform layers');
   }
 
   /**
@@ -2818,7 +2845,7 @@ class PlatformManager {
             source: sourceId,
             filter: config.filter,
             paint: {
-              'circle-radius': 4,
+              'circle-radius': currentStyle === '3d' ? 2 : 4, // Smaller radius in 3D mode
               'circle-color': config.color,
               'circle-stroke-width': 1,
               'circle-stroke-color': '#ffffff'
@@ -2827,12 +2854,24 @@ class PlatformManager {
         }
       });
 
-      // 🚁 ADD 3D RIGS FOR SATELLITE VIEW
-      if (currentStyle === '3d' || currentStyle === 'satellite') {
-        this.add3DRigModels();
-      }
+      // 🚁 DISABLED: 3D rig models - keeping normal circles for now
+      // if (currentStyle === '3d' || currentStyle === 'satellite') {
+      //   this.add3DRigModels();
+      // }
+      console.log(`ℹ️ 3D rig models disabled - keeping normal circle markers in ${currentStyle} mode`);
 
       console.log('✅ Basic platform layers added successfully');
+      
+      // DEBUG: Log all circle layers on the map to find the blue discs
+      setTimeout(() => {
+        const allLayers = map.getStyle().layers;
+        const circleLayers = allLayers.filter(l => l.type === 'circle');
+        console.log('🔍 DEBUG: All circle layers on map:', circleLayers.map(l => ({
+          id: l.id,
+          paint: l.paint,
+          source: l.source
+        })));
+      }, 500);
       
       // CRITICAL: Reset the flag to allow future legitimate calls
       this._addingBasicLayers = false;
@@ -3058,23 +3097,132 @@ class PlatformManager {
    * Set up automatic layer restoration on style change
    */
   setupStyleChangeListener() {
+    window.addEventListener('map-style-changed', (event) => {
+      const { newStyle, is3D } = event.detail;
+      console.log(`🔄 RESTORE: PlatformManager received style change event: ${newStyle}, is3D: ${is3D}`);
+      
+      // AGGRESSIVE CLEANUP: Remove ALL possible 3D layers first
+      this.removeAll3DLayers();
+      
+      if (newStyle === '3d') {
+        // 3D MODE: Keep rigs OFF for clean view (no clutter)
+        console.log('🔄 RESTORE: 3D mode - keeping rigs OFF for clean view');
+        
+        // Restore weather circles and alternate lines in 3D mode too
+        this.restoreWeatherFeatures();
+      } else {
+        // 2D MODE: Restore rigs for navigation
+        console.log('🔄 RESTORE: 2D mode - restoring rigs for navigation');
+        setTimeout(() => {
+          if (this.platforms && this.platforms.length > 0) {
+            this.addPlatformsToMap(this.platforms);
+          }
+          
+          // Restore weather circles and alternate lines
+          this.restoreWeatherFeatures();
+        }, 500);
+      }
+    });
+  }
+
+  /**
+   * Remove problematic 3D platform layers to prevent discs
+   */
+  removeAll3DLayers() {
     const map = this.mapManager?.getMap();
     if (!map) return;
-
-    // 🚁 DISABLED FOR DEMO - Prevent automatic style restoration
-    // This was causing the beautiful rig styling to switch to basic disks automatically
-    /*
-    // Listen for style changes and restore layers
-    map.on('styledata', () => {
-      // Longer delay to ensure style is fully loaded and stable
-      setTimeout(() => {
-        console.log('🎨 Style change detected, restoring platform layers...');
-        this.restoreLayersAfterStyleChange();
-      }, 500); // Increased delay
+    
+    console.log('🧹 CLEANUP: Removing problematic 3D platform layers (keeping weather circles)');
+    
+    // DON'T remove weather circles - they are legitimate weather visualization
+    // The "horrible discs" were from 3D platform layers, not weather circles
+    
+    // ONLY remove problematic 3D PLATFORM layers - NOT weather circles or alternate lines
+    const problematic3DLayerIds = [
+      // Three.js custom PLATFORM layers only
+      '3d-rigs-layer',
+      'additive-3d-rigs-layer', 
+      'fixed-3d-rigs-layer',
+      'blocks-3d-rigs-layer',
+      'platforms-3d-rigs-layer',
+      'all-3d-rigs-layer',
+      
+      // Simple 3D PLATFORM marker layers only
+      'simple-3d-rigs',
+      'simple-3d-rigs-base',
+      'simple-3d-rigs-deck', 
+      'simple-3d-rigs-helipad',
+      'simple-3d-rigs-center',
+      
+      // Real 3D extrusion PLATFORM layers (these were the discs!)
+      'real-3d-rigs',
+      'real-3d-rigs-helipad',
+      'fill-extrusion-rigs'
+      
+      // DON'T remove weather circles or alternate lines - they are legitimate aviation layers
+    ];
+    
+    // Remove ONLY problematic platform layer IDs
+    problematic3DLayerIds.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🧹 Removing problematic platform layer: ${layerId}`);
+        map.removeLayer(layerId);
+      }
     });
-    */
+    
+    // Remove ONLY problematic platform sources
+    const problematic3DSourceIds = [
+      'simple-3d-rigs-source',
+      'real-3d-rigs-source', 
+      'blocks-3d-rigs-source',
+      'platforms-3d-rigs-source'
+      // DON'T remove weather-circles-source or weather alternate line sources
+    ];
+    
+    problematic3DSourceIds.forEach(sourceId => {
+      if (map.getSource(sourceId)) {
+        console.log(`🧹 Removing problematic platform source: ${sourceId}`);
+        map.removeSource(sourceId);
+      }
+    });
+    
+    console.log('🧹 CLEANUP: Complete - only problematic 3D platform layers removed (weather preserved)');
+  }
 
-    console.log('🎨 PlatformManager: Style change listener DISABLED for demo - preserving original beautiful styling');
+  /**
+   * Restore weather circles and alternate lines after map style change
+   */
+  restoreWeatherFeatures() {
+    console.log('🌤️ RESTORE: Restoring weather circles and alternate lines...');
+    
+    // Use the same auto-load logic from MapManager
+    if (this.mapManager && typeof this.mapManager.autoLoadWeatherCircles === 'function') {
+      console.log('🌤️ RESTORE: Using MapManager autoLoadWeatherCircles');
+      setTimeout(() => {
+        this.mapManager.autoLoadWeatherCircles();
+      }, 200);
+    } else {
+      console.log('🌤️ RESTORE: MapManager autoLoadWeatherCircles not available, trying direct restore');
+      
+      // Direct approach - check for existing weather data
+      if (window.loadedWeatherSegments?.length > 0) {
+        console.log('🌤️ RESTORE: Found loadedWeatherSegments, creating weather layer');
+        setTimeout(async () => {
+          try {
+            const { default: WeatherCirclesLayer } = await import('./layers/WeatherCirclesLayer');
+            const weatherLayer = new WeatherCirclesLayer(this.mapManager?.getMap());
+            
+            await weatherLayer.addWeatherCircles(window.loadedWeatherSegments);
+            window.currentWeatherCirclesLayer = weatherLayer;
+            console.log('✅ RESTORE: Weather circles and alternate lines restored');
+          } catch (error) {
+            console.error('❌ RESTORE: Error restoring weather features:', error);
+          }
+        }, 300);
+      } else {
+        console.log('🌤️ RESTORE: No weather data available for restoration');
+      }
+    }
   }
 
   /**
@@ -3682,10 +3830,12 @@ class PlatformManager {
 
     console.log(`✅ Three.js available - adding 3D models ON TOP of original styling`);
 
-    // Get more platforms for testing (increased from 20 to 100)
+    // Get ONLY BLOCKS for 3D rig replacement
     const rigsFor3D = this.platforms.filter(p => 
-      p.coordinates && p.coordinates.length === 2
-    ).slice(0, 100); // More rigs now that we have better performance
+      p.isBlocks && p.coordinates && p.coordinates.length === 2
+    ); // All blocks, no limit
+    
+    console.log(`🎯 BLOCKS ONLY: Found ${rigsFor3D.length} blocks to replace with 3D rigs`);
 
     console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs ON TOP of existing styling`);
 
@@ -3752,7 +3902,7 @@ class PlatformManager {
         
         // SUPER SIMPLE: One leg + flat top - FORCE VERTICAL ORIENTATION
         const rigGroup = new THREE.Group();
-        const size = 0.00003; // Small but visible
+        const size = 0.000015; // Half the previous size (was 0.00003)
         
         // 1. ONE VERTICAL LEG (cylinder) - SHORTER LEG
         const legGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 2, 6); // Reduced from size * 3 to size * 2
@@ -3820,6 +3970,488 @@ class PlatformManager {
     console.log('🚁 ADDITIVE 3D layer added - original beautiful styling PRESERVED!');
     
     // REMOVED: Flashing Mapbox labels - using physical nameplates instead
+  }
+
+  /**
+   * 🎯 REPLACE ALL BLOCKS WITH 3D RIGS - Dedicated function for blocks only
+   */
+  replaceBlocksWith3DRigs() {
+    console.log(`🎯 REPLACING ALL BLOCKS WITH 3D RIGS!`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ No map available`);
+      return;
+    }
+
+    // Clean up any existing 3D layers
+    if (map.getLayer('blocks-3d-rigs-layer')) {
+      console.log('🧹 Removing existing blocks 3D layer');
+      map.removeLayer('blocks-3d-rigs-layer');
+    }
+    
+    // IMPORTANT: Hide regular block layers so 3D rigs show instead
+    const blockLayers = [
+      'platforms-blocks-layer', 'platforms-blocks-layer-basic'
+    ];
+    
+    blockLayers.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🙈 Hiding regular block layer: ${layerId}`);
+        map.setLayoutProperty(layerId, 'visibility', 'none');
+      }
+    });
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Three.js available - replacing blocks with 3D rigs`);
+
+    // Get ONLY blocks for replacement
+    const blocksFor3D = this.platforms.filter(p => 
+      p.isBlocks && p.coordinates && p.coordinates.length === 2
+    );
+    
+    console.log(`🎯 Found ${blocksFor3D.length} blocks to replace with 3D rigs`);
+
+    if (blocksFor3D.length === 0) {
+      console.log('❌ No blocks found');
+      return;
+    }
+
+    // Store block data for the layer
+    const rigData = blocksFor3D.map(block => ({
+      coordinates: block.coordinates,
+      name: block.name,
+      type: 'block'
+    }));
+
+    // Add Three.js custom layer for blocks replacement
+    map.addLayer({
+      id: 'blocks-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🎯 Initializing BLOCKS 3D RIGS layer');
+        
+        // Create Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // Use Mapbox's WebGL context
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create 3D rigs for each block
+        rigData.forEach((block, index) => {
+          this.createBlockRig(block, index);
+        });
+
+        console.log(`✅ BLOCKS 3D RIGS layer initialized with ${rigData.length} rigs!`);
+      },
+
+      render: function(gl, matrix) {
+        // Simple camera setup
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        
+        // Render 3D rigs
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createBlockRig: function(block, index) {
+        const [lng, lat] = block.coordinates;
+        
+        // Convert to world coordinates 
+        const worldCoords = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        
+        // Create SUPER SIMPLE and TINY 3D rig for blocks
+        const rigGroup = new THREE.Group();
+        const size = 0.00000015; // Another 10x smaller - microscopic for 14,000 rigs!
+        
+        // Just a simple platform deck - back to original simple shape
+        const deckGeometry = new THREE.CylinderGeometry(size, size, size * 0.3, 8);
+        const deckMaterial = new THREE.MeshBasicMaterial({ color: 0x444444 });
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        deck.position.set(0, 0, 0);
+        rigGroup.add(deck);
+        
+        // Use proper coordinate transformation like the working blocks
+        const modelTransform = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        const modelAsMatrix = new THREE.Matrix4()
+          .makeTranslation(modelTransform.x, modelTransform.y, modelTransform.z)
+          .scale(new THREE.Vector3(modelTransform.meterInMercatorCoordinateUnits(), 
+                                   -modelTransform.meterInMercatorCoordinateUnits(), 
+                                   modelTransform.meterInMercatorCoordinateUnits()));
+        
+        rigGroup.applyMatrix4(modelAsMatrix);
+        
+        this.scene.add(rigGroup);
+        console.log(`✅ Added 3D rig for block: ${block.name}`);
+      }
+    });
+
+    console.log('🎯 BLOCKS 3D RIGS layer added - blocks replaced with 3D rigs!');
+  }
+
+  /**
+   * 🏗️ REPLACE ALL PLATFORMS WITH BIG 3D RIGS WITH TOWERS - Dedicated function for platforms
+   */
+  replacePlatformsWith3DRigs() {
+    console.log(`🏗️ REPLACING ALL PLATFORMS WITH BIG 3D RIGS WITH TOWERS!`);
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log(`❌ No map available`);
+      return;
+    }
+
+    // Clean up any existing platform 3D layers
+    if (map.getLayer('platforms-3d-rigs-layer')) {
+      console.log('🧹 Removing existing platforms 3D layer');
+      map.removeLayer('platforms-3d-rigs-layer');
+    }
+    
+    // IMPORTANT: Hide regular platform layers so 3D rigs show instead
+    const platformLayers = [
+      'platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer',
+      'platforms-fixed-layer-basic', 'platforms-movable-layer-basic', 'platforms-airfield-layer-basic'
+    ];
+    
+    platformLayers.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🙈 Hiding regular platform layer: ${layerId}`);
+        map.setLayoutProperty(layerId, 'visibility', 'none');
+      }
+    });
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Three.js available - replacing platforms with BIG 3D rigs with towers`);
+
+    // Get ONLY platforms for replacement (isPlatform but not blocks, bases, etc.)
+    const platformsFor3D = this.platforms.filter(p => 
+      p.isPlatform && !p.isBlocks && !p.isBases && !p.isAirfield && p.coordinates && p.coordinates.length === 2
+    );
+    
+    console.log(`🏗️ Found ${platformsFor3D.length} platforms to replace with big 3D rigs with towers`);
+
+    if (platformsFor3D.length === 0) {
+      console.log('❌ No platforms found');
+      return;
+    }
+
+    // Store platform data for the layer
+    const rigData = platformsFor3D.map(platform => ({
+      coordinates: platform.coordinates,
+      name: platform.name,
+      type: 'platform',
+      hasFuel: platform.hasFuel || false
+    }));
+
+    // Add Three.js custom layer for platform replacement
+    map.addLayer({
+      id: 'platforms-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🏗️ Initializing PLATFORMS 3D RIGS layer with towers');
+        
+        // Create Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // Use Mapbox's WebGL context
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create big 3D rigs with towers for each platform
+        rigData.forEach((platform, index) => {
+          this.createPlatformRigWithTower(platform, index);
+        });
+
+        console.log(`✅ PLATFORMS 3D RIGS layer initialized with ${rigData.length} big rigs with towers!`);
+      },
+
+      render: function(gl, matrix) {
+        // Simple camera setup
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        
+        // Render 3D rigs
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createPlatformRigWithTower: function(platform, index) {
+        const [lng, lat] = platform.coordinates;
+        
+        // Convert to world coordinates 
+        const worldCoords = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        
+        // Create SIMPLE and SMALL 3D platform - same size as blocks but with light blue legs
+        const rigGroup = new THREE.Group();
+        const size = 0.00000015; // Same microscopic size as blocks
+        
+        // 1. Platform deck (same as blocks but different color)
+        const deckGeometry = new THREE.CylinderGeometry(size, size, size * 0.3, 8);
+        const deckMaterial = new THREE.MeshBasicMaterial({ 
+          color: platform.hasFuel ? 0x666666 : 0x777777  // Slightly lighter than blocks
+        });
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        deck.position.set(0, 0, 0);
+        rigGroup.add(deck);
+        
+        // 2. Light blue legs/pillars (what makes it different from blocks)
+        const legGeometry = new THREE.CylinderGeometry(size * 0.2, size * 0.2, size * 1.5, 6);
+        const legMaterial = new THREE.MeshBasicMaterial({ color: 0x87CEEB }); // Light blue
+        const leg = new THREE.Mesh(legGeometry, legMaterial);
+        leg.position.set(0, 0, -size * 0.75);
+        rigGroup.add(leg);
+        
+        // 3. Light blue top indicator
+        const topGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 0.1, 6);
+        const topMaterial = new THREE.MeshBasicMaterial({ color: 0x87CEEB }); // Light blue
+        const top = new THREE.Mesh(topGeometry, topMaterial);
+        top.position.set(0, 0, size * 0.2);
+        rigGroup.add(top);
+        
+        // Use same coordinate transformation as blocks
+        const modelTransform = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        const modelAsMatrix = new THREE.Matrix4()
+          .makeTranslation(modelTransform.x, modelTransform.y, modelTransform.z)
+          .scale(new THREE.Vector3(modelTransform.meterInMercatorCoordinateUnits(), 
+                                   -modelTransform.meterInMercatorCoordinateUnits(), 
+                                   modelTransform.meterInMercatorCoordinateUnits()));
+        
+        rigGroup.applyMatrix4(modelAsMatrix);
+        
+        this.scene.add(rigGroup);
+        console.log(`✅ Added BIG 3D rig with tower for platform: ${platform.name}`);
+      }
+    });
+
+    console.log('🏗️ PLATFORMS 3D RIGS layer added - platforms replaced with big 3D rigs with towers!');
+  }
+
+  /**
+   * 🚁 AUTO 3D RIGS - Enable all 3D rigs automatically when switching to 3D view
+   */
+  enableAuto3DRigs() {
+    console.log('🚁 AUTO-ENABLING ALL 3D RIGS for 3D view...');
+    
+    const map = this.mapManager.getMap();
+    if (!map) {
+      console.log('❌ No map available');
+      return;
+    }
+
+    // DEBUG: Check if we have platforms data
+    console.log(`🔍 DEBUG: Have ${this.platforms?.length || 0} platforms in memory`);
+    if (!this.platforms || this.platforms.length === 0) {
+      console.log('❌ No platforms data available for 3D rigs');
+      return;
+    }
+
+    // Clean up any existing 3D layers
+    ['blocks-3d-rigs-layer', 'platforms-3d-rigs-layer', 'auto-3d-rigs-layer'].forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        console.log(`🧹 Removing existing layer: ${layerId}`);
+        map.removeLayer(layerId);
+      }
+    });
+
+    // DON'T hide platform layers yet - wait until 3D objects are successfully created
+
+    // Check Three.js availability
+    if (typeof THREE === 'undefined') {
+      console.error('❌ Three.js not loaded!');
+      return;
+    }
+
+    console.log(`✅ Creating auto 3D rigs for all ${this.platforms.length} platforms`);
+
+    // Get all platforms that have coordinates
+    const allPlatformsFor3D = this.platforms.filter(p => 
+      p.coordinates && p.coordinates.length === 2
+    );
+    
+    if (allPlatformsFor3D.length === 0) {
+      console.log('❌ No platforms with coordinates found');
+      return;
+    }
+
+    // Add unified 3D layer for all platform types
+    map.addLayer({
+      id: 'auto-3d-rigs-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      
+      onAdd: function(map, gl) {
+        console.log('🚁 Initializing AUTO 3D RIGS layer');
+        
+        // Create Three.js scene
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+        
+        // Use Mapbox's WebGL context
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: map.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        
+        this.renderer.autoClear = false;
+        this.map = map;
+
+        // Create 3D rigs for each platform with proper colors
+        allPlatformsFor3D.forEach((platform, index) => {
+          this.createColorCoded3DRig(platform, index);
+        });
+
+        console.log(`✅ AUTO 3D RIGS layer initialized with ${allPlatformsFor3D.length} rigs!`);
+        
+        // NOW hide the regular platform layers since 3D objects are successfully created
+        const allPlatformLayers = [
+          'platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer',
+          'platforms-fixed-layer-basic', 'platforms-movable-layer-basic', 'platforms-airfield-layer-basic',
+          'platforms-blocks-layer', 'platforms-blocks-layer-basic',
+          'platforms-bases-layer', 'platforms-bases-layer-basic',
+          'platforms-fuel-layer', 'platforms-fuel-layer-basic'
+        ];
+        
+        allPlatformLayers.forEach(layerId => {
+          if (map.getLayer(layerId)) {
+            console.log(`🙈 Hiding regular layer: ${layerId}`);
+            map.setLayoutProperty(layerId, 'visibility', 'none');
+          }
+        });
+      },
+
+      render: function(gl, matrix) {
+        // DEBUG: Log render calls occasionally
+        if (!this.renderCount) this.renderCount = 0;
+        this.renderCount++;
+        if (this.renderCount % 60 === 1) { // Log every 60 frames
+          console.log(`🎬 Rendering 3D rigs frame ${this.renderCount}, scene has ${this.scene.children.length} children`);
+        }
+        
+        // Simple camera setup - just use the matrix directly
+        this.camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix);
+        this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+        
+        // Render 3D rigs
+        this.renderer.resetState();
+        this.renderer.render(this.scene, this.camera);
+      },
+
+      createColorCoded3DRig: function(platform, index) {
+        const [lng, lat] = platform.coordinates;
+        
+        // DEBUG: Log every 1000th rig to track progress
+        if (index % 1000 === 0) {
+          console.log(`🔍 Creating 3D rig ${index}: ${platform.name} at [${lng}, ${lat}]`);
+        }
+        
+        // FORCE DEBUG: Always log first 3 rigs to see coordinates
+        if (index < 3) {
+          console.log(`🔍 FORCE DEBUG rig ${index}: ${platform.name} at [${lng}, ${lat}]`);
+        }
+        
+        // Create color-coded 3D rig based on platform type
+        const rigGroup = new THREE.Group();
+        const size = index < 10 ? 0.01 : 0.00015; // First 10 rigs are MASSIVE for testing
+        
+        // Determine colors based on platform type
+        let deckColor = 0x555555; // Default gray
+        let accentColor = 0x666666; // Default accent
+        
+        if (platform.isBlocks) {
+          deckColor = 0x444444; // Dark gray for blocks
+          accentColor = 0x555555;
+        } else if (platform.isBases) {
+          deckColor = 0x666666; // Medium gray for bases  
+          accentColor = 0x777777;
+        } else if (platform.isMovable) {
+          deckColor = 0x8B0000; // Dark red for movable
+          accentColor = 0xFF0000; // Bright red accent
+        } else if (platform.hasFuel || platform.isFuel) {
+          deckColor = 0xB8860B; // Dark gold for fuel
+          accentColor = 0xFFD700; // Yellow accent
+        } else if (platform.isPlatform) {
+          deckColor = 0x555555; // Gray for platforms
+          accentColor = 0x87CEEB; // Light blue accent
+        }
+        
+        // 1. Main platform deck
+        const deckGeometry = new THREE.CylinderGeometry(size, size, size * 0.3, 8);
+        const deckMaterial = new THREE.MeshBasicMaterial({ color: deckColor });
+        const deck = new THREE.Mesh(deckGeometry, deckMaterial);
+        deck.position.set(0, 0, 0);
+        rigGroup.add(deck);
+        
+        // 2. Accent indicator (different for each type)
+        if (!platform.isBlocks) {
+          // Add accent for non-blocks
+          const accentGeometry = new THREE.CylinderGeometry(size * 0.3, size * 0.3, size * 0.1, 6);
+          const accentMaterial = new THREE.MeshBasicMaterial({ color: accentColor });
+          const accent = new THREE.Mesh(accentGeometry, accentMaterial);
+          accent.position.set(0, 0, size * 0.2);
+          rigGroup.add(accent);
+        }
+        
+        // TEMPORARY DEBUG: Use simple positioning first to test if rendering works
+        if (index < 10) {
+          // Position first 10 rigs at center of view - should be impossible to miss
+          const x = (index % 5) * 0.01 - 0.02; // Spread them out BIG
+          const y = Math.floor(index / 5) * 0.01;
+          const z = 1000; // Put them way above ground level
+          
+          rigGroup.position.set(x, y, z);
+          console.log(`🔍 TEST positioning MASSIVE rig ${index} at center coords [${x}, ${y}, ${z}]`);
+        } else {
+          // Use proper coordinate transformation for the rest
+          const modelTransform = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+          
+          const modelAsMatrix = new THREE.Matrix4()
+            .makeTranslation(modelTransform.x, modelTransform.y, modelTransform.z)
+            .scale(new THREE.Vector3(modelTransform.meterInMercatorCoordinateUnits(), 
+                                     -modelTransform.meterInMercatorCoordinateUnits(), 
+                                     modelTransform.meterInMercatorCoordinateUnits()));
+          
+          rigGroup.applyMatrix4(modelAsMatrix);
+        }
+        
+        this.scene.add(rigGroup);
+        
+        // DEBUG: Log scene stats for first few rigs
+        if (index < 5) {
+          console.log(`🔍 Scene children count after adding rig ${index}: ${this.scene.children.length}`);
+        }
+      }
+    });
+
+    console.log('🚁 AUTO 3D RIGS layer added - all platforms now showing as color-coded 3D rigs!');
   }
 }
 
