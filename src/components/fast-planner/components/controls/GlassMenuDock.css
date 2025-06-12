@@ -1,4 +1,4 @@
-/* Apple-style Glass Menu Dock CSS */
+/* Apple-style Glass Menu Dock CSS - Ultra Thin & Transparent */
 
 .glass-dock-container {
   position: fixed;
@@ -14,57 +14,69 @@
 
 .glass-dock {
   display: flex;
-  gap: 16px;
-  padding: 12px 20px;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
   
-  /* Apple glassmorphism effect */
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* Ultra-transparent Apple glassmorphism */
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   
-  /* Subtle border and shadow */
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 24px;
+  /* Whiter highlights, minimal border */
+  border: 0.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
   
-  /* Beautiful shadow system */
+  /* Stronger glass shadow system */
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    0 4px 20px rgba(0, 0, 0, 0.15),
+    0 1px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   
   /* Smooth animations */
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   
   /* Re-enable pointer events for dock */
   pointer-events: auto;
+  
+  /* Much thinner height */
+  min-height: 44px;
 }
 
 .glass-dock:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.12);
   box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.15),
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    0 6px 25px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.glass-button-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .glass-button {
-  width: 52px;
-  height: 52px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 16px;
+  border-radius: 12px;
   
-  /* Individual button glass effect */
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* Ultra-subtle button glass effect */
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   
-  /* Subtle button border */
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  /* Stronger white border */
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
   
-  /* Button shadow */
+  /* Enhanced button shadow */
   box-shadow: 
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
   
   /* Smooth transitions */
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -79,13 +91,28 @@
   overflow: hidden;
 }
 
+/* Round lock button */
+.glass-button.round {
+  border-radius: 50%;
+}
+
+.glass-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
 /* Button hover and active states */
 .glass-button:hover {
-  transform: translateY(-1px) scale(1.05);
-  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-0.5px) scale(1.02);
+  background: rgba(255, 255, 255, 0.12);
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
   box-shadow: 
-    0 6px 20px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    0 3px 12px rgba(0, 0, 0, 0.18),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
 }
 
 .glass-button:active {
@@ -95,8 +122,8 @@
 
 /* Icon styling */
 .glass-icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   color: rgba(255, 255, 255, 0.9);
   transition: all 0.2s ease;
 }
@@ -109,34 +136,40 @@
   stroke-linejoin: round;
 }
 
-/* Lock button states */
+/* Lock button states with stronger color hints */
 .glass-button.locked {
-  background: rgba(255, 107, 107, 0.15); /* Subtle red tint when locked */
+  background: rgba(255, 59, 48, 0.12); /* Red tint when locked */
+  border: 0.5px solid rgba(255, 59, 48, 0.3);
 }
 
 .glass-button.locked:hover {
-  background: rgba(255, 107, 107, 0.25);
+  background: rgba(255, 59, 48, 0.18);
+  border: 0.5px solid rgba(255, 59, 48, 0.4);
 }
 
 .glass-button.unlocked {
-  background: rgba(72, 187, 120, 0.15); /* Subtle green tint when unlocked */
+  background: rgba(52, 199, 89, 0.12); /* Green tint when unlocked */
+  border: 0.5px solid rgba(52, 199, 89, 0.3);
 }
 
 .glass-button.unlocked:hover {
-  background: rgba(72, 187, 120, 0.25);
+  background: rgba(52, 199, 89, 0.18);
+  border: 0.5px solid rgba(52, 199, 89, 0.4);
 }
 
-/* Route button - subtle blue */
+/* Route button - blue like Apple maps */
 .route-button:hover {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(0, 122, 255, 0.15);
+  border: 0.5px solid rgba(0, 122, 255, 0.3);
 }
 
-/* Menu button - subtle purple */
+/* Menu button - purple like Apple settings */
 .menu-button:hover {
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(175, 82, 222, 0.15);
+  border: 0.5px solid rgba(175, 82, 222, 0.3);
 }
 
-/* Ripple effect on click */
+/* Subtle ripple effect on click */
 .glass-button::after {
   content: '';
   position: absolute;
@@ -145,21 +178,21 @@
   width: 0;
   height: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.4);
   transform: translate(-50%, -50%);
-  transition: width 0.4s ease, height 0.4s ease;
+  transition: width 0.3s ease, height 0.3s ease;
 }
 
 .glass-button:active::after {
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
 }
 
 /* Entrance animation */
 @keyframes glassSlideIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(20px) scale(0.9);
+    transform: translateX(-50%) translateY(15px) scale(0.95);
   }
   to {
     opacity: 1;
