@@ -2117,25 +2117,36 @@ const FastPlannerCore = ({
 
   // Create ref for RightPanel to access its card change functionality
   const rightPanelRef = useRef(null);
+  
+  // Track the current active card in main component for toggle functionality
+  const [currentActiveCard, setCurrentActiveCard] = useState('main');
 
-  // Function to handle card changes from glass dock buttons
+  // Function to handle card changes from glass dock buttons with toggle functionality
   const handleCardChange = useCallback((cardId) => {
-    console.log(`🎛️ Glass dock requesting card change to: ${cardId}`);
+    console.log(`🎛️ Glass dock: ${cardId} button clicked`);
+    console.log(`🎛️ Current state: panel=${rightPanelVisible}, activeCard=${currentActiveCard}`);
     
-    // First ensure the right panel is visible
+    // If panel is open and same card is clicked → close panel (toggle off)
+    if (rightPanelVisible && currentActiveCard === cardId) {
+      console.log(`🎛️ Toggle OFF: Closing ${cardId} card`);
+      toggleRightPanel();
+      return;
+    }
+    
+    // Otherwise → open panel and/or switch to card
+    console.log(`🎛️ Opening/switching to ${cardId} card`);
+    
+    // Open panel if closed
     if (!rightPanelVisible) {
-      console.log('🎛️ Opening right panel first...');
       toggleRightPanel();
     }
     
-    // Then change the card
-    if (rightPanelRef.current && rightPanelRef.current.handleCardChange) {
-      console.log(`🎛️ Calling right panel handleCardChange(${cardId})`);
+    // Switch to the requested card and update our tracking
+    if (rightPanelRef.current?.handleCardChange) {
       rightPanelRef.current.handleCardChange(cardId);
-    } else {
-      console.warn('🎛️ Right panel ref or handleCardChange not available');
+      setCurrentActiveCard(cardId);
     }
-  }, [rightPanelVisible, toggleRightPanel]);
+  }, [rightPanelVisible, currentActiveCard, toggleRightPanel]);
 
   // Individual card change handlers for glass dock buttons
   const handleMainCard = () => handleCardChange('main');
