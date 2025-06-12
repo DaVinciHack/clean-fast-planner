@@ -1935,13 +1935,127 @@ const FastPlannerCore = ({
 
   // Glass menu handlers
   const handleToggleLock = () => {
-    setIsEditLocked(!isEditLocked);
-    console.log('🔒 Edit lock toggled:', !isEditLocked ? 'LOCKED' : 'UNLOCKED');
+    const newLockState = !isEditLocked;
+    setIsEditLocked(newLockState);
+    console.log('🔒 Edit lock toggled:', newLockState ? 'LOCKED' : 'UNLOCKED');
     
     // Update global edit lock state for managers
-    window.isEditLocked = !isEditLocked;
+    window.isEditLocked = newLockState;
     
-    // Notify managers to refresh route display
+    // 🚫 IMPLEMENT ACTUAL LOCKING - Disable map interactions when locked
+    if (newLockState) {
+      // LOCKED - Disable map interactions
+      console.log('🚫 LOCKING: Disabling map interactions and waypoint modifications');
+      
+      // Disable map click handlers
+      if (window.mapboxManager?.mapInteractionHandler) {
+        window.mapboxManager.mapInteractionHandler.disableMapClicks();
+      }
+      
+      // Disable waypoint dragging
+      if (window.mapboxManager?.waypointManager) {
+        window.mapboxManager.waypointManager.disableWaypointDragging();
+      }
+      
+      // Add visual overlay to indicate locked state
+      const overlay = document.createElement('div');
+      overlay.id = 'edit-lock-overlay';
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 59, 48, 0.05);
+        backdrop-filter: blur(1px);
+        z-index: 1000;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      overlay.innerHTML = `
+        <div style="
+          background: rgba(255, 59, 48, 0.9);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 14px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        ">
+          🔒 Flight Locked - Click unlock to edit
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+      // Fade in the overlay
+      setTimeout(() => {
+        overlay.style.opacity = '1';
+        setTimeout(() => {
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          }, 300);
+        }, 2000);
+      }, 100);
+      
+    } else {
+      // UNLOCKED - Re-enable map interactions
+      console.log('🔓 UNLOCKING: Re-enabling map interactions and waypoint modifications');
+      
+      // Re-enable map click handlers
+      if (window.mapboxManager?.mapInteractionHandler) {
+        window.mapboxManager.mapInteractionHandler.enableMapClicks();
+      }
+      
+      // Re-enable waypoint dragging
+      if (window.mapboxManager?.waypointManager) {
+        window.mapboxManager.waypointManager.enableWaypointDragging();
+      }
+      
+      // Show unlock notification
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(52, 199, 89, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      `;
+      overlay.innerHTML = '🔓 Flight Unlocked - Editing enabled';
+      document.body.appendChild(overlay);
+      
+      // Fade in and out
+      setTimeout(() => {
+        overlay.style.opacity = '1';
+        setTimeout(() => {
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          }, 300);
+        }, 1500);
+      }, 100);
+    }
+    
+    // Notify managers to refresh route display with new lock state
     if (window.mapboxManager?.waypointManager) {
       setTimeout(() => {
         window.mapboxManager.waypointManager.refreshRouteDisplay();
