@@ -274,6 +274,8 @@ const useUIControls = ({
       // Skip if clicking on panel toggle buttons or inside panels
       if (clickedElement.closest('.route-editor-panel') || 
           clickedElement.closest('.info-panel') ||
+          clickedElement.closest('.panel-tab') ||          // Toggle buttons!
+          clickedElement.closest('.right-panel-tab') ||    // Right panel tabs
           clickedElement.closest('[data-panel-button]') ||
           clickedElement.closest('.simple-controls-container') ||
           clickedElement.closest('.floating-controls')) {
