@@ -96,9 +96,10 @@ const RightPanelContainer = React.forwardRef(({
     }, 400);
   };
   
-  // Expose the handleCardChange method through the ref
+  // Expose the handleCardChange method and current activeCard through the ref
   React.useImperativeHandle(ref, () => ({
-    handleCardChange
+    handleCardChange,
+    getCurrentActiveCard: () => activeCard
   }));
   
   return (
