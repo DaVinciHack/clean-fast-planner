@@ -58,93 +58,72 @@ const useUIControls = ({
     }
   }, [appSettingsManagerRef]);
 
-  // Clean iPad auto-hide: Close left panel on small screens (runs after all loading)
+  // 🎯 ENABLED: Auto-close BOTH panels on iPad/small screens for INITIAL load only
+  // This provides better user experience by keeping the map clear on small screens
+  // But ONLY runs once on initial load, never during editing workflow
   useEffect(() => {
     if (isSmallScreen) {
       // Wait for all loading and settings to complete before checking
       const timer = setTimeout(() => {
-        console.log('📱 iPad detected - checking panel state after loading');
+        console.log('📱 iPad/small screen detected - checking panel states on INITIAL load');
         
-        // Check both state AND visual position
-        const panel = document.querySelector('.route-editor-panel');
-        const rect = panel?.getBoundingClientRect();
-        const isVisuallyOpen = rect && rect.left >= 0;
+        // Check both panels
+        const leftPanel = document.querySelector('.route-editor-panel');
+        const rightPanel = document.querySelector('.info-panel');
+        const leftRect = leftPanel?.getBoundingClientRect();
+        const rightRect = rightPanel?.getBoundingClientRect();
+        const isLeftVisuallyOpen = leftRect && leftRect.left >= 0;
+        const isRightVisuallyOpen = rightRect && rightRect.right <= window.innerWidth;
         
-        console.log('Panel check:', { 
+        console.log('Panel check on initial load:', { 
           leftPanelVisible, 
-          isVisuallyOpen,
-          panelLeft: rect?.left 
+          rightPanelVisible,
+          isLeftVisuallyOpen,
+          isRightVisuallyOpen
         });
         
-        // Close if either state says open OR panel is visually open
-        if (leftPanelVisible || isVisuallyOpen) {
-          console.log('Panel needs closing - doing it now');
+        // Close left panel if open
+        if (leftPanelVisible || isLeftVisuallyOpen) {
+          console.log('📱 INITIAL LOAD: Closing left panel for small screen');
           setLeftPanelVisible(false);
           
-          // Force slide-out animation
-          if (panel) {
-            panel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          if (leftPanel) {
+            leftPanel.style.animation = 'slideOutToLeft 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
           }
           
-          // Save the setting
           if (appSettingsManagerRef?.current) {
             appSettingsManagerRef.current.updateUISettings({
               leftPanelVisible: false
             });
           }
-        } else {
-          console.log('Panel is properly closed - good!');
         }
-      }, 2000); // Wait 2 seconds for all loading to complete
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isSmallScreen]); // Only depend on isSmallScreen, not leftPanelVisible
-
-  // Clean iPad auto-hide: Close RIGHT panel on small screens (runs after all loading) 
-  useEffect(() => {
-    if (isSmallScreen) {
-      // Wait for all loading and settings to complete before checking
-      const timer = setTimeout(() => {
-        console.log('📱 iPad detected - checking RIGHT panel state after loading');
         
-        // Check both state AND visual position
-        const panel = document.querySelector('.info-panel');
-        const rect = panel?.getBoundingClientRect();
-        const isVisuallyOpen = rect && rect.right <= window.innerWidth;
-        
-        console.log('RIGHT Panel check:', { 
-          rightPanelVisible, 
-          isVisuallyOpen,
-          panelRight: rect?.right 
-        });
-        
-        // Close if either state says open OR panel is visually open
-        if (rightPanelVisible || isVisuallyOpen) {
-          console.log('RIGHT Panel needs closing - doing it now');
+        // Close right panel if open
+        if (rightPanelVisible || isRightVisuallyOpen) {
+          console.log('📱 INITIAL LOAD: Closing right panel for small screen');
           setRightPanelVisible(false);
           
-          // Force slide-out animation
-          if (panel) {
-            panel.style.animation = 'slideOutToRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
+          if (rightPanel) {
+            rightPanel.style.animation = 'slideOutToRight 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards';
           }
           
-          // Save the setting
           if (appSettingsManagerRef?.current) {
             appSettingsManagerRef.current.updateUISettings({
               rightPanelVisible: false
             });
           }
-        } else {
-          console.log('RIGHT Panel is properly closed - good!');
         }
+        
+        console.log('📱 INITIAL LOAD: Panel closure complete for small screen');
       }, 2000); // Wait 2 seconds for all loading to complete
       
       return () => clearTimeout(timer);
     }
-  }, [isSmallScreen]); // Only depend on isSmallScreen, not rightPanelVisible
+  }, [isSmallScreen]); // Only depend on isSmallScreen - runs once on mount
 
-  // iPad map click: Open panel when map is clicked (for adding waypoints)
+  // 🚫 DISABLED: Auto-open panel on map click - can be annoying on small screens
+  // Panels should only open/close via explicit button clicks for better UX
+  /*
   useEffect(() => {
     if (!isSmallScreen) return; // Only on iPad/small screens
     
@@ -181,6 +160,7 @@ const useUIControls = ({
       document.removeEventListener('click', handleMapClick);
     };
   }, [isSmallScreen, leftPanelVisible, appSettingsManagerRef]);
+  */
 
   // DISABLED: iPad edge detection - causes problems on touch devices
   // The auto-opening panels when near screen edges interferes with touch interaction
@@ -265,7 +245,9 @@ const useUIControls = ({
     }
   };
 
-  // Click outside panels to close them - better iPad UX
+  // 🚫 DISABLED: Click outside to close panels - panels should only close via explicit button clicks
+  // This prevents accidental panel closure during editing workflow
+  /*
   useEffect(() => {
     const handleClickOutside = (e) => {
       // Don't close if clicking on buttons or controls that should open panels
@@ -281,7 +263,16 @@ const useUIControls = ({
           clickedElement.closest('.glass-dock-container') || // Glass menu container!
           clickedElement.closest('[data-panel-button]') ||
           clickedElement.closest('.simple-controls-container') ||
-          clickedElement.closest('.floating-controls')) {
+          clickedElement.closest('.floating-controls') ||
+          // 🔧 CRITICAL: Don't close panels when interacting with waypoints or map elements
+          clickedElement.closest('.waypoint-marker') ||    // Waypoint markers
+          clickedElement.closest('.leaflet-marker-icon') || // Leaflet markers
+          clickedElement.closest('.mapboxgl-marker') ||     // Mapbox markers
+          clickedElement.closest('.waypoint-popup') ||      // Waypoint popups
+          clickedElement.closest('.leaflet-popup') ||       // Leaflet popups
+          clickedElement.closest('.mapboxgl-popup') ||      // Mapbox popups
+          clickedElement.closest('.stop-card') ||           // Stop cards
+          clickedElement.closest('.waypoint-controls')) {   // Waypoint control buttons
         return;
       }
       
@@ -326,6 +317,7 @@ const useUIControls = ({
       document.removeEventListener('click', handleClickOutside);
     };
   }, [leftPanelVisible, rightPanelVisible, appSettingsManagerRef]);
+  */
 
   /**
    * Toggles only fixed platforms visibility on the map (updated for new design)
