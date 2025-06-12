@@ -963,33 +963,33 @@ const FastPlannerCore = ({
       setIsEditLocked(true); // Always start locked to prevent accidental edits
       console.log('🏗️ Glass menu activated for loaded flight');
       
-      // 🎯 NEW BEHAVIOR: Close BOTH panels when flight loads and apply lock
-      console.log('🔒 FLIGHT LOAD: Closing both panels and applying edit lock');
-      console.log('🔒 FLIGHT LOAD: Current panel states - left:', leftPanelVisible, 'right:', rightPanelVisible);
+      // 🎯 AUTO-CLOSE: Close panels on smaller screens only to free up screen space
+      const isSmallScreen = window.innerWidth <= 1024; // iPad and smaller
       
-      // Add a small delay to ensure flight load card transitions complete first
-      setTimeout(() => {
-        console.log('🔒 FLIGHT LOAD: Panel closing timeout triggered');
+      if (isSmallScreen) {
+        console.log('📱 Small screen detected - will close side panels after flight load completes');
         
-        // Close BOTH panels after flight load to show clean map
-        if (leftPanelVisible) {
-          console.log('📦 Closing left panel after flight load');
-          toggleLeftPanel();
-        } else {
-          console.log('📦 Left panel already closed');
-        }
+        // Delay the panel closing to avoid interfering with flight load card transitions
+        setTimeout(() => {
+          console.log('📱 Now closing side panels for small screen real estate');
+          
+          // Only close panels if they're actually open
+          if (leftPanelVisible) {
+            console.log('📦 Closing left panel (small screen)');
+            toggleLeftPanel();
+          }
+          
+          if (rightPanelVisible) {
+            console.log('📦 Closing right panel (small screen)');  
+            toggleRightPanel();
+          }
+          
+          console.log('📱 Side panel closure complete - main content should remain stable');
+        }, 500); // Wait for flight load to complete
         
-        if (rightPanelVisible) {
-          console.log('📦 Closing right panel after flight load');  
-          toggleRightPanel();
-        } else {
-          console.log('📦 Right panel already closed');
-        }
-        
-        console.log('🔒 Both panels closed - clean map view with loaded flight');
-      }, 300); // Small delay to ensure smooth transitions
-      
-      console.log('🔒 Edit lock applied - click unlock to enable editing, then manually open panels as needed');
+      } else {
+        console.log('🖥️ Large screen detected - keeping panels as they are');
+      }
       
       // 🚨 CRITICAL: Set current flight ID and load weather segments
       if (flightData.flightId) {
@@ -2093,26 +2093,9 @@ const FastPlannerCore = ({
   };
 
   const handleOpenMenu = () => {
-    console.log('⚙️ Menu button clicked - Current panel states: left:', leftPanelVisible, 'right:', rightPanelVisible);
-    
-    // Menu button ONLY closes panels, never opens them
-    // If either panel is open, close BOTH panels
-    if (leftPanelVisible || rightPanelVisible) {
-      console.log('⚙️ Closing both panels via menu button');
-      
-      if (leftPanelVisible) {
-        toggleLeftPanel();
-        console.log('⚙️ Closed left panel');
-      }
-      
-      if (rightPanelVisible) {
-        toggleRightPanel();
-        console.log('⚙️ Closed right panel');
-      }
-    } else {
-      // If both panels are already closed, do nothing
-      console.log('⚙️ Both panels already closed - no action needed');
-    }
+    console.log('⚙️ Menu button clicked - Current rightPanelVisible:', rightPanelVisible);
+    toggleRightPanel();
+    console.log('⚙️ toggleRightPanel called');
   };
 
   // Create ref for RightPanel to access its card change functionality

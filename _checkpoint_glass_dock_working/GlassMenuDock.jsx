@@ -15,17 +15,7 @@ const GlassMenuDock = ({
   onOpenMenu,
   // Panel states for visual feedback
   leftPanelVisible = false,
-  rightPanelVisible = false,
-  // Card change handlers for expanded buttons
-  onMainCard,
-  onSettingsCard,
-  onPerformanceCard,
-  onWeatherCard,
-  onFinanceCard,
-  onEvacuationCard,
-  onSaveCard,
-  onLoadCard,
-  onLayersCard
+  rightPanelVisible = false
 }) => {
 
   // State for expanded/compact mode
@@ -57,7 +47,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Main',
-      action: onMainCard || (() => console.log('Main clicked'))
+      action: () => console.log('Main clicked')
     },
     {
       id: 'settings',
@@ -68,7 +58,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Settings',
-      action: onSettingsCard || (() => console.log('Settings clicked'))
+      action: () => console.log('Settings clicked')
     },
     {
       id: 'performance',
@@ -78,7 +68,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Performance',
-      action: onPerformanceCard || (() => console.log('Performance clicked'))
+      action: () => console.log('Performance clicked')
     },
     {
       id: 'weather',
@@ -88,7 +78,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Weather',
-      action: onWeatherCard || (() => console.log('Weather clicked'))
+      action: () => console.log('Weather clicked')
     },
     {
       id: 'finance',
@@ -99,7 +89,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Finance',
-      action: onFinanceCard || (() => console.log('Finance clicked'))
+      action: () => console.log('Finance clicked')
     },
     {
       id: 'evacuation',
@@ -111,7 +101,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Evacuation',
-      action: onEvacuationCard || (() => console.log('Evacuation clicked'))
+      action: () => console.log('Evacuation clicked')
     },
     {
       id: 'save',
@@ -123,7 +113,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Save',
-      action: onSaveCard || (() => console.log('Save clicked'))
+      action: () => console.log('Save clicked')
     },
     {
       id: 'load',
@@ -137,7 +127,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Load',
-      action: onLoadCard || (() => console.log('Load clicked'))
+      action: () => console.log('Load clicked')
     },
     {
       id: 'layers',
@@ -149,7 +139,7 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Map Layers',
-      action: onLayersCard || (() => console.log('Map Layers clicked'))
+      action: () => console.log('Map Layers clicked')
     }
   ];
 
