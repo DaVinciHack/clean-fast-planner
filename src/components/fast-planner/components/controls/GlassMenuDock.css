@@ -14,33 +14,72 @@
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 6px 12px; /* Much thinner padding */
   
-  /* ULTRA-transparent Apple glassmorphism - almost invisible */
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  /* ULTRA-transparent with whiter highlights */
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
   
-  /* Very subtle border */
-  border: 0.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  /* Much whiter, more prominent border */
+  border: 0.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 18px; /* Slightly smaller radius for thinner look */
   
-  /* Minimal shadow */
+  /* Apple shimmer effect with multiple layers */
   box-shadow: 
-    0 2px 12px rgba(0, 0, 0, 0.08),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
+    0 1px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8), /* Strong white top highlight */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2), /* Subtle bottom highlight */
+    inset 1px 0 0 rgba(255, 255, 255, 0.3), /* Left highlight */
+    inset -1px 0 0 rgba(255, 255, 255, 0.3); /* Right highlight */
   
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   pointer-events: auto;
-  min-height: 44px;
+  min-height: 38px; /* Thinner height */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Add animated shimmer overlay */
+.glass-dock::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .glass-dock:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.5);
   box-shadow: 
-    0 3px 15px rgba(0, 0, 0, 0.12),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9), /* Even stronger on hover */
+    inset 0 -1px 0 rgba(255, 255, 255, 0.3),
+    inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    inset -1px 0 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  50% {
+    transform: translateX(0%) translateY(0%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
 }
 
 .glass-button-container {
@@ -52,14 +91,77 @@
 
 .glass-button {
   border: none;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
   transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  
+  /* Subtle button shimmer */
+  box-shadow: 
+    0 1px 4px rgba(0, 0, 0, 0.05),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Add button shimmer overlay */
+.glass-button::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 60%
+  );
+  animation: buttonShimmer 4s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glass-button:hover::before {
+  opacity: 1;
+}
+
+.focus-inner-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 0.5px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  
+  /* Inner circle highlights */
+  box-shadow: 
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -0.5px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Button shimmer animation (slightly different timing) */
+@keyframes buttonShimmer {
+  0% {
+    transform: translateX(-120%) translateY(-120%) rotate(45deg);
+  }
+  50% {
+    transform: translateX(0%) translateY(0%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(120%) translateY(120%) rotate(45deg);
+  }
 }
 
 /* Round lock button */
@@ -83,20 +185,6 @@
   padding: 0 8px 0 4px;
 }
 
-.focus-inner-circle {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 0.5px solid rgba(255, 255, 255, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
 .focus-label {
   font-size: 11px;
   font-weight: 600;
@@ -105,6 +193,26 @@
   user-select: none;
   flex: 1;
   text-align: center;
+  z-index: 1; /* Above shimmer effect */
+  position: relative;
+}
+
+/* Icon styling */
+.glass-icon {
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+  z-index: 1; /* Above shimmer effect */
+  position: relative;
+}
+
+.glass-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Icon styling */
