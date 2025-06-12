@@ -276,6 +276,9 @@ const useUIControls = ({
           clickedElement.closest('.info-panel') ||
           clickedElement.closest('.panel-tab') ||          // Toggle buttons!
           clickedElement.closest('.right-panel-tab') ||    // Right panel tabs
+          clickedElement.closest('.glass-dock') ||         // Glass menu dock!
+          clickedElement.closest('.glass-button') ||       // Glass menu buttons!
+          clickedElement.closest('.glass-dock-container') || // Glass menu container!
           clickedElement.closest('[data-panel-button]') ||
           clickedElement.closest('.simple-controls-container') ||
           clickedElement.closest('.floating-controls')) {
