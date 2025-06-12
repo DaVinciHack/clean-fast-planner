@@ -216,9 +216,9 @@
   border: 0.5px solid rgba(255, 255, 255, 0.35);
 }
 
-/* Lock button color states */
+/* Lock button color states with proper blue/purple theme */
 .glass-button.locked {
-  background: rgba(255, 59, 48, 0.08);
+  background: rgba(255, 59, 48, 0.08); /* Apple red for locked */
   border: 0.5px solid rgba(255, 59, 48, 0.2);
 }
 
@@ -228,7 +228,7 @@
 }
 
 .glass-button.unlocked {
-  background: rgba(52, 199, 89, 0.08);
+  background: rgba(52, 199, 89, 0.08); /* Apple green for unlocked */
   border: 0.5px solid rgba(52, 199, 89, 0.2);
 }
 
@@ -237,31 +237,67 @@
   border: 0.5px solid rgba(52, 199, 89, 0.3);
 }
 
-/* Focus-style button color hints */
+/* Focus-style button color hints - matching blue/purple theme */
+.focus-style.route-button {
+  background: rgba(0, 122, 255, 0.06); /* Apple blue for route */
+  border: 0.5px solid rgba(0, 122, 255, 0.15);
+}
+
 .focus-style.route-button:hover {
-  background: rgba(0, 122, 255, 0.06);
-  border: 0.5px solid rgba(0, 122, 255, 0.2);
+  background: rgba(0, 122, 255, 0.12);
+  border: 0.5px solid rgba(0, 122, 255, 0.25);
 }
 
 .focus-style.route-button:hover .focus-inner-circle {
   background: rgba(0, 122, 255, 0.1);
-  border: 0.5px solid rgba(0, 122, 255, 0.25);
+  border: 0.5px solid rgba(0, 122, 255, 0.3);
+}
+
+.focus-style.menu-button {
+  background: rgba(175, 82, 222, 0.06); /* Apple purple for menu */
+  border: 0.5px solid rgba(175, 82, 222, 0.15);
 }
 
 .focus-style.menu-button:hover {
-  background: rgba(175, 82, 222, 0.06);
-  border: 0.5px solid rgba(175, 82, 222, 0.2);
+  background: rgba(175, 82, 222, 0.12);
+  border: 0.5px solid rgba(175, 82, 222, 0.25);
 }
 
 .focus-style.menu-button:hover .focus-inner-circle {
   background: rgba(175, 82, 222, 0.1);
-  border: 0.5px solid rgba(175, 82, 222, 0.25);
+  border: 0.5px solid rgba(175, 82, 222, 0.3);
 }
 
 /* Active states */
 .glass-button:active {
   transform: translateY(0) scale(0.98);
   transition: all 0.1s ease;
+}
+
+/* Active states for when panels are open */
+.focus-style.route-button.active {
+  background: rgba(0, 122, 255, 0.15); /* Stronger blue when active */
+  border: 0.5px solid rgba(0, 122, 255, 0.3);
+}
+
+.focus-style.route-button.active .focus-inner-circle {
+  background: rgba(0, 122, 255, 0.2);
+  border: 0.5px solid rgba(0, 122, 255, 0.4);
+}
+
+.focus-style.menu-button.active {
+  background: rgba(175, 82, 222, 0.15); /* Stronger purple when active */
+  border: 0.5px solid rgba(175, 82, 222, 0.3);
+}
+
+.focus-style.menu-button.active .focus-inner-circle {
+  background: rgba(175, 82, 222, 0.2);
+  border: 0.5px solid rgba(175, 82, 222, 0.4);
+}
+
+/* Active states should maintain hover effect */
+.focus-style.active:hover {
+  transform: translateY(-0.5px);
 }
 
 /* Entrance animation */
