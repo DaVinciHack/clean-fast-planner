@@ -24,6 +24,9 @@ import {
   AppHeader
 } from './components';
 
+// Import GlassMenuDock for flight-loaded controls
+import GlassMenuDock from './components/controls/GlassMenuDock';
+
 // Import MapZoomHandler for waypoint display
 import MapZoomHandler from './components/map/MapZoomHandler';
 
@@ -62,7 +65,14 @@ const FastPlannerCore = ({
   alternateRouteData, setAlternateRouteData, // Pass alternate route state and setter
   alternateRouteInput, setAlternateRouteInput, // Pass alternate route input state and setter
   addWaypointDirectImplementation, // Pass the actual implementation function
-  handleMapReadyImpl // Pass the map ready implementation
+  handleMapReadyImpl,              // Pass the map ready implementation
+  
+  // Glass menu props
+  isFlightLoaded,
+  isEditLocked,
+  onToggleLock,
+  onOpenRoute,
+  onOpenMenu
 }) => {
   const { isAuthenticated, userName, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion(); 
@@ -950,6 +960,17 @@ const FastPlannerCore = ({
     try {
       console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
       console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
+      
+      // 🎯 GLASS MENU: Activate glass menu when flight loads
+      setIsFlightLoaded(true);
+      setIsEditLocked(true); // Always start locked to prevent accidental edits
+      console.log('🏗️ Glass menu activated for loaded flight');
+      
+      // 🎯 AUTO-CLOSE: Close left panel to give back screen real estate
+      if (leftPanelVisible) {
+        toggleLeftPanel();
+        console.log('📦 Auto-closed left panel to free up screen space');
+      }
       
       // 🚨 CRITICAL: Set current flight ID and load weather segments
       if (flightData.flightId) {
@@ -2022,6 +2043,15 @@ const FastPlannerCore = ({
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
         />
       </div>
+
+      {/* Glass Menu Dock - appears when flight is loaded */}
+      <GlassMenuDock
+        isVisible={isFlightLoaded}
+        isLocked={isEditLocked}
+        onToggleLock={onToggleLock}
+        onOpenRoute={onOpenRoute}
+        onOpenMenu={onOpenMenu}
+      />
     </>
   );
 };
@@ -2060,6 +2090,10 @@ const FastPlannerApp = () => {
   const [routeStats, setRouteStats] = useState(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [routeInput, setRouteInput] = useState('');
+  
+  // Glass menu states for flight-loaded controls
+  const [isFlightLoaded, setIsFlightLoaded] = useState(false);
+  const [isEditLocked, setIsEditLocked] = useState(true); // Start locked to prevent accidental edits
   const [reserveMethod, setReserveMethod] = useState('fixed');
   const [alternateRouteData, setAlternateRouteData] = useState(null);
   const [alternateRouteInput, setAlternateRouteInput] = useState('');
@@ -2206,6 +2240,35 @@ const FastPlannerApp = () => {
     }
   }, [appManagers, handleMapReadyImpl]);
 
+  // Glass menu handlers
+  const handleToggleLock = () => {
+    setIsEditLocked(!isEditLocked);
+    console.log('🔒 Edit lock toggled:', !isEditLocked ? 'LOCKED' : 'UNLOCKED');
+    
+    // Update global edit lock state for managers
+    window.isEditLocked = !isEditLocked;
+    
+    // Notify managers to refresh route display
+    if (window.mapboxManager?.waypointManager) {
+      setTimeout(() => {
+        window.mapboxManager.waypointManager.refreshRouteDisplay();
+        window.mapboxManager.waypointManager.updateRouteDragState(window._originalRouteDragHandler);
+      }, 100);
+    }
+  };
+
+  const handleOpenRoute = () => {
+    // Use the existing toggle function that's already available
+    toggleLeftPanel();
+    console.log('🗺️ Route panel opened via glass menu');
+  };
+
+  const handleOpenMenu = () => {
+    // Use the existing toggle function that's already available
+    toggleRightPanel();
+    console.log('⚙️ Settings panel opened via glass menu');
+  };
+
   return (
     <RegionProvider
       mapManagerRef={appManagers.mapManagerRef}
@@ -2233,6 +2296,13 @@ const FastPlannerApp = () => {
         alternateRouteInput={alternateRouteInput} setAlternateRouteInput={setAlternateRouteInput}
         addWaypointDirectImplementation={addWaypointDirectImpl}
         handleMapReadyImpl={handleMapReadyImpl}
+        
+        // Glass menu props
+        isFlightLoaded={isFlightLoaded}
+        isEditLocked={isEditLocked}
+        onToggleLock={handleToggleLock}
+        onOpenRoute={handleOpenRoute} 
+        onOpenMenu={handleOpenMenu}
       />
     </RegionProvider>
   );
