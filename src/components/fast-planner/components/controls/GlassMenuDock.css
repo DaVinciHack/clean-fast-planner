@@ -1,0 +1,168 @@
+/* Apple-style Glass Menu Dock CSS */
+
+.glass-dock-container {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  pointer-events: none; /* Allow clicks through container */
+  
+  /* Entrance animation */
+  animation: glassSlideIn 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.glass-dock {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  
+  /* Apple glassmorphism effect */
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  
+  /* Subtle border and shadow */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  
+  /* Beautiful shadow system */
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  
+  /* Smooth animations */
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  /* Re-enable pointer events for dock */
+  pointer-events: auto;
+}
+
+.glass-dock:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.glass-button {
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 16px;
+  
+  /* Individual button glass effect */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
+  /* Subtle button border */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  
+  /* Button shadow */
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  
+  /* Smooth transitions */
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  /* Center the icon */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Button hover and active states */
+.glass-button:hover {
+  transform: translateY(-1px) scale(1.05);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.glass-button:active {
+  transform: translateY(0) scale(0.98);
+  transition: all 0.1s ease;
+}
+
+/* Icon styling */
+.glass-icon {
+  width: 24px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+}
+
+.glass-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Lock button states */
+.glass-button.locked {
+  background: rgba(255, 107, 107, 0.15); /* Subtle red tint when locked */
+}
+
+.glass-button.locked:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+.glass-button.unlocked {
+  background: rgba(72, 187, 120, 0.15); /* Subtle green tint when unlocked */
+}
+
+.glass-button.unlocked:hover {
+  background: rgba(72, 187, 120, 0.25);
+}
+
+/* Route button - subtle blue */
+.route-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* Menu button - subtle purple */
+.menu-button:hover {
+  background: rgba(139, 92, 246, 0.2);
+}
+
+/* Ripple effect on click */
+.glass-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease, height 0.4s ease;
+}
+
+.glass-button:active::after {
+  width: 60px;
+  height: 60px;
+}
+
+/* Entrance animation */
+@keyframes glassSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
