@@ -2065,25 +2065,15 @@ const FastPlannerCore = ({
   };
 
   const handleOpenRoute = () => {
-    // Smart toggle: Open if closed, close if open
-    if (!leftPanelVisible) {
-      toggleLeftPanel();
-      console.log('🗺️ Opening route panel via glass menu');
-    } else {
-      toggleLeftPanel();
-      console.log('🗺️ Closing route panel via glass menu');
-    }
+    console.log('🗺️ Route button clicked - Current leftPanelVisible:', leftPanelVisible);
+    toggleLeftPanel();
+    console.log('🗺️ toggleLeftPanel called');
   };
 
   const handleOpenMenu = () => {
-    // Smart toggle: Open if closed, close if open  
-    if (!rightPanelVisible) {
-      toggleRightPanel();
-      console.log('⚙️ Opening settings panel via glass menu');
-    } else {
-      toggleRightPanel();
-      console.log('⚙️ Closing settings panel via glass menu');
-    }
+    console.log('⚙️ Menu button clicked - Current rightPanelVisible:', rightPanelVisible);
+    toggleRightPanel();
+    console.log('⚙️ toggleRightPanel called');
   };
 
   return (

@@ -24,6 +24,13 @@ const GlassMenuDock = ({
 
   if (!isVisible) return null;
 
+  // Debug logging to check panel states
+  console.log('🎛️ GlassMenuDock render - Panel states:', {
+    leftPanelVisible,
+    rightPanelVisible,
+    isLocked
+  });
+
   return (
     <div className="glass-dock-container">
       <div className="glass-dock">
