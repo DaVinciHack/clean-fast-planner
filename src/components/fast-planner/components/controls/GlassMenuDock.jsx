@@ -25,7 +25,7 @@ const GlassMenuDock = ({
     <div className="glass-dock-container">
       <div className="glass-dock">
         
-        {/* Lock/Unlock Button - Round like Apple */}
+        {/* Lock/Unlock Button - Simple round */}
         <div className="glass-button-container">
           <button 
             className={`glass-button round ${isLocked ? 'locked' : 'unlocked'}`}
@@ -48,38 +48,42 @@ const GlassMenuDock = ({
           </button>
         </div>
 
-        {/* Route Button - With label */}
+        {/* Route Button - Apple Focus style (nested buttons) */}
         <div className="glass-button-container">
           <button 
-            className="glass-button route-button"
+            className="glass-button focus-style route-button"
             onClick={onOpenRoute}
             title="Open route editor"
           >
-            <div className="glass-icon route-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
+            <div className="focus-inner-circle">
+              <div className="glass-icon route-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                  <circle cx="12" cy="10" r="3"/>
+                </svg>
+              </div>
             </div>
+            <span className="focus-label">Route</span>
           </button>
-          <span className="glass-label">Route</span>
         </div>
 
-        {/* Menu Button - With label */}
+        {/* Menu Button - Apple Focus style (nested buttons) */}
         <div className="glass-button-container">
           <button 
-            className="glass-button menu-button"
+            className="glass-button focus-style menu-button"
             onClick={onOpenMenu}
             title="Open settings menu"
           >
-            <div className="glass-icon menu-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="m12 1l3.09 5.26L22 9l-5.26 3.09L14 21l-2-7-7-2 8.91-5.26L12 1z"/>
-              </svg>
+            <div className="focus-inner-circle">
+              <div className="glass-icon menu-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="m12 1l3.09 5.26L22 9l-5.26 3.09L14 21l-2-7-7-2 8.91-5.26L12 1z"/>
+                </svg>
+              </div>
             </div>
+            <span className="focus-label">Menu</span>
           </button>
-          <span className="glass-label">Menu</span>
         </div>
 
       </div>
