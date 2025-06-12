@@ -967,19 +967,26 @@ const FastPlannerCore = ({
       const isSmallScreen = window.innerWidth <= 1024; // iPad and smaller
       
       if (isSmallScreen) {
-        console.log('📱 Small screen detected - auto-closing panels for flight load');
+        console.log('📱 Small screen detected - will close side panels after flight load completes');
         
-        // Close left panel if open
-        if (leftPanelVisible) {
-          toggleLeftPanel();
-          console.log('📦 Auto-closed left panel (small screen)');
-        }
+        // Delay the panel closing to avoid interfering with flight load card transitions
+        setTimeout(() => {
+          console.log('📱 Now closing side panels for small screen real estate');
+          
+          // Only close panels if they're actually open
+          if (leftPanelVisible) {
+            console.log('📦 Closing left panel (small screen)');
+            toggleLeftPanel();
+          }
+          
+          if (rightPanelVisible) {
+            console.log('📦 Closing right panel (small screen)');  
+            toggleRightPanel();
+          }
+          
+          console.log('📱 Side panel closure complete - main content should remain stable');
+        }, 500); // Wait for flight load to complete
         
-        // Close right panel if open  
-        if (rightPanelVisible) {
-          toggleRightPanel();
-          console.log('📦 Auto-closed right panel (small screen)');
-        }
       } else {
         console.log('🖥️ Large screen detected - keeping panels as they are');
       }
