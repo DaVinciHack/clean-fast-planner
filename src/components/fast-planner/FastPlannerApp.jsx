@@ -963,10 +963,25 @@ const FastPlannerCore = ({
       setIsEditLocked(true); // Always start locked to prevent accidental edits
       console.log('🏗️ Glass menu activated for loaded flight');
       
-      // 🎯 AUTO-CLOSE: Close left panel to give back screen real estate
-      if (leftPanelVisible) {
-        toggleLeftPanel();
-        console.log('📦 Auto-closed left panel to free up screen space');
+      // 🎯 AUTO-CLOSE: Close panels on smaller screens only to free up screen space
+      const isSmallScreen = window.innerWidth <= 1024; // iPad and smaller
+      
+      if (isSmallScreen) {
+        console.log('📱 Small screen detected - auto-closing panels for flight load');
+        
+        // Close left panel if open
+        if (leftPanelVisible) {
+          toggleLeftPanel();
+          console.log('📦 Auto-closed left panel (small screen)');
+        }
+        
+        // Close right panel if open  
+        if (rightPanelVisible) {
+          toggleRightPanel();
+          console.log('📦 Auto-closed right panel (small screen)');
+        }
+      } else {
+        console.log('🖥️ Large screen detected - keeping panels as they are');
       }
       
       // 🚨 CRITICAL: Set current flight ID and load weather segments
