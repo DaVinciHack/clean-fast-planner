@@ -16,7 +16,10 @@ const GlassMenuDock = ({
   isLocked = true,
   onToggleLock,
   onOpenRoute,
-  onOpenMenu
+  onOpenMenu,
+  // Panel states for visual feedback
+  leftPanelVisible = false,
+  rightPanelVisible = false
 }) => {
 
   if (!isVisible) return null;
@@ -51,9 +54,9 @@ const GlassMenuDock = ({
         {/* Route Button - Apple Focus style (nested buttons) */}
         <div className="glass-button-container">
           <button 
-            className="glass-button focus-style route-button"
+            className={`glass-button focus-style route-button ${leftPanelVisible ? 'active' : ''}`}
             onClick={onOpenRoute}
-            title="Open route editor"
+            title={leftPanelVisible ? 'Close route editor' : 'Open route editor'}
           >
             <div className="focus-inner-circle">
               <div className="glass-icon route-icon">
@@ -70,9 +73,9 @@ const GlassMenuDock = ({
         {/* Menu Button - Apple Focus style (nested buttons) */}
         <div className="glass-button-container">
           <button 
-            className="glass-button focus-style menu-button"
+            className={`glass-button focus-style menu-button ${rightPanelVisible ? 'active' : ''}`}
             onClick={onOpenMenu}
-            title="Open settings menu"
+            title={rightPanelVisible ? 'Close settings menu' : 'Open settings menu'}
           >
             <div className="focus-inner-circle">
               <div className="glass-icon menu-icon">
