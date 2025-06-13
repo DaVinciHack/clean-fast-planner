@@ -54,10 +54,10 @@ const MapLayersCard = ({
     bases: true, // New category for bases
     fuelAvailable: false, // New category for fuel available (default off)
     // Weather Satellite Layers
-    lightning: true, // DEFAULT ON - Critical safety layer (was working fine)
-    satelliteConus: true, // DEFAULT ON for Gulf region (when applicable)
+    lightning: true, // DEFAULT ON - Critical safety layer (opacity 0.6)
+    satelliteConus: true, // DEFAULT ON for Gulf region (opacity 0.6)
     satelliteLongwave: false, // Optional - user can enable
-    satelliteShortwave: false, // Optional - user can enable
+    satelliteShortwave: true, // DEFAULT ON with 0.4 opacity and z-index 0
     // 3D Cloud Effects
     cloud3DEffects: false, // GENIUS altitude-based cloud opacity
     enhanced3DControls: false, // Advanced flight simulation controls
@@ -69,10 +69,10 @@ const MapLayersCard = ({
   
   // State for weather layer opacities
   const [weatherOpacities, setWeatherOpacities] = useState({
-    lightning: 0.8,
-    satelliteConus: 0.6, // More subtle default for radar
+    lightning: 0.6, // Reduced from 0.8 to 0.6
+    satelliteConus: 0.6, // Keep at 0.6 (already correct)
     satelliteLongwave: 0.8,
-    satelliteShortwave: 0.8
+    satelliteShortwave: 0.4 // Reduced from 0.8 to 0.4 for auto-enable
   });
   
   // Update layer states when references or visibility props change
@@ -152,20 +152,28 @@ const MapLayersCard = ({
       
       const mapInstance = mapManagerRef.current.map;
       
-      // Auto-enable lightning (global safety layer) - was working fine before
-      if (layers.lightning && !mapInstance.getLayer('simple-lightning-layer')) {
+      // Auto-enable lightning (global safety layer) - only if not already present
+      if (!mapInstance.getLayer('simple-lightning-layer')) {
         console.log('🌩️ Auto-initializing lightning detection...');
         try {
           const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
           await addSimpleLightningOverlay(mapInstance);
-          console.log('✅ Lightning auto-enabled');
+          // Set default opacity after enabling
+          setTimeout(() => {
+            try {
+              mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', weatherOpacities.lightning);
+              console.log(`✅ Lightning auto-enabled with ${weatherOpacities.lightning * 100}% opacity`);
+            } catch (error) {
+              console.warn('⚠️ Could not set lightning default opacity:', error);
+            }
+          }, 500);
         } catch (error) {
           console.warn('⚠️ Failed to auto-enable lightning:', error);
         }
       }
       
-      // Auto-enable CONUS radar for Gulf region
-      if (currentRegion?.id === 'gulf-of-mexico' && layers.satelliteConus && !mapInstance.getLayer('noaa-conus-layer')) {
+      // Auto-enable CONUS radar for Gulf region - only if not already present
+      if (currentRegion?.id === 'gulf-of-mexico' && !mapInstance.getLayer('noaa-conus-layer')) {
         console.log('🌧️ Auto-initializing CONUS radar for Gulf region...');
         try {
           const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
@@ -185,12 +193,41 @@ const MapLayersCard = ({
           console.warn('⚠️ Failed to auto-enable CONUS:', error);
         }
       }
+      
+      // TEMPORARILY DISABLE shortwave IR auto-enable to test waypoint mode
+      /*
+      // Auto-enable Shortwave IR - only if not already present and not already attempted
+      if (!mapInstance.getLayer('noaa-shortwave-layer') && !window._shortwaveInitAttempted) {
+        window._shortwaveInitAttempted = true; // Prevent multiple attempts
+        console.log('🛰️ Auto-initializing Shortwave IR...');
+        try {
+          const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+          const success = await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
+          if (success) {
+            // Set custom opacity and z-index
+            setTimeout(() => {
+              try {
+                mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', weatherOpacities.satelliteShortwave);
+                console.log(`✅ Shortwave IR auto-enabled with ${weatherOpacities.satelliteShortwave * 100}% opacity (NOAA default positioning)`);
+              } catch (error) {
+                console.warn('⚠️ Could not set Shortwave IR default properties:', error);
+              }
+            }, 1000);
+          } else {
+            window._shortwaveInitAttempted = false; // Reset on failure so we can try again
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to auto-enable Shortwave IR:', error);
+          window._shortwaveInitAttempted = false; // Reset on failure
+        }
+      }
+      */
     };
     
     // Small delay to ensure map is fully loaded
     const timeoutId = setTimeout(initializeDefaultWeatherLayers, 1000);
     return () => clearTimeout(timeoutId);
-  }, [mapManagerRef, currentRegion, layers.lightning, layers.satelliteConus, weatherOpacities.satelliteConus]);
+  }, [mapManagerRef, currentRegion, weatherOpacities.lightning, weatherOpacities.satelliteConus, weatherOpacities.satelliteShortwave]);
 
   // Real-time altitude display update when 3D clouds are active
   useEffect(() => {
@@ -529,7 +566,15 @@ const MapLayersCard = ({
               const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
               const success = await addSimpleLightningOverlay(mapInstance);
               if (success) {
-                console.log('✅ Lightning layer added');
+                // Set the correct opacity after adding
+                setTimeout(() => {
+                  try {
+                    mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', weatherOpacities.lightning);
+                    console.log(`✅ Lightning layer added with ${weatherOpacities.lightning * 100}% opacity`);
+                  } catch (error) {
+                    console.warn('⚠️ Could not set lightning toggle opacity:', error);
+                  }
+                }, 500);
                 setLayers(prev => ({ ...prev, lightning: true }));
               } else {
                 console.error('❌ Failed to add lightning layer');
@@ -625,7 +670,15 @@ const MapLayersCard = ({
               const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
               const success = await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
               if (success) {
-                console.log('✅ Shortwave layer added');
+                // Set the correct opacity and z-index after adding
+                setTimeout(() => {
+                  try {
+                    mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', weatherOpacities.satelliteShortwave);
+                    console.log(`✅ Shortwave layer added with ${weatherOpacities.satelliteShortwave * 100}% opacity (NOAA default positioning)`);
+                  } catch (error) {
+                    console.warn('⚠️ Could not set shortwave toggle properties:', error);
+                  }
+                }, 500);
                 setLayers(prev => ({ ...prev, satelliteShortwave: true }));
               } else {
                 console.error('❌ Failed to add shortwave layer');

@@ -11,6 +11,7 @@ class MapInteractionHandler {
     this.waypointManager = waypointManager;
     this.platformManager = platformManager;
     this.isInitialized = false;
+    this.isMapClicksDisabled = false; // Lock state for map interactions
     this.callbacks = {
       onLeftPanelOpen: null,
       onMapClick: null,
@@ -32,6 +33,19 @@ class MapInteractionHandler {
     }
   }
 
+  /**
+   * Lock Methods - Disable/Enable Map Click Interactions
+   */
+  disableMapClicks() {
+    this.isMapClicksDisabled = true;
+    console.log('🚫 MapInteractionHandler: Map clicks disabled');
+  }
+
+  enableMapClicks() {
+    this.isMapClicksDisabled = false;
+    console.log('✅ MapInteractionHandler: Map clicks enabled');
+  }
+
   initialize() {
     console.log('🚨 MapInteractionHandler: Attempting to initialize map interaction handlers');
     if (!this.mapManager || !this.waypointManager || !this.platformManager) {
@@ -50,11 +64,20 @@ class MapInteractionHandler {
         return;
       }
 
-      // 1. Remove the previously bound click handler, if it exists and map.off is a function.
-      //    It's safe to call map.off even if the specific listener wasn't previously added for this specific event type.
-      if (this._boundClickHandler && typeof map.off === 'function') {
-        map.off('click', this._boundClickHandler);
-        console.log('MapInteractionHandler: Attempted to remove old _boundClickHandler.');
+      // 1. AGGRESSIVE CLEANUP: Remove ALL click handlers to prevent duplicates
+      if (typeof map.off === 'function') {
+        // Remove our specific handler if it exists
+        if (this._boundClickHandler) {
+          map.off('click', this._boundClickHandler);
+          console.log('MapInteractionHandler: Removed old _boundClickHandler.');
+        }
+        
+        // Remove ALL click handlers to clean up any orphaned handlers from emergency fixes
+        const existingHandlers = map._listeners?.click?.length || 0;
+        if (existingHandlers > 0) {
+          console.log(`🧹 MapInteractionHandler: Removing ${existingHandlers} existing click handlers to prevent duplicates`);
+          map.off('click');
+        }
       }
 
       // 2. Create and store the new bound click handler
@@ -63,7 +86,8 @@ class MapInteractionHandler {
       // 3. Attach the new click handler
       try {
         map.on('click', this._boundClickHandler);
-        console.log('MapInteractionHandler: Attached new _boundClickHandler.');
+        const finalHandlerCount = map._listeners?.click?.length || 0;
+        console.log(`✅ MapInteractionHandler: Attached new handler. Total click handlers: ${finalHandlerCount}`);
       } catch (e) {
         console.error('MapInteractionHandler: Error attaching new _boundClickHandler:', e.message);
         this.triggerCallback('onError', 'Error attaching map click handler');
@@ -99,6 +123,21 @@ class MapInteractionHandler {
   }
 
   handleMapClick(e) {
+    // LOCK CHECK: Prevent map clicks when editing is locked
+    if (this.isMapClicksDisabled || window.isEditLocked === true) {
+      console.log('🔒 MapInteractionHandler: Ignoring click - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
+    // SEPARATE HANDLERS CHECK: If separate mode handlers are active, defer to them
+    if (window.toggleMapMode && typeof window.toggleMapMode === 'function') {
+      console.log('🔄 MapInteractionHandler: Separate mode handlers are active, deferring click handling');
+      return;
+    }
+    
     if (window.isRegionLoading === true) {
       console.log('MapInteractionHandler: Ignoring click - region is loading/changing.');
       if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator('Map interactions paused during region update...', 'info', 1500);
@@ -265,6 +304,15 @@ class MapInteractionHandler {
 
   handleRouteDragComplete(insertIndex, coords, dragData = {}) {
     console.log(`MapInteractionHandler.handleRouteDragComplete: Received insertIndex: ${insertIndex}, coords: ${JSON.stringify(coords)}, dragData: ${JSON.stringify(dragData)}`);
+    
+    // LOCK CHECK: Prevent route drag completion when editing is locked
+    if (this.isMapClicksDisabled || window.isEditLocked === true) {
+      console.log('🔒 MapInteractionHandler: Ignoring route drag completion - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
     
     if (window._processingRouteDrag === true) {
       console.log('MapInteractionHandler: Ignoring duplicate route drag - already processing');
