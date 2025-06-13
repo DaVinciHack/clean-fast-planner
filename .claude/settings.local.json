@@ -7,7 +7,8 @@
       "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -A 10 -B 5 \"auto.*weather|weather.*auto\" src/components/fast-planner/components/panels/cards/MapLayersCard.jsx)",
       "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -A 15 -B 5 \"interval.*weather|setInterval\" src/components/fast-planner/components/panels/cards/MapLayersCard.jsx)",
       "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -n \"weather-circles-force-enabled\" src/components/fast-planner/FastPlannerApp.jsx)",
-      "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -A 5 -B 5 \"onSubmit|handleSubmit\" src/components/fast-planner/components/panels/cards/SaveFlightCard.jsx)"
+      "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -A 5 -B 5 \"onSubmit|handleSubmit\" src/components/fast-planner/components/panels/cards/SaveFlightCard.jsx)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
