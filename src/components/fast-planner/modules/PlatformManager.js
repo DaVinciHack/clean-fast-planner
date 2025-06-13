@@ -1762,35 +1762,90 @@ class PlatformManager {
     if (!map) return;
     
     const visibility = visible ? 'visible' : 'none';
+    // LAYER GROUPING FIX: Only include platform and airport layers here
+    // Other layers (blocks, bases, fuel) have their own toggle functions
     const platformLayerIds = [
+      // Standard platform layers
       'platforms-layer',
       'platforms-fixed-layer',
       'platforms-movable-layer',
       'platforms-fixed-labels',
       'platforms-movable-labels',
+      
+      // Basic platform layers (MISSING FROM ORIGINAL LIST!)
+      'platforms-fixed-layer-basic',
+      'platforms-movable-layer-basic',
+      'platforms-airfield-layer-basic',
+      
+      // Airport layers  
       'airfields-layer',
       'airfields-labels',
-      'blocks-layer',           // New blocks layer
-      'blocks-labels',          // New blocks labels
-      'bases-layer',            // New bases layer
-      'bases-labels',           // New bases labels
-      'fuel-available-layer',   // New fuel available overlay
-      'fuel-available-labels'   // New fuel available labels
+      
+      // 3D platform layers (but not blocks/bases/fuel 3D layers)
+      '3d-rigs-layer',
+      'simple-3d-rigs-base',
+      'simple-3d-rigs-deck', 
+      'simple-3d-rigs-helipad',
+      'simple-3d-rigs-center',
+      'real-3d-rigs',
+      'real-3d-rigs-helipad',
+      'fixed-3d-rigs-layer',
+      'all-3d-rigs-layer',
+      'additive-3d-rigs-layer',
+      'platforms-3d-rigs-layer',
+      'auto-3d-rigs-layer'
+      
+      // REMOVED: blocks, bases, fuel layers - they have separate toggle functions
     ];
     
     // Just set visibility property instead of removing layers
+    let layersProcessed = 0;
+    let layersFound = 0;
+    
     platformLayerIds.forEach(layerId => {
+      layersProcessed++;
       if (map.getLayer(layerId)) {
+        layersFound++;
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
+          console.log(`✅ PlatformManager: Successfully set ${layerId} visibility to ${visibility}`);
         } catch (e) {
-          console.error(`PlatformManager: Error setting visibility for ${layerId}:`, e);
+          console.error(`❌ PlatformManager: Error setting visibility for ${layerId}:`, e);
         }
       } else {
-        console.log(`PlatformManager: Layer ${layerId} NOT found for platform visibility change.`);
+        console.log(`⚠️ PlatformManager: Layer ${layerId} not found on map`);
       }
     });
+    
+    console.log(`🔍 PlatformManager: Platform visibility ${visible ? 'ON' : 'OFF'} - Processed ${layersProcessed} layers, found ${layersFound} on map`);
+    
+    // DEBUG: Show ALL layers currently on the map to see what we're missing
+    if (!visible) { // Only when hiding layers
+      console.log('🔍 DEBUG: ALL LAYERS CURRENTLY ON MAP:');
+      const style = map.getStyle();
+      if (style && style.layers) {
+        const allLayers = style.layers.map(layer => layer.id);
+        const platformRelated = allLayers.filter(id => 
+          id.includes('platform') || 
+          id.includes('airfield') || 
+          id.includes('airport') || 
+          id.includes('rig') ||
+          id.includes('block') ||
+          id.includes('base') ||
+          id.includes('fuel')
+        );
+        console.log('🔍 Platform-related layers on map:', platformRelated);
+        console.log('🔍 ALL layers on map:', allLayers);
+        
+        // DEBUG: Check if platforms are loaded
+        console.log('🔍 DEBUG: Platform data loaded?', {
+          platformsCount: this.platforms?.length || 0,
+          platformsLoaded: this.platformsLoaded,
+          isVisible: this.isVisible,
+          firstFewPlatforms: this.platforms?.slice(0, 3)?.map(p => p.name) || []
+        });
+      }
+    }
     
     console.log(`Platform layers visibility set to: ${visibility}`);
   }
@@ -1815,13 +1870,13 @@ class PlatformManager {
       if (map.getLayer(layerId)) {
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`PlatformManager: Successfully set ${layerId} visibility to ${visibility}.`);
+          console.log(`✅ OSDK waypoint layer ${layerId} visibility set to: ${visibility}`);
           layersFound = true;
         } catch (e) {
-          console.error(`PlatformManager: Error setting visibility for ${layerId}:`, e);
+          console.error(`❌ Error setting OSDK waypoint layer ${layerId} visibility:`, e);
         }
       } else {
-        console.log(`PlatformManager: Layer ${layerId} NOT found for OSDK waypoint visibility change.`);
+        console.log(`⚠️ PlatformManager: OSDK waypoint layer ${layerId} NOT found on map`);
       }
     });
     
@@ -1835,6 +1890,80 @@ class PlatformManager {
       console.log("No waypoint layers found but have waypoints. Creating layers now...");
       this._addOsdkWaypointsToMap();
     }
+  }
+
+  /**
+   * Hide base map features (airports, airfields) during waypoint mode
+   * These are features built into the map style, not custom layers
+   */
+  _hideBaseMapFeatures() {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    console.log('🗺️ Hiding base map airport/platform features during waypoint mode');
+    
+    // Store original visibility states for restoration
+    this._baseMapStates = {};
+    
+    // List of base map layer IDs that show airports and platforms
+    const baseMapFeatureLayers = [
+      'airport-label',
+      'airport-label-major',
+      'airport-label-minor',
+      'airfield',
+      'airfield-label',
+      'poi-label',
+      'poi-scalerank1',
+      'poi-scalerank2',
+      'poi-scalerank3',
+      'poi-scalerank4-label',
+      'place-city-sm',
+      'place-town',
+      'place-village'
+    ];
+    
+    // Hide each base map feature layer
+    baseMapFeatureLayers.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        try {
+          // Store current visibility state
+          const currentVisibility = map.getLayoutProperty(layerId, 'visibility') || 'visible';
+          this._baseMapStates[layerId] = currentVisibility;
+          
+          // Hide the layer
+          map.setLayoutProperty(layerId, 'visibility', 'none');
+          console.log(`✅ Hidden base map layer: ${layerId}`);
+        } catch (e) {
+          console.warn(`⚠️ Could not hide base map layer ${layerId}:`, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Show base map features (airports, airfields) when exiting waypoint mode
+   * Restores the original visibility states
+   */
+  _showBaseMapFeatures() {
+    const map = this.mapManager.getMap();
+    if (!map || !this._baseMapStates) return;
+    
+    console.log('🗺️ Restoring base map airport/platform features after waypoint mode');
+    
+    // Restore each base map feature layer to its original state
+    Object.entries(this._baseMapStates).forEach(([layerId, originalVisibility]) => {
+      if (map.getLayer(layerId)) {
+        try {
+          map.setLayoutProperty(layerId, 'visibility', originalVisibility);
+          console.log(`✅ Restored base map layer: ${layerId} to ${originalVisibility}`);
+        } catch (e) {
+          console.warn(`⚠️ Could not restore base map layer ${layerId}:`, e);
+        }
+      }
+    });
+    
+    // Clear stored states
+    this._baseMapStates = null;
   }
 
   /**
@@ -1860,11 +1989,28 @@ class PlatformManager {
       if (active) {
       // Entering waypoint mode
       console.log("PlatformManager: Entering waypoint mode - hiding platforms, showing waypoints");
-      this._setPlatformLayersVisibility(false); // Hide normal platforms and airfields
+      
+      // Store current visibility states before hiding everything
+      this._preWaypointModeStates = {
+        blocksVisible: this.blocksVisible,
+        basesVisible: this.basesVisible, 
+        fuelAvailableVisible: this.fuelAvailableVisible
+      };
+      
+      // Hide platform and airport layers using the centralized function
+      this._setPlatformLayersVisibility(false);
+      
+      // Hide other layer groups using their individual toggle functions
+      this.toggleBlocksVisibility(false);
+      this.toggleBasesVisibility(false);
+      this.toggleFuelAvailableVisibility(false);
+      
+      // HIDE BASE MAP AIRPORT/PLATFORM FEATURES
+      this._hideBaseMapFeatures();
       
       // Check if we already have waypoints loaded
       if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
-        console.log(`PlatformManager: ${this.osdkWaypoints.length} waypoints already loaded, making visible`);
+        console.log(`🗺️ PlatformManager: ${this.osdkWaypoints.length} waypoints already loaded, making visible`);
         this._setOsdkWaypointLayerVisibility(true);
         
         // Show success message
@@ -1876,6 +2022,7 @@ class PlatformManager {
           );
         }
       } else {
+        console.log(`📥 PlatformManager: No waypoints loaded yet, need to fetch from OSDK`);
         
         // Validate client and region name
         if (!client) {
@@ -1968,7 +2115,27 @@ class PlatformManager {
       // Exiting waypoint mode
       console.log("PlatformManager: Exiting waypoint mode - hiding waypoints, showing platforms");
       this._setOsdkWaypointLayerVisibility(false); // Hide OSDK waypoints
-      this._setPlatformLayersVisibility(this.isVisible); // Restore normal platform/airfield visibility
+      
+      // Restore platform and airport layers - always show when exiting waypoint mode
+      this._setPlatformLayersVisibility(true);
+      
+      // RESTORE BASE MAP AIRPORT/PLATFORM FEATURES
+      this._showBaseMapFeatures();
+      
+      // Restore other layer groups to their previous states
+      if (this._preWaypointModeStates) {
+        console.log("🔄 PlatformManager: Restoring layer visibility states");
+        this.toggleBlocksVisibility(this._preWaypointModeStates.blocksVisible);
+        this.toggleBasesVisibility(this._preWaypointModeStates.basesVisible);
+        this.toggleFuelAvailableVisibility(this._preWaypointModeStates.fuelAvailableVisible);
+        this._preWaypointModeStates = null; // Clear stored states
+      } else {
+        console.log("⚠️ PlatformManager: No stored states, using defaults");
+        // Default restoration - you may need to adjust these defaults
+        this.toggleBlocksVisibility(true);
+        this.toggleBasesVisibility(true);
+        this.toggleFuelAvailableVisibility(false);
+      }
     }
     
       // Trigger visibility change callback
