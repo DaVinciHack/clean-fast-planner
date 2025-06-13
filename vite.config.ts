@@ -8,7 +8,26 @@ export default defineConfig({
   server: {
     port: 8080,
     strictPort: true, // This will force Vite to use exactly port 8080
-    host: true
+    host: true,
+    proxy: {
+      // Proxy NOAA nowCOAST weather services to avoid CORS issues
+      '/api/noaa': {
+        target: 'https://nowcoast.noaa.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/noaa/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('NOAA proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying NOAA request:', req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('NOAA proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
+      }
+    }
   },
   resolve: {
     alias: {

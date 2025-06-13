@@ -334,8 +334,8 @@ class PalantirFlightService {
           "locations": cleanLocations,
           "structuredWaypoints": structuredWaypointsJson,
           "useOnlyProvidedWaypoints": true,
-          "region": "NORWAY",
-          "aircraftRegion": "NORWAY",
+          "region": flightData.region || flightData.aircraftRegion || "NORWAY",
+          "aircraftRegion": flightData.aircraftRegion || flightData.region || "NORWAY", 
           "etd": flightData.etd || new Date().toISOString()
         };
         

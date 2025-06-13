@@ -54,26 +54,6 @@ const ModeHandler = ({
           }
           
           setIsInitialized(true);
-          
-          // Add an emergency reset button to the DOM
-          const button = document.createElement('button');
-          button.innerText = 'Reset Map Handlers';
-          button.style.position = 'fixed';
-          button.style.bottom = '10px';
-          button.style.left = '10px';
-          button.style.zIndex = '9999';
-          button.style.background = '#ff4136';
-          button.style.color = 'white';
-          button.style.padding = '5px 10px';
-          button.style.border = 'none';
-          button.style.borderRadius = '4px';
-          button.style.cursor = 'pointer';
-          button.onclick = () => {
-            console.log('🚨 EMERGENCY: Reinitializing handlers');
-            reinitializeHandlers();
-            window.LoadingIndicator.updateStatusIndicator('Map handlers reset. Try clicking again.', 'success');
-          };
-          document.body.appendChild(button);
         } else {
           console.error('🚨 ModeHandler: Failed to initialize handlers directly');
         }

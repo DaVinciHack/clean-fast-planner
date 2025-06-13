@@ -68,8 +68,53 @@ const useMapLayers = ({ mapManagerRef }) => {
         });
       }
       
-      // Initialize other layers as needed
-      // weather, VFR charts, etc.
+      // ALWAYS create weather layer adapter - even if weather system isn't ready
+      if (!weatherLayerRef.current) {
+        console.log("useMapLayers: Creating Weather layer adapter (always available)...");
+        weatherLayerRef.current = {
+          toggle: async () => {
+            try {
+              console.log('🌤️ Weather overlay toggle clicked!');
+              
+              // Check if weather system is available and initialized
+              if (!window.weatherTest?.weatherManager) {
+                console.warn('🌤️ Weather system not available - initializing...');
+                try {
+                  const { initializeWeatherSystem } = await import('../modules/WeatherLoader.js');
+                  await initializeWeatherSystem();
+                } catch (importError) {
+                  console.error('❌ Could not import weather system:', importError);
+                  return false;
+                }
+              }
+
+              if (!window.weatherTest?.weatherManager) {
+                console.error('❌ Weather system could not be initialized');
+                return false;
+              }
+
+              // Ensure weather manager has map reference
+              if (!window.weatherTest.weatherManager.mapManager) {
+                console.log('🌤️ Setting map manager reference for weather system');
+                window.weatherTest.weatherManager.mapManager = mapManagerRef.current;
+              }
+
+              const currentVisible = window.weatherTest.weatherManager.isWeatherVisible;
+              const newVisible = !currentVisible;
+              
+              console.log(`🌤️ Toggling weather overlay: ${currentVisible} → ${newVisible}`);
+              window.weatherTest.weatherManager.setWeatherVisible(newVisible);
+              
+              return newVisible;
+            } catch (error) {
+              console.error('❌ Error toggling weather layer:', error);
+              return false;
+            }
+          },
+          isVisible: () => window.weatherTest?.weatherManager?.isWeatherVisible || false
+        };
+        console.log("useMapLayers: Weather layer adapter created (always available)");
+      }
       
       setLayersInitialized(true);
     }

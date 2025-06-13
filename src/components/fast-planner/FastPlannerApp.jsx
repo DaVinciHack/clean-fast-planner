@@ -13,6 +13,9 @@ import StopCardCalculator from './modules/calculations/flight/StopCardCalculator
 // Import WeatherFuelAnalyzer for weather-based fuel calculations
 import WeatherFuelAnalyzer from './modules/fuel/weather/WeatherFuelAnalyzer.js';
 
+// Import weather system initialization
+import { initializeWeatherSystem } from './modules/WeatherLoader.js';
+
 // Import extracted utilities
 import { generateStopCardsData as generateStopCardsUtil } from './utilities/FlightUtilities.js';
 
@@ -1040,7 +1043,7 @@ const FastPlannerCore = ({
                       console.error('🌤️ AUTO-SHOW: Error importing WeatherCirclesLayer:', importError);
                     });
                   } catch (autoShowError) {
-                    console.error('🌤️ AUTO-SHOW: Error auto-showing weather circles:', autoShowError);
+                    console.error('🌤️ AUTO-SHOW: Error during auto-show:', autoShowError);
                   }
                 }, 1000); // Wait 1 second for map to be ready
               }
@@ -2264,6 +2267,8 @@ const FastPlannerCore = ({
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
+          waypoints={waypoints} // Pass current flight waypoints for AutoFlight
+          routeStats={routeStats} // Pass route statistics for AutoFlight
           ref={rightPanelRef} // Add ref to access card change functionality
         />
       </div>
@@ -2471,6 +2476,29 @@ const FastPlannerApp = () => {
       appManagers.handleMapReady = handleMapReadyImpl;
     }
   }, [appManagers, handleMapReadyImpl]);
+
+  // Initialize weather system - minimal integration for testing
+  useEffect(() => {
+    const initWeatherSystem = async () => {
+      if (appManagers && appManagers.mapManagerRef?.current) {
+        console.log('🌤️ Initializing weather system for testing...');
+        try {
+          const weatherTest = await initializeWeatherSystem();
+          if (weatherTest) {
+            console.log('✅ Weather system initialized and ready for testing');
+            console.log('🚀 Test in console with: window.weatherTest.quickTest()');
+          }
+        } catch (error) {
+          console.error('❌ Weather system initialization failed:', error);
+        }
+      }
+    };
+
+    initWeatherSystem();
+  }, [appManagers]);
+
+  // Layer restoration is handled by PlatformManager.restoreWeatherFeatures() 
+  // No additional persistence manager needed - clean single responsibility architecture
 
   return (
     <RegionProvider
