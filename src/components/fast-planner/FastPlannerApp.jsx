@@ -85,7 +85,13 @@ const FastPlannerCore = ({
   
   // Glass menu states for flight-loaded controls
   const [isFlightLoaded, setIsFlightLoaded] = useState(false);
-  const [isEditLocked, setIsEditLocked] = useState(true); // Start locked to prevent accidental edits
+  const [isEditLocked, setIsEditLocked] = useState(false); // Start unlocked to build flights immediately
+  
+  // CRITICAL: Set initial global lock state for managers
+  React.useEffect(() => {
+    window.isEditLocked = isEditLocked;
+  }, [isEditLocked]);
+  
   
   // State for weather-based fuel calculations
   const [weatherFuel, setWeatherFuel] = useState({ araFuel: 0, approachFuel: 0 });
@@ -1973,13 +1979,13 @@ const FastPlannerCore = ({
       console.log('🚫 LOCKING: Disabling map interactions and waypoint modifications');
       
       // Disable map click handlers
-      if (window.mapboxManager?.mapInteractionHandler) {
-        window.mapboxManager.mapInteractionHandler.disableMapClicks();
+      if (appManagers.mapInteractionHandlerRef?.current) {
+        appManagers.mapInteractionHandlerRef.current.disableMapClicks();
       }
       
       // Disable waypoint dragging
-      if (window.mapboxManager?.waypointManager) {
-        window.mapboxManager.waypointManager.disableWaypointDragging();
+      if (appManagers.waypointManagerRef?.current) {
+        appManagers.waypointManagerRef.current.disableWaypointDragging();
       }
       
       // Add visual overlay to indicate locked state
@@ -2035,13 +2041,13 @@ const FastPlannerCore = ({
       console.log('🔓 UNLOCKING: Re-enabling map interactions and waypoint modifications');
       
       // Re-enable map click handlers
-      if (window.mapboxManager?.mapInteractionHandler) {
-        window.mapboxManager.mapInteractionHandler.enableMapClicks();
+      if (appManagers.mapInteractionHandlerRef?.current) {
+        appManagers.mapInteractionHandlerRef.current.enableMapClicks();
       }
       
       // Re-enable waypoint dragging
-      if (window.mapboxManager?.waypointManager) {
-        window.mapboxManager.waypointManager.enableWaypointDragging();
+      if (appManagers.waypointManagerRef?.current) {
+        appManagers.waypointManagerRef.current.enableWaypointDragging();
       }
       
       // Show unlock notification
@@ -2081,10 +2087,14 @@ const FastPlannerCore = ({
     }
     
     // Notify managers to refresh route display with new lock state
-    if (window.mapboxManager?.waypointManager) {
+    if (appManagers.waypointManagerRef?.current) {
       setTimeout(() => {
-        window.mapboxManager.waypointManager.refreshRouteDisplay();
-        window.mapboxManager.waypointManager.updateRouteDragState(window._originalRouteDragHandler);
+        if (typeof appManagers.waypointManagerRef.current.refreshRouteDisplay === 'function') {
+          appManagers.waypointManagerRef.current.refreshRouteDisplay();
+        }
+        if (typeof appManagers.waypointManagerRef.current.updateRouteDragState === 'function') {
+          appManagers.waypointManagerRef.current.updateRouteDragState(window._originalRouteDragHandler);
+        }
       }, 100);
     }
   };

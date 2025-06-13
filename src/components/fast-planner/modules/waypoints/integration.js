@@ -8,8 +8,9 @@
 import WaypointInsertionManager from './WaypointInsertionManager';
 import WaypointModeHandler from './WaypointModeHandler';
 import { isNavigationalWaypoint, createWaypointMarker } from './WaypointUtils';
-// Import createWaypointModeHandler from waypointModeIntegration and alias toggleWaypointModeImpl
-import { createWaypointModeHandler as createWaypointModeHandlerImported, toggleWaypointMode as toggleWaypointModeImpl } from './waypointModeIntegration';
+
+// REMOVED: waypointModeIntegration import - deleted competing system
+// Now using clean direct PlatformManager calls
 
 /**
  * Create and initialize the waypoint insertion manager
@@ -359,7 +360,9 @@ export const patchWaypointManager = (waypointManager) => {
  * @returns {Promise<boolean>} - Promise that resolves to the new state
  */
 export const toggleWaypointMode = (waypointModeHandler, mapInteractionHandler, active) => {
-  return toggleWaypointModeImpl(waypointModeHandler, mapInteractionHandler, active);
+  console.log('🧹 integration.js toggleWaypointMode: Simplified - now handled by useWaypoints → PlatformManager');
+  // No-op since waypoint mode is now handled directly by PlatformManager
+  return Promise.resolve(active);
 };
 
 /**
@@ -389,7 +392,10 @@ export const categorizeRouteItems = (items) => {
 
 export default {
   createWaypointInsertionManager,
-  createWaypointModeHandler: createWaypointModeHandlerImported, // Export the imported version
+  createWaypointModeHandler: () => {
+    console.log('🧹 createWaypointModeHandler: No-op - handled by PlatformManager');
+    return null;
+  }, // Simplified - no longer needed
   setupWaypointCallbacks,
   patchWaypointManager,
   toggleWaypointMode,

@@ -18,6 +18,7 @@ class WaypointManager {
     };
     this._routeDragHandlers = null; // To store references to drag handlers
     this.storedAlternateRouteData = null; // Store alternate route data for persistence
+    this.isWaypointDraggingDisabled = false; // Lock state for waypoint dragging
   }
 
   /**
@@ -27,7 +28,19 @@ class WaypointManager {
     console.log('⭐ Clearing stored alternate route data');
     this.storedAlternateRouteData = null;
   }
-  
+
+  /**
+   * Lock Methods - Disable/Enable Waypoint Dragging
+   */
+  disableWaypointDragging() {
+    this.isWaypointDraggingDisabled = true;
+    console.log('🚫 WaypointManager: Waypoint dragging disabled');
+  }
+
+  enableWaypointDragging() {
+    this.isWaypointDraggingDisabled = false;
+    console.log('✅ WaypointManager: Waypoint dragging enabled');
+  }
 
 
   // Calculate if pill should be visible based on segment length
@@ -200,6 +213,20 @@ class WaypointManager {
       // Set up marker drag handling
       if (marker) {
         marker.on('dragend', () => {
+          // LOCK CHECK: Prevent waypoint marker dragging when editing is locked
+          if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
+            console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+            }
+            // Revert the marker to its original position
+            const index = this.markers.indexOf(marker);
+            if (index !== -1 && index < this.waypoints.length) {
+              marker.setLngLat(this.waypoints[index].coords);
+            }
+            return;
+          }
+          
           const lngLat = marker.getLngLat();
           const index = this.markers.indexOf(marker);
           if (index !== -1 && index < this.waypoints.length) {
@@ -595,6 +622,20 @@ class WaypointManager {
     
     // Set up marker drag handling
     marker.on('dragend', () => {
+      // LOCK CHECK: Prevent waypoint marker dragging when editing is locked
+      if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
+        console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+        }
+        // Revert the marker to its original position
+        const markerIndex = this.markers.indexOf(marker);
+        if (markerIndex !== -1 && markerIndex < this.waypoints.length) {
+          marker.setLngLat(this.waypoints[markerIndex].coords);
+        }
+        return;
+      }
+      
       const lngLat = marker.getLngLat();
       const markerIndex = this.markers.indexOf(marker);
       if (markerIndex !== -1 && markerIndex < this.waypoints.length) {
@@ -2338,6 +2379,15 @@ class WaypointManager {
     
     // Mouse down handler - start the drag operation
     const handleMouseDown = (e) => {
+      // LOCK CHECK: Prevent route dragging when editing is locked
+      if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
+        console.log('🔒 WaypointManager: Ignoring mousedown - waypoint dragging is locked');
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+        }
+        return;
+      }
+      
       // Skip if no route or if right-click (context menu)
       if (!map.getSource('route') || e.originalEvent.button === 2) return;
       

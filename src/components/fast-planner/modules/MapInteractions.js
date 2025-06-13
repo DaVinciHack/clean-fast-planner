@@ -342,6 +342,15 @@ class MapInteractions {
    * Handle map click events
    */
   handleMapClick(e) {
+    // LOCK CHECK: Prevent map clicks when editing is locked
+    if (window.isEditLocked === true) {
+      console.log('🔒 MapInteractions: Ignoring click - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
     // Prevent rapid clicks
     const now = Date.now();
     if (now - this.lastClickTime < this.config.debounceTime) {
@@ -411,6 +420,15 @@ class MapInteractions {
    * Handle platform click events
    */
   handlePlatformClick(e) {
+    // LOCK CHECK: Prevent platform clicks when editing is locked
+    if (window.isEditLocked === true) {
+      console.log('🔒 MapInteractions: Ignoring platform click - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
     // Prevent rapid clicks
     const now = Date.now();
     if (now - this.lastClickTime < this.config.debounceTime) {
