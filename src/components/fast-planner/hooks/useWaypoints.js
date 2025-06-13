@@ -465,68 +465,21 @@ const useWaypoints = ({
    * Uses the clean implementation if available, falls back to original
    */
   const toggleWaypointMode = useCallback((active) => {
-    // Try to use the clean implementation first
-    if (window.setWaypointModeClean && typeof window.setWaypointModeClean === 'function') {
-      console.log('Using clean implementation for toggleWaypointMode');
-      window.setWaypointModeClean(active);
-      
-      // Update our local state to stay in sync
-      setWaypointModeActive(active);
-      // REMOVED 'return;' TO ALLOW ORIGINAL LOGIC TO RUN AS WELL
-    }
-    
-    // Original implementation (or the part that handles PlatformManager)
-    // This will now run even if the clean implementation was called.
-    console.log(`Toggling waypoint insertion mode (useWaypoints): ${active ? 'ON' : 'OFF'}`);
+    console.log(`🎯 WAYPOINT MODE: ${active ? 'ENTERING' : 'EXITING'} waypoint mode`);
     
     setWaypointModeActive(active);
     window.isWaypointModeActive = active;
     
-    if (platformManagerRef.current) {
-      // Use client and currentRegion passed as props
-      const regionIdentifier = currentRegion ? currentRegion.osdkRegion || currentRegion.name : null;
-      
-      if (platformManagerRef.current.toggleWaypointMode) {
-        // Pass the client and regionIdentifier from props
-        platformManagerRef.current.toggleWaypointMode(active, client, regionIdentifier);
-      } else {
-        if (platformManagerRef.current) {
-          platformManagerRef.current.waypointModeActive = active;
-        }
-      }
-    }
+    // CLEAN SOLUTION: Direct call to PlatformManager only
+    console.log('🎯 WAYPOINT MODE: Clean direct call to PlatformManager');
     
-    // Manage interaction handlers
-    if (window.waypointHandler && typeof window.waypointHandler.toggle === 'function') {
-      window.waypointHandler.toggle(active); // Use toggle method
-      
-      if (!active) { // If deactivating waypoint mode
-        // Re-initialize the main MapInteractionHandler to restore its listeners
-        if (mapInteractionHandlerRef && mapInteractionHandlerRef.current && typeof mapInteractionHandlerRef.current.initialize === 'function') {
-          console.log('useWaypoints: Waypoint mode deactivated. Re-initializing MapInteractionHandler.');
-          mapInteractionHandlerRef.current.initialize();
-        } else {
-          console.warn('useWaypoints: mapInteractionHandlerRef not available to re-initialize after deactivating waypoint mode.');
-        }
-      }
-    } else if (window.waypointHandler) {
-      // Fallback for older setEnabled logic if toggle doesn't exist, though less ideal
-      console.warn('useWaypoints: window.waypointHandler.toggle not found, attempting setEnabled.');
-      if (typeof window.waypointHandler.setEnabled === 'function') {
-        window.waypointHandler.setEnabled(active);
-      }
-       if (!active) { // If deactivating waypoint mode
-        if (mapInteractionHandlerRef && mapInteractionHandlerRef.current && typeof mapInteractionHandlerRef.current.initialize === 'function') {
-          console.log('useWaypoints: Waypoint mode deactivated (via setEnabled). Re-initializing MapInteractionHandler.');
-          mapInteractionHandlerRef.current.initialize();
-        }
-      }
+    // Call PlatformManager directly for visibility toggle
+    if (platformManagerRef.current && typeof platformManagerRef.current.toggleWaypointMode === 'function') {
+      const client = window.client || window.osdkClient;
+      const region = currentRegion?.name || window.currentRegion?.name || 'GULF OF MEXICO';
+      platformManagerRef.current.toggleWaypointMode(active, client, region);
     } else {
-      console.warn('useWaypoints: window.waypointHandler not found or does not have a toggle/setEnabled method.');
-    }
-    
-    if (typeof window.toggleMapMode === 'function') {
-      window.toggleMapMode(active ? 'waypoint' : 'normal');
+      console.warn('🎯 WAYPOINT MODE: PlatformManager or toggleWaypointMode not available');
     }
     
     if (window.LoadingIndicator) {
@@ -539,9 +492,11 @@ const useWaypoints = ({
   }, [
     setWaypointModeActive,
     platformManagerRef,
+    mapInteractionHandlerRef,
     currentRegion,
-    client,
-    mapInteractionHandlerRef
+    client
+    // Note: currentRegion and client are back in dependencies to prevent stale closures
+    // Double execution is now prevented by the execution guard in PlatformManager
   ]);
 
   return {
