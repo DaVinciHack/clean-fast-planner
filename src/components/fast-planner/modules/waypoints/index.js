@@ -32,21 +32,6 @@ setTimeout(() => {
   }
 }, 1000);
 
-// Create a global emergency reset function
-window.resetMapHandlers = () => {
-  console.log('🚨 EMERGENCY: Manual handler reset requested');
-  const handlers = reinitializeHandlers();
-  if (handlers) {
-    console.log('🚨 EMERGENCY: Handlers reset successfully');
-    window.LoadingIndicator?.updateStatusIndicator('Map handlers reset. Try clicking again.', 'success');
-    return true;
-  } else {
-    console.error('🚨 EMERGENCY: Failed to reset handlers');
-    window.LoadingIndicator?.updateStatusIndicator('Failed to reset map handlers', 'error');
-    return false;
-  }
-};
-
 export {
   WaypointInsertionManager,
   WaypointModeHandler,

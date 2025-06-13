@@ -30,9 +30,16 @@ const MapLayersCard = ({
   toggleBasesVisibility, // New function for bases
   toggleFuelAvailableVisibility, // New function for fuel available
   // Weather segments props
-  weatherSegmentsHook // Pass the entire weather segments hook
+  weatherSegmentsHook, // Pass the entire weather segments hook
+  // Flight data props for AutoFlight
+  waypoints, // Current flight waypoints
+  routeStats // Route statistics
 }) => {
   const { currentRegion } = useRegion();
+  
+  // State for real-time altitude display updates
+  const [altitudeDisplay, setAltitudeDisplay] = useState(0);
+  
   const [layers, setLayers] = useState({
     gulfCoastHeli: false,
     weather: false,
@@ -45,11 +52,28 @@ const MapLayersCard = ({
     movablePlatforms: true,
     blocks: true, // New category for blocks
     bases: true, // New category for bases
-    fuelAvailable: false // New category for fuel available (default off)
+    fuelAvailable: false, // New category for fuel available (default off)
+    // Weather Satellite Layers
+    lightning: true, // DEFAULT ON - Critical safety layer (was working fine)
+    satelliteConus: true, // DEFAULT ON for Gulf region (when applicable)
+    satelliteLongwave: false, // Optional - user can enable
+    satelliteShortwave: false, // Optional - user can enable
+    // 3D Cloud Effects
+    cloud3DEffects: false, // GENIUS altitude-based cloud opacity
+    enhanced3DControls: false, // Advanced flight simulation controls
+    autoFlight: false // Automatic route following
   });
 
   // State for Gulf Coast map opacity
   const [gulfCoastOpacity, setGulfCoastOpacity] = useState(0.85);
+  
+  // State for weather layer opacities
+  const [weatherOpacities, setWeatherOpacities] = useState({
+    lightning: 0.8,
+    satelliteConus: 0.6, // More subtle default for radar
+    satelliteLongwave: 0.8,
+    satelliteShortwave: 0.8
+  });
   
   // Update layer states when references or visibility props change
   useEffect(() => {
@@ -120,6 +144,71 @@ const MapLayersCard = ({
     
     return () => clearInterval(interval);
   }, [layers.grid, layers.gulfCoastHeli, layers.weatherCircles, mapManagerRef, gulfCoastMapRef]);
+
+  // Auto-initialize default weather layers when map becomes available
+  useEffect(() => {
+    const initializeDefaultWeatherLayers = async () => {
+      if (!mapManagerRef?.current?.map) return;
+      
+      const mapInstance = mapManagerRef.current.map;
+      
+      // Auto-enable lightning (global safety layer) - was working fine before
+      if (layers.lightning && !mapInstance.getLayer('simple-lightning-layer')) {
+        console.log('🌩️ Auto-initializing lightning detection...');
+        try {
+          const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
+          await addSimpleLightningOverlay(mapInstance);
+          console.log('✅ Lightning auto-enabled');
+        } catch (error) {
+          console.warn('⚠️ Failed to auto-enable lightning:', error);
+        }
+      }
+      
+      // Auto-enable CONUS radar for Gulf region
+      if (currentRegion?.id === 'gulf-of-mexico' && layers.satelliteConus && !mapInstance.getLayer('noaa-conus-layer')) {
+        console.log('🌧️ Auto-initializing CONUS radar for Gulf region...');
+        try {
+          const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+          const success = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+          if (success) {
+            // Set default opacity
+            setTimeout(() => {
+              try {
+                mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', weatherOpacities.satelliteConus);
+                console.log(`✅ CONUS auto-enabled with ${weatherOpacities.satelliteConus * 100}% opacity`);
+              } catch (error) {
+                console.warn('⚠️ Could not set CONUS default opacity:', error);
+              }
+            }, 500);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to auto-enable CONUS:', error);
+        }
+      }
+    };
+    
+    // Small delay to ensure map is fully loaded
+    const timeoutId = setTimeout(initializeDefaultWeatherLayers, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [mapManagerRef, currentRegion, layers.lightning, layers.satelliteConus, weatherOpacities.satelliteConus]);
+
+  // Real-time altitude display update when 3D clouds are active
+  useEffect(() => {
+    let intervalId;
+    
+    if (layers.cloud3DEffects && window.threeDCloudManager) {
+      intervalId = setInterval(() => {
+        if (window.threeDCloudManager) {
+          const currentAltitude = window.threeDCloudManager.cameraAltitude || 0;
+          setAltitudeDisplay(currentAltitude);
+        }
+      }, 100); // Update every 100ms for smooth display
+    }
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [layers.cloud3DEffects]);
 
   // DISABLED: Auto-enable weather circles - these were the ugly discs!
   // useEffect(() => {
@@ -236,9 +325,38 @@ const MapLayersCard = ({
           break;
           
         case 'weather':
-          if (weatherLayerRef?.current) {
-            const isVisible = await weatherLayerRef.current.toggle();
-            setLayers(prev => ({ ...prev, weather: isVisible }));
+          console.log('🌤️ WEATHER OVERLAY: Toggling weather overlay...');
+          
+          try {
+            // Don't rely on weatherLayerRef - handle weather toggle directly
+            if (!window.weatherTest?.weatherManager) {
+              console.log('🌤️ Initializing weather system...');
+              const { initializeWeatherSystem } = await import('../../../modules/WeatherLoader.js');
+              await initializeWeatherSystem();
+            }
+
+            if (!window.weatherTest?.weatherManager) {
+              console.error('❌ Weather system could not be initialized');
+              break;
+            }
+
+            // Ensure weather manager has map reference
+            if (!window.weatherTest.weatherManager.mapManager) {
+              console.log('🌤️ Setting map manager reference for weather system');
+              window.weatherTest.weatherManager.mapManager = mapManagerRef.current;
+            }
+
+            const currentVisible = window.weatherTest.weatherManager.isWeatherVisible;
+            const newVisible = !currentVisible;
+            
+            console.log(`🌤️ Toggling weather overlay: ${currentVisible} → ${newVisible}`);
+            window.weatherTest.weatherManager.setWeatherVisible(newVisible);
+            
+            setLayers(prev => ({ ...prev, weather: newVisible }));
+            
+            console.log(`✅ Weather overlay ${newVisible ? 'ENABLED' : 'DISABLED'}`);
+          } catch (error) {
+            console.error('❌ Error toggling weather overlay:', error);
           }
           break;
           
@@ -256,21 +374,29 @@ const MapLayersCard = ({
               console.warn('Error removing weather circles:', error);
             }
           } else {
-            // Create weather circles
-            if (weatherSegmentsHook?.segments && weatherSegmentsHook.segments.length > 0) {
+            // Create weather circles using PlatformManager (single responsibility)
+            console.log('🌤️ TOGGLE: Requesting weather circles from PlatformManager');
+            
+            // Get platform manager and use its loadWeatherFeatures method
+            if (window.platformManager && typeof window.platformManager.loadWeatherFeatures === 'function') {
+              window.platformManager.loadWeatherFeatures();
+              console.log('✅ Weather circles requested from PlatformManager');
+              // State will be synced by the existing sync logic
+            } else if (weatherSegmentsHook?.segments && weatherSegmentsHook.segments.length > 0) {
+              // Fallback: direct creation only if PlatformManager not available
               try {
                 const { default: WeatherCirclesLayer } = await import('../../../modules/layers/WeatherCirclesLayer');
-                const weatherLayer = new WeatherCirclesLayer(mapManagerRef?.current);
+                const weatherLayer = new WeatherCirclesLayer(mapManagerRef?.current?.map);
                 
-                await weatherLayer.createWeatherCircles(weatherSegmentsHook.segments);
+                await weatherLayer.addWeatherCircles(weatherSegmentsHook.segments);
                 window.currentWeatherCirclesLayer = weatherLayer;
-                console.log('✅ Created weather circles');
+                console.log('✅ Created weather circles (fallback method)');
                 setLayers(prev => ({ ...prev, weatherCircles: true }));
               } catch (error) {
                 console.error('Error creating weather circles:', error);
               }
             } else {
-              console.warn('No weather segments available for circles');
+              console.warn('No weather segments available for circles and PlatformManager not available');
             }
           }
           break;
@@ -379,6 +505,361 @@ const MapLayersCard = ({
           }, 100);
           break;
           
+        // Weather Satellite Layer Cases
+        case 'lightning':
+          console.log('⚡ LIGHTNING: Toggling global lightning detection...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for lightning toggle');
+              break;
+            }
+            
+            const currentVisible = layers.lightning;
+            if (currentVisible) {
+              // Remove lightning layer
+              if (mapInstance.getSource('simple-lightning')) {
+                mapInstance.removeLayer('simple-lightning-layer');
+                mapInstance.removeSource('simple-lightning');
+                console.log('🧹 Removed lightning layer');
+              }
+              setLayers(prev => ({ ...prev, lightning: false }));
+            } else {
+              // Add lightning layer
+              const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
+              const success = await addSimpleLightningOverlay(mapInstance);
+              if (success) {
+                console.log('✅ Lightning layer added');
+                setLayers(prev => ({ ...prev, lightning: true }));
+              } else {
+                console.error('❌ Failed to add lightning layer');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling lightning layer:', error);
+          }
+          break;
+          
+        case 'satelliteConus':
+          console.log('🛰️ CONUS: Toggling CONUS weather radar...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for CONUS toggle');
+              break;
+            }
+            
+            const currentVisible = layers.satelliteConus;
+            if (currentVisible) {
+              // Remove CONUS layer
+              const { removeNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              await removeNOAAWeatherOverlay(mapInstance, 'CONUS');
+              console.log('🧹 Removed CONUS layer');
+              setLayers(prev => ({ ...prev, satelliteConus: false }));
+            } else {
+              // Add CONUS layer
+              const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              const success = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+              if (success) {
+                console.log('✅ CONUS layer added');
+                setLayers(prev => ({ ...prev, satelliteConus: true }));
+              } else {
+                console.error('❌ Failed to add CONUS layer');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling CONUS layer:', error);
+          }
+          break;
+          
+        case 'satelliteLongwave':
+          console.log('🛰️ LONGWAVE: Toggling longwave infrared...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for longwave toggle');
+              break;
+            }
+            
+            const currentVisible = layers.satelliteLongwave;
+            if (currentVisible) {
+              // Remove longwave layer
+              const { removeNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              await removeNOAAWeatherOverlay(mapInstance, 'LONGWAVE');
+              console.log('🧹 Removed longwave layer');
+              setLayers(prev => ({ ...prev, satelliteLongwave: false }));
+            } else {
+              // Add longwave layer
+              const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              const success = await addNOAAWeatherOverlay(mapInstance, 'LONGWAVE');
+              if (success) {
+                console.log('✅ Longwave layer added');
+                setLayers(prev => ({ ...prev, satelliteLongwave: true }));
+              } else {
+                console.error('❌ Failed to add longwave layer');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling longwave layer:', error);
+          }
+          break;
+          
+        case 'satelliteShortwave':
+          console.log('🛰️ SHORTWAVE: Toggling shortwave infrared...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for shortwave toggle');
+              break;
+            }
+            
+            const currentVisible = layers.satelliteShortwave;
+            if (currentVisible) {
+              // Remove shortwave layer
+              const { removeNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              await removeNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
+              console.log('🧹 Removed shortwave layer');
+              setLayers(prev => ({ ...prev, satelliteShortwave: false }));
+            } else {
+              // Add shortwave layer
+              const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+              const success = await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
+              if (success) {
+                console.log('✅ Shortwave layer added');
+                setLayers(prev => ({ ...prev, satelliteShortwave: true }));
+              } else {
+                console.error('❌ Failed to add shortwave layer');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling shortwave layer:', error);
+          }
+          break;
+          
+        case 'cloud3DEffects':
+          console.log('🌩️ 3D CLOUDS: Toggling altitude-based cloud effects...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for 3D clouds');
+              break;
+            }
+            
+            const currentVisible = layers.cloud3DEffects;
+            if (currentVisible) {
+              // Disable 3D cloud effects
+              if (window.threeDCloudManager) {
+                window.threeDCloudManager.deactivate();
+                window.threeDCloudManager = null;
+                console.log('🧹 3D cloud effects disabled');
+              }
+              setLayers(prev => ({ ...prev, cloud3DEffects: false }));
+            } else {
+              // Enable 3D cloud effects
+              const { default: ThreeDCloudManager } = await import('../../../modules/weather/3DCloudManager.js');
+              const cloudManager = new ThreeDCloudManager(mapInstance);
+              
+              if (cloudManager.initialize()) {
+                window.threeDCloudManager = cloudManager;
+                
+                // Enable cloud layers that are currently active
+                if (layers.satelliteShortwave) {
+                  cloudManager.enableCloudLayer('LOW_CLOUDS', weatherOpacities.satelliteShortwave);
+                }
+                if (layers.satelliteLongwave) {
+                  cloudManager.enableCloudLayer('MID_CLOUDS', weatherOpacities.satelliteLongwave);
+                }
+                
+                console.log('✅ 3D cloud effects enabled - Ready for flight simulation!');
+                setLayers(prev => ({ ...prev, cloud3DEffects: true }));
+              } else {
+                console.error('❌ Failed to initialize 3D cloud system');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling 3D cloud effects:', error);
+          }
+          break;
+          
+        case 'enhanced3DControls':
+          console.log('🎮 3D CONTROLS: Toggling enhanced flight simulation controls...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for 3D controls');
+              break;
+            }
+            
+            const currentVisible = layers.enhanced3DControls;
+            if (currentVisible) {
+              // Disable enhanced controls
+              if (window.enhanced3DControls) {
+                window.enhanced3DControls.deactivate();
+                window.enhanced3DControls = null;
+                console.log('🧹 Enhanced 3D controls disabled');
+              }
+              setLayers(prev => ({ ...prev, enhanced3DControls: false }));
+            } else {
+              // Enable enhanced controls
+              const { default: Enhanced3DControls } = await import('../../../modules/weather/Enhanced3DControls.js');
+              const controls = new Enhanced3DControls(mapInstance);
+              
+              controls.activate();
+              window.enhanced3DControls = controls;
+              
+              console.log('✅ Enhanced 3D controls enabled - Ready for flight simulation!');
+              setLayers(prev => ({ ...prev, enhanced3DControls: true }));
+            }
+          } catch (error) {
+            console.error('❌ Error toggling enhanced 3D controls:', error);
+          }
+          break;
+          
+        case 'autoFlight':
+          console.log('🛩️ AUTO FLIGHT: Toggling automatic route following...');
+          try {
+            const mapInstance = mapManagerRef?.current?.map;
+            if (!mapInstance) {
+              console.error('❌ No map instance available for auto flight');
+              break;
+            }
+            
+            const currentVisible = layers.autoFlight;
+            if (currentVisible) {
+              // Disable auto flight
+              if (window.autoFlightManager) {
+                window.autoFlightManager.destroy();
+                window.autoFlightManager = null;
+                console.log('🧹 Auto flight disabled');
+              }
+              setLayers(prev => ({ ...prev, autoFlight: false }));
+            } else {
+              // Enable auto flight
+              console.log('🛩️ === AUTO FLIGHT ROUTE DETECTION DEBUG ===');
+              console.log('🛩️ waypoints prop exists?', !!waypoints);
+              console.log('🛩️ waypoints length:', waypoints?.length || 'undefined');
+              console.log('🛩️ waypoints content:', waypoints);
+              console.log('🛩️ routeStats:', routeStats);
+              console.log('🛩️ weatherSegmentsHook exists?', !!weatherSegmentsHook);
+              console.log('🛩️ window.currentWaypoints exists?', !!window.currentWaypoints);
+              console.log('🛩️ window.currentWaypoints:', window.currentWaypoints);
+              console.log('🛩️ === END DEBUG ===');
+              
+              const { default: AutoFlightManager } = await import('../../../modules/weather/AutoFlightManager.js');
+              
+              // Get enhanced 3D controls if available
+              const controls = window.enhanced3DControls || null;
+              const flightManager = new AutoFlightManager(mapInstance, controls);
+              
+              // Try to get REAL flight route from your existing system
+              let flightRoute = null;
+              
+              // DEBUG: Log all available data sources
+              console.log('🛩️ DEBUG: AutoFlight route detection:');
+              console.log('🛩️ waypoints prop:', waypoints);
+              console.log('🛩️ routeStats prop:', routeStats);
+              console.log('🛩️ weatherSegmentsHook:', weatherSegmentsHook);
+              console.log('🛩️ mapManagerRef:', mapManagerRef?.current);
+              
+              // Method 1: Use the waypoints prop (ACTUAL PLANNED FLIGHT!)
+              if (waypoints && waypoints.length >= 2) {
+                console.log('🛩️ Method 1: Found waypoints prop with', waypoints.length, 'waypoints');
+                console.log('🛩️ Sample waypoint:', waypoints[0]);
+                
+                flightRoute = waypoints.map((wp, index) => ({
+                  lat: wp.lat || wp.latitude,
+                  lng: wp.lng || wp.longitude || wp.lon,
+                  name: wp.name || wp.id || `${wp.type || 'WP'} ${index + 1}`,
+                  altitude: wp.altitude || (wp.type === 'departure' ? 0 : (wp.type === 'destination' ? 0 : 2000)),
+                  type: wp.type || 'waypoint'
+                }));
+                
+                console.log('🛩️ ✅ SUCCESS! Using REAL FLIGHT WAYPOINTS!');
+                console.log('🛩️ Converted route:', flightRoute);
+                console.log(`🛩️ Flight route: ${flightRoute.map(wp => wp.name).join(' → ')}`);
+              } else {
+                console.log('🛩️ Method 1: No waypoints prop or insufficient waypoints');
+              }
+              
+              // Method 2: Try to get from mapManagerRef waypoints
+              if (!flightRoute && mapManagerRef?.current?.getWaypoints) {
+                console.log('🛩️ Method 2: Trying mapManager.getWaypoints()');
+                const mapWaypoints = mapManagerRef.current.getWaypoints();
+                console.log('🛩️ Map waypoints:', mapWaypoints);
+                
+                if (mapWaypoints && mapWaypoints.length >= 2) {
+                  flightRoute = mapWaypoints.map((wp, index) => ({
+                    lat: wp.lat || wp.latitude,
+                    lng: wp.lng || wp.longitude || wp.lon,
+                    name: wp.name || wp.id || `WP${index + 1}`,
+                    altitude: wp.altitude || (index === 0 ? 500 : (index === mapWaypoints.length - 1 ? 500 : 2000))
+                  }));
+                  console.log('✅ Using real waypoints from mapManager');
+                }
+              } else if (!flightRoute) {
+                console.log('🛩️ Method 2: mapManager.getWaypoints not available');
+              }
+              
+              // Method 2.5: Try to get waypoints from window.currentWaypoints (global variable)
+              if (!flightRoute && window.currentWaypoints && window.currentWaypoints.length >= 2) {
+                console.log('🛩️ Method 2.5: Found window.currentWaypoints');
+                console.log('🛩️ Global waypoints:', window.currentWaypoints);
+                
+                flightRoute = window.currentWaypoints.map((wp, index) => ({
+                  lat: wp.lat || wp.latitude,
+                  lng: wp.lng || wp.longitude || wp.lon,
+                  name: wp.name || wp.id || `Global WP${index + 1}`,
+                  altitude: wp.altitude || 2000
+                }));
+                console.log('✅ Using waypoints from window.currentWaypoints');
+              }
+              
+              // Method 3: Try to get from weather segments hook
+              if (!flightRoute && weatherSegmentsHook?.segments) {
+                const segments = weatherSegmentsHook.segments;
+                if (segments.length > 0) {
+                  // Extract coordinates from segments
+                  const coords = segments.map(seg => seg.coordinates).flat();
+                  if (coords.length >= 2) {
+                    flightRoute = coords.map((coord, index) => ({
+                      lat: coord.lat || coord.latitude,
+                      lng: coord.lng || coord.longitude || coord.lon,
+                      name: coord.name || `Segment ${index + 1}`,
+                      altitude: coord.altitude || 2000
+                    }));
+                    console.log('✅ Using real route from weather segments');
+                  }
+                }
+              }
+              
+              // Method 4: Fallback to realistic Gulf demo route if no real route found
+              if (!flightRoute) {
+                console.log('⚠️ No real flight route found, using realistic Gulf demo route');
+                flightRoute = [
+                  { lat: 29.7604, lng: -95.3698, name: "KHOU (Houston)", altitude: 0 },
+                  { lat: 29.5333, lng: -94.8667, name: "Galveston Bay", altitude: 1000 },
+                  { lat: 29.2000, lng: -94.5000, name: "Offshore Waypoint", altitude: 2000 },
+                  { lat: 28.8667, lng: -94.2000, name: "East Cameron 330", altitude: 2000 },
+                  { lat: 28.6000, lng: -93.8000, name: "South Timbalier 54", altitude: 1500 },
+                  { lat: 28.4500, lng: -93.5000, name: "Final Approach", altitude: 500 },
+                  { lat: 28.3333, lng: -93.3333, name: "Heliport Landing", altitude: 0 }
+                ];
+              }
+              
+              if (flightManager.loadRoute(flightRoute)) {
+                window.autoFlightManager = flightManager;
+                console.log(`✅ Auto flight enabled with ${flightRoute.length} waypoints!`);
+                console.log(`🛩️ Route: ${flightRoute.map(wp => wp.name).join(' → ')}`);
+                setLayers(prev => ({ ...prev, autoFlight: true }));
+              } else {
+                console.error('❌ Failed to initialize auto flight system');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling auto flight:', error);
+          }
+          break;
+          
         default:
           console.warn(`Unknown layer: ${layerName}`);
       }
@@ -483,9 +964,253 @@ const MapLayersCard = ({
         
         <div className="layer-section">
           <h4>Aviation Layers</h4>
-          {renderLayerToggle('weather', 'Weather Overlay', !!weatherLayerRef?.current)}
+          {renderLayerToggle('weather', 'Weather Overlay', true)}
           {renderLayerToggle('weatherCircles', 'Weather Circles', !!weatherSegmentsHook)}
           {renderLayerToggle('vfrCharts', 'VFR Charts', !!vfrChartsRef?.current)}
+        </div>
+        
+        <div className="layer-section">
+          <h4>Weather Satellite Layers</h4>
+          
+          {/* Global Lightning - Available in all regions */}
+          <div className="button-row">
+            {renderLayerToggle('lightning', '⚡ Lightning (Global)', true)}
+          </div>
+          
+          {/* Lightning opacity slider - always visible when lightning is on */}
+          {layers.lightning && (
+            <div className="opacity-slider-container">
+              <label className="opacity-slider-label">
+                Lightning Opacity: {Math.round(weatherOpacities.lightning * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0.2"
+                max="1"
+                step="0.05"
+                value={weatherOpacities.lightning}
+                onChange={(e) => {
+                  const newOpacity = parseFloat(e.target.value);
+                  setWeatherOpacities(prev => ({ ...prev, lightning: newOpacity }));
+                  // Apply opacity to lightning layer
+                  const mapInstance = mapManagerRef?.current?.map;
+                  if (mapInstance && mapInstance.getLayer('simple-lightning-layer')) {
+                    try {
+                      mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', newOpacity);
+                    } catch (error) {
+                      console.warn('Could not set lightning opacity:', error);
+                    }
+                  }
+                }}
+                className="opacity-slider"
+              />
+              <div className="opacity-slider-marks">
+                <span>20%</span>
+                <span>60%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Gulf Region Specific Weather Layers */}
+          {currentRegion?.id === 'gulf-of-mexico' && (
+            <>
+              <div className="region-specific-label">Gulf Region Weather:</div>
+              <div className="button-row">
+                {renderLayerToggle('satelliteConus', '🌧️ Radar (CONUS)', true)}
+                {renderLayerToggle('satelliteLongwave', '🛰️ Longwave IR', true)}
+              </div>
+              <div className="button-row">
+                {renderLayerToggle('satelliteShortwave', '🛰️ Shortwave IR', true)}
+              </div>
+              
+              {/* Weather layer descriptions */}
+              <div className="weather-layer-descriptions">
+                <div className="layer-description">
+                  <strong>🌧️ Radar (CONUS):</strong> Real-time precipitation and storm intensity
+                </div>
+                <div className="layer-description">
+                  <strong>🛰️ Longwave IR:</strong> Cloud temperature and high-altitude weather
+                </div>
+                <div className="layer-description">
+                  <strong>🛰️ Shortwave IR:</strong> Low clouds, fog, and surface conditions
+                </div>
+              </div>
+              
+              {/* Opacity sliders for active Gulf weather layers */}
+              {layers.satelliteConus && (
+                <div className="opacity-slider-container">
+                  <label className="opacity-slider-label">
+                    Radar Opacity: {Math.round(weatherOpacities.satelliteConus * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={weatherOpacities.satelliteConus}
+                    onChange={(e) => {
+                      const newOpacity = parseFloat(e.target.value);
+                      setWeatherOpacities(prev => ({ ...prev, satelliteConus: newOpacity }));
+                      // Apply opacity to map layer using new naming convention
+                      const mapInstance = mapManagerRef?.current?.map;
+                      if (mapInstance && mapInstance.getLayer('noaa-conus-layer')) {
+                        try {
+                          mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', newOpacity);
+                        } catch (error) {
+                          console.warn('Could not set CONUS opacity:', error);
+                        }
+                      }
+                    }}
+                    className="opacity-slider"
+                  />
+                  <div className="opacity-slider-marks">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              )}
+              
+              {layers.satelliteLongwave && (
+                <div className="opacity-slider-container">
+                  <label className="opacity-slider-label">
+                    Longwave Opacity: {Math.round(weatherOpacities.satelliteLongwave * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={weatherOpacities.satelliteLongwave}
+                    onChange={(e) => {
+                      const newOpacity = parseFloat(e.target.value);
+                      setWeatherOpacities(prev => ({ ...prev, satelliteLongwave: newOpacity }));
+                      // Apply opacity to map layer using new naming convention
+                      const mapInstance = mapManagerRef?.current?.map;
+                      if (mapInstance && mapInstance.getLayer('noaa-longwave-layer')) {
+                        try {
+                          mapInstance.setPaintProperty('noaa-longwave-layer', 'raster-opacity', newOpacity);
+                        } catch (error) {
+                          console.warn('Could not set longwave opacity:', error);
+                        }
+                      }
+                    }}
+                    className="opacity-slider"
+                  />
+                  <div className="opacity-slider-marks">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              )}
+              
+              {layers.satelliteShortwave && (
+                <div className="opacity-slider-container">
+                  <label className="opacity-slider-label">
+                    Shortwave Opacity: {Math.round(weatherOpacities.satelliteShortwave * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={weatherOpacities.satelliteShortwave}
+                    onChange={(e) => {
+                      const newOpacity = parseFloat(e.target.value);
+                      setWeatherOpacities(prev => ({ ...prev, satelliteShortwave: newOpacity }));
+                      // Apply opacity to map layer using new naming convention
+                      const mapInstance = mapManagerRef?.current?.map;
+                      if (mapInstance && mapInstance.getLayer('noaa-shortwave-layer')) {
+                        try {
+                          mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', newOpacity);
+                        } catch (error) {
+                          console.warn('Could not set shortwave opacity:', error);
+                        }
+                      }
+                    }}
+                    className="opacity-slider"
+                  />
+                  <div className="opacity-slider-marks">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* Norway Region Specific Weather Layers (for future implementation) */}
+          {currentRegion?.id === 'norway' && (
+            <>
+              <div className="region-specific-label">Norway Region Weather:</div>
+              <div className="layer-placeholder">
+                <em>Wind maps and triggered lightning coming soon...</em>
+              </div>
+            </>
+          )}
+          
+          {/* Other regions */}
+          {currentRegion?.id !== 'gulf-of-mexico' && currentRegion?.id !== 'norway' && (
+            <div className="region-specific-label">
+              <em>Additional weather layers available in Gulf and Norway regions</em>
+            </div>
+          )}
+        </div>
+        
+        <div className="layer-section">
+          <h4>🌩️ 3D Flight Simulation</h4>
+          <div className="button-row">
+            {renderLayerToggle('cloud3DEffects', '☁️ Altitude-Based Clouds', true)}
+            {renderLayerToggle('enhanced3DControls', '🎮 Flight Controls', true)}
+          </div>
+          <div className="button-row">
+            {renderLayerToggle('autoFlight', '🛩️ Auto Flight', true)}
+          </div>
+          
+          {/* Enhanced controls descriptions */}
+          {(layers.cloud3DEffects || layers.enhanced3DControls || layers.autoFlight) && (
+            <div className="weather-layer-descriptions">
+              {layers.cloud3DEffects && (
+                <div className="layer-description">
+                  <strong>☁️ 3D CLOUDS:</strong> Low clouds (0-3,000ft), Mid clouds (6-15,000ft), High clouds (20-40,000ft)
+                </div>
+              )}
+              {layers.enhanced3DControls && (
+                <div className="layer-description">
+                  <strong>🎮 Flight Controls:</strong> Right-click drag, WASD keys, scroll wheel
+                </div>
+              )}
+              {layers.autoFlight && (
+                <div className="layer-description">
+                  <strong>🛩️ AUTO FLIGHT:</strong> Automatic route following with speed control (1x-50x)
+                </div>
+              )}
+              {(layers.cloud3DEffects && window.threeDCloudManager) && (
+                <div className="layer-description" style={{color: '#4CAF50', fontWeight: 'bold'}}>
+                  <strong>📊 Current Altitude:</strong> {Math.round(altitudeDisplay)}ft AGL
+                  <br />
+                  <span style={{fontSize: '10px', color: '#ccc'}}>
+                    Zoom: {mapManagerRef?.current?.map?.getZoom()?.toFixed(1) || 'N/A'} | 
+                    Pitch: {mapManagerRef?.current?.map?.getPitch()?.toFixed(1) || 'N/A'}°
+                  </span>
+                </div>
+              )}
+              {(layers.cloud3DEffects || layers.enhanced3DControls || layers.autoFlight) && (
+                <div className="layer-description">
+                  <strong>✈️ FLIGHT SIMULATION:</strong> Zoom in = Lower altitude, Zoom out = Higher altitude
+                </div>
+              )}
+            </div>
+          )}
+          
+          {(!layers.cloud3DEffects && !layers.enhanced3DControls && !layers.autoFlight) && (
+            <div className="layer-description" style={{marginTop: '8px', fontStyle: 'italic', color: 'rgba(255,255,255,0.6)'}}>
+              Enable for revolutionary 3D flight simulation with automatic route following
+            </div>
+          )}
         </div>
         
         <div className="layer-section">
@@ -502,6 +1227,11 @@ const MapLayersCard = ({
                     console.error('Map manager not available');
                     return;
                   }
+                  
+                  // SAVE CURRENT LAYER STATE before switching
+                  const currentLayers = { ...layers };
+                  const currentWeatherOpacities = { ...weatherOpacities };
+                  console.log('💾 Saving layer state before style switch:', currentLayers);
                   
                   // Toggle between dark and 3D style
                   const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
@@ -523,6 +1253,84 @@ const MapLayersCard = ({
                   }
                   
                   console.log(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
+                  
+                  // RESTORE LAYERS after style switch (small delay to ensure style is loaded)
+                  setTimeout(async () => {
+                    console.log('🔄 Restoring layers after style switch...');
+                    const mapInstance = mapManager.getMap();
+                    
+                    try {
+                      // Restore lightning if it was on
+                      if (currentLayers.lightning && !mapInstance.getLayer('simple-lightning-layer')) {
+                        console.log('⚡ Restoring lightning...');
+                        const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
+                        await addSimpleLightningOverlay(mapInstance);
+                        setTimeout(() => {
+                          try {
+                            mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', currentWeatherOpacities.lightning);
+                          } catch (e) { console.warn('Lightning opacity restore failed:', e); }
+                        }, 200);
+                      }
+                      
+                      // Restore Gulf weather layers if in Gulf region
+                      if (currentRegion?.id === 'gulf-of-mexico') {
+                        const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+                        
+                        if (currentLayers.satelliteConus && !mapInstance.getLayer('noaa-conus-layer')) {
+                          console.log('🌧️ Restoring CONUS radar...');
+                          await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', currentWeatherOpacities.satelliteConus);
+                            } catch (e) { console.warn('CONUS opacity restore failed:', e); }
+                          }, 200);
+                        }
+                        
+                        if (currentLayers.satelliteLongwave && !mapInstance.getLayer('noaa-longwave-layer')) {
+                          console.log('🛰️ Restoring Longwave IR...');
+                          await addNOAAWeatherOverlay(mapInstance, 'LONGWAVE');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-longwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteLongwave);
+                            } catch (e) { console.warn('Longwave opacity restore failed:', e); }
+                          }, 200);
+                        }
+                        
+                        if (currentLayers.satelliteShortwave && !mapInstance.getLayer('noaa-shortwave-layer')) {
+                          console.log('🛰️ Restoring Shortwave IR...');
+                          await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteShortwave);
+                            } catch (e) { console.warn('Shortwave opacity restore failed:', e); }
+                          }, 200);
+                        }
+                      }
+                      
+                      // Emit multiple events to notify all components to restore their layers
+                      setTimeout(() => {
+                        const eventDetail = { 
+                          newStyle, 
+                          previousLayers: currentLayers,
+                          restoreAlternateLines: true,
+                          restoreWeatherCircles: true 
+                        };
+
+                        // Emit multiple event types for maximum compatibility
+                        ['map-style-switched', 'map-style-changed'].forEach(eventName => {
+                          const event = new CustomEvent(eventName, { detail: eventDetail });
+                          window.dispatchEvent(event);
+                        });
+                        
+                        console.log('📢 Notified other components to restore layers (multiple event types)');
+                      }, 500);
+                      
+                      console.log('✅ Layer restoration completed');
+                      
+                    } catch (error) {
+                      console.error('❌ Error during layer restoration:', error);
+                    }
+                  }, 1000); // Wait 1 second for style to fully load
                   
                 } catch (error) {
                   console.error('3D map switch failed:', error);

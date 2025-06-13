@@ -119,6 +119,9 @@ const useManagers = ({
     if (!platformManagerRef.current && mapManagerRef.current) {
       console.log("FastPlannerApp: Creating PlatformManager instance");
       platformManagerRef.current = new PlatformManager(mapManagerRef.current);
+      
+      // ARCHITECTURE: Expose globally for weather circles management
+      window.platformManager = platformManagerRef.current;
     }
 
     // Create RegionManager 

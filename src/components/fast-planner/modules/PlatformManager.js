@@ -1398,6 +1398,10 @@ class PlatformManager {
           // Set up style change listener for layer restoration
           this.setupStyleChangeListener();
           
+          // Note: Weather features are loaded by other systems (FastPlannerApp, RightPanel)
+          // PlatformManager only handles restoration during style changes
+          console.log('🌤️ ARCHITECTURE: PlatformManager will handle weather restoration during style changes only');
+          
           this.triggerCallback('onPlatformsLoaded', platforms);
         } catch (error) {
           console.error('PlatformManager: Error adding platform layers:', error);
@@ -3097,31 +3101,34 @@ class PlatformManager {
    * Set up automatic layer restoration on style change
    */
   setupStyleChangeListener() {
-    window.addEventListener('map-style-changed', (event) => {
-      const { newStyle, is3D } = event.detail;
-      console.log(`🔄 RESTORE: PlatformManager received style change event: ${newStyle}, is3D: ${is3D}`);
-      
-      // AGGRESSIVE CLEANUP: Remove ALL possible 3D layers first
-      this.removeAll3DLayers();
-      
-      if (newStyle === '3d') {
-        // 3D MODE: Keep rigs OFF for clean view (no clutter)
-        console.log('🔄 RESTORE: 3D mode - keeping rigs OFF for clean view');
+    // Listen for BOTH event names to ensure compatibility
+    ['map-style-switched', 'map-style-changed'].forEach(eventName => {
+      window.addEventListener(eventName, (event) => {
+        const { newStyle, is3D } = event.detail || {};
+        console.log(`🔄 RESTORE: PlatformManager received ${eventName} event: ${newStyle}, is3D: ${is3D}`);
         
-        // Restore weather circles and alternate lines in 3D mode too
-        this.restoreWeatherFeatures();
-      } else {
-        // 2D MODE: Restore rigs for navigation
-        console.log('🔄 RESTORE: 2D mode - restoring rigs for navigation');
-        setTimeout(() => {
-          if (this.platforms && this.platforms.length > 0) {
-            this.addPlatformsToMap(this.platforms);
-          }
+        // AGGRESSIVE CLEANUP: Remove ALL possible 3D layers first
+        this.removeAll3DLayers();
+        
+        if (newStyle === '3d') {
+          // 3D MODE: Keep rigs OFF for clean view (no clutter)
+          console.log('🔄 RESTORE: 3D mode - keeping rigs OFF for clean view');
           
-          // Restore weather circles and alternate lines
+          // Restore weather circles and alternate lines in 3D mode too
           this.restoreWeatherFeatures();
-        }, 500);
-      }
+        } else {
+          // 2D MODE: Restore rigs for navigation
+          console.log('🔄 RESTORE: 2D mode - restoring rigs for navigation');
+          setTimeout(() => {
+            if (this.platforms && this.platforms.length > 0) {
+              this.addPlatformsToMap(this.platforms);
+            }
+            
+            // Restore weather circles and alternate lines
+            this.restoreWeatherFeatures();
+          }, 500);
+        }
+      });
     });
   }
 
@@ -3187,6 +3194,43 @@ class PlatformManager {
     });
     
     console.log('🧹 CLEANUP: Complete - only problematic 3D platform layers removed (weather preserved)');
+  }
+
+  /**
+   * Load weather circles initially (for flight loading)
+   * Single responsibility: PlatformManager handles ALL weather circle loading
+   */
+  loadWeatherFeatures() {
+    console.log('🌤️ LOAD: Loading weather circles and alternate lines...');
+    
+    // Check for existing weather data
+    if (window.loadedWeatherSegments?.length > 0) {
+      console.log('🌤️ LOAD: Found loadedWeatherSegments, creating weather layer');
+      setTimeout(async () => {
+        try {
+          // Clean up any existing layer first
+          if (window.currentWeatherCirclesLayer) {
+            try {
+              window.currentWeatherCirclesLayer.removeWeatherCircles();
+            } catch (cleanupError) {
+              console.warn('🌤️ LOAD: Error during cleanup:', cleanupError);
+            }
+            window.currentWeatherCirclesLayer = null;
+          }
+          
+          const { default: WeatherCirclesLayer } = await import('./layers/WeatherCirclesLayer');
+          const weatherLayer = new WeatherCirclesLayer(this.mapManager?.getMap());
+          
+          await weatherLayer.addWeatherCircles(window.loadedWeatherSegments);
+          window.currentWeatherCirclesLayer = weatherLayer;
+          console.log('✅ LOAD: Weather circles and alternate lines loaded successfully');
+        } catch (error) {
+          console.error('❌ LOAD: Error loading weather features:', error);
+        }
+      }, 1000); // Wait 1 second for map to be ready
+    } else {
+      console.log('🌤️ LOAD: No weather data available for loading');
+    }
   }
 
   /**

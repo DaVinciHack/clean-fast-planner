@@ -219,6 +219,9 @@ const RightPanel = React.forwardRef(({
       
       // Prepare parameters for the Palantir API
       const apiParams = {
+        // CRITICAL FIX: Include flight ID for updates instead of always creating new flights
+        ...(currentFlightId && { flightId: currentFlightId }),
+        
         // Basic parameters
         flightName: flightData.flightName,
         aircraftRegion: regionCode, // Use current region
@@ -253,10 +256,10 @@ const RightPanel = React.forwardRef(({
       
       // Check if the result is successful
       if (PalantirFlightService.isSuccessfulResult(result)) {
-        // Extract the flight ID
-        const flightId = PalantirFlightService.extractFlightId(result);
+        // For updates, use the existing flight ID; for creates, extract from result
+        const flightId = currentFlightId || PalantirFlightService.extractFlightId(result);
         
-        console.log(`Flight created successfully with ID: ${flightId}`);
+        console.log(`Flight ${currentFlightId ? 'updated' : 'created'} successfully with ID: ${flightId}`);
         
         // Show success message
         if (window.LoadingIndicator) {
@@ -396,13 +399,14 @@ const RightPanel = React.forwardRef(({
                           }
                         };
                         
-                        // Set up the event listener
+                        // Set up the event listener - Working system for automation
                         window.addEventListener('weather-data-ready', handleWeatherDataReady);
+                        console.log('🎯 AUTOMATION: Weather data ready listener enabled for automation');
                         
                         // Clean up listener after reasonable time (failsafe)
                         setTimeout(() => {
                           window.removeEventListener('weather-data-ready', handleWeatherDataReady);
-                          console.log('🎯 PROFESSIONAL: Cleaned up weather-data-ready event listener');
+                          console.log('🎯 AUTOMATION: Cleaned up weather-data-ready event listener');
                         }, 60000); // 60 seconds failsafe
                       }
                       

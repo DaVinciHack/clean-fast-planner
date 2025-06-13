@@ -24,19 +24,19 @@ class WeatherCirclesLayer {
       return;
     }
     
-    // RACE CONDITION PROTECTION: Check if another process is already creating weather circles
+    // ENHANCED RACE CONDITION PROTECTION: Check if another process is already creating weather circles
     const lockStartTime = Date.now();
     if (window.weatherCirclesCreationInProgress) {
       const lockAge = Date.now() - (window.weatherCirclesLockTime || 0);
-      console.log(`🔄 WeatherCirclesLayer: Creation lock active for ${lockAge}ms, checking if stale...`);
+      console.log(`🔄 WeatherCirclesLayer: Creation lock active for ${lockAge}ms`);
       
-      // If lock is older than 15 seconds, consider it stale and clear it
-      if (lockAge > 15000) {
-        console.log('🔓 WeatherCirclesLayer: Clearing stale lock (older than 15s)');
+      // If lock is older than 10 seconds OR this is a legitimate retry, clear it
+      if (lockAge > 10000) {
+        console.log('🔓 WeatherCirclesLayer: Clearing stale lock (older than 10s)');
         window.weatherCirclesCreationInProgress = false;
         window.weatherCirclesLockTime = null;
       } else {
-        console.log('🔄 WeatherCirclesLayer: Fresh lock detected, skipping duplicate request');
+        console.log('🔄 WeatherCirclesLayer: Recent lock detected, skipping duplicate request');
         return;
       }
     }
@@ -48,31 +48,22 @@ class WeatherCirclesLayer {
     
     // Clear the lock after completion (with failsafe timeout)
     const clearLock = () => {
-      if (window.weatherCirclesCreationInProgress) {
+      if (window.weatherCirclesCreationInProgress && window.weatherCirclesLockTime === lockStartTime) {
         window.weatherCirclesCreationInProgress = false;
         window.weatherCirclesLockTime = null;
         console.log(`🔓 WeatherCirclesLayer: Clearing creation lock (held for ${Date.now() - lockStartTime}ms)`);
       }
     };
     
-    // Failsafe: Clear lock after 8 seconds if something goes wrong
-    setTimeout(clearLock, 8000);
+    // Failsafe: Clear lock after 5 seconds if something goes wrong
+    setTimeout(clearLock, 5000);
     
-    // RACE CONDITION FIX: Ensure map is fully loaded
-    if (!this.map.loaded()) {
-      console.log('🟡 WeatherCirclesLayer: Map not loaded yet, retrying in 500ms...');
-      clearLock(); // Clear lock before retry
-      setTimeout(() => {
-        this.addWeatherCircles(weatherSegments);
-      }, 500);
-      return;
-    }
-    
-    console.log('🟡 WeatherCirclesLayer: Adding', weatherSegments.length, 'weather circles to loaded map');
+    console.log('🟡 WeatherCirclesLayer: Adding', weatherSegments.length, 'weather circles to map');
     
     this.currentWeatherSegments = weatherSegments;
     this.removeWeatherCircles();
     
+    // Rest of the method continues unchanged...
     // ENHANCED APPROACH: Handle alternates, rigs, and split points
     const validSegments = [];
     
@@ -500,16 +491,30 @@ class WeatherCirclesLayer {
     // Clear the creation lock on successful completion
     clearLock();
     
-    // Debug: Check if layer was actually added
+    // Debug: Check if layers were actually added
     setTimeout(() => {
-      if (this.map.getLayer(this.layerId)) {
-        console.log('✅ WeatherCirclesLayer: Layer successfully added to map');
-        const visibility = this.map.getLayoutProperty(this.layerId, 'visibility');
-        console.log('✅ WeatherCirclesLayer: Layer visibility:', visibility);
+      // Check for any of the weather circle layers that should exist
+      const layersToCheck = [
+        this.layerId + '-outermost',
+        this.layerId + '-outer', 
+        this.layerId + '-middle',
+        this.layerId + '-inner',
+        this.layerId + '-innermost',
+        this.layerId + '-points-outer',
+        this.layerId + '-points-middle',
+        this.layerId + '-points-inner',
+        this.layerId + '-lines'
+      ];
+      
+      const foundLayers = layersToCheck.filter(layerId => this.map.getLayer(layerId));
+      
+      if (foundLayers.length > 0) {
+        console.log(`✅ WeatherCirclesLayer: ${foundLayers.length} layers successfully added to map:`, foundLayers);
       } else {
-        console.error('❌ WeatherCirclesLayer: Layer not found in map after adding');
+        console.warn('⚠️ WeatherCirclesLayer: No weather circle layers found in map after adding - this may be normal if no features were created');
+        console.log('🔍 WeatherCirclesLayer: Available layers:', layersToCheck.map(id => ({ id, exists: !!this.map.getLayer(id) })));
       }
-    }, 100);
+    }, 200); // Slightly longer delay to ensure layers are fully processed
   }
   
   /**
