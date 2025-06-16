@@ -79,6 +79,9 @@ class MapManager {
           // Add the grid first
           this.addGridToMap(); 
           
+          // Enhance land brightness while keeping seas dark
+          this.enhanceLandBrightness();
+          
           // Execute and clear any pending callbacks
           console.log(`Executing ${this._loadCallbacks.length} queued onMapLoaded callbacks.`);
           this._loadCallbacks.forEach(cb => {
@@ -395,6 +398,107 @@ class MapManager {
     } catch (error) {
       console.error('Error in _addSimpleGridSafely:', error);
     }
+  }
+  
+  /**
+   * Enhance land brightness while keeping seas dark
+   * Modifies specific map layers to brighten land areas
+   */
+  enhanceLandBrightness() {
+    if (!this.map || !this.map.isStyleLoaded()) {
+      console.warn('MapManager: Cannot enhance land brightness - map style not loaded');
+      return;
+    }
+    
+    console.log('🌍 MapManager: Enhancing land brightness for better visibility');
+    
+    try {
+      // Get all layers to find land-related ones
+      const style = this.map.getStyle();
+      if (!style || !style.layers) return;
+      
+      // Land-related layer patterns to brighten
+      const landLayerPatterns = [
+        'land',
+        'landcover',
+        'landuse',
+        'building',
+        'country',
+        'admin',
+        'place',
+        'road',
+        'highway',
+        'street',
+        'poi'
+      ];
+      
+      // Find and enhance background map layers only (not our custom overlays)
+      style.layers.forEach(layer => {
+        // Only enhance BASE MAP layers, not custom layers
+        const isCustomLayer = layer.id.includes('platform') || 
+                             layer.id.includes('waypoint') || 
+                             layer.id.includes('route') || 
+                             layer.id.includes('grid') ||
+                             layer.id.includes('lightning') ||
+                             layer.id.includes('weather') ||
+                             layer.id.includes('gulf') ||
+                             layer.id.includes('3d-rig');
+        
+        if (isCustomLayer) {
+          return; // Skip our custom overlays
+        }
+        
+        // Enhance base map background layers
+        if (layer.type === 'background') {
+          try {
+            // Get current background color and brighten it more
+            const currentColor = this.map.getPaintProperty(layer.id, 'background-color') || '#000000';
+            this.map.setPaintProperty(layer.id, 'background-color', this.brightenColor(currentColor, 2.5));
+            console.log(`✅ Enhanced background layer: ${layer.id}`);
+          } catch (e) {
+            console.warn(`⚠️ Could not enhance background layer ${layer.id}:`, e.message);
+          }
+        }
+        
+        // Enhance base map land/water layers 
+        if (layer.type === 'fill' && (layer.id.includes('land') || layer.id.includes('water'))) {
+          try {
+            const currentColor = this.map.getPaintProperty(layer.id, 'fill-color');
+            if (currentColor && layer.id.includes('land')) {
+              // Only brighten land, not water - increased brightness
+              this.map.setPaintProperty(layer.id, 'fill-color', this.brightenColor(currentColor, 2.2));
+              console.log(`✅ Enhanced land fill layer: ${layer.id}`);
+            }
+          } catch (e) {
+            console.warn(`⚠️ Could not enhance fill layer ${layer.id}:`, e.message);
+          }
+        }
+      });
+      
+      console.log('🌍 Land brightness enhancement completed');
+      
+    } catch (error) {
+      console.error('MapManager: Error enhancing land brightness:', error);
+    }
+  }
+  
+  /**
+   * Helper function to brighten a color
+   * @param {string} color - CSS color string
+   * @param {number} factor - Brightness factor (1.0 = no change, 2.0 = double brightness)
+   * @returns {string} Brightened color
+   */
+  brightenColor(color, factor) {
+    // Simple implementation - just return a lighter version
+    if (typeof color === 'string' && color.startsWith('#')) {
+      // Convert hex to RGB and brighten
+      const hex = color.slice(1);
+      const r = Math.min(255, Math.floor(parseInt(hex.substr(0, 2), 16) * factor));
+      const g = Math.min(255, Math.floor(parseInt(hex.substr(2, 2), 16) * factor));
+      const b = Math.min(255, Math.floor(parseInt(hex.substr(4, 2), 16) * factor));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    return color; // Return original if we can't parse it
   }
   
   /**
@@ -883,11 +987,13 @@ class MapManager {
       // Map of style IDs to Mapbox style URLs
       const styles = {
         'dark': 'mapbox://styles/mapbox/dark-v11',
-        '3d': 'mapbox://styles/mapbox/satellite-v9', // Use satellite instead of standard for better compatibility
+        'dark-v10': 'mapbox://styles/mapbox/dark-v10',
+        'navigation-night': 'mapbox://styles/mapbox/navigation-night-v1',
         'satellite': 'mapbox://styles/mapbox/satellite-v9',
         'satellite-streets': 'mapbox://styles/mapbox/satellite-streets-v12',
         'light': 'mapbox://styles/mapbox/light-v11',
-        'navigation': 'mapbox://styles/mapbox/navigation-day-v1'
+        'navigation': 'mapbox://styles/mapbox/navigation-day-v1',
+        '3d': 'mapbox://styles/mapbox/satellite-v9' // Use satellite instead of standard for better compatibility
       };
 
       const styleUrl = styles[styleId];

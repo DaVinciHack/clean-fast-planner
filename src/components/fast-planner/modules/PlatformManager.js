@@ -713,32 +713,39 @@ class PlatformManager {
             hasFuel = true;
           }
           
-          // Special handling for specific key locations (without excessive logging)
+          // COMMENTED OUT: Special ENZV/Norway handling that was forcing them to be airfields instead of bases
+          // This was preventing ENZV from showing as a Bristow base with proper icon
+          /*
           if (name === 'ENZV' || name === 'SVG' || name.includes('STAVANGER') || name.includes('SOLA')) {
             isAirfield = true;
             isPlatform = false;
             isMovable = false;
             isBlocks = false;
-            isBases = false;
+            isBases = false;  // <-- This was forcing them to NOT be bases!
             
             // Ensure ENZV has correct coordinates if found
             if (name === 'ENZV' && (!coords || coords[0] === 0 || coords[1] === 0)) {
               coords = [5.6316667, 58.8816667]; // Correct coordinates for ENZV
             }
           }
+          */
           
+          // COMMENTED OUT: Special KHUM handling that was forcing it to be airfield instead of base
+          // This was preventing KHUM from showing as a Bristow base with proper icon
+          /*
           if (name === 'KHUM' || name.includes('HOUMA')) {
             isAirfield = true;
             isPlatform = false;
             isMovable = false;
             isBlocks = false;
-            isBases = false;
+            isBases = false;  // <-- This was forcing it to NOT be a base!
             
             // Ensure KHUM has correct coordinates if found
             if (name === 'KHUM' && (!coords || coords[0] === 0 || coords[1] === 0)) {
               coords = [-90.65383, 29.55583]; // Correct coordinates for KHUM
             }
           }
+          */
           
           // Count by type for debugging
           if (isAirfield) {

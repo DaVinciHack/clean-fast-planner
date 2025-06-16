@@ -63,6 +63,7 @@ const RightPanel = React.forwardRef(({
   onReserveFuelChange,
   routeStats,
   alternateRouteData, // Add alternate route data for alternate stop card
+  alternateRouteInput, // Add alternate route input for save functionality
   stopCards,
   waypoints,
   onRemoveWaypoint,
@@ -829,6 +830,8 @@ const RightPanel = React.forwardRef(({
         waypoints={waypoints}
         selectedAircraft={selectedAircraft}
         isSaving={false}
+        alternateRouteData={alternateRouteData}
+        alternateRouteInput={alternateRouteInput}
       />
       
       {/* Load Flights Card */}

@@ -24,15 +24,15 @@ const FlightAutomationLoader = ({
       subtitle: "Validating route and saving to Palantir"
     },
     {
-      title: "Getting Sunrise and Sunset Times", 
+      title: "Computing Sunrise and Sunset Times", 
       subtitle: "Calculating daylight operations windows"
     },
     {
-      title: "Getting Wind and Altitude",
+      title: "Fetching Winds for Flight Track",
       subtitle: "Fetching atmospheric conditions"
     },
     {
-      title: "Looking for Nearest Alternates",
+      title: "Searching for Nearest Alternates",
       subtitle: "Finding available alternate destinations"
     },
     {
@@ -78,7 +78,7 @@ const FlightAutomationLoader = ({
     let taffTimer;
     let startTime = Date.now();
     
-    const STEP_DURATION = 9000; // 9 seconds per step
+    const STEP_DURATION = 7000; // 9 seconds per step
     const TOTAL_STEPS = automationSteps.length;
 
     const updateProgress = () => {
