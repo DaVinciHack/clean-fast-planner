@@ -15,7 +15,9 @@ const SaveFlightCard = ({
   waypoints,
   onRunDiagnostic = null,
   runAutomation = true, // Default to true to match current behavior
-  selectedAircraft
+  selectedAircraft,
+  alternateRouteData = null,    // ADD THIS
+  alternateRouteInput = ''      // ADD THIS
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -55,6 +57,29 @@ const SaveFlightCard = ({
       return; // Don't submit if required fields are missing
     }
     
+    // Extract alternate location using priority order
+    const alternateLocation = (() => {
+      // Priority 1: Use alternateRouteData.name if available
+      if (alternateRouteData?.name) {
+        return alternateRouteData.name;
+      }
+      
+      // Priority 2: Use alternateRouteInput if available
+      if (alternateRouteInput && alternateRouteInput.trim() !== '') {
+        return alternateRouteInput.trim();
+      }
+      
+      // Priority 3: Explicit null (no alternate)
+      return null;
+    })();
+    
+    // Aviation safety logging for audit trail
+    console.log('ALTERNATE SAVE: Using alternateLocation =', alternateLocation, {
+      fromAlternateRouteData: alternateRouteData?.name || null,
+      fromAlternateRouteInput: alternateRouteInput || null,
+      finalValue: alternateLocation
+    });
+    
     const flightData = {
       flightName,
       etd,
@@ -63,6 +88,7 @@ const SaveFlightCard = ({
       medicId: medicId || null,
       soId: soId || null,
       rswId: rswId || null,
+      alternateLocation: alternateLocation, // ADD ALTERNATE LOCATION
       runAutomation: enableAutomation, // Add the automation flag
       useOnlyProvidedWaypoints: useOnlyProvidedWaypoints // Add the waypoint handling flag
     };

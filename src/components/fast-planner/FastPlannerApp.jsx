@@ -1717,6 +1717,7 @@ const FastPlannerCore = ({
             
             // Also populate the alternate route input field with the current alternate name
             console.log('🟠 STATE DEBUG: Setting alternate route input to:', alternateRouteData.name);
+            console.log('ALTERNATE LOAD: Restored alternateRouteInput =', alternateRouteData.name);
             setAlternateRouteInput(alternateRouteData.name);
           } else {
             console.log('🟠 STATE DEBUG: Clearing alternate route data (no alternate route in flight)');
@@ -2274,6 +2275,7 @@ const FastPlannerCore = ({
           toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
+          alternateRouteInput={alternateRouteInput} // Add alternate route input for save functionality
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls

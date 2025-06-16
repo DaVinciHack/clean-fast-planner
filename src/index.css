@@ -46,13 +46,8 @@ body {
   font-weight: bold;
 }
 
-/* MAP CONTRAST ENHANCEMENT - Better land/sea visibility */
-.mapboxgl-canvas {
-  /* Enhance contrast and brightness for better land/sea distinction */
-  filter: contrast(1.15) brightness(1.05) saturate(1.1);
-  /* Smooth transitions when changing filter values */
-  transition: filter 0.3s ease;
-}
+/* MAP CONTRAST ENHANCEMENT - Removed filters that affected overlays */
+/* Clean dark map preserved - filters made everything look horrible */
 
 /* Alternative enhanced contrast mode (can be toggled) */
 .mapboxgl-canvas.enhanced-contrast {

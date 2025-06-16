@@ -1,3 +1,4 @@
+
 # Fast Planner System Architecture Map
 
 ## 🚨 CURRENT BROKEN STATE (As of June 1, 2025)
