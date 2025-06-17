@@ -702,10 +702,10 @@ class WaypointManager {
       
       // Create marker with appropriate styling based on type
       const marker = new window.mapboxgl.Marker({ 
-        color: isWaypoint ? "#BA55D3" : "#FF4136", // Medium purple for waypoints, red for stops
+        color: isWaypoint ? "#DAA520" : "#FF4136", // Golden for waypoints, red for stops
         draggable: true,
-        scale: isWaypoint ? 0.4 : 0.5, // Make waypoints slightly smaller than stops but still visible
-        anchor: 'center' // Explicitly set the anchor to center
+        scale: isWaypoint ? 0.25 : 0.5, // Make waypoints even smaller and sharper
+        anchor: 'bottom' // Use bottom anchor for proper pin positioning
       })
       .setLngLat(coords)
       .addTo(map);
