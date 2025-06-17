@@ -469,6 +469,30 @@ const FastPlannerCore = ({
       }
     }
     
+    // Clear wind arrows from rig weather integration
+    if (window.rigWeatherIntegration) {
+      try {
+        window.rigWeatherIntegration.removeWeatherGraphics();
+        console.log('🧹 CLEAR: Removed wind arrows and cleaned up popups');
+      } catch (e) {
+        console.warn('🧹 CLEAR: Error removing wind arrows:', e.message);
+      }
+    }
+    
+    // Additional popup cleanup - remove any orphaned popups from the map container
+    try {
+      const mapContainer = document.querySelector('.mapboxgl-map');
+      if (mapContainer) {
+        const orphanedPopups = mapContainer.querySelectorAll('.mapboxgl-popup, .rig-weather-popup, .unified-weather-popup');
+        orphanedPopups.forEach(popup => popup.remove());
+        if (orphanedPopups.length > 0) {
+          console.log(`🧹 CLEAR: Removed ${orphanedPopups.length} additional orphaned popups`);
+        }
+      }
+    } catch (e) {
+      console.warn('🧹 CLEAR: Error during additional popup cleanup:', e.message);
+    }
+    
     // Force clear any stuck weather circles locks
     window.weatherCirclesCreationInProgress = false;
     window.weatherCirclesLockTime = null;
