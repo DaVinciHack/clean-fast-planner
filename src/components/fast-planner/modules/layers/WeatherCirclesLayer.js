@@ -697,6 +697,21 @@ class WeatherCirclesLayer {
     }
     
     try {
+      // Remove event listeners BEFORE removing layers
+      const hoverLayer = this.layerId + '-hover-areas';
+      if (this.map.getLayer(hoverLayer)) {
+        this.map.off('mouseenter', hoverLayer);
+        this.map.off('mouseleave', hoverLayer);
+        console.log('🧹 Removed weather hover event listeners');
+      }
+      
+      // Clean up popup instance
+      if (this.popup) {
+        this.popup.remove();
+        this.popup = null;
+        console.log('🧹 Removed weather popup instance');
+      }
+      
       // Remove all ring layers (polygon-based) - MORE RINGS!
       const ringLayers = ['-outermost', '-outer', '-middle', '-inner', '-innermost'];
       ringLayers.forEach(suffix => {
@@ -954,57 +969,30 @@ class WeatherCirclesLayer {
    * Add hover popups to show weather information
    */
   addWeatherHoverPopups(deduplicatedSegments) {
-    // Create popup instance
-    this.popup = new mapboxgl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      className: 'weather-popup',
-      maxWidth: '300px'
-    });
-
-    // Create invisible filled circles for easy hover (entire center area)
-    // Pass the deduplicated segments to hover creation
-    this.addInvisibleHoverAreas(deduplicatedSegments);
-
-    // Add hover listeners to the invisible hover areas
-    const hoverLayer = this.layerId + '-hover-areas';
-
-    if (this.map.getLayer(hoverLayer)) {
-      // Show popup on hover
-      this.map.on('mouseenter', hoverLayer, (e) => {
-        this.map.getCanvas().style.cursor = 'pointer';
-        
-        const feature = e.features[0];
-        const properties = feature.properties;
-        
-        // Get detailed weather info (same as weather card)
-        const airportIcao = properties.airportIcao || 'Unknown';
-        const ranking = properties.ranking || 'Unknown';
-        const isRig = properties.isRig;
-        const circleType = properties.ringType || 'weather';
-        
-        // Find the original weather segment for detailed info
-        const weatherSegment = this.findWeatherSegmentByIcao(airportIcao);
-        
-        // Create detailed popup content (like weather card)
-        const coordinates = e.lngLat;
-        const popupContent = this.createDetailedWeatherPopup(airportIcao, ranking, weatherSegment, circleType);
-        
-        this.popup.setLngLat(coordinates)
-                 .setHTML(popupContent)
-                 .addTo(this.map);
-      });
-
-      // Hide popup on mouse leave (with small delay to prevent flickering)
-      this.map.on('mouseleave', hoverLayer, () => {
-        setTimeout(() => {
-          this.map.getCanvas().style.cursor = '';
-          this.popup.remove();
-        }, 100);
-      });
+    // 🔗 UNIFIED POPUP: OLD POPUP SYSTEM DISABLED
+    // The old Palantir popup system has been disabled to prevent conflicts with the new unified popup system.
+    // TAF/METAR data is now displayed in the unified rig weather graphics popup system instead.
+    
+    console.log('🔗 UNIFIED POPUP: Old weather circle popups disabled - using unified popup system for weather data');
+    
+    // Clean up any existing popup instances
+    if (this.popup) {
+      this.popup.remove();
+      this.popup = null;
     }
-
-    console.log('🎯 Added hover popups to entire center areas (large stable hover zones)');
+    
+    // Remove any existing event listeners
+    const hoverLayer = this.layerId + '-hover-areas';
+    if (this.map.getLayer(hoverLayer)) {
+      this.map.off('mouseenter', hoverLayer);
+      this.map.off('mouseleave', hoverLayer);
+    }
+    
+    // Still create invisible hover areas for potential future use, but without popups
+    // This maintains the layer structure but removes the competing popup system
+    this.addInvisibleHoverAreas(deduplicatedSegments);
+    
+    console.log('🔗 UNIFIED POPUP: Weather circles maintained without competing popups');
   }
 
   /**

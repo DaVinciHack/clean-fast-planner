@@ -14,7 +14,7 @@
   z-index: 100;
 }
 
-/* Left Side: Logo + Aircraft Display */
+/* Left Side: Logo + Flight Info Display */
 .header-left {
   display: flex;
   align-items: center;
@@ -63,6 +63,29 @@
 .no-aircraft {
   font-size: 12px; /* Reduced from 14px to 12px */
   color: #8e8e93;
+  font-style: italic;
+}
+
+/* Flight Info Section Styles */
+.AppHeader-flight-info {
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px; /* Reduced from 20px to 10px - closer to logo */
+  margin-top: 4px; /* Move down slightly for better vertical alignment */
+}
+
+.AppHeader-flight-name {
+  font-size: 12px; /* Reduced from 14px to 12px */
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.AppHeader-flight-departure {
+  font-size: 12px;
+}
+
+.AppHeader-no-flight {
+  font-size: 12px;
   font-style: italic;
 }
 /* Center: Flight Details */
@@ -181,6 +204,13 @@
 }
 
 /* iPad portrait and smaller tablets */
+@media (max-width: 1024px) {
+  /* Hide flight info on iPad and smaller to prevent crowding */
+  .AppHeader-flight-info {
+    display: none !important;
+  }
+}
+
 @media (max-width: 900px) {
   .flight-summary {
     gap: 12px;

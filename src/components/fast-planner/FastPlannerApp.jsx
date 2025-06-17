@@ -82,6 +82,13 @@ const FastPlannerCore = ({
   
   // State for tracking current loaded flight for weather segments
   const [currentFlightId, setCurrentFlightId] = useState(null);
+  const [loadedFlightData, setLoadedFlightData] = useState(null); // Track loaded flight data for AppHeader
+  
+  // DEBUG: Track loadedFlightData state changes
+  useEffect(() => {
+    console.log('🔄 FASTPLANNER STATE CHANGE: loadedFlightData =', loadedFlightData);
+    console.log('🔄 FASTPLANNER STATE CHANGE: loadedFlightData is null?', loadedFlightData === null);
+  }, [loadedFlightData]);
   
   // Glass menu states for flight-loaded controls
   const [isFlightLoaded, setIsFlightLoaded] = useState(false);
@@ -421,9 +428,10 @@ const FastPlannerCore = ({
   }, [weatherSegments, waypoints, fuelPolicy?.araFuelDefault, fuelPolicy?.approachFuelDefault]);
 
   // AGGRESSIVE clearRoute that flushes all system state 
-  const clearRoute = useCallback(() => {
-    console.log('🟠 CLEAR ROUTE DEBUG: clearRoute() called');
+  const clearRoute = useCallback((preserveFlightData = false) => {
+    console.log('🟠 CLEAR ROUTE DEBUG: clearRoute() called, preserveFlightData:', preserveFlightData);
     console.log('🟠 CLEAR ROUTE DEBUG: About to clear alternateRouteData - current value:', alternateRouteData);
+    console.log('🟠 CLEAR ROUTE DEBUG: About to clear loadedFlightData - current value:', loadedFlightData);
     console.log('🟠 CLEAR ROUTE DEBUG: Stack trace:', new Error().stack);
     console.log('🧹 FastPlannerApp: AGGRESSIVE CLEARING - Flushing all system state');
     
@@ -436,6 +444,9 @@ const FastPlannerCore = ({
     
     // Clear current flight ID and weather segments
     setCurrentFlightId(null);
+    if (!preserveFlightData) {
+      setLoadedFlightData(null); // Clear loaded flight data for AppHeader
+    }
     clearWeatherSegments();
     
     // AGGRESSIVE CLEANUP: Clear all persistent window state
@@ -970,6 +981,9 @@ const FastPlannerCore = ({
       // 🎯 GLASS MENU: Activate glass menu when flight loads
       setIsFlightLoaded(true);
       setIsEditLocked(true); // Always start locked to prevent accidental edits
+      setLoadedFlightData(flightData); // Store flight data for AppHeader display
+      console.log('🚁 FLIGHT STORAGE DEBUG: Setting loadedFlightData =', flightData);
+      console.log('🚁 FLIGHT STORAGE DEBUG: flightData keys =', Object.keys(flightData));
       console.log('🏗️ Glass menu activated for loaded flight');
       
       // 🎯 NEW BEHAVIOR: Close BOTH panels when flight loads and apply lock
@@ -1021,35 +1035,61 @@ const FastPlannerCore = ({
                 window.loadedWeatherSegments = result.segments;
                 console.log('🌤️ MANUAL: Weather segments stored in window.loadedWeatherSegments');
                 
-                // AUTO-SHOW: Create weather circles immediately with loaded flight data
+                // 🚁 HYBRID WEATHER SYSTEM: Auto-show weather circles for airports + rig graphics for rigs
                 setTimeout(() => {
                   try {
-                    console.log('🌤️ AUTO-SHOW: Creating weather circles for loaded flight');
+                    console.log('🚁 HYBRID: Creating hybrid weather display - circles for airports, graphics for rigs');
                     
-                    // Import and create weather circles layer
-                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                      if (mapManagerRef?.current?.map) {
-                        console.log('🌤️ AUTO-SHOW: Creating WeatherCirclesLayer with loaded data');
-                        
-                        // Clean up any existing layer first
-                        if (window.currentWeatherCirclesLayer) {
-                          try {
-                            window.currentWeatherCirclesLayer.removeWeatherCircles();
-                          } catch (cleanupError) {
-                            console.warn('🌤️ AUTO-SHOW: Error during cleanup:', cleanupError);
+                    // Split segments into airports vs rigs
+                    const airportSegments = result.segments.filter(segment => !segment.isRig);
+                    const rigSegments = result.segments.filter(segment => segment.isRig === true);
+                    
+                    console.log(`🚁 HYBRID: Found ${airportSegments.length} airports and ${rigSegments.length} rigs`);
+                    
+                    // 1. Create weather circles for AIRPORTS ONLY
+                    if (airportSegments.length > 0) {
+                      import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                        if (mapManagerRef?.current?.map) {
+                          console.log('🌤️ HYBRID: Creating weather circles for airports only');
+                          
+                          // Clean up any existing layer first
+                          if (window.currentWeatherCirclesLayer) {
+                            try {
+                              window.currentWeatherCirclesLayer.removeWeatherCircles();
+                            } catch (cleanupError) {
+                              console.warn('🌤️ HYBRID: Error during cleanup:', cleanupError);
+                            }
                           }
+                          
+                          const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                          weatherCirclesLayer.addWeatherCircles(airportSegments); // Only airports
+                          window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                          console.log(`🌤️ HYBRID: ✅ Weather circles displayed for ${airportSegments.length} airports`);
                         }
-                        
-                        const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
-                        weatherCirclesLayer.addWeatherCircles(result.segments);
-                        window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                        console.log('🌤️ AUTO-SHOW: Weather circles automatically displayed for loaded flight');
+                      }).catch(importError => {
+                        console.error('🌤️ HYBRID: Error importing WeatherCirclesLayer:', importError);
+                      });
+                    }
+                    
+                    // 2. Create rig weather graphics for RIGS ONLY with REAL API data
+                    if (rigSegments.length > 0) {
+                      console.log('🚁 HYBRID: Auto-enabling rig weather graphics with real API data');
+                      
+                      // Enable rig weather graphics
+                      if (window.rigWeatherIntegration) {
+                        window.rigWeatherIntegration.toggleVisibility(true);
+                        console.log('🚁 HYBRID: ✅ Rig weather graphics enabled');
                       }
-                    }).catch(importError => {
-                      console.error('🌤️ AUTO-SHOW: Error importing WeatherCirclesLayer:', importError);
-                    });
+                      
+                      // Update with real API data (same as RightPanel.jsx logic)
+                      if (window.weatherVisualizationManager) {
+                        window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(rigSegments);
+                        console.log(`🚁 HYBRID: ✅ Real API weather data loaded for ${rigSegments.length} rigs`);
+                      }
+                    }
+                    
                   } catch (autoShowError) {
-                    console.error('🌤️ AUTO-SHOW: Error during auto-show:', autoShowError);
+                    console.error('🚁 HYBRID: Error during hybrid weather display:', autoShowError);
                   }
                 }, 1000); // Wait 1 second for map to be ready
               }
@@ -1078,8 +1118,37 @@ const FastPlannerCore = ({
         console.log('⚠️ No wind data found in loaded flight:', flightData);
       }
       
-      // Clear existing route first
-      clearRoute();
+      // Clear existing route data but preserve loaded flight data
+      console.log('🧹 FLIGHT LOAD: Clearing existing route data before loading new flight');
+      hookClearRoute(); // Clear waypoints, stop cards, route stats
+      setAlternateRouteData(null); // Clear alternate route
+      setAlternateRouteInput('');
+      clearWeatherSegments(); // Clear weather segments
+      
+      // Clear weather circles immediately (don't wait for new flight to load)
+      if (window.currentWeatherCirclesLayer) {
+        try {
+          console.log('🌤️ FLIGHT LOAD: Removing old weather circles immediately');
+          window.currentWeatherCirclesLayer.removeWeatherCircles();
+          window.currentWeatherCirclesLayer = null;
+        } catch (e) {
+          console.warn('🧹 FLIGHT LOAD: Error removing weather circles:', e.message);
+        }
+      }
+      
+      // Clear weather window state
+      window.currentWeatherSegments = null;
+      window.currentWeatherAnalysis = null;
+      window.loadedWeatherSegments = null;
+      
+      // Force clear any stuck weather circles locks
+      window.weatherCirclesCreationInProgress = false;
+      window.weatherCirclesLockTime = null;
+      
+      // Reset weather fuel state
+      setWeatherFuel({ araFuel: 0, approachFuel: 0 });
+      
+      // NOTE: We deliberately DON'T clear loadedFlightData here since we just set it
       
       // Wait for clear to complete
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -2200,6 +2269,7 @@ const FastPlannerCore = ({
           loadingText={aircraftLoading ? "Loading aircraft..." : rigsLoading ? "Loading platforms..." : ""}
           weather={weather}
           waypoints={waypoints}
+          loadedFlightData={loadedFlightData}
         />
         
         {/* Map container - now full width below header */}
@@ -2276,6 +2346,7 @@ const FastPlannerCore = ({
           toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
           alternateRouteInput={alternateRouteInput} // Add alternate route input for save functionality
+          loadedFlightData={loadedFlightData} // Pass loaded flight data for responsive display
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls

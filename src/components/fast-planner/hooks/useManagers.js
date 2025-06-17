@@ -10,7 +10,8 @@ import {
   FavoriteLocationsManager,
   AircraftManager,
   MapInteractionHandler,
-  AppSettingsManager
+  AppSettingsManager,
+  WeatherVisualizationManager
 } from '../modules';
 import FlightCalculations from '../modules/calculations/FlightCalculations';
 import { createWaypointInsertionManager, setupWaypointCallbacks, patchWaypointManager } from '../modules/waypoints';
@@ -50,6 +51,7 @@ const useManagers = ({
   const mapInteractionHandlerRef = useRef(null);
   const appSettingsManagerRef = useRef(null);
   const waypointHandlerRef = useRef(null);
+  const weatherVisualizationManagerRef = useRef(null);
 
   // Track initialization status to prevent multiple initializations
   const [managersInitialized, setManagersInitialized] = useState(false);
@@ -507,6 +509,18 @@ const useManagers = ({
       });
     }
 
+    // Initialize WeatherVisualizationManager
+    if (!weatherVisualizationManagerRef.current && mapManagerRef.current && platformManagerRef.current) {
+      console.log("🚁 Initializing WeatherVisualizationManager");
+      weatherVisualizationManagerRef.current = new WeatherVisualizationManager();
+      
+      // Initialize with other managers
+      weatherVisualizationManagerRef.current.initialize({
+        mapManager: mapManagerRef.current,
+        platformManager: platformManagerRef.current
+      });
+    }
+
     // Mark initialization as complete
     setManagersInitialized(true);
     
@@ -692,6 +706,7 @@ const useManagers = ({
     mapInteractionHandlerRef,
     appSettingsManagerRef,
     waypointHandlerRef,
+    weatherVisualizationManagerRef,
     handleMapReady
   };
 };

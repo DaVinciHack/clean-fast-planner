@@ -26,6 +26,23 @@ export default defineConfig({
             console.log('NOAA proxy response:', proxyRes.statusCode, req.url);
           });
         }
+      },
+      // Proxy Aviation Weather Center API to avoid CORS issues
+      '/api/awc': {
+        target: 'https://aviationweather.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/awc/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('AWC proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying AWC request:', req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('AWC proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
       }
     }
   },

@@ -47,6 +47,8 @@ const MainCard = ({
   onWeatherUpdate = () => {},
   // Alternate route data
   alternateRouteData = null,
+  // Loaded flight data for responsive display
+  loadedFlightData = null,
   // Stop cards data from useRouteCalculation
   stopCards = [],
   // Fuel policy for MasterFuelManager
@@ -101,6 +103,50 @@ const MainCard = ({
     }
   }, [selectedAircraft, aircraftType]);
   
+  // Calculate time to departure - same logic as AppHeader
+  const getTimeToDepature = (etd) => {
+    if (!etd) return { text: '', color: '#888888' };
+    
+    try {
+      const now = new Date();
+      const departure = new Date(etd);
+      const diffMs = departure.getTime() - now.getTime();
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      
+      // Format the departure time
+      const depTime = departure.toISOString().substr(11, 5) + 'Z';
+      
+      if (diffMinutes < -1440) {
+        const daysAgo = Math.abs(Math.floor(diffMinutes / 1440));
+        return { text: `Dep. ${depTime} (${daysAgo}d ago)`, color: '#888888' };
+      } else if (diffMinutes < 0) {
+        const minutesAgo = Math.abs(diffMinutes);
+        if (minutesAgo < 60) {
+          return { text: `Dep. ${depTime} (${minutesAgo} min ago)`, color: '#888888' };
+        } else {
+          const hoursAgo = Math.floor(minutesAgo / 60);
+          return { text: `Dep. ${depTime} (${hoursAgo}h ago)`, color: '#888888' };
+        }
+      } else if (diffMinutes < 1440) {
+        if (diffMinutes < 60) {
+          return { text: `Dep. ${depTime} ${diffMinutes} min`, color: '#2196F3' };
+        } else {
+          const hours = Math.floor(diffMinutes / 60);
+          const mins = diffMinutes % 60;
+          return { text: `Dep. ${depTime} ${hours}:${mins.toString().padStart(2, '0')} min`, color: '#2196F3' };
+        }
+      } else {
+        const days = Math.floor(diffMinutes / 1440);
+        const remainingMins = diffMinutes % 1440;
+        const hours = Math.floor(remainingMins / 60);
+        return { text: `Dep. ${depTime} ${days}d ${hours}h`, color: '#4CAF50' };
+      }
+    } catch (error) {
+      console.error('Error calculating departure time:', error);
+      return { text: '', color: '#888888' };
+    }
+  };
+  
   return (
     <div className="tab-content main-tab">
       <div className="panel-header">
@@ -109,6 +155,21 @@ const MainCard = ({
           <RegionSelector />
         </div>
       </div>
+      
+      {/* Responsive flight info - only shows on iPad and smaller when AppHeader hides it */}
+      {loadedFlightData && (
+        <div className="maincard-flight-info">
+          <div className="maincard-flight-name">
+            {loadedFlightData.flightNumber || loadedFlightData.name || 'Unknown Flight'}
+          </div>
+          <div 
+            className="maincard-flight-departure"
+            style={{ color: getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).color }}
+          >
+            {getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).text}
+          </div>
+        </div>
+      )}
       
       <div className="control-section" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '15px' }}>
         {/* Save and Load Flight buttons - Side by Side with exactly 7px gap to match left buttons */}

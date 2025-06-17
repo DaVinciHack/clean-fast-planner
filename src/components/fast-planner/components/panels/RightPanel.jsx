@@ -64,6 +64,7 @@ const RightPanel = React.forwardRef(({
   routeStats,
   alternateRouteData, // Add alternate route data for alternate stop card
   alternateRouteInput, // Add alternate route input for save functionality
+  loadedFlightData, // Add loaded flight data for MainCard responsive display
   stopCards,
   waypoints,
   onRemoveWaypoint,
@@ -361,36 +362,61 @@ const RightPanel = React.forwardRef(({
                           const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
                           
                           if (weatherSegments && weatherSegments.length > 0 && hasMap) {
-                            console.log('🎯 PROFESSIONAL: All data ready, creating weather circles immediately');
+                            console.log('🚁 AUTOMATION HYBRID: All data ready, creating hybrid weather display');
+                            
+                            // Split segments into airports vs rigs
+                            const airportSegments = weatherSegments.filter(segment => !segment.isRig);
+                            const rigSegments = weatherSegments.filter(segment => segment.isRig === true);
+                            
+                            console.log(`🚁 AUTOMATION HYBRID: Found ${airportSegments.length} airports and ${rigSegments.length} rigs`);
                             
                             // Dispatch force-enable event to MapLayersCard
                             window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
                             
-                            // Create weather circles with proper data
-                            import('../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                              // Clean up existing layer
-                              if (window.currentWeatherCirclesLayer) {
-                                try {
-                                  window.currentWeatherCirclesLayer.removeWeatherCircles();
-                                  console.log('🎯 PROFESSIONAL: Cleaned up existing weather layer');
-                                } catch (e) { 
-                                  console.warn('🎯 PROFESSIONAL: Cleanup warning (non-fatal):', e.message);
+                            // 1. Create weather circles for AIRPORTS ONLY
+                            if (airportSegments.length > 0) {
+                              import('../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                                // Clean up existing layer
+                                if (window.currentWeatherCirclesLayer) {
+                                  try {
+                                    window.currentWeatherCirclesLayer.removeWeatherCircles();
+                                    console.log('🎯 AUTOMATION HYBRID: Cleaned up existing weather layer');
+                                  } catch (e) { 
+                                    console.warn('🎯 AUTOMATION HYBRID: Cleanup warning (non-fatal):', e.message);
+                                  }
                                 }
+                                
+                                // Create new layer with airport data only
+                                console.log('🎯 AUTOMATION HYBRID: Creating WeatherCirclesLayer with', airportSegments.length, 'airports');
+                                const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
+                                weatherCirclesLayer.addWeatherCircles(airportSegments); // Only airports
+                                window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                                console.log('🎯 AUTOMATION HYBRID: ✅ Weather circles created for airports via automation!');
+                                
+                              }).catch(error => {
+                                console.error('🎯 AUTOMATION HYBRID: Error creating weather circles:', error);
+                              });
+                            }
+                            
+                            // 2. Create rig weather graphics for RIGS ONLY with REAL API data
+                            if (rigSegments.length > 0) {
+                              console.log('🚁 AUTOMATION HYBRID: Auto-enabling rig weather graphics with real API data');
+                              
+                              // Enable rig weather graphics
+                              if (window.rigWeatherIntegration) {
+                                window.rigWeatherIntegration.toggleVisibility(true);
+                                console.log('🚁 AUTOMATION HYBRID: ✅ Rig weather graphics enabled');
                               }
                               
-                              // Create new layer with complete data
-                              console.log('🎯 PROFESSIONAL: Creating WeatherCirclesLayer with', weatherSegments.length, 'segments');
-                              const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
-                              weatherCirclesLayer.addWeatherCircles(weatherSegments);
-                              window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                              console.log('🎯 PROFESSIONAL: Weather circles created successfully via event-driven trigger!');
-                              
-                              // Remove the event listener as it's no longer needed
-                              window.removeEventListener('weather-data-ready', handleWeatherDataReady);
-                              
-                            }).catch(error => {
-                              console.error('🎯 PROFESSIONAL: Error creating weather circles:', error);
-                            });
+                              // Update with real API data
+                              if (window.weatherVisualizationManager) {
+                                window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(rigSegments);
+                                console.log(`🚁 AUTOMATION HYBRID: ✅ Real API weather data loaded for ${rigSegments.length} rigs`);
+                              }
+                            }
+                            
+                            // Remove the event listener as it's no longer needed
+                            window.removeEventListener('weather-data-ready', handleWeatherDataReady);
                           } else {
                             console.warn('🎯 PROFESSIONAL: Data not ready yet:', {
                               hasWeatherSegments: !!(weatherSegments && weatherSegments.length > 0),
@@ -487,6 +513,14 @@ const RightPanel = React.forwardRef(({
     console.log('🟠 RIGHTPANEL LOAD: Load flight data from card:', flight);
     console.log('🟠 RIGHTPANEL LOAD: Raw flight available:', !!flight._rawFlight);
     
+    // 🧹 CRITICAL: Clear all old weather graphics before loading new flight
+    console.log('🧹 FLIGHT LOAD: Clearing old weather graphics');
+    if (window.clearRigWeatherGraphics) {
+      window.clearRigWeatherGraphics();
+    }
+    
+    // Note: Rig weather graphics auto-enable moved to after flight data processing
+    
     // DEBUG: Check for alternate data in the loaded flight
     if (flight._rawFlight) {
       const rawFlight = flight._rawFlight;
@@ -570,6 +604,61 @@ const RightPanel = React.forwardRef(({
       // Call the parent's flight loading handler if available
       if (onFlightLoad) {
         onFlightLoad(flightData);
+      }
+      
+      // 🚁 IMMEDIATE RIG WEATHER: Auto-enable with real API data (Gulf region only)
+      if (currentRegion?.id === 'gulf-of-mexico') {
+        console.log('🚁 IMMEDIATE: Starting automatic rig weather display with real API data');
+        
+        setTimeout(async () => {
+          try {
+            // Ensure rig weather graphics are enabled
+            if (window.rigWeatherIntegration) {
+              window.rigWeatherIntegration.toggleVisibility(true);
+              console.log('🚁 IMMEDIATE: ✅ Rig weather graphics enabled');
+            }
+            
+            // Get weather visualization manager and update with real API data
+            if (window.weatherVisualizationManager && flightData.waypoints) {
+              console.log('🚁 IMMEDIATE: Updating rig weather with real API data for', flightData.waypoints.length, 'waypoints');
+              
+              // Create fake weather segments from waypoints to trigger the real API calls
+              const waypointSegments = flightData.waypoints
+                .filter(wp => {
+                  // Filter for rigs (same logic as in the analyzer)
+                  const isRig = !wp.isairport || (wp.isairport && 
+                    wp.isairport.toString().toLowerCase() !== 'y' && 
+                    wp.isairport.toString().toLowerCase() !== 'yes');
+                  return isRig && wp.coords && wp.coords.length >= 2;
+                })
+                .map(wp => ({
+                  locationName: wp.name,
+                  name: wp.name,
+                  airportIcao: wp.name,
+                  isRig: true,
+                  latitude: wp.coords[1],
+                  longitude: wp.coords[0],
+                  // This will trigger real API calls, not use this data
+                  windSpeed: undefined, // Force API call
+                  windDirection: undefined, // Force API call
+                  flightCategory: undefined // Force API call
+                }));
+              
+              console.log('🚁 IMMEDIATE: Found', waypointSegments.length, 'rigs for weather analysis');
+              
+              if (waypointSegments.length > 0) {
+                // This will call the real external APIs for each rig
+                await window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(waypointSegments);
+                console.log('🚁 IMMEDIATE: ✅ Real weather data loaded and displayed');
+              } else {
+                console.log('🚁 IMMEDIATE: No rigs found in waypoints for weather display');
+              }
+            }
+            
+          } catch (error) {
+            console.error('🚁 IMMEDIATE: Error auto-enabling rig weather:', error);
+          }
+        }, 1000); // Small delay to ensure waypoints are loaded
       }
       
       // Update loading indicator
@@ -737,6 +826,7 @@ const RightPanel = React.forwardRef(({
         araFuel={araFuel} // 🔧 ADDED: ARA fuel from weather analysis
         approachFuel={approachFuel} // 🔧 ADDED: Approach fuel from weather analysis
         alternateRouteData={alternateRouteData}
+        loadedFlightData={loadedFlightData} // Pass flight data for responsive display
         stopCards={stopCards}
         fuelPolicy={fuelPolicy}
         onFlightLoad={onFlightLoad}
@@ -820,6 +910,8 @@ const RightPanel = React.forwardRef(({
         toggleBasesVisibility={toggleBasesVisibility} // New prop for bases
         toggleFuelAvailableVisibility={toggleFuelAvailableVisibility} // New prop
         weatherSegmentsHook={weatherSegmentsHook} // Pass weather segments hook for layer controls
+        waypoints={waypoints} // Pass current flight waypoints for rig weather graphics
+        routeStats={routeStats} // Pass route statistics for rig weather graphics
       />
       
       {/* Save Flight Card */}
