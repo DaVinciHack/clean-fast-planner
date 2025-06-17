@@ -1081,11 +1081,8 @@ const FastPlannerCore = ({
                         console.log('🚁 HYBRID: ✅ Rig weather graphics enabled');
                       }
                       
-                      // Update with real API data (same as RightPanel.jsx logic)
-                      if (window.weatherVisualizationManager) {
-                        window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(rigSegments);
-                        console.log(`🚁 HYBRID: ✅ Real API weather data loaded for ${rigSegments.length} rigs`);
-                      }
+                      // DISABLED: Competing rig-only system - WeatherCirclesLayer now handles ALL arrows  
+                      console.log(`🌬️ UNIFIED: Weather data loaded for ${rigSegments.length} rigs - WeatherCirclesLayer handles all arrows automatically`);
                     }
                     
                   } catch (autoShowError) {

@@ -398,22 +398,9 @@ const RightPanel = React.forwardRef(({
                               });
                             }
                             
-                            // 2. Create rig weather graphics for RIGS ONLY with REAL API data
-                            if (rigSegments.length > 0) {
-                              console.log('🚁 AUTOMATION HYBRID: Auto-enabling rig weather graphics with real API data');
-                              
-                              // Enable rig weather graphics
-                              if (window.rigWeatherIntegration) {
-                                window.rigWeatherIntegration.toggleVisibility(true);
-                                console.log('🚁 AUTOMATION HYBRID: ✅ Rig weather graphics enabled');
-                              }
-                              
-                              // Update with real API data
-                              if (window.weatherVisualizationManager) {
-                                window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(rigSegments);
-                                console.log(`🚁 AUTOMATION HYBRID: ✅ Real API weather data loaded for ${rigSegments.length} rigs`);
-                              }
-                            }
+                            // 2. DISABLED: Old separate rig graphics - now using unified weather arrows
+                            console.log(`🚁 AUTOMATION HYBRID: Unified system handles ${rigSegments.length} rigs automatically`);
+                            // The WeatherCirclesLayer auto-creates arrows for ALL locations including rigs
                             
                             // Remove the event listener as it's no longer needed
                             window.removeEventListener('weather-data-ready', handleWeatherDataReady);
@@ -606,60 +593,9 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
-      // 🚁 IMMEDIATE RIG WEATHER: Auto-enable with real API data (Gulf region only)
-      if (currentRegion?.id === 'gulf-of-mexico') {
-        console.log('🚁 IMMEDIATE: Starting automatic rig weather display with real API data');
-        
-        setTimeout(async () => {
-          try {
-            // Ensure rig weather graphics are enabled
-            if (window.rigWeatherIntegration) {
-              window.rigWeatherIntegration.toggleVisibility(true);
-              console.log('🚁 IMMEDIATE: ✅ Rig weather graphics enabled');
-            }
-            
-            // Get weather visualization manager and update with real API data
-            if (window.weatherVisualizationManager && flightData.waypoints) {
-              console.log('🚁 IMMEDIATE: Updating rig weather with real API data for', flightData.waypoints.length, 'waypoints');
-              
-              // Create fake weather segments from waypoints to trigger the real API calls
-              const waypointSegments = flightData.waypoints
-                .filter(wp => {
-                  // Filter for rigs (same logic as in the analyzer)
-                  const isRig = !wp.isairport || (wp.isairport && 
-                    wp.isairport.toString().toLowerCase() !== 'y' && 
-                    wp.isairport.toString().toLowerCase() !== 'yes');
-                  return isRig && wp.coords && wp.coords.length >= 2;
-                })
-                .map(wp => ({
-                  locationName: wp.name,
-                  name: wp.name,
-                  airportIcao: wp.name,
-                  isRig: true,
-                  latitude: wp.coords[1],
-                  longitude: wp.coords[0],
-                  // This will trigger real API calls, not use this data
-                  windSpeed: undefined, // Force API call
-                  windDirection: undefined, // Force API call
-                  flightCategory: undefined // Force API call
-                }));
-              
-              console.log('🚁 IMMEDIATE: Found', waypointSegments.length, 'rigs for weather analysis');
-              
-              if (waypointSegments.length > 0) {
-                // This will call the real external APIs for each rig
-                await window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(waypointSegments);
-                console.log('🚁 IMMEDIATE: ✅ Real weather data loaded and displayed');
-              } else {
-                console.log('🚁 IMMEDIATE: No rigs found in waypoints for weather display');
-              }
-            }
-            
-          } catch (error) {
-            console.error('🚁 IMMEDIATE: Error auto-enabling rig weather:', error);
-          }
-        }, 1000); // Small delay to ensure waypoints are loaded
-      }
+      // 🚁 DISABLED: Old separate rig weather system - now using unified weather arrows
+      // The WeatherCirclesLayer now automatically adds arrows to ALL weather circles (airports, rigs, alternates)
+      console.log('🚁 UNIFIED: Using unified weather arrow system (no separate rig weather needed)');
       
       // Update loading indicator
       if (window.LoadingIndicator) {
