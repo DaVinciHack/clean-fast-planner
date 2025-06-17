@@ -63,6 +63,9 @@ class WeatherCirclesLayer {
     this.currentWeatherSegments = weatherSegments;
     this.removeWeatherCircles();
     
+    // CONSOLIDATED ARROW SYSTEM: Collect all arrow data first, then create all arrows at once
+    const allArrowData = [];
+    
     // Rest of the method continues unchanged...
     // ENHANCED APPROACH: Handle alternates, rigs, and split points
     const validSegments = [];
@@ -104,6 +107,56 @@ class WeatherCirclesLayer {
         validSegments.push(alternateSegment);
         console.log(`✅ Alternate ${index}: ${segment.airportIcao} at ${JSON.stringify(segment.alternateGeoShape.coordinates[1])} with ranking ${ranking}`);
         console.log(`🚨 COORDINATE DEBUG: Full alternateGeoShape.coordinates for ${segment.airportIcao}:`, JSON.stringify(segment.alternateGeoShape.coordinates, null, 2));
+        
+        // COLLECT ALTERNATE ARROW DATA: Store for batch creation later
+        console.log(`🌬️ COLLECTING: Alternate arrow data for ${segment.airportIcao}`);
+        
+        // Extract wind data for this alternate
+        let windSpeed = null, windDirection = null, windGust = null, windSource = 'Unknown';
+        
+        // Try METAR first (for airports)
+        if (segment.rawMetar && window.weatherVisualizationManager) {
+          const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
+          const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
+          const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
+          
+          if (metarSpeed !== null && metarDir !== null) {
+            windSpeed = metarSpeed;
+            windDirection = metarDir;
+            windGust = metarGust;
+            windSource = 'METAR';
+          }
+        }
+        
+        // Use segment wind data if no METAR
+        if (windSpeed === null && segment.windSpeed) {
+          windSpeed = segment.windSpeed;
+          windDirection = segment.windDirection;
+          windGust = segment.windGust;
+          windSource = 'Segment';
+        }
+        
+        if (windSpeed !== null) {
+          allArrowData.push({
+            rigName: segment.airportIcao,
+            latitude: segment.alternateGeoShape.coordinates[1][1],
+            longitude: segment.alternateGeoShape.coordinates[1][0],
+            isAirport: !segment.isRig,
+            windSpeed: windSpeed,
+            windDirection: windDirection,
+            windGust: windGust,
+            windSource: windSource,
+            flightCategory: segment.flightCategory || 'VFR',
+            visibility: segment.visibility || 10,
+            temperature: segment.temperature,
+            conditions: segment.conditions || segment.weather || 'Clear',
+            stationId: segment.airportIcao,
+            locationType: 'alternate'
+          });
+          console.log(`🌬️ COLLECTED: Alternate ${segment.airportIcao} arrow data`);
+        } else {
+          console.log(`🌬️ SKIP: No wind data for alternate ${segment.airportIcao}`);
+        }
         
         // SKIP split point circles - they were creating unwanted rig weather
         console.log(`⏭️ Skipping split point for ${segment.airportIcao} - only showing alternate destination`);
@@ -176,6 +229,125 @@ class WeatherCirclesLayer {
           };
           validSegments.push(rigSegment);
           console.log(`✅ Rig ${segment.airportIcao}: Found coordinates ${JSON.stringify(rigCoordinates)} with ranking ${segment.ranking2}`);
+          
+          // COLLECT RIG ARROW DATA: Store for batch creation later
+          console.log(`🌬️ COLLECTING: Rig arrow data for ${segment.airportIcao}`);
+          
+          // Extract wind data for this rig
+          let windSpeed = null, windDirection = null, windGust = null, windSource = 'Unknown';
+          
+          // DEBUG: Log all available wind fields for rigs
+          console.log(`🌬️ RIG DEBUG: Available wind fields for ${segment.airportIcao}:`, {
+            rawMetar: segment.rawMetar,
+            rawTaf: segment.rawTaf,
+            windSpeed: segment.windSpeed,
+            windDirection: segment.windDirection,
+            windGust: segment.windGust,
+            wind: segment.wind,
+            allKeys: Object.keys(segment).filter(key => key.toLowerCase().includes('wind'))
+          });
+          
+          // Try METAR first (for airports AND rigs - they both have METAR data!)
+          if (segment.rawMetar && window.weatherVisualizationManager) {
+            console.log(`🌬️ RIG METAR: Parsing METAR for ${segment.airportIcao}: "${segment.rawMetar}"`);
+            
+            const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
+            const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
+            const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
+            
+            console.log(`🌬️ RIG METAR: Parsed values - Speed: ${metarSpeed}, Dir: ${metarDir}, Gust: ${metarGust}`);
+            
+            if (metarSpeed !== null && metarDir !== null) {
+              windSpeed = metarSpeed;
+              windDirection = metarDir;
+              windGust = metarGust;
+              windSource = 'METAR';
+              console.log(`🌬️ RIG METAR: ✅ Successfully extracted wind from METAR for ${segment.airportIcao}`);
+            } else {
+              console.log(`🌬️ RIG METAR: ❌ METAR parsing failed for ${segment.airportIcao}`);
+            }
+          }
+          
+          // Try TAF data for rigs (pseudo TAF)
+          if (windSpeed === null && segment.rawTaf && window.weatherVisualizationManager) {
+            console.log(`🌬️ RIG TAF: Parsing TAF for ${segment.airportIcao}: "${segment.rawTaf}"`);
+            
+            // TAF uses same wind format as METAR
+            const tafSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawTaf);
+            const tafDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawTaf);
+            const tafGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawTaf);
+            
+            console.log(`🌬️ RIG TAF: Parsed values - Speed: ${tafSpeed}, Dir: ${tafDir}, Gust: ${tafGust}`);
+            
+            if (tafSpeed !== null && tafDir !== null) {
+              windSpeed = tafSpeed;
+              windDirection = tafDir;
+              windGust = tafGust;
+              windSource = 'Pseudo TAF';
+              console.log(`🌬️ RIG TAF: ✅ Successfully extracted wind from TAF for ${segment.airportIcao}`);
+            }
+          }
+          
+          // Use direct segment wind data (for rigs)
+          if (windSpeed === null && segment.windSpeed !== undefined && segment.windSpeed !== null) {
+            windSpeed = segment.windSpeed;
+            windDirection = segment.windDirection;
+            windGust = segment.windGust;
+            windSource = 'Rig Model Data';
+          }
+          
+          // Try alternative wind field names for rigs
+          if (windSpeed === null && segment.wind) {
+            if (typeof segment.wind === 'object') {
+              windSpeed = segment.wind.speed || segment.wind.windSpeed;
+              windDirection = segment.wind.direction || segment.wind.windDirection;
+              windGust = segment.wind.gust || segment.wind.windGust;
+              windSource = 'Rig Wind Object';
+            }
+          }
+          
+          // Try other possible wind field names
+          if (windSpeed === null) {
+            const possibleSpeedFields = ['windSpeedKts', 'windSpeedMps', 'speed', 'wspd'];
+            const possibleDirFields = ['windDirectionDeg', 'direction', 'wdir'];
+            
+            for (const field of possibleSpeedFields) {
+              if (segment[field] !== undefined && segment[field] !== null) {
+                windSpeed = segment[field];
+                windSource = `Rig Field: ${field}`;
+                break;
+              }
+            }
+            
+            for (const field of possibleDirFields) {
+              if (segment[field] !== undefined && segment[field] !== null) {
+                windDirection = segment[field];
+                break;
+              }
+            }
+          }
+          
+          if (windSpeed !== null) {
+            allArrowData.push({
+              rigName: segment.airportIcao,
+              latitude: rigCoordinates[1],
+              longitude: rigCoordinates[0],
+              isAirport: false,
+              windSpeed: windSpeed,
+              windDirection: windDirection,
+              windGust: windGust,
+              windSource: windSource,
+              flightCategory: segment.flightCategory || 'VFR',
+              visibility: segment.visibility || 10,
+              temperature: segment.temperature,
+              conditions: segment.conditions || segment.weather || 'Clear',
+              stationId: segment.airportIcao,
+              locationType: 'rig'
+            });
+            console.log(`🌬️ COLLECTED: Rig ${segment.airportIcao} arrow data`);
+          } else {
+            console.log(`🌬️ SKIP: No wind data for rig ${segment.airportIcao}`);
+          }
         } else {
           console.log(`❌ Rig ${segment.airportIcao}: Could not find coordinates in any source`);
         }
@@ -243,6 +415,56 @@ class WeatherCirclesLayer {
           };
           validSegments.push(destinationSegment);
           console.log(`✅ Destination ${segment.airportIcao || segment.locationName}: Found coordinates ${JSON.stringify(destinationCoordinates)} with ranking ${segment.ranking2}`);
+          
+          // COLLECT DESTINATION ARROW DATA: Store for batch creation later
+          console.log(`🌬️ COLLECTING: Destination arrow data for ${segment.airportIcao}`);
+          
+          // Extract wind data for this destination
+          let windSpeed = null, windDirection = null, windGust = null, windSource = 'Unknown';
+          
+          // Try METAR first (airports should have METAR)
+          if (segment.rawMetar && window.weatherVisualizationManager) {
+            const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
+            const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
+            const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
+            
+            if (metarSpeed !== null && metarDir !== null) {
+              windSpeed = metarSpeed;
+              windDirection = metarDir;
+              windGust = metarGust;
+              windSource = 'METAR';
+            }
+          }
+          
+          // Use segment wind data if no METAR
+          if (windSpeed === null && segment.windSpeed) {
+            windSpeed = segment.windSpeed;
+            windDirection = segment.windDirection;
+            windGust = segment.windGust;
+            windSource = 'Segment';
+          }
+          
+          if (windSpeed !== null) {
+            allArrowData.push({
+              rigName: segment.airportIcao || segment.locationName,
+              latitude: destinationCoordinates[1],
+              longitude: destinationCoordinates[0],
+              isAirport: true,
+              windSpeed: windSpeed,
+              windDirection: windDirection,
+              windGust: windGust,
+              windSource: windSource,
+              flightCategory: segment.flightCategory || 'VFR',
+              visibility: segment.visibility || 10,
+              temperature: segment.temperature,
+              conditions: segment.conditions || segment.weather || 'Clear',
+              stationId: segment.airportIcao || segment.locationName,
+              locationType: 'destination'
+            });
+            console.log(`🌬️ COLLECTED: Destination ${segment.airportIcao} arrow data`);
+          } else {
+            console.log(`🌬️ SKIP: No wind data for destination ${segment.airportIcao}`);
+          }
         } else {
           console.log(`❌ Destination ${segment.airportIcao || segment.locationName}: Could not find coordinates from any source (geoPoint: ${segment.geoPoint})`);
         }
@@ -487,6 +709,39 @@ class WeatherCirclesLayer {
     
     this.isVisible = true;
     console.log('WeatherCirclesLayer: Added', outerFeatures.length, 'weather circles');
+    
+    // CONSOLIDATED ARROW SYSTEM: Create ALL arrows at once to prevent overwrites
+    if (allArrowData.length > 0 && window.rigWeatherIntegration) {
+      console.log(`🌬️ CONSOLIDATED: Creating ${allArrowData.length} wind arrows for all locations:`, 
+        allArrowData.map(a => `${a.rigName}(${a.locationType})`));
+      
+      // DEBUG: Show detailed breakdown of all arrow data
+      console.log(`🌬️ CONSOLIDATED DEBUG: Full arrow data:`, allArrowData.map(a => ({
+        name: a.rigName,
+        type: a.locationType,
+        windSpeed: a.windSpeed,
+        windDirection: a.windDirection,
+        isAirport: a.isAirport
+      })));
+      
+      try {
+        // Create ALL arrows in one batch operation
+        window.rigWeatherIntegration.updateRigWeather(allArrowData);
+        console.log(`🌬️ CONSOLIDATED: ✅ Successfully created ${allArrowData.length} wind arrows`);
+        
+        // Debug: Log what types of arrows were created
+        const arrowTypes = allArrowData.reduce((acc, arrow) => {
+          acc[arrow.locationType] = (acc[arrow.locationType] || 0) + 1;
+          return acc;
+        }, {});
+        console.log(`🌬️ CONSOLIDATED: Arrow breakdown:`, arrowTypes);
+        
+      } catch (error) {
+        console.error(`🌬️ CONSOLIDATED: Error creating wind arrows:`, error);
+      }
+    } else {
+      console.log(`🌬️ CONSOLIDATED: No wind arrows to create (${allArrowData.length} arrow data, rigWeatherIntegration: ${!!window.rigWeatherIntegration})`);
+    }
     
     // Clear the creation lock on successful completion
     clearLock();
