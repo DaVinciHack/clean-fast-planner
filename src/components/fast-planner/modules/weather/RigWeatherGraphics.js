@@ -6,6 +6,8 @@
  * Aviation weather data visualization with proper safety standards
  */
 
+import { formatTemperature, formatVisibility, getCurrentRegion } from './utils/RegionalUnits.js';
+
 class RigWeatherGraphics {
     constructor(map) {
         this.map = map;
@@ -666,7 +668,7 @@ class RigWeatherGraphics {
                 // Weather ranking removed - not needed in popup
                 
                 if (palantirWeather.visibility) {
-                    tafDetails += `<div><strong>Planned Visibility:</strong> ${palantirWeather.visibility} SM</div>`;
+                    tafDetails += `<div><strong>Planned Visibility:</strong> ${this.formatVisibilityRegionally(palantirWeather.visibility)}</div>`;
                 }
                 
                 // TAF will be shown in the raw data section below
@@ -799,10 +801,10 @@ class RigWeatherGraphics {
                             <strong>Flight Category:</strong> 
                             <span style="color: ${categoryColor}; font-weight: bold; margin-left: 6px; padding: 2px 6px; border-radius: 3px; background-color: rgba(${categoryColor === '#66BB6A' ? '102,187,106' : categoryColor === '#FFA726' ? '255,167,38' : categoryColor === '#EF5350' ? '239,83,80' : '156,39,176'}, 0.2);">${rigData.flightCategory || 'Unknown'}</span>
                         </div>
-                        <div><strong>Visibility:</strong> ${rigData.visibility || 'Unknown'} SM</div>
+                        <div><strong>Visibility:</strong> ${this.formatVisibilityRegionally(rigData.visibility || rigData.visibilityMeters)}</div>
                         <div><strong>Wind:</strong> ${windString}</div>
                         ${this.generateCloudLayersHTML(rigData.clouds || [])}
-                        <div><strong>Temperature:</strong> ${rigData.temperature ? Math.round(rigData.temperature) + '°C' : 'Unknown'}</div>
+                        <div><strong>Temperature:</strong> ${this.formatTemperatureRegionally(rigData.temperature)}</div>
                         ${this.generateWeatherConditionsHTML(rigData.weatherConditions || [])}
                         ${rigData.limitations ? `<div style="color: #FF5722; font-weight: bold; margin-top: 4px;"><strong>⚠️ Limitations:</strong> ${rigData.limitations}</div>` : ''}
                         ${rigData.warnings ? `<div style="color: #F44336; font-weight: bold; margin-top: 4px;"><strong>🚨 Warnings:</strong> ${rigData.warnings}</div>` : ''}
@@ -847,6 +849,47 @@ class RigWeatherGraphics {
         
         const conditionStrings = conditions.map(condition => condition.description);
         return `<div><strong>Conditions:</strong> ${conditionStrings.join(', ')}</div>`;
+    }
+    
+    /**
+     * Format temperature with regional units
+     * @private
+     */
+    formatTemperatureRegionally(tempCelsius) {
+        const currentRegion = getCurrentRegion();
+        console.log(`🌡️ REGIONAL: Formatting temperature ${tempCelsius}°C for region:`, currentRegion?.name || 'Unknown');
+        const result = formatTemperature(tempCelsius, currentRegion);
+        console.log(`🌡️ REGIONAL: Result: ${result}`);
+        return result;
+    }
+    
+    /**
+     * Format visibility with regional units
+     * @private
+     */
+    formatVisibilityRegionally(visibilityValue) {
+        const currentRegion = getCurrentRegion();
+        
+        // Handle different input formats - could be in SM, meters, or km
+        let visibilityMeters;
+        
+        if (!visibilityValue && visibilityValue !== 0) {
+            return 'Unknown';
+        }
+        
+        // If value is small (< 50), assume it's in statute miles
+        if (visibilityValue < 50) {
+            visibilityMeters = Math.round(visibilityValue * 1609.34);
+            console.log(`👁️ REGIONAL: Converting visibility ${visibilityValue} SM → ${visibilityMeters} meters for region:`, currentRegion?.name || 'Unknown');
+        } else {
+            // If large value, assume it's already in meters
+            visibilityMeters = Math.round(visibilityValue);
+            console.log(`👁️ REGIONAL: Using visibility ${visibilityValue} (assumed meters) for region:`, currentRegion?.name || 'Unknown');
+        }
+        
+        const result = formatVisibility(visibilityMeters, currentRegion);
+        console.log(`👁️ REGIONAL: Result: ${result}`);
+        return result;
     }
     
     /**
