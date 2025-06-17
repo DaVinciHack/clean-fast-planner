@@ -36,31 +36,31 @@ class RigWeatherGraphics {
     }
     
     /**
-     * Add compass rose weather graphics - maritime/aviation style
+     * Add simple wind arrow graphics 
      * @private
      */
     addWeatherIcons() {
         try {
-            // Create compass rose with integrated wind arrow
-            const compassRose = this.createCompassRose();
+            // Create simple wind arrow
+            const windArrow = this.createCompassRose(); // Keep method name for compatibility
             
-            if (compassRose && !this.map.hasImage('compass-rose')) {
-                this.map.addImage('compass-rose', compassRose);
-                console.log('🚁 Compass rose weather graphic added');
+            if (windArrow && !this.map.hasImage('compass-rose')) {
+                this.map.addImage('compass-rose', windArrow);
+                console.log('🚁 Simple wind arrow graphic added');
             }
             
         } catch (error) {
-            console.error('🚁 Failed to add compass rose:', error);
+            console.error('🚁 Failed to add wind arrow:', error);
         }
     }
     
     /**
-     * Create maritime/aviation compass rose with integrated wind arrow
-     * Like a traditional compass rose on nautical charts
+     * Create simple wind arrow without compass rose
+     * Clean design for overlaying on weather circles
      * @private
      */
     createCompassRose() {
-        const size = 120; // Large enough for compass rose
+        const size = 60; // Even bigger canvas to fit the full arrow with shadow
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = size;
@@ -71,88 +71,57 @@ class RigWeatherGraphics {
         
         const centerX = size / 2;
         const centerY = size / 2;
-        const radius = 50; // Compass rose radius
         
-        // Draw compass rose base (subtle circle)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
+        // Draw clean modern arrow with angled cutbacks like reference image
+        
+        // Thinner proportions matching your reference
+        const totalLength = 28;    // Longer shaft to match the perfect head
+        const shaftWidth = 2;      // Keep shaft width the same 
+        const headWidth = 11;      // Slightly bigger arrow head width
+        const headLength = 18;     // Much longer head for more prominent pointed tip
+        const cutbackLength = 12;  // Cutback further back to preserve more arrow head
+        
+        // Position arrow so the BACK END is at center, arrow points outward
+        const arrowTip = centerY - totalLength;  // Tip extends outward from center
+        const arrowBack = centerY;               // Back end is at center of circle
+        
+        // Draw drop shadow first (slightly offset)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        const shadowOffset = 2;
+        
         ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-        
-        // Draw cardinal direction markers (N, E, S, W)
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = 1;
-        
-        // North marker
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY - radius);
-        ctx.lineTo(centerX - 3, centerY - radius + 8);
-        ctx.lineTo(centerX + 3, centerY - radius + 8);
+        ctx.moveTo(centerX + shadowOffset, arrowTip + shadowOffset);
+        ctx.lineTo(centerX + headWidth + shadowOffset, arrowTip + headLength + shadowOffset);
+        ctx.lineTo(centerX + shaftWidth + shadowOffset, arrowTip + cutbackLength + shadowOffset);
+        ctx.lineTo(centerX + shaftWidth + shadowOffset, arrowBack + shadowOffset);
+        ctx.lineTo(centerX - shaftWidth + shadowOffset, arrowBack + shadowOffset);
+        ctx.lineTo(centerX - shaftWidth + shadowOffset, arrowTip + cutbackLength + shadowOffset);
+        ctx.lineTo(centerX - headWidth + shadowOffset, arrowTip + headLength + shadowOffset);
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
         
-        // East marker
-        ctx.beginPath();
-        ctx.moveTo(centerX + radius, centerY);
-        ctx.lineTo(centerX + radius - 8, centerY - 3);
-        ctx.lineTo(centerX + radius - 8, centerY + 3);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        
-        // South marker
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY + radius);
-        ctx.lineTo(centerX - 3, centerY + radius - 8);
-        ctx.lineTo(centerX + 3, centerY + radius - 8);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        
-        // West marker
-        ctx.beginPath();
-        ctx.moveTo(centerX - radius, centerY);
-        ctx.lineTo(centerX - radius + 8, centerY - 3);
-        ctx.lineTo(centerX - radius + 8, centerY + 3);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        
-        // Draw main wind arrow (pointing north by default, will be rotated)
-        // Make arrow completely white so MapBox can colorize it
+        // Draw main arrow (white)
         ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'white'; // No black outline so color shows better
-        ctx.lineWidth = 2;
-        
-        // Large directional arrow
-        const arrowLength = radius * 0.8;
-        const arrowWidth = 12;
         
         ctx.beginPath();
-        // Arrow tip
-        ctx.moveTo(centerX, centerY - arrowLength);
-        // Left side of arrowhead
-        ctx.lineTo(centerX - arrowWidth, centerY - arrowLength + 15);
-        // Left side of shaft
-        ctx.lineTo(centerX - 4, centerY - arrowLength + 15);
-        // Left bottom of shaft
-        ctx.lineTo(centerX - 4, centerY + arrowLength * 0.3);
-        // Right bottom of shaft
-        ctx.lineTo(centerX + 4, centerY + arrowLength * 0.3);
-        // Right side of shaft
-        ctx.lineTo(centerX + 4, centerY - arrowLength + 15);
-        // Right side of arrowhead
-        ctx.lineTo(centerX + arrowWidth, centerY - arrowLength + 15);
+        // Start from arrow tip (pointing outward, more pointed)
+        ctx.moveTo(centerX, arrowTip);
+        
+        // Right side of arrow head - go out to the wide part
+        ctx.lineTo(centerX + headWidth, arrowTip + headLength);
+        // Right cutback - angle back toward shaft
+        ctx.lineTo(centerX + shaftWidth, arrowTip + cutbackLength);
+        // Right side of shaft continues down to center
+        ctx.lineTo(centerX + shaftWidth, arrowBack);
+        // Bottom of shaft (at center)
+        ctx.lineTo(centerX - shaftWidth, arrowBack);
+        // Left side of shaft goes up
+        ctx.lineTo(centerX - shaftWidth, arrowTip + cutbackLength);
+        // Left cutback - angle back toward shaft
+        ctx.lineTo(centerX - headWidth, arrowTip + headLength);
+        
         ctx.closePath();
         ctx.fill();
-        
-        // Add thin black outline for definition
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 1;
-        ctx.stroke();
         
         // Convert to ImageData
         return ctx.getImageData(0, 0, size, size);
@@ -176,7 +145,13 @@ class RigWeatherGraphics {
         
         // ALWAYS render arrows when weather data is updated
         this.isVisible = true;
+        
+        // COMPREHENSIVE CLEANUP: Remove all existing graphics and popups first
         this.removeWeatherGraphics();
+        
+        // ENHANCED POPUP CLEANUP: Clear any orphaned popups that might be accumulating
+        this.clearAllPopups();
+        
         this.renderWeatherGraphics();
         
         console.log(`🚁 Updated weather graphics for ${rigWeatherData.length} rigs`);
@@ -425,14 +400,7 @@ class RigWeatherGraphics {
             source: this.sourceIds.arrows,
             layout: {
                 'icon-image': 'compass-rose',
-                'icon-size': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    5, 0.5,   // Bigger at low zoom
-                    10, 0.8,  // Bigger at mid zoom  
-                    15, 1.0   // Full size at high zoom - prominent wind arrows
-                ],
+                'icon-size': 1.0, // Fixed size, no zoom dependency
                 'icon-rotate': ['get', 'rotation'],
                 'icon-allow-overlap': true,
                 'icon-ignore-placement': true
@@ -445,11 +413,11 @@ class RigWeatherGraphics {
             }
         }); // No beforeId = adds to TOP of stack
         
-        // Debug: Check if compass-rose image exists
+        // Debug: Check if wind arrow image exists
         if (!this.map.hasImage('compass-rose')) {
-            console.error('🚁 ❌ compass-rose image not found! Arrows will not render.');
+            console.error('🚁 ❌ wind arrow image not found! Arrows will not render.');
         } else {
-            console.log('🚁 ✅ compass-rose image available for arrows');
+            console.log('🚁 ✅ wind arrow image available for arrows');
         }
         
         console.log(`🚁 Added ${arrowFeatures.length} wind arrows`);
@@ -695,42 +663,42 @@ class RigWeatherGraphics {
                     tafDetails += `<div><strong>Planned Wind:</strong> ${Math.round(palantirWeather.windSpeed)} kts @ ${Math.round(palantirWeather.windDirection)}°</div>`;
                 }
                 
-                if (palantirWeather.ranking2) {
-                    tafDetails += `<div><strong>Weather Ranking:</strong> ${palantirWeather.ranking2}</div>`;
-                }
+                // Weather ranking removed - not needed in popup
                 
                 if (palantirWeather.visibility) {
                     tafDetails += `<div><strong>Planned Visibility:</strong> ${palantirWeather.visibility} SM</div>`;
                 }
                 
-                // 🔗 ADD FULL TAF DATA (the complete TAF that explains why ARA fuel is required)
-                if (palantirWeather.rawTaf) {
+                // TAF will be shown in the raw data section below
+                
+                // 🔗 ADD FULL METAR DATA  
+                if (rigData.rawMetar) {
                     tafDetails += `
-                        <div style="margin-top: 8px; margin-bottom: 6px;">
-                            <strong style="color: #FFC107;">📋 TAF (Terminal Aerodrome Forecast):</strong><br>
-                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${palantirWeather.rawTaf}</div>
+                        <div style="margin-top: 6px; margin-bottom: 6px;">
+                            <strong style="color: #00bcd4;">🌦️ METAR (Current Observations):</strong><br>
+                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${rigData.rawMetar}</div>
                         </div>
                     `;
                 }
                 
-                // 🔗 ADD FULL METAR DATA  
-                if (palantirWeather.rawMetar) {
+                // 🔗 ADD FULL TAF DATA
+                if (rigData.rawTaf) {
                     tafDetails += `
                         <div style="margin-top: 6px; margin-bottom: 6px;">
-                            <strong style="color: #FFC107;">🌦️ METAR (Current Observations):</strong><br>
-                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${palantirWeather.rawMetar}</div>
+                            <strong style="color: #1976d2;">🌩️ TAF (Terminal Forecast):</strong><br>
+                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${rigData.rawTaf}</div>
                         </div>
                     `;
                 }
                         
                 tafSection = `
-                    <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,193,7,0.15); border-radius: 6px; border-left: 3px solid #FFC107;">
-                        <div style="color: #FFC107; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center;">
+                    <div style="margin-top: 10px; padding: 8px; background-color: rgba(0,123,191,0.15); border-radius: 6px; border-left: 3px solid #00bcd4;">
+                        <div style="color: #00bcd4; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center;">
                             📋 Flight Planning (Palantir Analysis)
                         </div>
                         <div style="font-size: 11px; color: #e0e0e0; line-height: 1.4;">
                             ${tafDetails}
-                            <div style="font-size: 10px; color: #aaa; margin-top: 6px; font-style: italic; padding-top: 4px; border-top: 1px solid rgba(255,193,7,0.3);">
+                            <div style="font-size: 10px; color: #aaa; margin-top: 6px; font-style: italic; padding-top: 4px; border-top: 1px solid rgba(0,188,212,0.3);">
                                 TAF/METAR data used for fuel calculations & ARA requirements
                             </div>
                         </div>
@@ -739,15 +707,51 @@ class RigWeatherGraphics {
             } else {
                 console.log('🔗 UNIFIED POPUP: No Palantir TAF data found for', rigData.rigName);
                 
-                // Show placeholder when no TAF data available
-                tafSection = `
-                    <div style="margin-top: 8px; padding: 6px; background-color: rgba(128,128,128,0.1); border-radius: 4px; border-left: 3px solid #888;">
-                        <div style="color: #888; font-weight: bold; margin-bottom: 4px;">📋 Flight Planning</div>
-                        <div style="font-size: 11px; color: #aaa;">
-                            <div>No TAF data available for planning</div>
+                // Show enhanced METAR/TAF from our comprehensive parsing even without Palantir data
+                let enhancedDetails = '';
+                
+                if (rigData.rawMetar) {
+                    enhancedDetails += `
+                        <div style="margin-top: 6px; margin-bottom: 6px;">
+                            <strong style="color: #00bcd4;">🌦️ METAR (Current Observations):</strong><br>
+                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${rigData.rawMetar}</div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
+                
+                if (rigData.rawTaf) {
+                    enhancedDetails += `
+                        <div style="margin-top: 6px; margin-bottom: 6px;">
+                            <strong style="color: #1976d2;">🌩️ TAF (Terminal Forecast):</strong><br>
+                            <div style="font-family: monospace; font-size: 10px; background-color: rgba(0,0,0,0.3); padding: 4px; border-radius: 3px; word-break: break-all; line-height: 1.3; margin-top: 4px;">${rigData.rawTaf}</div>
+                        </div>
+                    `;
+                }
+                
+                if (enhancedDetails) {
+                    tafSection = `
+                        <div style="margin-top: 10px; padding: 8px; background-color: rgba(0,123,191,0.15); border-radius: 6px; border-left: 3px solid #00bcd4;">
+                            <div style="color: #00bcd4; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center;">
+                                📋 Flight Planning
+                            </div>
+                            <div style="font-size: 11px; color: #e0e0e0; line-height: 1.4;">
+                                ${enhancedDetails}
+                                <div style="font-size: 10px; color: #aaa; margin-top: 6px; font-style: italic; padding-top: 4px; border-top: 1px solid rgba(0,188,212,0.3);">
+                                    Raw aviation weather data for flight planning
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    tafSection = `
+                        <div style="margin-top: 8px; padding: 6px; background-color: rgba(128,128,128,0.1); border-radius: 4px; border-left: 3px solid #888;">
+                            <div style="color: #888; font-weight: bold; margin-bottom: 4px;">📋 Flight Planning</div>
+                            <div style="font-size: 11px; color: #aaa;">
+                                <div>No TAF data available for planning</div>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         } catch (error) {
             console.warn('🔗 UNIFIED POPUP: Error searching for TAF data:', error);
@@ -784,8 +788,8 @@ class RigWeatherGraphics {
                 </div>
                 
                 <!-- REAL-TIME WEATHER SECTION -->
-                <div style="margin-bottom: 10px; padding: 8px; background-color: rgba(64, 200, 240, 0.1); border-radius: 6px; ${warningStyle}">
-                    <div style="color: #40c8f0; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="margin-bottom: 10px; padding: 8px; background-color: rgba(25, 118, 210, 0.15); border-radius: 6px; ${warningStyle}">
+                    <div style="color: #1976d2; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
                         <span>🌦️ ${rigData.weatherTimeInfo || (rigData.arrivalTime ? `Weather for ${new Date(rigData.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} arrival` : 'Live Weather')} (NOAA GFS)</span>
                         ${hasWarnings ? '<span style="color: #FF5722; margin-left: 8px;">⚠️</span>' : ''}
                     </div>
@@ -795,12 +799,11 @@ class RigWeatherGraphics {
                             <strong>Flight Category:</strong> 
                             <span style="color: ${categoryColor}; font-weight: bold; margin-left: 6px; padding: 2px 6px; border-radius: 3px; background-color: rgba(${categoryColor === '#66BB6A' ? '102,187,106' : categoryColor === '#FFA726' ? '255,167,38' : categoryColor === '#EF5350' ? '239,83,80' : '156,39,176'}, 0.2);">${rigData.flightCategory || 'Unknown'}</span>
                         </div>
-                        ${rigData.ceiling ? `<div><strong>Ceiling:</strong> ${rigData.ceiling.toLocaleString()} ft AGL</div>` : '<div><strong>Ceiling:</strong> Unlimited</div>'}
                         <div><strong>Visibility:</strong> ${rigData.visibility || 'Unknown'} SM</div>
                         <div><strong>Wind:</strong> ${windString}</div>
-                        <div><strong>Clouds:</strong> ${rigData.cloudCoverage || 0}%</div>
-                        <div><strong>Temperature:</strong> ${rigData.temperature ? Math.round(rigData.temperature) + '°F' : 'Unknown'}</div>
-                        ${rigData.conditions ? `<div><strong>Conditions:</strong> ${rigData.conditions}</div>` : ''}
+                        ${this.generateCloudLayersHTML(rigData.clouds || [])}
+                        <div><strong>Temperature:</strong> ${rigData.temperature ? Math.round(rigData.temperature) + '°C' : 'Unknown'}</div>
+                        ${this.generateWeatherConditionsHTML(rigData.weatherConditions || [])}
                         ${rigData.limitations ? `<div style="color: #FF5722; font-weight: bold; margin-top: 4px;"><strong>⚠️ Limitations:</strong> ${rigData.limitations}</div>` : ''}
                         ${rigData.warnings ? `<div style="color: #F44336; font-weight: bold; margin-top: 4px;"><strong>🚨 Warnings:</strong> ${rigData.warnings}</div>` : ''}
                         ${weatherTimeInfo}
@@ -815,6 +818,35 @@ class RigWeatherGraphics {
                 </div>
             </div>
         `;
+    }
+    
+    /**
+     * Generate HTML for cloud layers from METAR data
+     * @private
+     */
+    generateCloudLayersHTML(clouds) {
+        if (!clouds || clouds.length === 0) {
+            return '<div><strong>Clouds:</strong> Clear</div>';
+        }
+        
+        const cloudStrings = clouds.map(cloud => 
+            `${cloud.type} ${cloud.altitude.toLocaleString()} ft`
+        );
+        
+        return `<div><strong>Clouds:</strong> ${cloudStrings.join(', ')}</div>`;
+    }
+    
+    /**
+     * Generate HTML for weather conditions from METAR data
+     * @private
+     */
+    generateWeatherConditionsHTML(conditions) {
+        if (!conditions || conditions.length === 0) {
+            return '<div><strong>Conditions:</strong> Clear</div>';
+        }
+        
+        const conditionStrings = conditions.map(condition => condition.description);
+        return `<div><strong>Conditions:</strong> ${conditionStrings.join(', ')}</div>`;
     }
     
     /**
@@ -848,15 +880,53 @@ class RigWeatherGraphics {
     }
     
     /**
-     * Remove all weather graphics
+     * Clear all popup instances to prevent accumulation
      * @private
      */
-    removeWeatherGraphics() {
-        // Remove event listeners
+    clearAllPopups() {
+        // Clear our main popup instance
         if (this.popup) {
             this.popup.remove();
             this.popup = null;
         }
+        
+        // ENHANCED: Clear any orphaned popups from the map
+        // Search for all popups that might be stuck on the map
+        const mapContainer = this.map.getContainer();
+        if (mapContainer) {
+            const existingPopups = mapContainer.querySelectorAll('.mapboxgl-popup, .rig-weather-popup, .unified-weather-popup');
+            existingPopups.forEach(popupElement => {
+                try {
+                    popupElement.remove();
+                    console.log('🧹 POPUP CLEANUP: Removed orphaned popup element');
+                } catch (error) {
+                    console.warn('🧹 POPUP CLEANUP: Error removing popup element:', error);
+                }
+            });
+            
+            if (existingPopups.length > 0) {
+                console.log(`🧹 POPUP CLEANUP: Removed ${existingPopups.length} orphaned popup elements`);
+            }
+        }
+        
+        // Also clear any global popup references that might be stuck
+        if (window.lastWeatherPopup) {
+            try {
+                window.lastWeatherPopup.remove();
+                window.lastWeatherPopup = null;
+            } catch (error) {
+                console.warn('🧹 POPUP CLEANUP: Error removing global popup reference:', error);
+            }
+        }
+    }
+
+    /**
+     * Remove all weather graphics
+     * @private
+     */
+    removeWeatherGraphics() {
+        // Enhanced popup cleanup first
+        this.clearAllPopups();
         
         if (this.map.getLayer(this.layerIds.hover)) {
             this.map.off('mouseenter', this.layerIds.hover);
