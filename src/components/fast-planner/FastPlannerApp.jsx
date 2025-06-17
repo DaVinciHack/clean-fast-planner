@@ -71,7 +71,13 @@ const FastPlannerCore = ({
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
   const { isAuthenticated, userName, login } = useAuth();
-  const { currentRegion: activeRegionFromContext } = useRegion(); 
+  const { currentRegion: activeRegionFromContext } = useRegion();
+  
+  // Make region globally accessible for weather system
+  useEffect(() => {
+    window.activeRegionFromContext = activeRegionFromContext;
+    console.log('🌍 REGION: Set global region for weather system:', activeRegionFromContext?.name);
+  }, [activeRegionFromContext]); 
   
   // Initialize fuel policy management
   const fuelPolicy = useFuelPolicy();
