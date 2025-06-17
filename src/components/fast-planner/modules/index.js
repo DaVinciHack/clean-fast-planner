@@ -9,6 +9,7 @@ import FlightCalculations from './calculations/FlightCalculations';
 import MapInteractionHandler from './MapInteractionHandler';
 import AppSettingsManager from './AppSettingsManager';
 import FinanceCalculator from './finance/FinanceCalculator';
+import WeatherVisualizationManager from './weather/WeatherVisualizationManager';
 
 export {
   MapManager,
@@ -21,5 +22,6 @@ export {
   FlightCalculations,
   MapInteractionHandler,
   AppSettingsManager,
-  FinanceCalculator
+  FinanceCalculator,
+  WeatherVisualizationManager
 };

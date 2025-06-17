@@ -1,3 +1,34 @@
+/* MainCard Flight Info - Responsive Display */
+.maincard-flight-info {
+  display: none; /* Hidden by default on large screens */
+  flex-direction: column;
+  margin-top: 2px; /* Reduced from 5px to 2px - minimal gap from region */
+  margin-bottom: 10px; /* Add bottom margin to create space above buttons */
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.maincard-flight-name {
+  font-size: 12px;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-bottom: 2px;
+}
+
+.maincard-flight-departure {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Show MainCard flight info on iPad and smaller (when AppHeader hides it) */
+@media (max-width: 1024px) {
+  .maincard-flight-info {
+    display: flex !important;
+  }
+}
+
 /* Route line and label styling enhancements */
 .mapboxgl-canvas {
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4)) drop-shadow(0 2px 6px rgba(30, 143, 254, 0.2)); /* Heavy shadow with blue accent */

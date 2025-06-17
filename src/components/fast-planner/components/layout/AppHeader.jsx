@@ -20,8 +20,19 @@ const AppHeader = ({
   isLoading = false,        // New prop for loading state
   loadingText = "",         // New prop for loading text
   weather, // CRITICAL: Weather must be provided from parent
-  waypoints = []            // CRITICAL: Add waypoints prop for real-time calculations
+  waypoints = [],            // CRITICAL: Add waypoints prop for real-time calculations
+  loadedFlightData = null  // ADD THIS
 }) => {
+  // DEBUG: Log props received
+  console.log('🔍 AppHeader PROPS DEBUG: loadedFlightData =', loadedFlightData);
+  console.log('🔍 AppHeader PROPS DEBUG: All props =', {
+    selectedAircraft: !!selectedAircraft,
+    stopCards: stopCards?.length,
+    loadedFlightData: !!loadedFlightData,
+    weather: !!weather,
+    waypoints: waypoints?.length
+  });
+  
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
   
@@ -43,6 +54,54 @@ const AppHeader = ({
       }, 300); // Match transition time
     }
   }, [isLoading, loadingText]);
+  
+  // Calculate time to departure with color coding - includes "Dep. 16:35Z" + countdown
+  const getTimeToDepature = (etd) => {
+    if (!etd) return { text: '', color: '#888888' };
+    
+    try {
+      const now = new Date();
+      const departure = new Date(etd);
+      const diffMs = departure.getTime() - now.getTime();
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      
+      // Format the departure time
+      const depTime = departure.toISOString().substr(11, 5) + 'Z';
+      
+      if (diffMinutes < -1440) {
+        // More than a day ago - grey
+        const daysAgo = Math.abs(Math.floor(diffMinutes / 1440));
+        return { text: `Dep. ${depTime} (${daysAgo}d ago)`, color: '#888888' };
+      } else if (diffMinutes < 0) {
+        // Past - grey
+        const minutesAgo = Math.abs(diffMinutes);
+        if (minutesAgo < 60) {
+          return { text: `Dep. ${depTime} (${minutesAgo} min ago)`, color: '#888888' };
+        } else {
+          const hoursAgo = Math.floor(minutesAgo / 60);
+          return { text: `Dep. ${depTime} (${hoursAgo}h ago)`, color: '#888888' };
+        }
+      } else if (diffMinutes < 1440) {
+        // Today - blue
+        if (diffMinutes < 60) {
+          return { text: `Dep. ${depTime} ${diffMinutes} min`, color: '#2196F3' };
+        } else {
+          const hours = Math.floor(diffMinutes / 60);
+          const mins = diffMinutes % 60;
+          return { text: `Dep. ${depTime} ${hours}:${mins.toString().padStart(2, '0')} min`, color: '#2196F3' };
+        }
+      } else {
+        // Future (more than 24h) - green
+        const days = Math.floor(diffMinutes / 1440);
+        const remainingMins = diffMinutes % 1440;
+        const hours = Math.floor(remainingMins / 60);
+        return { text: `Dep. ${depTime} ${days}d ${hours}h`, color: '#4CAF50' };
+      }
+    } catch (error) {
+      console.error('Error calculating departure time:', error);
+      return { text: '', color: '#888888' };
+    }
+  };
   
   // Simple helper to format time as HH:MM
   const formatTime = (timeHours) => {
@@ -185,18 +244,34 @@ const AppHeader = ({
           />
         </div>
         
-        <div className="aircraft-display">
-          {selectedAircraft ? (
+        {/* Flight info section - loaded flight display */}
+        <div className="AppHeader-flight-info">
+          {/* ALWAYS LOG - DEBUG */}
+          {console.log('🔍 AppHeader ALWAYS: loadedFlightData =', loadedFlightData)}
+          {console.log('🔍 AppHeader ALWAYS: loadedFlightData is null?', loadedFlightData === null)}
+          {console.log('🔍 AppHeader ALWAYS: loadedFlightData is undefined?', loadedFlightData === undefined)}
+          
+          {loadedFlightData ? (
             <>
-              <span className="aircraft-registration">
-                {selectedAircraft.registration?.split(' (')[0] || 'Unknown'}
+              {console.log('🔍 AppHeader DEBUG: INSIDE loadedFlightData block')}
+              {console.log('🔍 AppHeader DEBUG: Available fields =', Object.keys(loadedFlightData))}
+              <span className="AppHeader-flight-name" style={{ color: '#FFFFFF' }}>
+                {loadedFlightData.flightNumber || loadedFlightData.name || 'Unknown Flight'}
               </span>
-              <span className="aircraft-type">
-                {selectedAircraft.modelType || 'Unknown Type'}
+              <span 
+                className="AppHeader-flight-departure" 
+                style={{ color: getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).color }}
+              >
+                {getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).text}
               </span>
             </>
           ) : (
-            <span className="no-aircraft">No Aircraft Selected</span>
+            <>
+              {console.log('🔍 AppHeader DEBUG: INSIDE No Flight Loaded block')}
+              <span className="AppHeader-no-flight" style={{ color: '#888888' }}>
+                No Flight Loaded
+              </span>
+            </>
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@
 
 import WeatherAPIService from './WeatherAPIService.js';
 import { WeatherReport, RigWeatherReport, WeatherLayer3D } from './utils/WeatherTypes.js';
+import RigWeatherGraphics from './RigWeatherGraphics.js';
 
 class WeatherVisualizationManager {
     constructor() {
@@ -32,6 +33,7 @@ class WeatherVisualizationManager {
         // Integration points
         this.mapManager = null;                 // Reference to MapManager
         this.platformManager = null;            // Reference to PlatformManager
+        this.rigWeatherGraphics = null;         // Rig weather graphics system
         
         // Weather overlay controls
         this.weatherControls = {
@@ -54,6 +56,81 @@ class WeatherVisualizationManager {
             // Store references to other managers
             this.mapManager = managers.mapManager || null;
             this.platformManager = managers.platformManager || null;
+            
+            // Initialize rig weather graphics if map is available
+            if (this.mapManager && this.mapManager.map) {
+                this.rigWeatherGraphics = new RigWeatherGraphics(this.mapManager.map);
+                // Make globally accessible for MapLayersCard
+                window.rigWeatherIntegration = this.rigWeatherGraphics;
+                window.weatherVisualizationManager = this;
+                
+                // Add global test function for debugging
+                window.testRigWeatherGraphics = () => {
+                    console.log('🧪 Running rig weather graphics test...');
+                    if (this.rigWeatherGraphics) {
+                        return this.rigWeatherGraphics.testStaticGraphics();
+                    } else {
+                        console.error('🧪 RigWeatherGraphics not available');
+                        return null;
+                    }
+                };
+                
+                // Add global function to use real rig positions
+                window.useRealRigPositions = () => {
+                    console.log('🧭 Using real rig positions...');
+                    if (this.rigWeatherGraphics) {
+                        return this.rigWeatherGraphics.useRealRigPositions();
+                    } else {
+                        console.error('🧭 RigWeatherGraphics not available');
+                        return null;
+                    }
+                };
+                
+                // Add global cleanup function for flight changes
+                window.clearRigWeatherGraphics = () => {
+                    console.log('🧹 GLOBAL: Clearing all rig weather graphics');
+                    if (this.rigWeatherGraphics) {
+                        this.rigWeatherGraphics.removeWeatherGraphics();
+                        console.log('🧹 GLOBAL: Rig weather graphics cleared');
+                    }
+                    
+                    // Also clear old weather circles
+                    if (window.currentWeatherCirclesLayer) {
+                        try {
+                            window.currentWeatherCirclesLayer.removeWeatherCircles();
+                            console.log('🧹 GLOBAL: Old weather circles cleared');
+                        } catch (error) {
+                            console.warn('🧹 GLOBAL: Could not clear old weather circles:', error);
+                        }
+                    }
+                };
+                
+                // Add global function to explore weather circles data
+                window.exploreWeatherData = () => {
+                    console.log('🔍 Exploring all weather data sources...');
+                    
+                    if (window.currentWeatherCirclesLayer) {
+                        console.log('🔍 Weather circles layer:', window.currentWeatherCirclesLayer);
+                        console.log('🔍 Weather circles properties:', Object.keys(window.currentWeatherCirclesLayer));
+                        
+                        // Try to find the actual data
+                        const props = Object.keys(window.currentWeatherCirclesLayer);
+                        props.forEach(prop => {
+                            const value = window.currentWeatherCirclesLayer[prop];
+                            if (Array.isArray(value) && value.length > 0) {
+                                console.log(`🔍 Found array in ${prop}:`, value.length, 'items');
+                                console.log(`🔍 Sample ${prop}[0]:`, value[0]);
+                            }
+                        });
+                    }
+                    
+                    return 'Check console for detailed exploration';
+                };
+                
+                console.log('🚁 RigWeatherGraphics initialized and made globally accessible');
+                console.log('🚁 WeatherVisualizationManager made globally accessible');
+                console.log('🧪 Global test function available: window.testRigWeatherGraphics()');
+            }
             
             // Initialize weather API service
             this.weatherAPI.initialize();
@@ -397,7 +474,7 @@ class WeatherVisualizationManager {
         for (const platform of platforms) {
             try {
                 console.log(`Fetching weather for ${platform.name} at ${platform.lat}, ${platform.lon}`);
-                const weatherData = await this.fetchNWSPointWeather(platform.lat, platform.lon);
+                const weatherData = await this.fetchAviationWeather(platform.lat, platform.lon);
                 
                 if (weatherData) {
                     weatherFeatures.push({
@@ -576,78 +653,112 @@ class WeatherVisualizationManager {
      */
     async createLiveWeatherSection(platformData) {
         try {
-            const liveWeather = await this.fetchNWSPointWeather(platformData.lat, platformData.lon);
+            const liveWeather = await this.fetchAviationWeather(platformData.lat, platformData.lon);
             
             if (!liveWeather) {
                 return `
                     <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #ff9800;">
-                        <strong style="color: #ff9800;">🌤️ Live Weather (NWS)</strong><br>
+                        <strong style="color: #ff9800;">🚁 Aviation Weather</strong><br>
                         <span style="color: #ccc; font-size: 12px;">Weather data unavailable</span>
                     </div>
                 `;
             }
             
-            // Build weather display with all available parameters
+            // Determine data source and icon (aviation only)
+            const dataIcon = '🚁';
+            const dataSource = 'Aviation Weather (AWC)';
+            const stationInfo = liveWeather.stationId ? ` - ${liveWeather.stationId}` : '';
+            
+            // Build aviation weather display
             let weatherDetails = '';
             
-            // Temperature and conditions
-            if (liveWeather.temperature !== null) {
-                weatherDetails += `<strong>Temp:</strong> ${Math.round(liveWeather.temperature)}°F<br>`;
+            // Aviation-specific parameters (priority display)
+            if (liveWeather.ceiling !== null && liveWeather.ceiling !== undefined) {
+                const ceilingFt = liveWeather.ceiling.toLocaleString();
+                weatherDetails += `<strong>Ceiling:</strong> ${ceilingFt} ft AGL<br>`;
+            } else {
+                weatherDetails += `<strong>Ceiling:</strong> Unlimited<br>`;
             }
             
-            // Wind information
+            // Flight category (critical for aviation)
+            if (liveWeather.flightCategory) {
+                const categoryColors = {
+                    'VFR': '#66BB6A',   // Green
+                    'MVFR': '#FFA726',  // Orange
+                    'IFR': '#EF5350',   // Red
+                    'LIFR': '#9C27B0'   // Purple
+                };
+                const categoryColor = categoryColors[liveWeather.flightCategory] || '#40c8f0';
+                weatherDetails += `<strong>Flight Category:</strong> <span style="color: ${categoryColor}; font-weight: bold;">${liveWeather.flightCategory}</span><br>`;
+            }
+            
+            // Visibility (aviation standard)
+            if (liveWeather.visibility !== null) {
+                const visibility = typeof liveWeather.visibility === 'number' ? 
+                    (liveWeather.visibility > 100 ? (liveWeather.visibility / 1609.34).toFixed(1) : liveWeather.visibility.toFixed(1)) :
+                    liveWeather.visibility;
+                weatherDetails += `<strong>Visibility:</strong> ${visibility} SM<br>`;
+            }
+            
+            // Wind information (enhanced for aviation)
             if (liveWeather.windSpeed !== null && liveWeather.windDirection !== null) {
                 const windSpeedKts = Math.round(liveWeather.windSpeed);
                 const windDir = Math.round(liveWeather.windDirection);
-                weatherDetails += `<strong>Wind:</strong> ${windSpeedKts} kts @ ${windDir}°<br>`;
+                let windString = `${windSpeedKts} kts @ ${windDir}°`;
+                
+                // Add gust information if available
+                if (liveWeather.windGust && liveWeather.windGust > liveWeather.windSpeed) {
+                    const gustKts = Math.round(liveWeather.windGust);
+                    windString = `${windSpeedKts}G${gustKts} kts @ ${windDir}°`;
+                }
+                
+                weatherDetails += `<strong>Wind:</strong> ${windString}<br>`;
             }
             
-            // Visibility
-            if (liveWeather.visibility !== null) {
-                const visibilityMiles = (liveWeather.visibility / 1609.34).toFixed(1); // Convert meters to miles
-                weatherDetails += `<strong>Visibility:</strong> ${visibilityMiles} SM<br>`;
+            // Cloud coverage (aviation format)
+            if (liveWeather.cloudCoverage !== null && liveWeather.cloudCoverage !== undefined) {
+                weatherDetails += `<strong>Cloud Coverage:</strong> ${liveWeather.cloudCoverage}%<br>`;
             }
             
-            // Cloud coverage
-            if (liveWeather.skyCover !== null) {
-                weatherDetails += `<strong>Cloud Cover:</strong> ${liveWeather.skyCover}%<br>`;
+            // Temperature
+            if (liveWeather.temperature !== null) {
+                let tempString = `${Math.round(liveWeather.temperature)}°F`;
+                
+                // Add dewpoint if available
+                if (liveWeather.dewPoint !== null && liveWeather.dewPoint !== undefined) {
+                    tempString += ` / ${Math.round(liveWeather.dewPoint)}°F`;
+                }
+                
+                weatherDetails += `<strong>Temp:</strong> ${tempString}<br>`;
             }
             
-            // Relative humidity
-            if (liveWeather.relativeHumidity !== null) {
-                weatherDetails += `<strong>Humidity:</strong> ${Math.round(liveWeather.relativeHumidity)}%<br>`;
-            }
-            
-            // Precipitation probability
-            if (liveWeather.probabilityOfPrecipitation !== null) {
-                weatherDetails += `<strong>Precip Chance:</strong> ${liveWeather.probabilityOfPrecipitation}%<br>`;
+            // Density altitude (important for helicopter performance)
+            if (liveWeather.densityAltitude !== null && liveWeather.densityAltitude !== undefined) {
+                const sign = liveWeather.densityAltitude >= 0 ? '+' : '';
+                weatherDetails += `<strong>Density Alt:</strong> ${sign}${liveWeather.densityAltitude} ft<br>`;
             }
             
             // Weather conditions
-            if (liveWeather.weather && liveWeather.weather !== 'Clear') {
-                weatherDetails += `<strong>Conditions:</strong> ${liveWeather.weather}<br>`;
+            if (liveWeather.conditions && liveWeather.conditions !== 'Clear') {
+                weatherDetails += `<strong>Conditions:</strong> ${liveWeather.conditions}<br>`;
             }
             
-            // Storm warnings/hazards
-            let hazardWarning = '';
-            if (liveWeather.hazards && liveWeather.hazards.length > 0) {
-                const warnings = liveWeather.hazards.map(h => `${h.phenomenon}-${h.significance}`).join(', ');
-                hazardWarning = `
-                    <div style="margin-top: 4px; padding: 4px; background-color: rgba(255,0,0,0.2); border-radius: 3px; border-left: 2px solid #ff0000;">
-                        <strong style="color: #ff4444;">⚠️ Warnings:</strong> ${warnings}
-                    </div>
-                `;
+            // Observation time for METAR data
+            let timeInfo = '';
+            if (liveWeather.observationTime) {
+                const obsTime = new Date(liveWeather.observationTime).toLocaleTimeString();
+                timeInfo = `Observed: ${obsTime}`;
+            } else {
+                timeInfo = `Updated: ${new Date().toLocaleTimeString()}`;
             }
             
             return `
                 <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #40c8f0;">
-                    <strong style="color: #40c8f0;">🌤️ Live Weather (NWS)</strong><br>
+                    <strong style="color: #40c8f0;">${dataIcon} ${dataSource}${stationInfo}</strong><br>
                     <div style="font-size: 12px; color: #e0e0e0; margin-top: 4px;">
                         ${weatherDetails}
-                        <strong>Overall:</strong> ${liveWeather.conditions}<br>
-                        <span style="font-size: 10px; color: #888; margin-top: 4px; display: block;">Updated: ${new Date().toLocaleTimeString()}</span>
+                        <span style="font-size: 10px; color: #888; margin-top: 4px; display: block;">${timeInfo}</span>
                     </div>
-                    ${hazardWarning}
                 </div>
             `;
             
@@ -655,7 +766,7 @@ class WeatherVisualizationManager {
             console.warn('Failed to create live weather section:', error.message);
             return `
                 <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #f44336;">
-                    <strong style="color: #f44336;">🌤️ Live Weather (NWS)</strong><br>
+                    <strong style="color: #f44336;">🚁 Aviation Weather</strong><br>
                     <span style="color: #ccc; font-size: 12px;">Error loading weather data</span>
                 </div>
             `;
@@ -710,50 +821,720 @@ class WeatherVisualizationManager {
     
     /**
      * Fetch comprehensive weather data for a specific point from NWS REST API
+     * ✅ PHASE 1.1: Add arrival time support
      * @private
      */
-    async fetchNWSPointWeather(lat, lon) {
+    async fetchAviationWeather(lat, lon, arrivalTime = null) {
+        const timeDesc = arrivalTime ? `arrival time ${new Date(arrivalTime).toISOString()}` : 'current conditions';
+        console.log(`🔍 ARRIVAL TIME WEATHER: Starting weather fetch for ${lat}, ${lon} at ${timeDesc}`);
+        
         try {
-            // Use NWS REST API to get current conditions and forecast grid data
-            const response = await fetch(`https://api.weather.gov/points/${lat},${lon}`);
-            
-            if (!response.ok) {
-                throw new Error(`NWS API responded with ${response.status}`);
+            // Use Open-Meteo for accurate offshore weather (uses NOAA GFS data)
+            console.log(`🔍 ARRIVAL TIME WEATHER: About to call Open-Meteo with ${arrivalTime ? 'arrival time' : 'current'} data`);
+            const noaaResult = await this.tryOpenMeteoNOAA(lat, lon, arrivalTime);
+            if (noaaResult) {
+                console.log(`🔍 ARRIVAL TIME WEATHER: ✅ Got weather data:`, noaaResult);
+                return noaaResult;
             }
             
-            const pointData = await response.json();
-            
-            // Get the forecast office and grid coordinates
-            if (pointData.properties && pointData.properties.forecastGridData) {
-                const gridDataUrl = pointData.properties.forecastGridData;
-                const gridResponse = await fetch(gridDataUrl);
-                
-                if (gridResponse.ok) {
-                    const gridData = await gridResponse.json();
-                    
-                    // Extract comprehensive weather parameters
-                    return {
-                        temperature: this.extractCurrentValue(gridData.properties.temperature),
-                        windSpeed: this.extractCurrentValue(gridData.properties.windSpeed),
-                        windDirection: this.extractCurrentValue(gridData.properties.windDirection),
-                        visibility: this.extractCurrentValue(gridData.properties.visibility),
-                        skyCover: this.extractCurrentValue(gridData.properties.skyCover), // Cloud coverage %
-                        dewpoint: this.extractCurrentValue(gridData.properties.dewpoint),
-                        relativeHumidity: this.extractCurrentValue(gridData.properties.relativeHumidity),
-                        probabilityOfPrecipitation: this.extractCurrentValue(gridData.properties.probabilityOfPrecipitation),
-                        weather: this.extractCurrentWeatherConditions(gridData.properties.weather), // Weather conditions array
-                        hazards: this.extractCurrentHazards(gridData.properties.hazards), // Storm warnings
-                        conditions: this.determineOverallConditions(gridData.properties)
-                    };
-                }
-            }
-            
+            console.error(`🔍 ARRIVAL TIME WEATHER: ❌ No data from Open-Meteo NOAA model`);
             return null;
             
         } catch (error) {
-            console.warn(`NWS API request failed for ${lat},${lon}:`, error.message);
+            console.error(`🔍 ARRIVAL TIME WEATHER: ❌ API error: ${error.message}`);
             return null;
         }
+    }
+    
+    /**
+     * Try Open-Meteo API with NOAA model for offshore weather
+     * @private
+     */
+    async tryOpenMeteoNOAA(lat, lon, arrivalTime = null) {
+        try {
+            // ✅ PHASE 1.1: Get forecast weather for ARRIVAL TIME, not current conditions
+            // Use Open-Meteo API for precise point forecast at exact rig coordinates (uses NOAA GFS model by default)
+            // Include marine-specific parameters for offshore operations
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover&hourly=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,visibility,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation&forecast_days=3&timezone=UTC`;
+            
+            console.log(`🔍 ARRIVAL TIME WEATHER: API URL for ${arrivalTime ? 'arrival time' : 'current'} weather: ${url}`);
+            
+            const response = await fetch(url);
+            console.log(`🔍 SEARCH FOR: "API RESPONSE" - Status: ${response.status}, OK: ${response.ok}`);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`🔍 SEARCH FOR: "API ERROR DETAILS" - ${response.status}: ${errorText}`);
+                throw new Error(`Open-Meteo NOAA API responded with ${response.status}: ${errorText}`);
+            }
+            
+            const weatherData = await response.json();
+            console.log(`🔍 SEARCH FOR: "RAW API DATA" - Full response:`, weatherData);
+            
+            if (!weatherData.current) {
+                console.warn(`🔍 SEARCH FOR: "NO CURRENT DATA" - Missing current weather in response`);
+                return null;
+            }
+            
+            console.log(`🔍 SEARCH FOR: "CURRENT WEATHER" - Current data:`, weatherData.current);
+            
+            // Try to get marine data for offshore conditions
+            let marineData = null;
+            try {
+                const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_direction,wave_period&timezone=UTC`;
+                console.log(`🔍 SEARCH FOR: "MARINE API" - Marine URL: ${marineUrl}`);
+                const marineResponse = await fetch(marineUrl);
+                if (marineResponse.ok) {
+                    marineData = await marineResponse.json();
+                    console.log(`🔍 SEARCH FOR: "MARINE DATA" - Marine data:`, marineData.current);
+                }
+            } catch (error) {
+                console.log(`🔍 SEARCH FOR: "MARINE ERROR" - ${error.message}`);
+            }
+            
+            // ✅ PHASE 1.2: Convert weather data for specific arrival time
+            console.log(`🔍 ARRIVAL TIME WEATHER: Converting weather data for ${arrivalTime ? new Date(arrivalTime).toISOString() : 'current time'}`);
+            const aviationWeather = this.convertOpenMeteoNOAAToAviation(weatherData, lat, lon, marineData, arrivalTime);
+            console.log(`🔍 ARRIVAL TIME WEATHER: ✅ Converted weather data:`, aviationWeather);
+            
+            return aviationWeather;
+            
+        } catch (error) {
+            console.error(`🔍 SEARCH FOR: "TRY CATCH ERROR" - ${error.message}`);
+            console.error(`🔍 SEARCH FOR: "ERROR STACK" - ${error.stack}`);
+            return null;
+        }
+    }
+
+    /**
+     * Try Aviation Weather Center API (backup)
+     * @private
+     */
+    async tryAWCAPI(lat, lon) {
+        try {
+            // Create a larger bounding box around the target coordinates for offshore locations
+            // Rigs are offshore, so we need to look for nearby coastal/airport weather stations
+            const buffer = 2.0; // Increase to 2 degrees to find coastal weather stations
+            const bbox = `${lat - buffer},${lon - buffer},${lat + buffer},${lon + buffer}`;
+            
+            console.log(`🌦️ AWC API: Fetching from /api/awc/api/data/metar?bbox=${bbox} (via proxy)`);
+            
+            const response = await fetch(`/api/awc/api/data/metar?bbox=${bbox}&format=json&taf=false&hours=1`);
+            
+            console.log(`🌦️ AWC API: Response status: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`AWC API responded with ${response.status}`);
+            }
+            
+            const metarData = await response.json();
+            console.log(`🌦️ AWC API: Received ${metarData.length} METAR stations:`, metarData.map(m => `${m.icaoId}@${m.lat},${m.lon}`));
+            
+            if (!metarData || metarData.length === 0) {
+                console.warn(`🌦️ AWC API: No METAR data found for ${lat},${lon} within ${buffer * 2}° search area`);
+                return null;
+            }
+            
+            // Find the closest METAR station to our target coordinates
+            const closestMetar = this.findClosestMetar(metarData, lat, lon);
+            
+            if (!closestMetar) {
+                console.warn(`🌦️ AWC API: No suitable METAR found within range for ${lat},${lon}`);
+                return null;
+            }
+            
+            // Parse METAR data into aviation-specific structure
+            const aviationWeather = this.parseMetarToAviationData(closestMetar);
+            console.log(`🌦️ AWC API: ✅ Parsed weather data:`, aviationWeather);
+            
+            return aviationWeather;
+            
+        } catch (error) {
+            console.error(`🌦️ AWC API: Failed - ${error.message}`);
+            return null;
+        }
+    }
+    
+    /**
+     * Try Open-Meteo API (no CORS issues)
+     * @private
+     */
+    async tryOpenMeteoAPI(lat, lon) {
+        try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=visibility&timezone=UTC`;
+            
+            console.log(`🌦️ Open-Meteo API: Fetching from ${url}`);
+            
+            const response = await fetch(url);
+            console.log(`🌦️ Open-Meteo API: Response status: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`Open-Meteo API responded with ${response.status}`);
+            }
+            
+            const weatherData = await response.json();
+            console.log(`🌦️ Open-Meteo API: Received data:`, weatherData);
+            
+            if (!weatherData.current) {
+                console.warn(`🌦️ Open-Meteo API: No current weather data available`);
+                return null;
+            }
+            
+            // Convert Open-Meteo data to aviation format
+            const aviationWeather = this.convertOpenMeteoToAviation(weatherData, lat, lon);
+            console.log(`🌦️ Open-Meteo API: ✅ Converted weather data:`, aviationWeather);
+            
+            return aviationWeather;
+            
+        } catch (error) {
+            console.error(`🌦️ Open-Meteo API: Failed - ${error.message}`);
+            return null;
+        }
+    }
+    
+    /**
+     * Convert Open-Meteo NOAA data to aviation format (for offshore rigs)
+     * ✅ PHASE 1.3: Extract weather data for specific arrival hour
+     * @private
+     */
+    convertOpenMeteoNOAAToAviation(weatherData, lat, lon, marineData = null, arrivalTime = null) {
+        const current = weatherData.current;
+        const hourly = weatherData.hourly;
+        
+        // ✅ PHASE 1.3: Determine which dataset to use (arrival time vs current)
+        let weatherDataToUse = current;
+        let dataSource = 'current';
+        let timeInfo = 'Current conditions';
+        
+        if (arrivalTime && hourly && hourly.time) {
+            // Find the closest hour to arrival time in the forecast
+            const arrivalDate = new Date(arrivalTime);
+            const arrivalHour = arrivalDate.toISOString().slice(0, 13) + ':00'; // Round to nearest hour
+            
+            console.log(`🔍 ARRIVAL TIME WEATHER: Looking for forecast at ${arrivalHour}`);
+            
+            const hourIndex = hourly.time.findIndex(time => time === arrivalHour);
+            
+            if (hourIndex !== -1) {
+                console.log(`🔍 ARRIVAL TIME WEATHER: ✅ Found forecast data at index ${hourIndex} for ${arrivalHour}`);
+                
+                // Extract forecast data for arrival time
+                weatherDataToUse = {
+                    temperature_2m: hourly.temperature_2m[hourIndex],
+                    relative_humidity_2m: hourly.relative_humidity_2m[hourIndex],
+                    weather_code: hourly.weather_code[hourIndex],
+                    surface_pressure: hourly.surface_pressure[hourIndex],
+                    wind_speed_10m: hourly.wind_speed_10m[hourIndex],
+                    wind_direction_10m: hourly.wind_direction_10m[hourIndex],
+                    wind_gusts_10m: hourly.wind_gusts_10m[hourIndex],
+                    cloud_cover: hourly.cloud_cover[hourIndex],
+                    time: hourly.time[hourIndex]
+                };
+                
+                dataSource = 'forecast';
+                const arrivalTimeString = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timeInfo = `Forecast for ${arrivalTimeString} arrival`;
+                
+                console.log(`🔍 ARRIVAL TIME WEATHER: Using forecast data:`, weatherDataToUse);
+            } else {
+                console.warn(`🔍 ARRIVAL TIME WEATHER: ❌ No forecast data found for ${arrivalHour}, falling back to current conditions`);
+                timeInfo = 'Current conditions (arrival forecast unavailable)';
+            }
+        }
+        
+        // ✅ PHASE 1.3: Use arrival time weather data instead of current
+        // Convert temperature from Celsius to Fahrenheit
+        const tempF = Math.round((weatherDataToUse.temperature_2m * 9/5) + 32);
+        
+        // Convert wind speed from km/h to knots
+        const windSpeedKts = Math.round(weatherDataToUse.wind_speed_10m * 0.539957);
+        const windGustKts = weatherDataToUse.wind_gusts_10m ? Math.round(weatherDataToUse.wind_gusts_10m * 0.539957) : null;
+        
+        // Get visibility from hourly data (first hour) - convert from meters to statute miles
+        const visibilityMeters = hourly.visibility && hourly.visibility[0] ? hourly.visibility[0] : 10000;
+        const visibilitySM = Math.round(visibilityMeters / 1609.34);
+        
+        // Calculate ceiling from cloud cover data
+        const cloudCoverLow = hourly.cloud_cover_low && hourly.cloud_cover_low[0] ? hourly.cloud_cover_low[0] : 0;
+        const cloudCoverMid = hourly.cloud_cover_mid && hourly.cloud_cover_mid[0] ? hourly.cloud_cover_mid[0] : 0;
+        const cloudCoverHigh = hourly.cloud_cover_high && hourly.cloud_cover_high[0] ? hourly.cloud_cover_high[0] : 0;
+        
+        // Estimate ceiling based on cloud layers (simplified aviation method)
+        let ceiling = null;
+        if (cloudCoverLow > 50) {
+            ceiling = 2000; // Low clouds ~2000 ft
+        } else if (cloudCoverMid > 50) {
+            ceiling = 8000; // Mid clouds ~8000 ft
+        } else if (cloudCoverHigh > 75) {
+            ceiling = 20000; // High clouds ~20000 ft
+        }
+        
+        // Determine flight category based on ceiling and visibility (aviation standards)
+        let flightCategory = 'VFR';
+        if (ceiling && ceiling < 500) {
+            flightCategory = 'LIFR';
+        } else if (ceiling && ceiling < 1000) {
+            flightCategory = 'IFR';
+        } else if (ceiling && ceiling < 3000 || visibilitySM < 5) {
+            flightCategory = 'MVFR';
+        } else if (visibilitySM < 1) {
+            flightCategory = 'LIFR';
+        } else if (visibilitySM < 3) {
+            flightCategory = 'IFR';
+        }
+        
+        // Weather code to conditions mapping (NOAA GFS model specific)
+        const weatherCodes = {
+            0: 'Clear skies',
+            1: 'Mainly clear',
+            2: 'Partly cloudy',
+            3: 'Overcast',
+            45: 'Fog',
+            48: 'Depositing rime fog',
+            51: 'Light drizzle',
+            53: 'Moderate drizzle',
+            55: 'Dense drizzle',
+            61: 'Slight rain',
+            63: 'Moderate rain',
+            65: 'Heavy rain',
+            80: 'Slight rain showers',
+            81: 'Moderate rain showers',
+            82: 'Violent rain showers',
+            95: 'Thunderstorm',
+            96: 'Thunderstorm with slight hail',
+            99: 'Thunderstorm with heavy hail'
+        };
+        
+        const conditions = weatherCodes[weatherDataToUse.weather_code] || 'Unknown conditions';
+        
+        // Calculate dewpoint approximation from relative humidity
+        const dewPoint = weatherDataToUse.relative_humidity_2m ? 
+            Math.round(weatherDataToUse.temperature_2m - ((100 - weatherDataToUse.relative_humidity_2m) / 5)) : null;
+        const dewPointF = dewPoint ? Math.round((dewPoint * 9/5) + 32) : null;
+        
+        return {
+            // Basic weather parameters
+            temperature: tempF,
+            windSpeed: windSpeedKts,
+            windDirection: Math.round(weatherDataToUse.wind_direction_10m || 0),
+            windGust: windGustKts,
+            visibility: visibilitySM,
+            
+            // Aviation-specific parameters
+            ceiling: ceiling,
+            flightCategory: flightCategory,
+            
+            // Cloud information
+            cloudCoverage: Math.round(weatherDataToUse.cloud_cover || 0),
+            cloudCoverageLow: Math.round(cloudCoverLow),
+            cloudCoverageMid: Math.round(cloudCoverMid),
+            cloudCoverageHigh: Math.round(cloudCoverHigh),
+            conditions: conditions,
+            
+            // Additional parameters
+            dewPoint: dewPointF,
+            altimeter: weatherDataToUse.surface_pressure ? Math.round(weatherDataToUse.surface_pressure * 0.02953) : null, // Convert hPa to inHg
+            relativeHumidity: Math.round(weatherDataToUse.relative_humidity_2m || 0),
+            
+            // Marine conditions (for offshore operations)
+            waveHeight: marineData?.current?.wave_height || null,
+            waveDirection: marineData?.current?.wave_direction || null,
+            wavePeriod: marineData?.current?.wave_period || null,
+            
+            // ✅ PHASE 1.4: Add arrival time information and data freshness
+            arrivalTime: arrivalTime,
+            weatherTime: weatherDataToUse.time || current.time,
+            weatherTimeInfo: timeInfo,
+            dataFreshness: new Date().toISOString(),
+            
+            // Metadata
+            stationId: `NOAA-GFS-${lat.toFixed(2)},${lon.toFixed(2)}`,
+            observationTime: weatherDataToUse.time || current.time,
+            dataSource: dataSource === 'forecast' ? 'OPEN_METEO_NOAA_GFS_FORECAST' : 'OPEN_METEO_NOAA_GFS_CURRENT',
+            rawMetar: `NOAA GFS Model via Open-Meteo for ${lat.toFixed(4)},${lon.toFixed(4)} - ${conditions} ${tempF}°F ${windSpeedKts}kts@${Math.round(weatherDataToUse.wind_direction_10m)}° ${visibilitySM}SM ${flightCategory}${marineData?.current?.wave_height ? ` Waves:${marineData.current.wave_height}m` : ''}`
+        };
+    }
+
+    /**
+     * Convert Open-Meteo data to aviation format (legacy)
+     * @private
+     */
+    convertOpenMeteoToAviation(weatherData, lat, lon) {
+        const current = weatherData.current;
+        const hourly = weatherData.hourly;
+        
+        // Convert temperature from Celsius to Fahrenheit
+        const tempF = Math.round((current.temperature_2m * 9/5) + 32);
+        
+        // Convert wind speed from km/h to knots
+        const windSpeedKts = Math.round(current.wind_speed_10m * 0.539957);
+        const windGustKts = current.wind_gusts_10m ? Math.round(current.wind_gusts_10m * 0.539957) : null;
+        
+        // Get visibility from hourly data (first hour)
+        const visibilityKm = hourly.visibility && hourly.visibility[0] ? hourly.visibility[0] / 1000 : 10;
+        const visibilitySM = Math.round(visibilityKm * 0.621371); // Convert km to statute miles
+        
+        // Determine flight category based on visibility
+        let flightCategory = 'VFR';
+        if (visibilitySM < 1) flightCategory = 'LIFR';
+        else if (visibilitySM < 3) flightCategory = 'IFR';
+        else if (visibilitySM < 5) flightCategory = 'MVFR';
+        
+        // Weather code to conditions mapping (simplified)
+        const weatherCodes = {
+            0: 'Clear skies',
+            1: 'Mainly clear',
+            2: 'Partly cloudy',
+            3: 'Overcast',
+            45: 'Fog',
+            48: 'Depositing rime fog',
+            51: 'Light drizzle',
+            61: 'Slight rain',
+            95: 'Thunderstorm'
+        };
+        
+        const conditions = weatherCodes[current.weather_code] || 'Unknown conditions';
+        
+        return {
+            // Basic weather parameters
+            temperature: tempF,
+            windSpeed: windSpeedKts,
+            windDirection: Math.round(current.wind_direction_10m || 0),
+            windGust: windGustKts,
+            visibility: visibilitySM,
+            
+            // Aviation-specific parameters
+            ceiling: null, // Open-Meteo doesn't provide ceiling data
+            flightCategory: flightCategory,
+            
+            // Cloud information
+            cloudCoverage: this.weatherCodeToCloudCoverage(current.weather_code),
+            conditions: conditions,
+            
+            // Additional parameters
+            dewPoint: null, // Not available in basic Open-Meteo
+            altimeter: current.surface_pressure ? Math.round(current.surface_pressure * 0.02953) : null, // Convert hPa to inHg
+            
+            // Metadata
+            stationId: `OPEN-METEO-${lat.toFixed(2)},${lon.toFixed(2)}`,
+            observationTime: current.time,
+            dataSource: 'OPEN_METEO',
+            rawMetar: `Generated from Open-Meteo API for ${lat.toFixed(4)},${lon.toFixed(4)}`
+        };
+    }
+    
+    /**
+     * Convert weather code to cloud coverage percentage
+     * @private
+     */
+    weatherCodeToCloudCoverage(code) {
+        if (code === 0) return 0;   // Clear skies
+        if (code === 1) return 25;  // Mainly clear
+        if (code === 2) return 50;  // Partly cloudy
+        if (code === 3) return 100; // Overcast
+        return 75; // Default for other conditions
+    }
+    
+    /**
+     * Try alternative weather API (WeatherAPI.com has free tier)
+     * @private
+     */
+    async tryAlternativeWeatherAPI(lat, lon) {
+        try {
+            // Using WeatherAPI.com free tier (no API key needed for basic calls)
+            const url = `https://api.weatherapi.com/v1/current.json?key=demo&q=${lat},${lon}&aqi=no`;
+            
+            console.log(`🌦️ WeatherAPI: Fetching from ${url}`);
+            
+            const response = await fetch(url);
+            console.log(`🌦️ WeatherAPI: Response status: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`WeatherAPI responded with ${response.status}`);
+            }
+            
+            const weatherData = await response.json();
+            console.log(`🌦️ WeatherAPI: Received data:`, weatherData);
+            
+            if (!weatherData.current) {
+                console.warn(`🌦️ WeatherAPI: No current weather data available`);
+                return null;
+            }
+            
+            // Convert WeatherAPI data to aviation format
+            const aviationWeather = this.convertWeatherAPIToAviation(weatherData, lat, lon);
+            console.log(`🌦️ WeatherAPI: ✅ Converted weather data:`, aviationWeather);
+            
+            return aviationWeather;
+            
+        } catch (error) {
+            console.error(`🌦️ WeatherAPI: Failed - ${error.message}`);
+            return null;
+        }
+    }
+    
+    /**
+     * Convert WeatherAPI data to aviation format
+     * @private
+     */
+    convertWeatherAPIToAviation(weatherData, lat, lon) {
+        const current = weatherData.current;
+        
+        // Convert wind speed from mph to knots
+        const windSpeedKts = Math.round(current.wind_mph * 0.868976);
+        
+        // Get visibility in miles
+        const visibilitySM = Math.round(current.vis_miles || 10);
+        
+        // Determine flight category based on visibility
+        let flightCategory = 'VFR';
+        if (visibilitySM < 1) flightCategory = 'LIFR';
+        else if (visibilitySM < 3) flightCategory = 'IFR';
+        else if (visibilitySM < 5) flightCategory = 'MVFR';
+        
+        // Convert cloud coverage percentage
+        const cloudCoverage = current.cloud || 0;
+        
+        return {
+            // Basic weather parameters
+            temperature: Math.round(current.temp_f),
+            windSpeed: windSpeedKts,
+            windDirection: Math.round(current.wind_degree || 0),
+            windGust: current.gust_mph ? Math.round(current.gust_mph * 0.868976) : null,
+            visibility: visibilitySM,
+            
+            // Aviation-specific parameters
+            ceiling: null, // WeatherAPI doesn't provide ceiling data
+            flightCategory: flightCategory,
+            
+            // Cloud information
+            cloudCoverage: cloudCoverage,
+            conditions: current.condition?.text || 'Unknown conditions',
+            
+            // Additional parameters
+            dewPoint: null, // Not available in basic WeatherAPI
+            altimeter: null, // Not available in basic WeatherAPI
+            
+            // Metadata
+            stationId: `WEATHERAPI-${lat.toFixed(2)},${lon.toFixed(2)}`,
+            observationTime: current.last_updated,
+            dataSource: 'WEATHER_API_COM',
+            rawMetar: `Generated from WeatherAPI for ${lat.toFixed(4)},${lon.toFixed(4)}`
+        };
+    }
+    
+    /**
+     * Generate realistic test weather data for debugging
+     * @private
+     */
+    generateTestWeatherData(lat, lon) {
+        console.log(`🌦️ TEST DATA: Generating realistic test weather for ${lat}, ${lon}`);
+        
+        // Generate realistic Gulf of Mexico weather patterns
+        const windDirections = [90, 135, 180, 225, 270]; // Common Gulf wind directions
+        const windSpeeds = [8, 12, 15, 18, 22, 25]; // Common wind speeds in knots
+        const temperatures = [68, 72, 75, 78, 82, 85]; // Gulf temperatures in Fahrenheit
+        const visibilities = [3, 5, 7, 10, 10, 10]; // Statute miles (more good vis)
+        const flightCategories = ['VFR', 'VFR', 'VFR', 'MVFR', 'IFR']; // Weighted toward VFR
+        
+        const randomWind = windSpeeds[Math.floor(Math.random() * windSpeeds.length)];
+        const randomDir = windDirections[Math.floor(Math.random() * windDirections.length)];
+        const randomTemp = temperatures[Math.floor(Math.random() * temperatures.length)];
+        const randomVis = visibilities[Math.floor(Math.random() * visibilities.length)];
+        const randomCategory = flightCategories[Math.floor(Math.random() * flightCategories.length)];
+        
+        return {
+            temperature: randomTemp,
+            windSpeed: randomWind,
+            windDirection: randomDir,
+            windGust: Math.random() > 0.7 ? randomWind + 8 : null,
+            visibility: randomVis,
+            ceiling: randomCategory === 'VFR' ? null : Math.floor(Math.random() * 3000) + 500,
+            flightCategory: randomCategory,
+            cloudCoverage: Math.floor(Math.random() * 100),
+            conditions: randomCategory === 'VFR' ? 'Few clouds' : 'Broken clouds',
+            stationId: `TEST-${lat.toFixed(1)},${lon.toFixed(1)}`,
+            observationTime: new Date().toISOString(),
+            dataSource: 'TEST_DATA_FOR_DEBUG',
+            rawMetar: `TEST DATA ${randomDir}${String(randomWind).padStart(2, '0')}KT ${randomVis}SM FEW025 ${randomTemp}/XX A3015`
+        };
+    }
+    
+    
+    /**
+     * Find the closest METAR station to target coordinates
+     * @private
+     */
+    findClosestMetar(metarData, targetLat, targetLon) {
+        let closestMetar = null;
+        let closestDistance = Infinity;
+        
+        for (const metar of metarData) {
+            if (!metar.lat || !metar.lon) continue;
+            
+            // Calculate distance using simple Euclidean distance (sufficient for small areas)
+            const distance = Math.sqrt(
+                Math.pow(metar.lat - targetLat, 2) + 
+                Math.pow(metar.lon - targetLon, 2)
+            );
+            
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestMetar = metar;
+            }
+        }
+        
+        // Only return if within reasonable distance (about 250 nautical miles for offshore locations)
+        if (closestDistance <= 4.5) {
+            console.log(`🌦️ AWC: Found closest METAR station at ${closestDistance.toFixed(2)}° distance (${closestMetar.icaoId})`);
+            return closestMetar;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Parse METAR data into aviation-specific weather structure
+     * @private
+     */
+    parseMetarToAviationData(metarData) {
+        const parsed = {
+            // Basic weather parameters
+            temperature: this.convertCelsiusToFahrenheit(metarData.temp),
+            windSpeed: metarData.wspd || 0,
+            windDirection: metarData.wdir || 0,
+            windGust: metarData.wgst || null,
+            visibility: metarData.visib || 10, // statute miles
+            
+            // Aviation-specific parameters
+            ceiling: this.parseCeiling(metarData.cig),
+            flightCategory: metarData.fltcat || this.determineFlightCategory(metarData.cig, metarData.visib),
+            
+            // Cloud information
+            cloudCoverage: this.parseCloudCoverage(metarData.cover),
+            cloudBase: metarData.cig || null, // Use ceiling as cloud base
+            conditions: metarData.wxString || this.parseWeatherConditions(metarData),
+            
+            // Additional parameters
+            dewPoint: this.convertCelsiusToFahrenheit(metarData.dewp),
+            altimeter: metarData.altim, // inches Hg
+            
+            // Aviation calculations
+            densityAltitude: this.calculateDensityAltitude(metarData.temp, metarData.altim),
+            
+            // Metadata
+            stationId: metarData.icaoId,
+            observationTime: metarData.obsTime,
+            dataSource: 'AWC_METAR',
+            rawMetar: metarData.rawOb
+        };
+        
+        return parsed;
+    }
+    
+    /**
+     * Parse ceiling from METAR data
+     * @private
+     */
+    parseCeiling(cig) {
+        if (!cig || cig === 'CLR' || cig === 'SKC') {
+            return null; // Clear skies, no ceiling
+        }
+        
+        // METAR ceiling is in hundreds of feet AGL
+        const ceilingValue = parseInt(cig);
+        if (!isNaN(ceilingValue)) {
+            return ceilingValue; // Already in feet AGL
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Determine flight category based on ceiling and visibility
+     * @private
+     */
+    determineFlightCategory(ceiling, visibility) {
+        // Standard aviation flight categories
+        if (!ceiling && visibility >= 5) {
+            return 'VFR'; // Visual Flight Rules
+        } else if (ceiling >= 3000 && visibility >= 5) {
+            return 'VFR';
+        } else if (ceiling >= 1000 && visibility >= 3) {
+            return 'MVFR'; // Marginal VFR
+        } else if (ceiling >= 500 && visibility >= 1) {
+            return 'IFR'; // Instrument Flight Rules
+        } else {
+            return 'LIFR'; // Low IFR
+        }
+    }
+    
+    /**
+     * Parse cloud coverage from METAR
+     * @private
+     */
+    parseCloudCoverage(cover) {
+        if (!cover) return 0;
+        
+        // Convert METAR cloud coverage to percentage
+        switch (cover.toUpperCase()) {
+            case 'CLR': case 'SKC': return 0;   // Clear
+            case 'FEW': return 25;              // Few (1/8 - 2/8)
+            case 'SCT': return 50;              // Scattered (3/8 - 4/8)
+            case 'BKN': return 75;              // Broken (5/8 - 7/8)
+            case 'OVC': return 100;             // Overcast (8/8)
+            default: return 0;
+        }
+    }
+    
+    /**
+     * Convert Celsius to Fahrenheit
+     * @private
+     */
+    convertCelsiusToFahrenheit(celsius) {
+        if (celsius === null || celsius === undefined) return null;
+        return Math.round((celsius * 9/5) + 32);
+    }
+    
+    /**
+     * Parse weather conditions from METAR
+     * @private
+     */
+    parseWeatherConditions(metarData) {
+        const conditions = [];
+        
+        // Cloud conditions
+        if (metarData.cover) {
+            switch (metarData.cover.toUpperCase()) {
+                case 'CLR': case 'SKC': conditions.push('Clear skies'); break;
+                case 'FEW': conditions.push('Few clouds'); break;
+                case 'SCT': conditions.push('Scattered clouds'); break;
+                case 'BKN': conditions.push('Broken clouds'); break;
+                case 'OVC': conditions.push('Overcast'); break;
+            }
+        }
+        
+        // Weather phenomena
+        if (metarData.wxString && metarData.wxString !== '') {
+            conditions.push(metarData.wxString);
+        }
+        
+        return conditions.length > 0 ? conditions.join(', ') : 'Clear';
+    }
+    
+    /**
+     * Calculate density altitude approximation
+     * @private
+     */
+    calculateDensityAltitude(tempC, altimeterInHg) {
+        if (!tempC || !altimeterInHg) return null;
+        
+        // Simplified density altitude calculation for sea level
+        const standardTemp = 15; // °C at sea level
+        const tempDiff = tempC - standardTemp;
+        const densityAltOffset = tempDiff * 120; // Rough approximation: 120 ft per °C
+        
+        return Math.round(densityAltOffset);
     }
     
     /**
@@ -966,6 +1747,320 @@ class WeatherVisualizationManager {
     }
     
     /**
+     * Fetch rig weather data from flight waypoints
+     * @param {Array} waypoints - Flight waypoints containing rig locations
+     * @returns {Array} Array of rig weather data
+     */
+    async fetchRigWeatherFromFlight(waypoints) {
+        if (!waypoints || waypoints.length === 0) {
+            console.log('🚁 No waypoints provided for rig weather');
+            return [];
+        }
+        
+        const rigWeatherData = [];
+        
+        // Debug: Log all waypoints first to understand the structure
+        console.log('🚁 All waypoints received:', waypoints);
+        console.log('🚁 Waypoint properties sample:', waypoints[0] ? Object.keys(waypoints[0]) : 'No waypoints');
+        
+        waypoints.forEach((wp, index) => {
+            console.log(`🚁 Waypoint ${index}:`, {
+                name: wp.name,
+                type: wp.type,
+                isRig: wp.isRig,
+                // Try different coordinate property names
+                lat: wp.lat || wp.latitude || wp.coords?.lat,
+                lng: wp.lng || wp.longitude || wp.lon || wp.coords?.lng,
+                coordinates: wp.coordinates,
+                // Log all properties to see what's available
+                allProps: Object.keys(wp)
+            });
+        });
+        
+        // Filter for rig waypoints - use LANDING_STOP type (rigs) vs WAYPOINT (navigation)
+        const rigWaypoints = waypoints.filter(wp => {
+            // Rigs are LANDING_STOP type that are NOT airports (airports start with K)
+            const isRig = wp.type === 'LANDING_STOP' && wp.pointType === 'LANDING_STOP' && 
+                         !wp.name?.startsWith('K'); // Skip airports like KLCH
+            
+            // Get coordinates from coords array [lng, lat]
+            const lat = wp.coords?.[1];
+            const lng = wp.coords?.[0];
+            
+            if (isRig) {
+                console.log(`🚁 Detected rig waypoint: ${wp.name} (${lat}, ${lng})`);
+                
+                // Ensure we have coordinates
+                if (!lat || !lng) {
+                    console.warn(`🚁 Rig ${wp.name} missing coordinates - skipping`);
+                    return false;
+                }
+            }
+            
+            return isRig && lat && lng;
+        });
+        
+        console.log(`🚁 Found ${rigWaypoints.length} rig waypoints for weather fetching:`, rigWaypoints.map(r => r.name));
+        
+        for (const rig of rigWaypoints) {
+            try {
+                // Get coordinates from coords array [lng, lat]
+                const lat = rig.coords?.[1];
+                const lng = rig.coords?.[0];
+                
+                console.log(`🚁 Fetching aviation weather for rig ${rig.name} at ${lat}, ${lng}`);
+                
+                const weatherData = await this.fetchAviationWeather(lat, lng);
+                
+                if (weatherData) {
+                    // Create structured data for visual graphics
+                    const rigWeather = {
+                        rigName: rig.name,
+                        latitude: lat,
+                        longitude: lng,
+                        
+                        // Aviation data (from AWC API)
+                        ceiling: weatherData.ceiling,
+                        flightCategory: weatherData.flightCategory,
+                        visibility: weatherData.visibility,
+                        cloudCoverage: weatherData.cloudCoverage,
+                        
+                        // Wind data
+                        windSpeed: weatherData.windSpeed || 0,
+                        windDirection: weatherData.windDirection || 0,
+                        windGust: weatherData.windGust,
+                        
+                        // Additional
+                        temperature: weatherData.temperature,
+                        conditions: weatherData.conditions,
+                        stationId: weatherData.stationId,
+                        observationTime: weatherData.observationTime,
+                        
+                        // Metadata
+                        waypointId: rig.id,
+                        dataSource: weatherData.dataSource
+                    };
+                    
+                    rigWeatherData.push(rigWeather);
+                    console.log(`🚁 Aviation weather retrieved for ${rig.name}:`, rigWeather);
+                } else {
+                    console.warn(`🚁 No aviation weather available for rig ${rig.name}`);
+                }
+                
+            } catch (error) {
+                console.error(`🚁 Failed to fetch weather for rig ${rig.name}:`, error.message);
+            }
+        }
+        
+        console.log(`🚁 Successfully fetched weather for ${rigWeatherData.length} rigs`);
+        return rigWeatherData;
+    }
+    
+    /**
+     * Update rig weather graphics with REAL external API weather data
+     * @param {Array} weatherSegments - Weather segments with location type data (used only for coordinates)
+     */
+    async updateRigWeatherGraphicsFromSegments(weatherSegments) {
+        if (!this.rigWeatherGraphics) {
+            console.warn('🚁 RigWeatherGraphics not initialized');
+            return;
+        }
+        
+        try {
+            console.log('🚁 Getting REAL weather from external APIs for rig graphics:', weatherSegments?.length || 0);
+            
+            if (!weatherSegments || weatherSegments.length === 0) {
+                console.warn('🚁 No weather segments available');
+                return;
+            }
+            
+            // Extract rig locations (coordinates only) from weather segments
+            const rigLocations = weatherSegments
+                .filter(segment => segment.isRig === true)
+                .map(segment => {
+                    const rigName = segment.locationName || segment.name || segment.airportIcao;
+                    
+                    // Get coordinates by matching airportIcao to waypoints
+                    let latitude = segment.latitude || segment.lat;
+                    let longitude = segment.longitude || segment.lng || segment.lon;
+                    
+                    // If no direct coordinates, look up from waypoints using airportIcao
+                    if ((!latitude || !longitude) && segment.airportIcao && window.currentWaypoints) {
+                        const matchingWaypoint = window.currentWaypoints.find(wp => 
+                            wp.name === segment.airportIcao || 
+                            wp.name?.includes(segment.airportIcao) ||
+                            segment.airportIcao?.includes(wp.name)
+                        );
+                        
+                        if (matchingWaypoint) {
+                            latitude = matchingWaypoint.coords?.[1] || matchingWaypoint.lat || matchingWaypoint.latitude;
+                            longitude = matchingWaypoint.coords?.[0] || matchingWaypoint.lng || matchingWaypoint.longitude;
+                            console.log('🚁 Matched weather rig to waypoint:', segment.airportIcao, '→', matchingWaypoint.name, 'at', latitude, longitude);
+                        } else {
+                            console.log('🚁 No waypoint match found for rig:', segment.airportIcao);
+                        }
+                    }
+                    
+                    return {
+                        rigName: rigName,
+                        latitude: latitude,
+                        longitude: longitude,
+                        arrivalTime: segment.arrivalTime, // Use for flight-time weather
+                        segmentId: segment.id || segment.uniqueId
+                    };
+                })
+                .filter(rig => rig.latitude && rig.longitude); // Only rigs with valid coordinates
+            
+            console.log(`🚁 Found ${rigLocations.length} rigs with coordinates:`, rigLocations.map(r => r.rigName));
+            
+            if (rigLocations.length === 0) {
+                console.warn('🚁 No rigs with valid coordinates found');
+                return;
+            }
+            
+            // 🌦️ CALL REAL EXTERNAL WEATHER APIs FOR EACH RIG
+            const realWeatherData = [];
+            
+            for (const rig of rigLocations) {
+                try {
+                    const arrivalDesc = rig.arrivalTime ? `for arrival at ${new Date(rig.arrivalTime).toLocaleTimeString()}` : 'current conditions';
+                    console.log(`🌦️ Fetching REAL weather from API for ${rig.rigName} at ${rig.latitude}, ${rig.longitude} ${arrivalDesc}`);
+                    
+                    // ✅ PHASE 1.1: Call API with arrival time for forecast weather
+                    const realWeather = await this.fetchAviationWeather(rig.latitude, rig.longitude, rig.arrivalTime);
+                    
+                    if (realWeather) {
+                        const rigWeatherData = {
+                            rigName: rig.rigName,
+                            latitude: rig.latitude,
+                            longitude: rig.longitude,
+                            
+                            // 🌦️ REAL WEATHER DATA FROM EXTERNAL APIs
+                            ceiling: realWeather.ceiling,
+                            flightCategory: realWeather.flightCategory,
+                            visibility: realWeather.visibility,
+                            cloudCoverage: realWeather.cloudCoverage || 0,
+                            
+                            // 🌬️ REAL WIND DATA FROM METAR
+                            windSpeed: realWeather.windSpeed || 0,
+                            windDirection: realWeather.windDirection || 0,
+                            windGust: realWeather.windGust,
+                            
+                            // 🌡️ REAL ATMOSPHERIC CONDITIONS
+                            temperature: realWeather.temperature,
+                            conditions: realWeather.conditions,
+                            densityAltitude: realWeather.densityAltitude,
+                            
+                            // 📡 REAL DATA SOURCE INFO
+                            stationId: realWeather.stationId,
+                            observationTime: realWeather.observationTime,
+                            dataSource: realWeather.dataSource, // 'AWC_METAR'
+                            rawMetar: realWeather.rawMetar,
+                            
+                            // Flight timing (from segment)
+                            arrivalTime: rig.arrivalTime,
+                            segmentId: rig.segmentId
+                        };
+                        
+                        realWeatherData.push(rigWeatherData);
+                        console.log(`🌦️ ✅ Real weather retrieved for ${rig.rigName}:`, {
+                            station: realWeather.stationId,
+                            category: realWeather.flightCategory,
+                            wind: `${realWeather.windSpeed}kts@${realWeather.windDirection}°`,
+                            visibility: `${realWeather.visibility}SM`,
+                            source: realWeather.dataSource
+                        });
+                    } else {
+                        console.warn(`🌦️ ❌ No real weather available for ${rig.rigName} - using fallback`);
+                        
+                        // Fallback with clear indication this is not real data
+                        realWeatherData.push({
+                            rigName: rig.rigName,
+                            latitude: rig.latitude,
+                            longitude: rig.longitude,
+                            flightCategory: 'UNKNOWN',
+                            ceiling: null,
+                            visibility: null,
+                            windSpeed: 0,
+                            windDirection: 0,
+                            temperature: null,
+                            conditions: 'No weather data available',
+                            dataSource: 'NO_DATA',
+                            stationId: 'N/A'
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.error(`🌦️ ❌ API error for ${rig.rigName}:`, error.message);
+                    
+                    // Error fallback
+                    realWeatherData.push({
+                        rigName: rig.rigName,
+                        latitude: rig.latitude,
+                        longitude: rig.longitude,
+                        flightCategory: 'ERROR',
+                        ceiling: null,
+                        visibility: null,
+                        windSpeed: 0,
+                        windDirection: 0,
+                        temperature: null,
+                        conditions: `API Error: ${error.message}`,
+                        dataSource: 'API_ERROR',
+                        stationId: 'ERROR'
+                    });
+                }
+            }
+            
+            console.log(`🌦️ Retrieved real weather for ${realWeatherData.length} rigs from external APIs`);
+            
+            // Update graphics with REAL weather data
+            this.rigWeatherGraphics.updateRigWeather(realWeatherData);
+            
+            console.log(`🚁 ✅ Updated rig weather graphics with REAL external API weather data for ${realWeatherData.length} rigs`);
+            
+        } catch (error) {
+            console.error('🚁 Failed to update rig weather graphics with real API data:', error.message);
+        }
+    }
+    
+    /**
+     * Update rig weather graphics from flight waypoints (fallback method)
+     * @param {Array} waypoints - Flight waypoints
+     */
+    async updateRigWeatherGraphics(waypoints) {
+        if (!this.rigWeatherGraphics) {
+            console.warn('🚁 RigWeatherGraphics not initialized');
+            return;
+        }
+        
+        try {
+            // Fetch weather data for rig waypoints
+            const rigWeatherData = await this.fetchRigWeatherFromFlight(waypoints);
+            
+            // Update graphics
+            this.rigWeatherGraphics.updateRigWeather(rigWeatherData);
+            
+            console.log(`🚁 Updated rig weather graphics for ${rigWeatherData.length} rigs`);
+            
+        } catch (error) {
+            console.error('🚁 Failed to update rig weather graphics:', error.message);
+        }
+    }
+    
+    /**
+     * Convert ranking to flight category
+     * @private
+     */
+    determineFlightCategoryFromRanking(ranking2) {
+        // Based on existing ranking system
+        if (ranking2 === 15 || ranking2 === 20) return 'VFR';
+        if (ranking2 === 10) return 'MVFR';
+        if (ranking2 === 8) return 'IFR';
+        if (ranking2 === 5) return 'LIFR';
+        return 'VFR'; // Default
+    }
+    
+    /**
      * Notify listeners of rig weather update
      * @private
      */
@@ -1000,6 +2095,74 @@ class WeatherVisualizationManager {
         if (cleanedCount > 0) {
             console.log(`Cleaned ${cleanedCount} expired weather reports from cache`);
         }
+    }
+    
+    /**
+     * Parse wind speed from METAR string
+     * @private
+     */
+    parseWindSpeedFromMetar(rawMetar) {
+        if (!rawMetar) return null;
+        
+        // Look for wind pattern like "215/18KT" or "21518KT"
+        const windMatch = rawMetar.match(/(\d{3})(\d{2,3})(G\d{2,3})?KT/);
+        if (windMatch) {
+            const windSpeed = parseInt(windMatch[2]);
+            console.log(`🌬️ Parsed wind speed: ${windSpeed} kts from METAR: ${rawMetar.substring(0, 50)}...`);
+            return windSpeed;
+        }
+        
+        // Variable wind pattern like "VRB05KT"
+        const variableMatch = rawMetar.match(/VRB(\d{2,3})KT/);
+        if (variableMatch) {
+            const windSpeed = parseInt(variableMatch[1]);
+            console.log(`🌬️ Parsed variable wind speed: ${windSpeed} kts from METAR`);
+            return windSpeed;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Parse wind direction from METAR string
+     * @private
+     */
+    parseWindDirectionFromMetar(rawMetar) {
+        if (!rawMetar) return null;
+        
+        // Look for wind pattern like "215/18KT" or "21518KT"
+        const windMatch = rawMetar.match(/(\d{3})(\d{2,3})(G\d{2,3})?KT/);
+        if (windMatch) {
+            const windDirection = parseInt(windMatch[1]);
+            console.log(`🌬️ Parsed wind direction: ${windDirection}° from METAR`);
+            return windDirection;
+        }
+        
+        // Variable wind returns null (no specific direction)
+        if (rawMetar.includes('VRB')) {
+            console.log(`🌬️ Variable wind direction from METAR`);
+            return null;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Parse wind gust from METAR string
+     * @private
+     */
+    parseWindGustFromMetar(rawMetar) {
+        if (!rawMetar) return null;
+        
+        // Look for gust pattern like "215/18G25KT"
+        const gustMatch = rawMetar.match(/\d{3}\d{2,3}G(\d{2,3})KT/);
+        if (gustMatch) {
+            const windGust = parseInt(gustMatch[1]);
+            console.log(`🌬️ Parsed wind gust: ${windGust} kts from METAR`);
+            return windGust;
+        }
+        
+        return null;
     }
     
     /**

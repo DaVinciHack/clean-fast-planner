@@ -303,7 +303,15 @@ const WeatherCard = ({
             {/* Header with location name in box and ranking disk */}
             <div className="location-card-header">
               <div className="location-info">
-                <span className="location-code-box">{location.icao || location.locationCode}</span>
+                <span 
+                  className="location-code-box"
+                  style={{
+                    color: location.segment1?.includes('(DAY)') ? '#FFFFFF' : '#2196F3',
+                    borderColor: location.segment1?.includes('(DAY)') ? '#FFFFFF' : '#2196F3'
+                  }}
+                >
+                  {location.icao || location.locationCode}
+                </span>
                 <span className="location-type">{location.locationType}</span>
               </div>
               
@@ -385,10 +393,10 @@ const WeatherCard = ({
                 <span 
                   className="arrival-text"
                   style={{ 
-                    color: isDayTime(location.arrivalTime) ? '#FFFFFF' : '#2196F3' 
+                    color: location.segment1?.includes('(DAY)') ? '#FFFFFF' : '#2196F3' 
                   }}
                 >
-                  Arrival at {location.locationCode}: {formatArrivalTime(location.arrivalTime)} ({isDayTime(location.arrivalTime) ? 'DAY' : 'NIGHT'})
+                  {location.segment1 || `Arrival at ${location.locationCode}: ${formatArrivalTime(location.arrivalTime)}`}
                 </span>
               </div>
             )}
@@ -492,18 +500,6 @@ const WeatherCard = ({
     }
   };
   
-  // Helper function to determine if arrival time is day or night
-  const isDayTime = (arrivalTime) => {
-    if (!arrivalTime) return true; // Default to day if no time
-    
-    try {
-      const date = new Date(arrivalTime);
-      const hour = date.getUTCHours();
-      return hour >= 6 && hour < 18; // Day is 06:00-18:00 UTC
-    } catch (error) {
-      return true; // Default to day if parsing fails
-    }
-  };
 
   // Helper function to check if timestamp is more than 3 hours old
   const isTimestampOld = (timestamp) => {
