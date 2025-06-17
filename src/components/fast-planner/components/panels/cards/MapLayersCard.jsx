@@ -44,7 +44,6 @@ const MapLayersCard = ({
     gulfCoastHeli: false,
     weather: false,
     weatherCircles: false, // Default OFF - user can toggle on when needed
-    rigWeatherGraphics: true, // Aviation rig weather graphics - DEFAULT ON in Gulf region
     vfrCharts: false,
     grid: true,
     platforms: true, // Fixed platforms (enhanced category)
@@ -146,30 +145,7 @@ const MapLayersCard = ({
     return () => clearInterval(interval);
   }, [layers.grid, layers.gulfCoastHeli, layers.weatherCircles, mapManagerRef, gulfCoastMapRef]);
 
-  // Auto-enable rig weather graphics in Gulf region (run once)
-  useEffect(() => {
-    const autoEnableRigWeatherGraphics = async () => {
-      // Only auto-enable in Gulf region
-      if (currentRegion?.id !== 'gulf-of-mexico') return;
-      if (!mapManagerRef?.current?.map) return;
-      if (!window.rigWeatherIntegration) return;
-      
-      console.log('🚁 AUTO-ENABLE: Rig weather graphics in Gulf region (one-time)');
-      
-      // Auto-enable rig weather graphics
-      try {
-        window.rigWeatherIntegration.toggleVisibility(true);
-        setLayers(prev => ({ ...prev, rigWeatherGraphics: true }));
-        console.log('🚁 AUTO-ENABLE: Rig weather graphics enabled automatically');
-      } catch (error) {
-        console.warn('🚁 AUTO-ENABLE: Failed to auto-enable rig weather graphics:', error);
-      }
-    };
-    
-    // Small delay to ensure everything is initialized, run only once
-    const timeoutId = setTimeout(autoEnableRigWeatherGraphics, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [currentRegion?.id]); // Only depend on region change, not waypoints
+  // REMOVED: Auto-enable rig weather graphics - now automatic with weather circles
 
   // DISABLED: Update rig weather graphics when waypoints change - causing conflicts
   // useEffect(() => {
@@ -460,6 +436,13 @@ const MapLayersCard = ({
                 await weatherLayer.addWeatherCircles(weatherSegmentsHook.segments);
                 window.currentWeatherCirclesLayer = weatherLayer;
                 console.log('✅ Created weather circles (fallback method)');
+                
+                // Auto-enable wind arrows when weather circles are created
+                if (window.rigWeatherIntegration) {
+                  window.rigWeatherIntegration.toggleVisibility(true);
+                  console.log('🌬️ Auto-enabled wind arrows with weather circles');
+                }
+                
                 setLayers(prev => ({ ...prev, weatherCircles: true }));
               } catch (error) {
                 console.error('Error creating weather circles:', error);
@@ -470,50 +453,7 @@ const MapLayersCard = ({
           }
           break;
           
-        case 'rigWeatherGraphics':
-          console.log('🚁 MapLayersCard: Rig weather graphics toggle clicked');
-          console.log('🚁 MapLayersCard: Current waypoints:', waypoints?.length || 0);
-          console.log('🚁 MapLayersCard: rigWeatherIntegration available:', !!window.rigWeatherIntegration);
-          console.log('🚁 MapLayersCard: weatherVisualizationManager available:', !!window.weatherVisualizationManager);
-          
-          if (window.rigWeatherIntegration) {
-            const newVisible = !layers.rigWeatherGraphics;
-            console.log('🚁 MapLayersCard: Toggling to:', newVisible);
-            
-            // Enhanced: Allow individual rig selections, not just full flight plans
-            if (newVisible && (!waypoints || waypoints.length === 0)) {
-              console.warn('🚁 MapLayersCard: No waypoints available');
-              alert('🚁 Click on rigs in the left panel or load a flight to display rig weather graphics');
-              return;
-            }
-            
-            console.log('🚁 MapLayersCard: Calling rigWeatherIntegration.toggleVisibility');
-            window.rigWeatherIntegration.toggleVisibility(newVisible);
-            setLayers(prev => ({ ...prev, rigWeatherGraphics: newVisible }));
-            
-            // If turning on, update with weather segments data
-            if (newVisible) {
-              if (window.weatherVisualizationManager) {
-                // Try to get weather segments first (preferred - has location type data)
-                const weatherSegments = weatherSegmentsHook?.weatherSegments;
-                if (weatherSegments && weatherSegments.length > 0) {
-                  console.log('🚁 MapLayersCard: Using weather segments data:', weatherSegments.length, 'segments');
-                  window.weatherVisualizationManager.updateRigWeatherGraphicsFromSegments(weatherSegments);
-                } else if (waypoints && waypoints.length > 0) {
-                  console.log('🚁 MapLayersCard: Fallback to waypoints:', waypoints.length, 'waypoints');
-                  window.weatherVisualizationManager.updateRigWeatherGraphics(waypoints);
-                } else {
-                  console.warn('🚁 MapLayersCard: No weather segments or waypoints available');
-                }
-              } else {
-                console.warn('🚁 Weather visualization manager not available');
-              }
-            }
-          } else {
-            console.warn('🚁 Rig weather integration not available - try refreshing the page');
-            alert('🚁 Rig weather system not initialized. Please refresh the page.');
-          }
-          break;
+        // REMOVED: rigWeatherGraphics case - arrows now automatic with weather circles
           
         case 'vfrCharts':
           if (vfrChartsRef?.current) {
@@ -1096,12 +1036,7 @@ const MapLayersCard = ({
           <h4>Aviation Layers</h4>
           {renderLayerToggle('weather', 'Weather Overlay', true)}
           
-          {/* Gulf Region: Advanced Rig Weather Graphics */}
-          {currentRegion?.id === 'gulf-of-mexico' && (
-            <>
-              {renderLayerToggle('rigWeatherGraphics', '🧭 Rig Weather Graphics (Gulf)', true)}
-            </>
-          )}
+          {/* Wind arrows are now automatic with weather circles - no separate toggle needed */}
           
           {/* All Other Regions: Standard Weather Circles */}
           {currentRegion?.id !== 'gulf-of-mexico' && (

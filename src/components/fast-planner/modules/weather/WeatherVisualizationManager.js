@@ -2099,16 +2099,23 @@ class WeatherVisualizationManager {
     
     /**
      * Parse wind speed from METAR string
-     * @private
      */
     parseWindSpeedFromMetar(rawMetar) {
         if (!rawMetar) return null;
         
-        // Look for wind pattern like "215/18KT" or "21518KT"
+        // First try pseudo-METAR format with slash like "174/12KT" (common for rigs)
+        const slashWindMatch = rawMetar.match(/(\d{3})\/(\d{1,3})(G\d{1,3})?KT/);
+        if (slashWindMatch) {
+            const windSpeed = parseInt(slashWindMatch[2]);
+            console.log(`🌬️ Parsed wind speed: ${windSpeed} kts from slash format METAR: ${rawMetar.substring(0, 50)}...`);
+            return windSpeed;
+        }
+        
+        // Standard METAR format like "21518KT"
         const windMatch = rawMetar.match(/(\d{3})(\d{2,3})(G\d{2,3})?KT/);
         if (windMatch) {
             const windSpeed = parseInt(windMatch[2]);
-            console.log(`🌬️ Parsed wind speed: ${windSpeed} kts from METAR: ${rawMetar.substring(0, 50)}...`);
+            console.log(`🌬️ Parsed wind speed: ${windSpeed} kts from standard METAR: ${rawMetar.substring(0, 50)}...`);
             return windSpeed;
         }
         
@@ -2125,16 +2132,23 @@ class WeatherVisualizationManager {
     
     /**
      * Parse wind direction from METAR string
-     * @private
      */
     parseWindDirectionFromMetar(rawMetar) {
         if (!rawMetar) return null;
         
-        // Look for wind pattern like "215/18KT" or "21518KT"
+        // First try pseudo-METAR format with slash like "174/12KT" (common for rigs)
+        const slashWindMatch = rawMetar.match(/(\d{3})\/(\d{1,3})(G\d{1,3})?KT/);
+        if (slashWindMatch) {
+            const windDirection = parseInt(slashWindMatch[1]);
+            console.log(`🌬️ Parsed wind direction: ${windDirection}° from slash format METAR`);
+            return windDirection;
+        }
+        
+        // Standard METAR format like "21518KT"
         const windMatch = rawMetar.match(/(\d{3})(\d{2,3})(G\d{2,3})?KT/);
         if (windMatch) {
             const windDirection = parseInt(windMatch[1]);
-            console.log(`🌬️ Parsed wind direction: ${windDirection}° from METAR`);
+            console.log(`🌬️ Parsed wind direction: ${windDirection}° from standard METAR`);
             return windDirection;
         }
         
@@ -2149,16 +2163,23 @@ class WeatherVisualizationManager {
     
     /**
      * Parse wind gust from METAR string
-     * @private
      */
     parseWindGustFromMetar(rawMetar) {
         if (!rawMetar) return null;
         
-        // Look for gust pattern like "215/18G25KT"
+        // First try pseudo-METAR format with slash like "174/12G25KT" (common for rigs)
+        const slashGustMatch = rawMetar.match(/(\d{3})\/(\d{1,3})G(\d{1,3})KT/);
+        if (slashGustMatch) {
+            const windGust = parseInt(slashGustMatch[3]);
+            console.log(`🌬️ Parsed wind gust: ${windGust} kts from slash format METAR`);
+            return windGust;
+        }
+        
+        // Standard METAR format like "21518G25KT"
         const gustMatch = rawMetar.match(/\d{3}\d{2,3}G(\d{2,3})KT/);
         if (gustMatch) {
             const windGust = parseInt(gustMatch[1]);
-            console.log(`🌬️ Parsed wind gust: ${windGust} kts from METAR`);
+            console.log(`🌬️ Parsed wind gust: ${windGust} kts from standard METAR`);
             return windGust;
         }
         

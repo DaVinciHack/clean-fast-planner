@@ -166,11 +166,18 @@ class RigWeatherGraphics {
         // SIMPLIFIED: Don't auto-cleanup, just update data
         this.rigWeatherData = rigWeatherData;
         
-        if (this.isVisible) {
-            // Remove existing graphics first, then render new ones
-            this.removeWeatherGraphics();
-            this.renderWeatherGraphics();
-        }
+        // DEBUG: Log what we received
+        console.log(`🚁 RECEIVED ${rigWeatherData.length} weather items:`, rigWeatherData.map(r => ({
+            name: r.rigName,
+            type: r.locationType,
+            isAirport: r.isAirport,
+            windSpeed: r.windSpeed
+        })));
+        
+        // ALWAYS render arrows when weather data is updated
+        this.isVisible = true;
+        this.removeWeatherGraphics();
+        this.renderWeatherGraphics();
         
         console.log(`🚁 Updated weather graphics for ${rigWeatherData.length} rigs`);
     }
@@ -180,37 +187,14 @@ class RigWeatherGraphics {
      * @param {boolean} visible - Show/hide graphics
      */
     toggleVisibility(visible) {
-        this.isVisible = visible;
+        // ALWAYS VISIBLE: Wind arrows should always be shown with weather data
+        this.isVisible = true;
         
-        if (visible) {
-            // 🔗 UNIFIED POPUP: Hide old weather circles AND their popups when showing rig weather graphics
-            if (window.currentWeatherCirclesLayer) {
-                console.log('🔗 UNIFIED POPUP: Hiding old weather circles and their popups to avoid conflicts');
-                try {
-                    window.currentWeatherCirclesLayer.removeWeatherCircles();
-                    
-                    // Also remove any existing popup event listeners from weather circles
-                    if (window.currentWeatherCirclesLayer.popup) {
-                        window.currentWeatherCirclesLayer.popup.remove();
-                        window.currentWeatherCirclesLayer.popup = null;
-                    }
-                    
-                    console.log('🔗 UNIFIED POPUP: ✅ Old weather system cleaned up');
-                } catch (error) {
-                    console.warn('🔗 UNIFIED POPUP: Could not hide old weather circles:', error);
-                }
-            }
-            
-            // Render rig weather graphics with unified popups
-            this.renderWeatherGraphics();
-            console.log('🔗 UNIFIED POPUP: ✅ Rig weather graphics with unified popups rendered');
-        } else {
-            this.removeWeatherGraphics();
-            // Optionally restore old weather circles when hiding rig graphics
-            // (User can manually toggle them back on if needed)
-        }
+        // Always render graphics regardless of toggle state
+        console.log('🌬️ Wind arrows are permanently visible - ignoring toggle');
+        this.renderWeatherGraphics();
         
-        console.log(`🚁 Rig weather graphics ${visible ? 'shown' : 'hidden'}`);
+        console.log(`🚁 Wind arrows are always shown (toggle ignored)`);
     }
     
     /**
@@ -1142,18 +1126,15 @@ class RigWeatherGraphics {
                 (airportValue.toString().toLowerCase() === 'y' || 
                  airportValue.toString().toLowerCase() === 'yes');
             
-            const isRig = !isAirport;
-            if (isRig) {
-                console.log('🧭 Detected rig/platform (not airport):', wp.name, 'isairport:', airportValue);
-            } else {
-                console.log('🧭 Skipping airport:', wp.name, 'isairport:', airportValue);
-            }
-            return isRig;
+            // Include BOTH airports and rigs
+            console.log(`🌬️ Including ${isAirport ? 'airport' : 'rig'}:`, wp.name, 'isairport:', airportValue);
+            return true; // Include both airports and rigs
         }
         
-        // Method 3: Legacy type-based detection for flight plans
-        if (wp.type === 'LANDING_STOP' && wp.pointType === 'LANDING_STOP' && !wp.name?.startsWith('K')) {
-            return true;
+        // Method 3: Include ALL landing stops (airports AND rigs)
+        if (wp.type === 'LANDING_STOP' && wp.pointType === 'LANDING_STOP') {
+            console.log(`🌬️ Including landing stop: ${wp.name}`);
+            return true; // Include both airports and rigs
         }
         
         // Method 4: If we're in waypoint mode, skip waypoints
