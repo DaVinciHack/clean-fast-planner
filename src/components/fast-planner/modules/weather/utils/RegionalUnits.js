@@ -12,19 +12,29 @@
  * @returns {boolean} True if US region (uses imperial), false for metric
  */
 export function isUSRegion(region) {
-  if (!region) return false;
+  console.log('🌍 REGION DEBUG: Checking region for US detection:', region);
+  
+  if (!region) {
+    console.log('🌍 REGION DEBUG: No region provided, defaulting to metric');
+    return false;
+  }
   
   const regionName = region.name || region.id || '';
   const lowerName = regionName.toLowerCase();
   
+  console.log('🌍 REGION DEBUG: Region name:', regionName, 'Lowercase:', lowerName);
+  
   // US regions: Gulf Coast, US territories, etc.
-  return lowerName.includes('gulf') || 
+  const isUS = lowerName.includes('gulf') || 
          lowerName.includes('us') || 
          lowerName.includes('united states') ||
          lowerName.includes('america') ||
          lowerName.includes('texas') ||
          lowerName.includes('louisiana') ||
          lowerName.includes('florida');
+         
+  console.log('🌍 REGION DEBUG: Is US region?', isUS);
+  return isUS;
 }
 
 /**
@@ -112,12 +122,21 @@ export function normalizeVisibilityToMeters(visibility, inputUnit = 'auto') {
  * @returns {Object|null} Current region object
  */
 export function getCurrentRegion() {
+  console.log('🌍 REGION DEBUG: Looking for current region...');
+  console.log('🌍 REGION DEBUG: window.activeRegionFromContext:', window.activeRegionFromContext);
+  console.log('🌍 REGION DEBUG: window.currentRegion:', window.currentRegion);
+  console.log('🌍 REGION DEBUG: window.regionManager?.getCurrentRegion():', window.regionManager?.getCurrentRegion());
+  console.log('🌍 REGION DEBUG: window.appManagers?.regionManagerRef?.current?.getCurrentRegion():', window.appManagers?.regionManagerRef?.current?.getCurrentRegion());
+  
   // Try multiple sources for region
-  return window.activeRegionFromContext || 
+  const region = window.activeRegionFromContext || 
          window.currentRegion || 
          window.regionManager?.getCurrentRegion() ||
          window.appManagers?.regionManagerRef?.current?.getCurrentRegion() ||
          null;
+         
+  console.log('🌍 REGION DEBUG: Selected region:', region);
+  return region;
 }
 
 /**
