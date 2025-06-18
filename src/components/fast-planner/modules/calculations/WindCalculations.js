@@ -101,46 +101,65 @@ const calculateGroundSpeed = (airspeed, course, windSpeed, windDirection) => {
     return airspeed;
   }
   
-  // Calculate using traditional component method for compatibility
-  const headwindComponent = calculateHeadwindComponent(windSpeed, course, windDirection);
-  
-  // Get crosswind component using original method
-  const crosswindComponent = calculateCrosswindComponent(windSpeed, course, windDirection);
-  
-  // Calculate basic groundspeed
-  const basicGroundSpeed = airspeed - headwindComponent;
-  
-  // ENHANCED ACCURACY: Use vector-based approach for better precision
-  // Convert course to radians
-  const courseRad = degreesToRadians(course);
-  
-  // Convert wind FROM direction to TO direction (add 180 degrees)
-  const windToDirection = (windDirection + 180) % 360;
-  const windDirectionRad = degreesToRadians(windToDirection);
-  
-  // Calculate wind vector components
-  const windX = windSpeed * Math.sin(windDirectionRad);
-  const windY = windSpeed * Math.cos(windDirectionRad);
-  
-  // Calculate aircraft velocity vector components
-  const aircraftX = airspeed * Math.sin(courseRad);
-  const aircraftY = airspeed * Math.cos(courseRad);
-  
-  // Calculate ground velocity components by vector addition
-  const groundX = aircraftX + windX;
-  const groundY = aircraftY + windY;
-  
-  // Calculate resulting ground speed using the Pythagorean theorem
-  const vectorGroundSpeed = Math.sqrt(Math.pow(groundX, 2) + Math.pow(groundY, 2));
-  
-  // Use the vector-based approach but keep similar adjustment pattern for compatibility
-  const crosswindCorrection = Math.abs(crosswindComponent) > 0 
-    ? -0.02 * Math.pow(crosswindComponent, 2) / airspeed 
-    : 0;
-  
-  // Blend both approaches to maintain compatibility
-  return basicGroundSpeed + crosswindCorrection;
+  // PALANTIR EXACT MATCH: Use the same calculation method as Palantir
+  return calculateGroundSpeedAndTrack(airspeed, windSpeed, windDirection, course).groundSpeed;
 };
+
+/**
+ * PALANTIR EXACT MATCH: Ground speed & drift calculation
+ * This matches the exact calculation in Palantir's calculations.ts
+ */
+const calculateGroundSpeedAndTrack = (
+  cruiseSpeedKnots,  // airspeed
+  windSpeed,         // wind speed in knots
+  windDirection,     // wind FROM direction (0°=north, 90°=east)
+  trackBearing       // intended track bearing (0°=north, 90°=east)
+) => {
+  // A) Convert "wind from X°" to "wind heading = X+180"
+  let windTo = (windDirection + 180) % 360;
+
+  // B) Shift from "aviation angles" (0°=north) to standard math angles (0°=east)
+  const headingRad = toRadians(90 - trackBearing);
+  const windRad = toRadians(90 - windTo);
+
+  // C) Aircraft velocity vector in standard math coordinates
+  const vAx = cruiseSpeedKnots * Math.cos(headingRad);
+  const vAy = cruiseSpeedKnots * Math.sin(headingRad);
+
+  // D) Wind velocity vector in standard math coordinates
+  const vWx = windSpeed * Math.cos(windRad);
+  const vWy = windSpeed * Math.sin(windRad);
+
+  // E) Summation: ground vector
+  const vGx = vAx + vWx;
+  const vGy = vAy + vWy;
+
+  // F) Ground speed = magnitude
+  const groundSpeed = Math.sqrt(vGx * vGx + vGy * vGy);
+
+  // G) Actual ground track in math angles
+  let groundTrackMath = toDegrees(Math.atan2(vGy, vGx));
+  if (groundTrackMath < 0) {
+    groundTrackMath += 360;
+  }
+
+  // H) Convert ground track back to aviation angles
+  let groundTrackAvi = 90 - groundTrackMath;
+  groundTrackAvi = (groundTrackAvi + 360) % 360;
+
+  // I) Drift angle = difference between ground track and intended heading
+  let driftAngle = groundTrackAvi - trackBearing;
+  // Normalize to -180..180
+  driftAngle = ((driftAngle + 180) % 360) - 180;
+
+  console.log(`🔧 PALANTIR MATCH: Track: ${trackBearing}°, Wind: ${windDirection}°@${windSpeed}kts, GS: ${groundSpeed.toFixed(1)}, Drift: ${driftAngle.toFixed(1)}°`);
+
+  return { groundSpeed, driftAngle };
+};
+
+// Helper functions to match Palantir's naming
+const toRadians = (deg) => (deg * Math.PI) / 180;
+const toDegrees = (rad) => (rad * 180) / Math.PI;
 
 /**
  * Calculate the course angle between two waypoints
@@ -243,21 +262,10 @@ const calculateWindAdjustedTime = (distance, airspeed, course, windSpeed, windDi
  * @returns {number} Additional fuel in lbs
  */
 const calculateWindAdjustedFuel = (baseFuelBurn, time, headwindComponent) => {
-  // In a headwind, aircraft typically burns slightly more fuel
-  // This is a simplified model - in reality, the relationship is complex
-  // For positive headwind values (true headwind), we increase fuel burn slightly
-  let adjustmentFactor = 1.0;
-  
-  if (headwindComponent > 0) {
-    // Increase fuel burn by up to 5% for strong headwinds
-    adjustmentFactor = 1.0 + Math.min(headwindComponent / 100, 0.05);
-  } else if (headwindComponent < 0) {
-    // Decrease fuel burn by up to 3% for tailwinds
-    // Tailwind component is negative, so we add its absolute value
-    adjustmentFactor = 1.0 - Math.min(Math.abs(headwindComponent) / 150, 0.03);
-  }
-  
-  return baseFuelBurn * time * adjustmentFactor;
+  // PALANTIR MATCH: No wind-based fuel adjustment
+  // Palantir uses simple: fuel = time × fuelBurn (no adjustment factor)
+  // Wind affects time (via ground speed), but not fuel burn rate
+  return baseFuelBurn * time;
 };
 
 /**
@@ -295,8 +303,8 @@ const calculateLegWithWind = (from, to, distance, aircraft, weather) => {
   // Calculate fuel with wind adjustment
   const fuel = calculateWindAdjustedFuel(fuelBurn, time, headwindComponent);
   
-  // ENHANCEMENT: Calculate drift angle for helicopter operations
-  const driftAngle = calculateDriftAngle(course, airspeed, windSpeed, windDirection);
+  // PALANTIR MATCH: Calculate drift angle using Palantir's exact method
+  const { driftAngle } = calculateGroundSpeedAndTrack(airspeed, windSpeed, windDirection, course);
   
   return {
     time,
@@ -316,6 +324,7 @@ if (typeof window !== 'undefined') {
     calculateHeadwindComponent,
     calculateCrosswindComponent,
     calculateGroundSpeed,
+    calculateGroundSpeedAndTrack, // NEW: Palantir exact match function
     calculateCourse,
     calculateWindAdjustedTime,
     calculateWindAdjustedFuel,
@@ -329,6 +338,7 @@ export {
   calculateHeadwindComponent,
   calculateCrosswindComponent,
   calculateGroundSpeed,
+  calculateGroundSpeedAndTrack, // NEW: Palantir exact match function
   calculateCourse,
   calculateWindAdjustedTime,
   calculateWindAdjustedFuel,

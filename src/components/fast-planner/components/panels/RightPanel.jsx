@@ -338,6 +338,12 @@ const RightPanel = React.forwardRef(({
                         console.log('🌬️ AUTO-RELOAD: avgWindDirection:', rawFlight.avgWindDirection);
                         console.log('🌬️ AUTO-RELOAD: windSpeed:', rawFlight.windSpeed);
                         console.log('🌬️ AUTO-RELOAD: windDirection:', rawFlight.windDirection);
+                        console.log('🌬️ AUTO-RELOAD: ALL WIND FIELDS:', {
+                          avgWindSpeed: rawFlight.avgWindSpeed,
+                          avgWindDirection: rawFlight.avgWindDirection,
+                          windSpeed: rawFlight.windSpeed,
+                          windDirection: rawFlight.windDirection
+                        });
                       }
                       
                       if (onFlightLoad) {
@@ -545,11 +551,11 @@ const RightPanel = React.forwardRef(({
         soId: flight.soId,
         rswId: flight.rswId,
         
-        // CRITICAL FIX: Extract wind data from flight if available - use avgWindSpeed/avgWindDirection
+        // CRITICAL FIX: Extract wind data from flight if available - use avgWindSpeed/avgWindDirection (automation calculated)
         windData: {
           windSpeed: flight._rawFlight?.avgWindSpeed || flight._rawFlight?.windSpeed || flight.avgWindSpeed || flight.windSpeed || 0,
           windDirection: flight._rawFlight?.avgWindDirection || flight._rawFlight?.windDirection || flight.avgWindDirection || flight.windDirection || 0,
-          source: 'loaded_flight'
+          source: 'palantir_automation'
         },
         
         // Other flight data

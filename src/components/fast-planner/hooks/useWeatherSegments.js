@@ -27,11 +27,11 @@ const useWeatherSegments = ({
         console.log('🌤️ useWeatherSegments: Successfully loaded', result.segments?.length, 'weather segments');
         setWeatherSegments(result.segments);
         
-        const windData = WeatherSegmentsService.extractWindDataForRoute(result.segments);
-        
-        if (windData && onWeatherUpdate) {
-          onWeatherUpdate(windData.windSpeed, windData.windDirection);
-        }
+        // DON'T automatically update global wind settings from weather segments
+        // Weather segments contain location-specific wind, but flight-level wind 
+        // should come from Palantir's flight automation (avgWindSpeed/avgWindDirection)
+        console.log('🌤️ useWeatherSegments: Weather segments loaded but NOT updating global wind settings');
+        console.log('🌤️ useWeatherSegments: Flight-level wind should come from Palantir automation, not segment averages');
         
         // RACE CONDITION FIX: Wait for map and segments to be ready, then add to map
         if (mapManagerRef?.current?.map && result.segments?.length > 0) {

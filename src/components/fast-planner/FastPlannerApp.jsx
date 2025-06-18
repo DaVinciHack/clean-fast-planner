@@ -274,7 +274,7 @@ const FastPlannerCore = ({
   
   // ✅ RESTORED: Proper weather update function
   const updateWeatherSettings = (windSpeed, windDirection) => {
-    console.log(`🌬️ RESTORED: updateWeatherSettings(${windSpeed}, ${windDirection})`);
+    console.log(`🌬️ updateWeatherSettings(${windSpeed}, ${windDirection})`);
     
     setWeather(prev => ({
       ...prev,
@@ -1127,19 +1127,50 @@ const FastPlannerCore = ({
         }
       }
       
-      // CRITICAL FIX: Apply wind data from loaded flight if available
-      if (flightData.windData) {
-        console.log('🌬️ Applying wind data from loaded flight:', flightData.windData);
-        console.log('🌬️ Current weather state before update:', weather);
+      // CRITICAL FIX: Apply wind data from loaded flight - use Palantir automation calculated wind
+      console.log('🌬️ Checking for wind data in loaded flight:', {
+        'flightData.windSpeed': flightData.windSpeed,
+        'flightData.windDirection': flightData.windDirection,
+        'flightData.windData': flightData.windData,
+        'current weather': weather
+      });
+      
+      if (flightData.windSpeed !== undefined || flightData.windDirection !== undefined || flightData.windData) {
+        // Priority: Use windData structure first, then direct fields (from automation)
+        const windSpeed = flightData.windData?.windSpeed || flightData.windSpeed || 0;
+        const windDirection = flightData.windData?.windDirection || flightData.windDirection || 0;
+        
+        console.log('🌬️ EXTRACTED WIND VALUES:', {
+          'flightData.windData?.windSpeed': flightData.windData?.windSpeed,
+          'flightData.windData?.windDirection': flightData.windData?.windDirection,
+          'flightData.windSpeed': flightData.windSpeed,
+          'flightData.windDirection': flightData.windDirection,
+          'final windSpeed': windSpeed,
+          'final windDirection': windDirection
+        });
+        
+        console.log('🌬️ Applying Palantir automation wind data:', {
+          windSpeed,
+          windDirection,
+          source: 'palantir_automation'
+        });
         
         const newWeather = {
-          windSpeed: flightData.windData.windSpeed || 0,
-          windDirection: flightData.windData.windDirection || 0,
-          source: flightData.windData.source || 'loaded_flight'
+          windSpeed,
+          windDirection,
+          source: 'palantir_automation'
         };
         
         console.log('🌬️ Setting new weather state:', newWeather);
         setWeather(newWeather);
+        
+        // Force a re-render to ensure UI updates
+        setTimeout(() => {
+          console.log('🌬️ Weather state after setWeather:', {
+            current: weather,
+            expected: newWeather
+          });
+        }, 100);
         
       } else {
         console.log('⚠️ No wind data found in loaded flight:', flightData);
@@ -2440,6 +2471,11 @@ const FastPlannerApp = () => {
     });
   }, [flightSettings.contingencyFuelPercent, flightSettings.passengerWeight, flightSettings.taxiFuel, flightSettings.reserveFuel, flightSettings.deckFuelFlow, flightSettings.deckTimePerStop]);
   const [weather, setWeather] = useState({ windSpeed: 15, windDirection: 270 });
+  
+  // Debug weather state changes
+  useEffect(() => {
+    console.log('🌬️ WEATHER STATE CHANGED:', weather);
+  }, [weather]);
   const [favoriteLocations, setFavoriteLocations] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
   const [stopCards, setStopCards] = useState([]);

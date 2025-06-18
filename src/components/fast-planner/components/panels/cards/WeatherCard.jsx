@@ -78,17 +78,11 @@ const WeatherCard = ({
       
       setOsdkWeatherData(result);
       
-      // Extract wind data for route calculations (if needed)
-      if (weatherSegments.length > 0) {
-        const firstSegment = weatherSegments[0];
-        if (firstSegment.windSpeed !== undefined && firstSegment.windDirection !== undefined) {
-          console.log('WeatherCard: Updating weather from OSDK data:', {
-            windSpeed: firstSegment.windSpeed,
-            windDirection: firstSegment.windDirection
-          });
-          onWeatherUpdate(firstSegment.windSpeed, firstSegment.windDirection);
-        }
-      }
+      // DON'T automatically update global wind data from segments
+      // Weather segments contain location-specific wind, but flight-level wind 
+      // should come from Palantir's automation system (avgWindSpeed/avgWindDirection)
+      console.log('WeatherCard: Weather segments loaded but NOT updating global wind settings');
+      console.log('WeatherCard: Use flight-level automation wind, not segment-specific wind');
       
     } catch (error) {
       console.error('WeatherCard: Error loading OSDK weather:', error);
