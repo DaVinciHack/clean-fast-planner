@@ -1137,14 +1137,47 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
     extraFuel = 0,        // 🔧 ADDED: Missing extraFuel parameter
     araFuel = 0,          // 🔧 FIXED: Missing araFuel parameter (was causing error)
-    approachFuel = 0      // 🔧 FIXED: Missing approachFuel parameter (was causing error)
+    approachFuel = 0,     // 🔧 FIXED: Missing approachFuel parameter (was causing error)
+    fuelPolicy = null     // 🔧 CRITICAL: Add fuel policy for reserve fuel conversion
   } = options;
   
+  // 🔧 CRITICAL FIX: Use same reserve fuel conversion logic as main route
+  let calculatedReserveFuel = null;
+  
+  console.log('🟠 AlternateStopCard: Reserve fuel conversion check:', {
+    reserveFuel,
+    hasFuelPolicy: !!fuelPolicy,
+    hasAircraft: !!selectedAircraft,
+    aircraftFuelBurn: selectedAircraft?.fuelBurn
+  });
+  
+  if (fuelPolicy && fuelPolicy.fuelTypes?.reserveFuel && selectedAircraft?.fuelBurn) {
+    const reserveType = fuelPolicy.fuelTypes.reserveFuel.type || 'fixed';
+    const reservePolicyValue = fuelPolicy.fuelTypes.reserveFuel.default || reserveFuel;
+    
+    if (reserveType === 'time') {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = reservePolicyValue;
+      const fuelFlowPerHour = selectedAircraft.fuelBurn;
+      calculatedReserveFuel = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      
+      console.log(`🟠 AlternateStopCard: Reserve Fuel Calc: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${calculatedReserveFuel} lbs`);
+    } else {
+      // Fixed amount - use policy value as-is
+      calculatedReserveFuel = reservePolicyValue;
+      console.log(`🟠 AlternateStopCard: Using fixed reserve fuel: ${calculatedReserveFuel} lbs`);
+    }
+  } else {
+    // Fallback: use raw value (this should match main route behavior)
+    calculatedReserveFuel = reserveFuel;
+    console.log(`🟠 AlternateStopCard: No fuel policy, using raw reserve fuel: ${calculatedReserveFuel}`);
+  }
+
   // Convert all calculation parameters to proper numeric values
   const taxiFuelValue = Number(taxiFuel) || 0;
   const passengerWeightValue = Number(passengerWeight) || 0;
   const contingencyFuelPercentValue = Number(contingencyFuelPercent) || 0;
-  const reserveFuelValue = Number(reserveFuel) || 0;
+  const reserveFuelValue = Number(calculatedReserveFuel) || 0;  // 🔧 Use converted reserve fuel
   const deckTimePerStopValue = Number(deckTimePerStop) || 0;
   const deckFuelFlowValue = Number(deckFuelFlow) || 0;
   const extraFuelValue = Number(extraFuel) || 0;
@@ -1252,19 +1285,110 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       console.log(`🟠 AlternateStopCard: Added leg ${i}: fuel=${leg.fuel}, distance=${leg.distance}, time=${leg.time}`);
     }
   } else {
-    console.log('🟠 AlternateStopCard: Calculating legs to split point manually');
+    console.log('🟠 AlternateStopCard: No route stats available - using RouteCalculator for consistency');
     
-    // Manual calculation for legs to split point
-    for (let i = 0; i < splitPointIndex; i++) {
-      const fromWaypoint = landingStopsOnly[i];
-      const toWaypoint = landingStopsOnly[i + 1];
-      
-      // Calculate leg distance, time, and fuel
-      const legData = calculateLegWithWind(fromWaypoint, toWaypoint, selectedAircraft, weather);
-      if (legData) {
-        legsToSplitPointFuel += legData.fuel;
-        legsToSplitPointDistance += legData.distance;
-        legsToSplitPointTime += legData.time;
+    // 🎯 SINGLE SOURCE OF TRUTH: Use RouteCalculator for legs to split point as well
+    if (splitPointIndex > 0) {
+      try {
+        // Import RouteCalculator - check what's available
+        console.log('🔍 AlternateStopCard: Checking RouteCalculator availability:', {
+          windowRouteCalculatorInstance: !!window.routeCalculator,
+          windowRouteCalculatorClass: !!window.RouteCalculator,
+          windowKeys: Object.keys(window).filter(k => k.includes('Route')),
+          requireAvailable: typeof require !== 'undefined'
+        });
+        
+        // Use the RouteCalculator instance (lowercase 'r') that's already initialized
+        const routeCalculator = window.routeCalculator;
+        
+        if (!routeCalculator) {
+          console.error('🟠 AlternateStopCard: RouteCalculator not available for legs to split point - falling back to simple calculation');
+          
+          // Fallback: simple calculation without RouteCalculator
+          for (let i = 0; i < splitPointIndex; i++) {
+            const fromWaypoint = landingStopsOnly[i];
+            const toWaypoint = landingStopsOnly[i + 1];
+            
+            // Simple distance calculation
+            if (fromWaypoint.coords && toWaypoint.coords) {
+              try {
+                const from = window.turf.point(fromWaypoint.coords);
+                const to = window.turf.point(toWaypoint.coords);
+                const distance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+                const time = distance / selectedAircraft.cruiseSpeed;
+                const fuel = Math.round(time * selectedAircraft.fuelBurn);
+                
+                legsToSplitPointFuel += fuel;
+                legsToSplitPointDistance += distance;
+                legsToSplitPointTime += time;
+              } catch (error) {
+                console.error('🟠 AlternateStopCard: Error in fallback calculation:', error);
+              }
+            }
+          }
+          
+          console.log('🟠 AlternateStopCard: Used fallback calculation for legs to split point');
+        } else {
+          // Create coordinates array for legs to split point
+          const legsToSplitCoordinates = [];
+          for (let i = 0; i <= splitPointIndex; i++) {
+            const waypoint = landingStopsOnly[i];
+            if (waypoint.coords) {
+              legsToSplitCoordinates.push(waypoint.coords);
+            } else if (waypoint.lat && waypoint.lon) {
+              legsToSplitCoordinates.push([waypoint.lon, waypoint.lat]);
+            }
+          }
+          
+          console.log('🔍 LEGS TO SPLIT COORDINATES:', {
+            splitPointIndex,
+            landingStopsOnlyLength: landingStopsOnly.length,
+            legsToSplitCoordinates,
+            coordinatesLength: legsToSplitCoordinates.length
+          });
+          
+          if (legsToSplitCoordinates.length >= 2) {
+            console.log('🔍 CALLING RouteCalculator for legs to split with:', {
+              coordinates: legsToSplitCoordinates,
+              selectedAircraft: !!selectedAircraft,
+              weather: !!weather
+            });
+            
+            const legsToSplitStats = routeCalculator.calculateRouteStats(
+              legsToSplitCoordinates,
+              {
+                selectedAircraft,
+                weather,
+                forceTimeCalculation: true
+              }
+            );
+            
+            console.log('🔍 RouteCalculator returned for legs to split:', legsToSplitStats);
+            
+            if (legsToSplitStats && legsToSplitStats.tripFuel !== undefined) {
+              legsToSplitPointFuel = legsToSplitStats.tripFuel;
+              legsToSplitPointDistance = legsToSplitStats.totalDistance;
+              legsToSplitPointTime = legsToSplitStats.timeHours; // FIX: Use timeHours instead of totalTime
+              
+              console.log('🎯 AlternateStopCard: Used RouteCalculator for legs to split point:', {
+                fuel: legsToSplitPointFuel,
+                distance: legsToSplitPointDistance,
+                time: legsToSplitPointTime,
+                timeInMinutes: legsToSplitPointTime * 60
+              });
+            } else {
+              console.error('🟠 AlternateStopCard: RouteCalculator returned invalid results for legs to split point');
+              return null;
+            }
+          } else {
+            console.error('🟠 AlternateStopCard: Not enough coordinates for legs to split point');
+            return null;
+          }
+        }
+        
+      } catch (error) {
+        console.error('🟠 AlternateStopCard: Error using RouteCalculator for legs to split point:', error);
+        return null;
       }
     }
   }
@@ -1275,55 +1399,103 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     time: legsToSplitPointTime
   });
   
-  // Calculate alternate leg fuel (from split point to alternate destination)
+  // 🎯 SINGLE SOURCE OF TRUTH: Use RouteCalculator for alternate route (same as main route)
   let alternateLegFuel = 0;
   let alternateLegDistance = 0;
   let alternateLegTime = 0;
   
   if (alternateRouteData.coordinates && alternateRouteData.coordinates.length >= 2) {
-    // Get split point and alternate destination coordinates
-    const splitPointCoords = alternateRouteData.coordinates[0]; // [lon, lat]
-    const alternateDestCoords = alternateRouteData.coordinates[alternateRouteData.coordinates.length - 1]; // [lon, lat]
+    console.log('🎯 AlternateStopCard: Using RouteCalculator (SINGLE SOURCE OF TRUTH)');
     
-    // Calculate alternate leg distance
     try {
-      const from = window.turf.point(splitPointCoords);
-      const to = window.turf.point(alternateDestCoords);
-      alternateLegDistance = window.turf.distance(from, to, { units: 'nauticalmiles' });
+      // Use the RouteCalculator instance - same as main route uses
+      const routeCalculator = window.routeCalculator;
       
-      // Calculate time and fuel with wind
-      if (window.WindCalculations) {
-        console.log('🟠 AlternateStopCard: Using WindCalculations with weather:', weather);
-        const fromCoords = { lat: splitPointCoords[1], lon: splitPointCoords[0] };
-        const toCoords = { lat: alternateDestCoords[1], lon: alternateDestCoords[0] };
-        
-        const legDetails = window.WindCalculations.calculateLegWithWind(
-          fromCoords,
-          toCoords,
-          alternateLegDistance,
+      if (!routeCalculator) {
+        console.error('🎯 AlternateStopCard: RouteCalculator not available');
+        return null;
+      }
+      
+      // Calculate JUST the alternate leg (split point to alternate destination) using RouteCalculator
+      const splitPointCoords = alternateRouteData.coordinates[0]; // [lon, lat]
+      const alternateDestCoords = alternateRouteData.coordinates[alternateRouteData.coordinates.length - 1]; // [lon, lat]
+      
+      console.log('🎯 AlternateStopCard: Alternate leg coordinates debug:', {
+        splitPoint: splitPointCoords,
+        alternateDest: alternateDestCoords,
+        fullCoordinates: alternateRouteData.coordinates,
+        coordinatesLength: alternateRouteData.coordinates.length
+      });
+      
+      // Create coordinates array for just the alternate leg
+      const alternateLegCoordinates = [splitPointCoords, alternateDestCoords];
+      
+      console.log('🔧 CALLING RouteCalculator with:', {
+        coordinates: alternateLegCoordinates,
+        aircraft: {
+          registration: selectedAircraft?.registration,
+          cruiseSpeed: selectedAircraft?.cruiseSpeed,
+          fuelBurn: selectedAircraft?.fuelBurn,
+          flatPitchFuelBurnDeckFuel: selectedAircraft?.flatPitchFuelBurnDeckFuel,
+          allKeys: selectedAircraft ? Object.keys(selectedAircraft) : [],
+          fuelKeys: selectedAircraft ? Object.keys(selectedAircraft).filter(k => k.toLowerCase().includes('fuel') || k.toLowerCase().includes('burn')) : []
+        },
+        weather: weather,
+        forceTimeCalculation: true
+      });
+      
+      const alternateLegStats = routeCalculator.calculateRouteStats(
+        alternateLegCoordinates,
+        {
           selectedAircraft,
-          weather
-        );
+          weather,
+          forceTimeCalculation: true
+        }
+      );
+      
+      console.log('🔧 RouteCalculator RETURNED:', alternateLegStats);
+      
+      if (alternateLegStats && alternateLegStats.tripFuel !== undefined) {
+        console.log('🎯 AlternateStopCard: RouteCalculator alternate leg results:', alternateLegStats);
         
-        alternateLegTime = legDetails.time;
-        alternateLegFuel = Math.round(legDetails.fuel);
+        // Use RouteCalculator results for alternate leg only
+        alternateLegDistance = alternateLegStats.totalDistance || 0;
+        alternateLegTime = alternateLegStats.timeHours || 0; // FIX: Use timeHours consistently
+        alternateLegFuel = alternateLegStats.tripFuel || 0;
         
-        console.log('🟠 AlternateStopCard: Alternate leg with wind:', legDetails);
-        console.log('🟠 AlternateStopCard: Final time/fuel:', { time: alternateLegTime, fuel: alternateLegFuel });
+        console.log('🚨 TIME DEBUG - RouteCalculator fields:', {
+          totalTime: alternateLegStats.totalTime,
+          timeHours: alternateLegStats.timeHours,
+          estimatedTime: alternateLegStats.estimatedTime,
+          allKeys: Object.keys(alternateLegStats),
+          finalTimeUsed: alternateLegTime
+        });
+        
+        console.log('🎯 PALANTIR COMPARISON - Alternate Leg Only:', {
+          'RouteCalculator Distance': alternateLegDistance,
+          'RouteCalculator Time': alternateLegTime, 
+          'RouteCalculator Fuel': alternateLegFuel,
+          'Expected Palantir Alt': 581,
+          'Difference': alternateLegFuel - 581,
+          'PercentageOff': ((alternateLegFuel - 581) / 581 * 100).toFixed(1) + '%'
+        });
+        
+        console.log('🎯 AlternateStopCard: Using RouteCalculator for alternate leg:', {
+          distance: alternateLegDistance,
+          time: alternateLegTime,
+          fuel: alternateLegFuel
+        });
       } else {
-        console.log('🟠 AlternateStopCard: WindCalculations not available, using basic calculation');
-        // Fallback calculation without wind
-        alternateLegTime = alternateLegDistance / selectedAircraft.cruiseSpeed;
-        alternateLegFuel = Math.round(alternateLegTime * selectedAircraft.fuelBurn);
-        console.log('🟠 AlternateStopCard: Basic calculation result:', { time: alternateLegTime, fuel: alternateLegFuel });
+        console.error('🎯 AlternateStopCard: RouteCalculator returned invalid results for alternate leg');
+        return null;
       }
       
     } catch (error) {
-      console.error('🟠 AlternateStopCard: Error calculating alternate leg:', error);
+      console.error('🎯 AlternateStopCard: Error using RouteCalculator:', error);
       return null;
     }
   } else {
-    console.error('🟠 AlternateStopCard: Invalid alternate route coordinates');
+    console.error('🎯 AlternateStopCard: Invalid alternate route coordinates');
     return null;
   }
   
@@ -1331,6 +1503,19 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     fuel: alternateLegFuel,
     distance: alternateLegDistance,
     time: alternateLegTime
+  });
+  
+  console.log(`🟠 AlternateStopCard: PALANTIR COMPARISON DEBUG:`, {
+    'Fast Planner - Legs to Split': legsToSplitPointFuel,
+    'Fast Planner - Alt Leg': alternateLegFuel,
+    'Fast Planner - Total': legsToSplitPointFuel + alternateLegFuel,
+    'Palantir Target - Trip': 517,
+    'Palantir Target - Alt': 581,
+    'Palantir Target - Total': 1098,
+    'Difference - Trip': (legsToSplitPointFuel - 517),
+    'Difference - Alt': (alternateLegFuel - 581),
+    'Alt Leg Distance (nm)': alternateLegDistance,
+    'Alt Leg Time (hours)': alternateLegTime
   });
   
   // Calculate total trip fuel for alternate route
@@ -1381,10 +1566,11 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     reserveFuelValue
   });
 
-  // Create fuel components text - only show non-zero weather fuel
+  // Create fuel components text - PALANTIR MATCH: Show Trip and Alt separately
   let alternateParts = [
     `Taxi:${taxiFuelValue}`,
-    `Trip:${totalAlternateTripFuel}`,
+    `Trip:${legsToSplitPointFuel}`,
+    `Alt:${alternateLegFuel}`,
     `Cont:${alternateContingencyFuel}`
   ];
   
@@ -1418,6 +1604,16 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   const totalAlternateDistance = Number(legsToSplitPointDistance || 0) + Number(alternateLegDistance || 0);
   const totalAlternateTime = Number(legsToSplitPointTime || 0) + Number(alternateLegTime || 0);
   
+  console.log('🚨 TIME CALCULATION DEBUG:', {
+    legsToSplitPointTime: legsToSplitPointTime,
+    legsToSplitPointTimeMinutes: legsToSplitPointTime * 60,
+    alternateLegTime: alternateLegTime,
+    alternateLegTimeMinutes: alternateLegTime * 60,
+    totalAlternateTime: totalAlternateTime,
+    totalAlternateTimeMinutes: totalAlternateTime * 60,
+    totalAlternateTimeFormatted: Math.floor(totalAlternateTime) + ':' + String(Math.round((totalAlternateTime % 1) * 60)).padStart(2, '0')
+  });
+  
   console.log(`🟠 AlternateStopCard: Final calculations:`, {
     totalAlternateFuel,
     maxPassengers,
@@ -1450,7 +1646,9 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     deckFuel: Number(alternateDeckFuel),
     fuelComponents: fuelComponentsText,
     fuelComponentsObject: {
-      tripFuel: totalAlternateTripFuel,
+      tripFuel: legsToSplitPointFuel,  // PALANTIR MATCH: Legs to split point only
+      altFuel: alternateLegFuel,       // PALANTIR MATCH: Alternate leg only
+      totalTripFuel: totalAlternateTripFuel,  // Keep total for calculations
       contingencyFuel: alternateContingencyFuel,
       taxiFuel: taxiFuelValue,
       araFuel: araFuel,  // Include weather fuel for alternate
@@ -1469,75 +1667,6 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   return alternateCard;
 };
 
-/**
- * Helper function to calculate a single leg with wind effects
- * Used for manual alternate leg calculations when route stats are not available
- */
-const calculateLegWithWind = (fromWaypoint, toWaypoint, aircraft, weather) => {
-  // Check for coordinates
-  const fromHasCoords = (fromWaypoint.lat && fromWaypoint.lon) ||
-                       (fromWaypoint.coords && fromWaypoint.coords.length === 2);
-  const toHasCoords = (toWaypoint.lat && toWaypoint.lon) ||
-                     (toWaypoint.coords && toWaypoint.coords.length === 2);
-  
-  if (!fromHasCoords || !toHasCoords) {
-    console.error('🟠 AlternateStopCard: Missing coordinates for leg calculation');
-    return null;
-  }
-  
-  // Get coordinates
-  const fromCoords = {
-    lat: fromWaypoint.lat || fromWaypoint.coords[1],
-    lon: fromWaypoint.lon || fromWaypoint.coords[0]
-  };
-  
-  const toCoords = {
-    lat: toWaypoint.lat || toWaypoint.coords[1],
-    lon: toWaypoint.lon || toWaypoint.coords[0]
-  };
-  
-  // Calculate distance
-  let distance = 0;
-  try {
-    const from = window.turf.point([fromCoords.lon, fromCoords.lat]);
-    const to = window.turf.point([toCoords.lon, toCoords.lat]);
-    distance = window.turf.distance(from, to, { units: 'nauticalmiles' });
-  } catch (error) {
-    console.error('🟠 AlternateStopCard: Error calculating distance:', error);
-    return null;
-  }
-  
-  // Calculate time and fuel with wind if available
-  if (window.WindCalculations) {
-    try {
-      const legDetails = window.WindCalculations.calculateLegWithWind(
-        fromCoords,
-        toCoords,
-        distance,
-        aircraft,
-        weather
-      );
-      
-      return {
-        distance: distance,
-        time: legDetails.time,
-        fuel: Math.round(legDetails.fuel)
-      };
-    } catch (error) {
-      console.error('🟠 AlternateStopCard: Error calculating wind effects:', error);
-    }
-  }
-  
-  // Fallback calculation without wind
-  const time = distance / aircraft.cruiseSpeed;
-  const fuel = Math.round(time * aircraft.fuelBurn);
-  
-  return {
-    distance: distance,
-    time: time,
-    fuel: fuel
-  };
-};
 
 export default {
   calculateStopCards,

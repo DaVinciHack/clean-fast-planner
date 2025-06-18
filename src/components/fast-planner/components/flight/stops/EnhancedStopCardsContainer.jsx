@@ -120,6 +120,15 @@ const EnhancedStopCardsContainer = ({
   
   // 🟠 ADDED: Calculate alternate stop card when alternate route data exists
   useEffect(() => {
+    console.log('🟠 EnhancedStopCardsContainer: Alternate card useEffect triggered with data:', {
+      hasAlternateRouteData: !!alternateRouteData,
+      alternateRouteKeys: alternateRouteData ? Object.keys(alternateRouteData) : [],
+      hasSelectedAircraft: !!selectedAircraft,
+      waypointCount: waypoints.length,
+      hasWeather: !!weather,
+      hasFuelPolicy: !!fuelPolicy
+    });
+    
     // Only calculate if we have the necessary data
     if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather) {
       console.log('🟠 EnhancedStopCardsContainer: Calculating alternate stop card with data:', {
@@ -143,7 +152,8 @@ const EnhancedStopCardsContainer = ({
           taxiFuel: Number(taxiFuel) || 0,
           extraFuel: Number(extraFuel) || 0,  // 🔧 ADDED: Missing extraFuel parameter
           araFuel: Number(araFuel) || 0,      // 🔧 ADDED: ARA fuel from weather
-          approachFuel: Number(approachFuel) || 0  // 🔧 ADDED: Approach fuel from weather
+          approachFuel: Number(approachFuel) || 0,  // 🔧 ADDED: Approach fuel from weather
+          fuelPolicy: fuelPolicy?.currentPolicy  // 🔧 CRITICAL: Add fuel policy for reserve fuel conversion
         };
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
@@ -182,7 +192,7 @@ const EnhancedStopCardsContainer = ({
       });
       setAlternateStopCard(null);
     }
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel]);
+  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy]);
   
   // Handle card click
   const handleCardClick = (index) => {

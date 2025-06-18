@@ -10,7 +10,8 @@
       "Bash(/Users/duncanburbury/.nvm/versions/node/v24.0.1/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg -A 5 -B 5 \"onSubmit|handleSubmit\" src/components/fast-planner/components/panels/cards/SaveFlightCard.jsx)",
       "Bash(find:*)",
       "Bash(rg:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }
