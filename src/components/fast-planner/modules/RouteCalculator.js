@@ -564,4 +564,11 @@ class RouteCalculator {
   }
 }
 
+// CRITICAL: Expose RouteCalculator globally for consistent access across all components
+// This ensures single source of truth for ALL route calculations
+if (typeof window !== 'undefined') {
+  window.RouteCalculator = RouteCalculator;
+  console.log('🎯 RouteCalculator: Exposed globally for single source of truth');
+}
+
 export default RouteCalculator;
