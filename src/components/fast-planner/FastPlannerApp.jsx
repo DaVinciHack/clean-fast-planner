@@ -1438,33 +1438,38 @@ const FastPlannerCore = ({
                   }
                 };
                 
-                // 🌤️ FORCE AUTO-ENABLE: Trigger weather circles creation after weather data is loaded
-                setTimeout(() => {
-                  console.log('🌤️ FORCE: Attempting to auto-create weather circles after data load');
-                  if (mapManagerRef?.current?.map && loadedWeatherSegments.length > 0) {
-                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                      // Clean up any existing layer first
-                      if (window.currentWeatherCirclesLayer) {
-                        try {
-                          window.currentWeatherCirclesLayer.removeWeatherCircles();
-                        } catch (cleanupError) {
-                          console.warn('🌤️ FORCE: Cleanup error:', cleanupError);
-                        }
-                      }
-                      
-                      console.log('🌤️ FORCE: Creating WeatherCirclesLayer with loaded flight data');
-                      const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
-                      weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
-                      window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                      console.log('🌤️ FORCE: Weather circles force-created for loaded flight');
-                      
-                      // Also dispatch an event to update MapLayersCard state
-                      window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
-                    }).catch(error => {
-                      console.error('🌤️ FORCE: Error force-creating weather circles:', error);
-                    });
-                  }
-                }, 2000); // Wait 2 seconds for map to be ready
+                // DISABLED: Auto-creation of weather circles on flight load - let user control
+                console.log('🚫 DISABLED: Auto-creation of weather circles on flight load');
+                console.log('🚫 Available weather data:', {
+                  segmentCount: loadedWeatherSegments.length,
+                  message: 'User can manually enable weather circles in Map Layers panel'
+                });
+                // setTimeout(() => {
+                //   console.log('🌤️ FORCE: Attempting to auto-create weather circles after data load');
+                //   if (mapManagerRef?.current?.map && loadedWeatherSegments.length > 0) {
+                //     import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                //       // Clean up any existing layer first
+                //       if (window.currentWeatherCirclesLayer) {
+                //         try {
+                //           window.currentWeatherCirclesLayer.removeWeatherCircles();
+                //         } catch (cleanupError) {
+                //           console.warn('🌤️ FORCE: Cleanup error:', cleanupError);
+                //         }
+                //       }
+                //       
+                //       console.log('🌤️ FORCE: Creating WeatherCirclesLayer with loaded flight data');
+                //       const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
+                //       weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
+                //       window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                //       console.log('🌤️ FORCE: Weather circles force-created for loaded flight');
+                //       
+                //       // Also dispatch an event to update MapLayersCard state
+                //       window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
+                //     }).catch(error => {
+                //       console.error('🌤️ FORCE: Error force-creating weather circles:', error);
+                //     });
+                //   }
+                // }, 2000); // Wait 2 seconds for map to be ready
               }
               
               console.log('🌤️ Weather segments loaded successfully for flight');

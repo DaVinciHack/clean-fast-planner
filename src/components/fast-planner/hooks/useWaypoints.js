@@ -477,6 +477,15 @@ const useWaypoints = ({
     if (platformManagerRef.current && typeof platformManagerRef.current.toggleWaypointMode === 'function') {
       const client = window.client || window.osdkClient;
       const region = currentRegion?.name || window.currentRegion?.name || 'GULF OF MEXICO';
+      
+      console.log('🎯 WAYPOINT MODE: Region detection:', {
+        currentRegionName: currentRegion?.name,
+        currentRegionId: currentRegion?.id,
+        windowCurrentRegion: window.currentRegion?.name,
+        finalRegion: region,
+        clientAvailable: !!client
+      });
+      
       platformManagerRef.current.toggleWaypointMode(active, client, region);
     } else {
       console.warn('🎯 WAYPOINT MODE: PlatformManager or toggleWaypointMode not available');

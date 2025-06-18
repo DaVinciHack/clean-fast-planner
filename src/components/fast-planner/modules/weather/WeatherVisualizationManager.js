@@ -2187,6 +2187,167 @@ class WeatherVisualizationManager {
     }
     
     /**
+     * Parse comprehensive weather data from METAR string
+     * @param {string} rawMetar - Raw METAR string
+     * @returns {object} Parsed weather data
+     */
+    parseComprehensiveMetar(rawMetar) {
+        if (!rawMetar) return null;
+        
+        const data = {
+            visibility: null,
+            temperature: null,
+            dewpoint: null,
+            altimeter: null,
+            clouds: [],
+            conditions: [],
+            rawMetar: rawMetar
+        };
+        
+        // Parse visibility (e.g., "10SM", "1/2SM", "3/4SM")
+        const visMatch = rawMetar.match(/(\d{1,2}(?:\/\d)?|\d+)SM/);
+        if (visMatch) {
+            const visString = visMatch[1];
+            if (visString.includes('/')) {
+                // Fractional visibility like "1/2SM"
+                const [num, den] = visString.split('/');
+                data.visibility = parseFloat(num) / parseFloat(den);
+            } else {
+                data.visibility = parseFloat(visString);
+            }
+        }
+        
+        // Parse temperature and dewpoint (e.g., "24/22")
+        const tempMatch = rawMetar.match(/\s(\d{2})\/(\d{2})\s/);
+        if (tempMatch) {
+            data.temperature = parseInt(tempMatch[1]); // Celsius
+            data.dewpoint = parseInt(tempMatch[2]);
+        }
+        
+        // Parse altimeter setting (e.g., "A3000")
+        const altMatch = rawMetar.match(/A(\d{4})/);
+        if (altMatch) {
+            data.altimeter = parseFloat(altMatch[1]) / 100; // Convert to inches Hg
+        }
+        
+        // Parse cloud layers (e.g., "FEW015", "SCT024", "BKN085", "OVC010")
+        const cloudMatches = rawMetar.matchAll(/(FEW|SCT|BKN|OVC)(\d{3})/g);
+        for (const match of cloudMatches) {
+            const coverage = match[1];
+            const altitude = parseInt(match[2]) * 100; // Convert to feet AGL
+            data.clouds.push({
+                coverage: coverage,
+                altitude: altitude,
+                type: this.getCloudCoverageDescription(coverage)
+            });
+        }
+        
+        // Parse weather conditions (e.g., "-RA", "TS", "FG", "SN")
+        const conditionMatches = rawMetar.matchAll(/\s(-|\+)?(RA|SN|TS|FG|BR|HZ|DZ|GR|IC|PL|GS|UP|VA|FC|SS|DS|PO|SQ|FC)\b/g);
+        for (const match of conditionMatches) {
+            const intensity = match[1] || '';
+            const phenomenon = match[2];
+            data.conditions.push({
+                intensity: intensity,
+                phenomenon: phenomenon,
+                description: this.getWeatherDescription(intensity, phenomenon)
+            });
+        }
+        
+        return data;
+    }
+    
+    /**
+     * Get cloud coverage description
+     */
+    getCloudCoverageDescription(coverage) {
+        switch (coverage) {
+            case 'FEW': return 'Few';
+            case 'SCT': return 'Scattered';
+            case 'BKN': return 'Broken';
+            case 'OVC': return 'Overcast';
+            default: return coverage;
+        }
+    }
+    
+    /**
+     * Get weather phenomenon description
+     */
+    getWeatherDescription(intensity, phenomenon) {
+        const intensityMap = {
+            '-': 'Light ',
+            '+': 'Heavy ',
+            '': ''
+        };
+        
+        const phenomenonMap = {
+            'RA': 'Rain',
+            'SN': 'Snow',
+            'TS': 'Thunderstorm',
+            'FG': 'Fog',
+            'BR': 'Mist',
+            'HZ': 'Haze',
+            'DZ': 'Drizzle',
+            'GR': 'Hail',
+            'IC': 'Ice Crystals',
+            'PL': 'Ice Pellets',
+            'GS': 'Small Hail',
+            'UP': 'Unknown Precipitation',
+            'VA': 'Volcanic Ash',
+            'FC': 'Funnel Cloud',
+            'SS': 'Sandstorm',
+            'DS': 'Duststorm',
+            'PO': 'Dust Devils',
+            'SQ': 'Squalls'
+        };
+        
+        return (intensityMap[intensity] || '') + (phenomenonMap[phenomenon] || phenomenon);
+    }
+    
+    /**
+     * Calculate flight category from METAR data (visibility and ceiling)
+     * @param {object} metarData - Parsed METAR data
+     * @returns {string} Flight category (VFR, MVFR, IFR, LIFR)
+     */
+    calculateFlightCategory(metarData) {
+        if (!metarData) return 'Unknown';
+        
+        const visibility = metarData.visibility;
+        const clouds = metarData.clouds || [];
+        
+        // Find lowest ceiling (BKN or OVC)
+        let ceiling = null;
+        for (const cloud of clouds) {
+            if (cloud.coverage === 'BKN' || cloud.coverage === 'OVC') {
+                if (ceiling === null || cloud.altitude < ceiling) {
+                    ceiling = cloud.altitude;
+                }
+            }
+        }
+        
+        // Flight category determination (FAA standards)
+        // LIFR: Ceiling < 500 ft AND/OR visibility < 1 SM
+        if ((ceiling !== null && ceiling < 500) || (visibility !== null && visibility < 1)) {
+            return 'LIFR';
+        }
+        
+        // IFR: Ceiling 500-999 ft AND/OR visibility 1-2 SM
+        if ((ceiling !== null && ceiling >= 500 && ceiling < 1000) || 
+            (visibility !== null && visibility >= 1 && visibility < 3)) {
+            return 'IFR';
+        }
+        
+        // MVFR: Ceiling 1000-3000 ft AND/OR visibility 3-4 SM
+        if ((ceiling !== null && ceiling >= 1000 && ceiling <= 3000) || 
+            (visibility !== null && visibility >= 3 && visibility <= 5)) {
+            return 'MVFR';
+        }
+        
+        // VFR: Ceiling > 3000 ft AND visibility > 5 SM
+        return 'VFR';
+    }
+    
+    /**
      * Cleanup method for manager shutdown
      */
     cleanup() {

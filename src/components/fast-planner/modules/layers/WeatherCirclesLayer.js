@@ -70,6 +70,19 @@ class WeatherCirclesLayer {
     // ENHANCED APPROACH: Handle alternates, rigs, and split points
     const validSegments = [];
     
+    // DEDUPLICATION: First pass - identify all alternates to prioritize them
+    const alternateLocations = new Set();
+    const processedLocations = new Set();
+    
+    // First pass: collect all alternate locations
+    weatherSegments.forEach(segment => {
+      if (segment.alternateGeoShape && (segment.airportIcao || segment.locationName)) {
+        alternateLocations.add(segment.airportIcao || segment.locationName);
+      }
+    });
+    
+    console.log('🔄 DEDUP: Found alternates for locations:', Array.from(alternateLocations));
+    
     weatherSegments.forEach((segment, index) => {
       console.log(`🔍 Segment ${index}:`, {
         airportIcao: segment.airportIcao,
@@ -87,6 +100,25 @@ class WeatherCirclesLayer {
       if (!hasValidRanking) {
         console.log(`❌ Invalid segment ${index}: no valid ranking`);
         return;
+      }
+      
+      // DUPLICATE CHECK: Skip destinations if there's an alternate for the same location
+      const locationKey = segment.airportIcao || segment.locationName;
+      if (locationKey) {
+        // If this is a destination (no alternateGeoShape) and there's an alternate for this location, skip it
+        if (!segment.isRig && !segment.alternateGeoShape && alternateLocations.has(locationKey)) {
+          console.log(`🔄 DEDUP: Skipping destination ${locationKey} - alternate exists for same location`);
+          return;
+        }
+        
+        // If we already processed this exact location, skip it
+        if (processedLocations.has(locationKey)) {
+          console.log(`🔄 DEDUP: Skipping duplicate ${locationKey} - already processed`);
+          return;
+        }
+        
+        // Mark this location as processed
+        processedLocations.add(locationKey);
       }
       
       // Handle ALTERNATE destinations (have alternateGeoShape)
@@ -115,10 +147,14 @@ class WeatherCirclesLayer {
         let windSpeed = null, windDirection = null, windGust = null, windSource = 'Unknown';
         
         // Try METAR first (for airports)
+        let comprehensiveMetarData = null;
         if (segment.rawMetar && window.weatherVisualizationManager) {
           const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
           const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
           const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
+          
+          // Parse comprehensive METAR data for alternates
+          comprehensiveMetarData = window.weatherVisualizationManager.parseComprehensiveMetar(segment.rawMetar);
           
           if (metarSpeed !== null && metarDir !== null) {
             windSpeed = metarSpeed;
@@ -147,11 +183,19 @@ class WeatherCirclesLayer {
             windGust: windGust,
             windSource: windSource,
             flightCategory: segment.flightCategory || 'VFR',
-            visibility: segment.visibility || 10,
-            temperature: segment.temperature,
+            visibility: comprehensiveMetarData?.visibility || segment.visibility || 10,
+            temperature: comprehensiveMetarData?.temperature || segment.temperature,
             conditions: segment.conditions || segment.weather || 'Clear',
             stationId: segment.airportIcao,
-            locationType: 'alternate'
+            locationType: 'alternate',
+            // Enhanced METAR data for better popups
+            comprehensiveMetar: comprehensiveMetarData,
+            rawMetar: segment.rawMetar,
+            rawTaf: segment.rawTaf,
+            clouds: comprehensiveMetarData?.clouds || [],
+            weatherConditions: comprehensiveMetarData?.conditions || [],
+            altimeter: comprehensiveMetarData?.altimeter,
+            dewpoint: comprehensiveMetarData?.dewpoint
           });
           console.log(`🌬️ COLLECTED: Alternate ${segment.airportIcao} arrow data`);
         } else {
@@ -248,14 +292,20 @@ class WeatherCirclesLayer {
           });
           
           // Try METAR first (for airports AND rigs - they both have METAR data!)
+          let comprehensiveMetarData = null;
           if (segment.rawMetar && window.weatherVisualizationManager) {
             console.log(`🌬️ RIG METAR: Parsing METAR for ${segment.airportIcao}: "${segment.rawMetar}"`);
             
+            // Parse wind data
             const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
             const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
             const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
             
+            // Parse comprehensive METAR data  
+            comprehensiveMetarData = window.weatherVisualizationManager.parseComprehensiveMetar(segment.rawMetar);
+            
             console.log(`🌬️ RIG METAR: Parsed values - Speed: ${metarSpeed}, Dir: ${metarDir}, Gust: ${metarGust}`);
+            console.log(`🌬️ RIG METAR: Comprehensive data:`, comprehensiveMetarData);
             
             if (metarSpeed !== null && metarDir !== null) {
               windSpeed = metarSpeed;
@@ -338,11 +388,19 @@ class WeatherCirclesLayer {
               windGust: windGust,
               windSource: windSource,
               flightCategory: segment.flightCategory || 'VFR',
-              visibility: segment.visibility || 10,
-              temperature: segment.temperature,
+              visibility: comprehensiveMetarData?.visibility || segment.visibility || 10,
+              temperature: comprehensiveMetarData?.temperature || segment.temperature,
               conditions: segment.conditions || segment.weather || 'Clear',
               stationId: segment.airportIcao,
-              locationType: 'rig'
+              locationType: 'rig',
+              // Enhanced METAR data for better popups
+              comprehensiveMetar: comprehensiveMetarData,
+              rawMetar: segment.rawMetar,
+              rawTaf: segment.rawTaf,
+              clouds: comprehensiveMetarData?.clouds || [],
+              weatherConditions: comprehensiveMetarData?.conditions || [],
+              altimeter: comprehensiveMetarData?.altimeter,
+              dewpoint: comprehensiveMetarData?.dewpoint
             });
             console.log(`🌬️ COLLECTED: Rig ${segment.airportIcao} arrow data`);
           } else {
@@ -423,10 +481,14 @@ class WeatherCirclesLayer {
           let windSpeed = null, windDirection = null, windGust = null, windSource = 'Unknown';
           
           // Try METAR first (airports should have METAR)
+          let comprehensiveMetarData = null;
           if (segment.rawMetar && window.weatherVisualizationManager) {
             const metarSpeed = window.weatherVisualizationManager.parseWindSpeedFromMetar(segment.rawMetar);
             const metarDir = window.weatherVisualizationManager.parseWindDirectionFromMetar(segment.rawMetar);
             const metarGust = window.weatherVisualizationManager.parseWindGustFromMetar(segment.rawMetar);
+            
+            // Parse comprehensive METAR data for destinations
+            comprehensiveMetarData = window.weatherVisualizationManager.parseComprehensiveMetar(segment.rawMetar);
             
             if (metarSpeed !== null && metarDir !== null) {
               windSpeed = metarSpeed;
@@ -455,11 +517,19 @@ class WeatherCirclesLayer {
               windGust: windGust,
               windSource: windSource,
               flightCategory: segment.flightCategory || 'VFR',
-              visibility: segment.visibility || 10,
-              temperature: segment.temperature,
+              visibility: comprehensiveMetarData?.visibility || segment.visibility || 10,
+              temperature: comprehensiveMetarData?.temperature || segment.temperature,
               conditions: segment.conditions || segment.weather || 'Clear',
               stationId: segment.airportIcao || segment.locationName,
-              locationType: 'destination'
+              locationType: 'destination',
+              // Enhanced METAR data for better popups
+              comprehensiveMetar: comprehensiveMetarData,
+              rawMetar: segment.rawMetar,
+              rawTaf: segment.rawTaf,
+              clouds: comprehensiveMetarData?.clouds || [],
+              weatherConditions: comprehensiveMetarData?.conditions || [],
+              altimeter: comprehensiveMetarData?.altimeter,
+              dewpoint: comprehensiveMetarData?.dewpoint
             });
             console.log(`🌬️ COLLECTED: Destination ${segment.airportIcao} arrow data`);
           } else {
