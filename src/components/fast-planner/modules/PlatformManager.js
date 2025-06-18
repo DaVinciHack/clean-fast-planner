@@ -47,12 +47,21 @@ class PlatformManager {
           coordinates: coordinates,
           type: item.locationType || 'WAYPOINT', // Store original type
           region: item.region || '',
-          activeSite: item.activeSite || ''
+          activeSite: item.activeSite || '',
+          routeDirection: item.routeDirection || '' // Add route direction for color coding
         };
       })
       .filter(wp => wp !== null); // Remove null entries
     
     console.log(`PlatformManager: Processed ${waypoints.length} valid waypoints`);
+    
+    // Log route direction statistics for debugging
+    const routeDirectionStats = {};
+    waypoints.forEach(wp => {
+      const direction = wp.routeDirection || 'NONE';
+      routeDirectionStats[direction] = (routeDirectionStats[direction] || 0) + 1;
+    });
+    console.log('🎯 WAYPOINT ROUTE DIRECTIONS:', routeDirectionStats);
     
     return waypoints;
   }
@@ -2625,7 +2634,8 @@ class PlatformManager {
         type: 'Feature',
         properties: {
           name: wp.name,
-          type: wp.type
+          type: wp.type,
+          routeDirection: wp.routeDirection // Add route direction for color coding
         },
         geometry: {
           type: 'Point',
@@ -2661,7 +2671,12 @@ class PlatformManager {
             source: sourceId,
             paint: {
               'circle-radius': 1, // Changed from 3 to 1 to make dots much smaller
-              'circle-color': '#FFCC00', // Yellow
+              'circle-color': [
+                'case',
+                ['==', ['get', 'routeDirection'], 'OUT'], '#87CEEB', // Light blue for outbound only
+                ['==', ['get', 'routeDirection'], 'IN'], '#90EE90',  // Light green for inbound only
+                '#FFCC00' // Default yellow for BOTH, NONE, or any other value
+              ],
               'circle-stroke-width': 1,
               'circle-stroke-color': '#FFFFFF'
             },
@@ -2686,7 +2701,12 @@ class PlatformManager {
               'visibility': this.osdkWaypointsVisible ? 'visible' : 'none'
             },
             paint: {
-              'text-color': '#FFCC00',
+              'text-color': [
+                'case',
+                ['==', ['get', 'routeDirection'], 'OUT'], '#4682B4', // Darker blue for outbound labels
+                ['==', ['get', 'routeDirection'], 'IN'], '#228B22',  // Darker green for inbound labels
+                '#FFCC00' // Default yellow for BOTH, NONE, or any other value
+              ],
               'text-halo-color': '#000000',
               'text-halo-width': 0.5
             }
