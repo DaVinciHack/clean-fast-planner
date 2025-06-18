@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useReserveFuel } from '../../../hooks/useReserveFuel';
 import RegionSelector from '../../controls/RegionSelector';
 import { SaveFlightButton, LoadFlightsButton } from '../../controls';
@@ -71,6 +71,27 @@ const MainCard = ({
     araFuelType: typeof araFuel,
     approachFuelType: typeof approachFuel
   });
+
+  // Listen for master toggle events from MapLayersCard to keep buttons synchronized
+  useEffect(() => {
+    const handleMasterToggle = (event) => {
+      if (event.detail && event.detail.source === 'mapLayersCard-master') {
+        console.log('🔄 MAIN CARD: Received master toggle from MapLayersCard:', event.detail);
+        // The MapLayersCard master button was used, so we should update our state
+        // but don't emit events back to avoid infinite loops
+        const { allVisible } = event.detail;
+        
+        // Update the chartsVisible state to match if needed
+        if (chartsVisible !== allVisible) {
+          console.log(`🔄 MAIN CARD: Syncing chartsVisible from ${chartsVisible} to ${allVisible}`);
+          onToggleChart(); // This should update the parent's chartsVisible state
+        }
+      }
+    };
+
+    window.addEventListener('master-layer-toggle', handleMasterToggle);
+    return () => window.removeEventListener('master-layer-toggle', handleMasterToggle);
+  }, [chartsVisible, onToggleChart]);
 
   // Status message handlers for the Save Flight button
   const handleSaveSuccess = (message) => {
@@ -250,6 +271,19 @@ const MainCard = ({
                 'bases', 'fuelAvailable', 'grid'
               ];
               
+              // Emit master toggle event to notify MapLayersCard
+              setTimeout(() => {
+                const masterEvent = new CustomEvent('master-layer-toggle', {
+                  detail: { 
+                    source: 'mainCard-master', 
+                    allVisible: newState,
+                    timestamp: Date.now()
+                  }
+                });
+                window.dispatchEvent(masterEvent);
+                console.log('🔄 TOGGLE ALL: Emitted master toggle event to MapLayersCard:', newState);
+              }, 10);
+
               // Emit events for each layer type
               layerTypes.forEach(layerType => {
                 const event = new CustomEvent('layer-visibility-changed', {

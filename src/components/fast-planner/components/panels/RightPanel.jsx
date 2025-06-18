@@ -370,33 +370,40 @@ const RightPanel = React.forwardRef(({
                             
                             console.log(`🚁 AUTOMATION HYBRID: Found ${airportSegments.length} airports and ${rigSegments.length} rigs`);
                             
-                            // Dispatch force-enable event to MapLayersCard
-                            window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
+                            // DISABLED: Force-enable event dispatch - let user control weather layers
+                            // window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
+                            console.log('🚫 DISABLED: Weather circles force-enable via automation');
                             
-                            // 1. Create weather circles for AIRPORTS ONLY
-                            if (airportSegments.length > 0) {
-                              import('../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                                // Clean up existing layer
-                                if (window.currentWeatherCirclesLayer) {
-                                  try {
-                                    window.currentWeatherCirclesLayer.removeWeatherCircles();
-                                    console.log('🎯 AUTOMATION HYBRID: Cleaned up existing weather layer');
-                                  } catch (e) { 
-                                    console.warn('🎯 AUTOMATION HYBRID: Cleanup warning (non-fatal):', e.message);
-                                  }
-                                }
-                                
-                                // Create new layer with airport data only
-                                console.log('🎯 AUTOMATION HYBRID: Creating WeatherCirclesLayer with', airportSegments.length, 'airports');
-                                const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
-                                weatherCirclesLayer.addWeatherCircles(airportSegments); // Only airports
-                                window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                                console.log('🎯 AUTOMATION HYBRID: ✅ Weather circles created for airports via automation!');
-                                
-                              }).catch(error => {
-                                console.error('🎯 AUTOMATION HYBRID: Error creating weather circles:', error);
-                              });
-                            }
+                            // DISABLED: Auto-create weather circles - let user manually enable
+                            console.log('🚫 DISABLED: Auto-creation of weather circles via automation');
+                            console.log('🚫 Available data:', {
+                              airportSegments: airportSegments.length,
+                              rigSegments: rigSegments.length,
+                              message: 'User can manually enable weather circles in Map Layers panel'
+                            });
+                            // if (airportSegments.length > 0) {
+                            //   import('../../modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
+                            //     // Clean up existing layer
+                            //     if (window.currentWeatherCirclesLayer) {
+                            //       try {
+                            //         window.currentWeatherCirclesLayer.removeWeatherCircles();
+                            //         console.log('🎯 AUTOMATION HYBRID: Cleaned up existing weather layer');
+                            //       } catch (e) { 
+                            //         console.warn('🎯 AUTOMATION HYBRID: Cleanup warning (non-fatal):', e.message);
+                            //       }
+                            //     }
+                            //     
+                            //     // Create new layer with airport data only
+                            //     console.log('🎯 AUTOMATION HYBRID: Creating WeatherCirclesLayer with', airportSegments.length, 'airports');
+                            //     const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
+                            //     weatherCirclesLayer.addWeatherCircles(airportSegments); // Only airports
+                            //     window.currentWeatherCirclesLayer = weatherCirclesLayer;
+                            //     console.log('🎯 AUTOMATION HYBRID: ✅ Weather circles created for airports via automation!');
+                            //     
+                            //   }).catch(error => {
+                            //     console.error('🎯 AUTOMATION HYBRID: Error creating weather circles:', error);
+                            //   });
+                            // }
                             
                             // 2. DISABLED: Old separate rig graphics - now using unified weather arrows
                             console.log(`🚁 AUTOMATION HYBRID: Unified system handles ${rigSegments.length} rigs automatically`);

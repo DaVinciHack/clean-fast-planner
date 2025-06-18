@@ -53,11 +53,11 @@ const MapLayersCard = ({
     blocks: true, // New category for blocks
     bases: true, // New category for bases
     fuelAvailable: false, // New category for fuel available (default off)
-    // Weather Satellite Layers
-    lightning: true, // DEFAULT ON - Critical safety layer (opacity 0.6)
-    satelliteConus: true, // DEFAULT ON for Gulf region (opacity 0.6)
-    satelliteLongwave: false, // Optional - user can enable
-    satelliteShortwave: true, // DEFAULT ON with 0.4 opacity and z-index 0
+    // Weather Satellite Layers - User controlled, no auto-enable
+    lightning: false, // User can enable when needed
+    satelliteConus: false, // User can enable when needed
+    satelliteLongwave: false, // User can enable when needed
+    satelliteShortwave: false, // User can enable when needed
     // 3D Cloud Effects
     cloud3DEffects: false, // GENIUS altitude-based cloud opacity
     enhanced3DControls: false, // Advanced flight simulation controls
@@ -128,12 +128,13 @@ const MapLayersCard = ({
         }
       }
       
-      // Sync weather circles state
-      const weatherCirclesVisible = !!window.currentWeatherCirclesLayer;
-      if (weatherCirclesVisible !== layers.weatherCircles) {
-        console.log('🔄 SYNC: Weather circles state mismatch detected, correcting:', { current: layers.weatherCircles, actual: weatherCirclesVisible });
-        setLayers(prev => ({ ...prev, weatherCircles: weatherCirclesVisible }));
-      }
+      // DISABLED: Auto-sync weather circles state - let user control toggles
+      // const weatherCirclesVisible = !!window.currentWeatherCirclesLayer;
+      // if (weatherCirclesVisible !== layers.weatherCircles) {
+      //   console.log('🔄 SYNC: Weather circles state mismatch detected, correcting:', { current: layers.weatherCircles, actual: weatherCirclesVisible });
+      //   setLayers(prev => ({ ...prev, weatherCircles: weatherCirclesVisible }));
+      // }
+      console.log('🚫 DISABLED: Weather circles auto-sync - user controls toggle state');
     };
     
     // Sync immediately
@@ -153,54 +154,55 @@ const MapLayersCard = ({
   //   console.log('🚫 DISABLED: Auto-update on waypoint changes (causing conflicts)');
   // }, [waypoints, weatherSegmentsHook?.weatherSegments, layers.rigWeatherGraphics]);
 
-  // Auto-initialize default weather layers when map becomes available
+  // DISABLED: Auto-initialize default weather layers - let user enable manually
   useEffect(() => {
     const initializeDefaultWeatherLayers = async () => {
-      if (!mapManagerRef?.current?.map) return;
-      
-      const mapInstance = mapManagerRef.current.map;
-      
-      // Auto-enable lightning (global safety layer) - only if not already present
-      if (!mapInstance.getLayer('simple-lightning-layer')) {
-        console.log('🌩️ Auto-initializing lightning detection...');
-        try {
-          const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
-          await addSimpleLightningOverlay(mapInstance);
-          // Set default opacity after enabling
-          setTimeout(() => {
-            try {
-              mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', weatherOpacities.lightning);
-              console.log(`✅ Lightning auto-enabled with ${weatherOpacities.lightning * 100}% opacity`);
-            } catch (error) {
-              console.warn('⚠️ Could not set lightning default opacity:', error);
-            }
-          }, 500);
-        } catch (error) {
-          console.warn('⚠️ Failed to auto-enable lightning:', error);
-        }
-      }
-      
-      // Auto-enable CONUS radar for Gulf region - only if not already present
-      if (currentRegion?.id === 'gulf-of-mexico' && !mapInstance.getLayer('noaa-conus-layer')) {
-        console.log('🌧️ Auto-initializing CONUS radar for Gulf region...');
-        try {
-          const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
-          const success = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
-          if (success) {
-            // Set default opacity
-            setTimeout(() => {
-              try {
-                mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', weatherOpacities.satelliteConus);
-                console.log(`✅ CONUS auto-enabled with ${weatherOpacities.satelliteConus * 100}% opacity`);
-              } catch (error) {
-                console.warn('⚠️ Could not set CONUS default opacity:', error);
-              }
-            }, 500);
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to auto-enable CONUS:', error);
-        }
-      }
+      console.log('🚫 DISABLED: Auto-initialization of weather layers - user can manually enable');
+      // if (!mapManagerRef?.current?.map) return;
+      // 
+      // const mapInstance = mapManagerRef.current.map;
+      // 
+      // // Auto-enable lightning (global safety layer) - only if not already present
+      // if (!mapInstance.getLayer('simple-lightning-layer')) {
+      //   console.log('🌩️ Auto-initializing lightning detection...');
+      //   try {
+      //     const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
+      //     await addSimpleLightningOverlay(mapInstance);
+      //     // Set default opacity after enabling
+      //     setTimeout(() => {
+      //       try {
+      //         mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', weatherOpacities.lightning);
+      //         console.log(`✅ Lightning auto-enabled with ${weatherOpacities.lightning * 100}% opacity`);
+      //       } catch (error) {
+      //         console.warn('⚠️ Could not set lightning default opacity:', error);
+      //       }
+      //     }, 500);
+      //   } catch (error) {
+      //     console.warn('⚠️ Failed to auto-enable lightning:', error);
+      //   }
+      // }
+      // 
+      // // Auto-enable CONUS radar for Gulf region - only if not already present
+      // if (currentRegion?.id === 'gulf-of-mexico' && !mapInstance.getLayer('noaa-conus-layer')) {
+      //   console.log('🌧️ Auto-initializing CONUS radar for Gulf region...');
+      //   try {
+      //     const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+      //     const success = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+      //     if (success) {
+      //       // Set default opacity
+      //       setTimeout(() => {
+      //         try {
+      //           mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', weatherOpacities.satelliteConus);
+      //           console.log(`✅ CONUS auto-enabled with ${weatherOpacities.satelliteConus * 100}% opacity`);
+      //         } catch (error) {
+      //           console.warn('⚠️ Could not set CONUS default opacity:', error);
+      //         }
+      //       }, 500);
+      //     }
+      //   } catch (error) {
+      //     console.warn('⚠️ Failed to auto-enable CONUS:', error);
+      //   }
+      // }
       
       // TEMPORARILY DISABLE shortwave IR auto-enable to test waypoint mode
       /*
@@ -232,9 +234,12 @@ const MapLayersCard = ({
       */
     };
     
-    // Small delay to ensure map is fully loaded
-    const timeoutId = setTimeout(initializeDefaultWeatherLayers, 1000);
-    return () => clearTimeout(timeoutId);
+    // DISABLED: Auto-initialization timeout
+    // const timeoutId = setTimeout(initializeDefaultWeatherLayers, 1000);
+    // return () => clearTimeout(timeoutId);
+    
+    // Run once to log that auto-init is disabled
+    initializeDefaultWeatherLayers();
   }, [mapManagerRef, currentRegion, weatherOpacities.lightning, weatherOpacities.satelliteConus, weatherOpacities.satelliteShortwave]);
 
   // Real-time altitude display update when 3D clouds are active
@@ -426,7 +431,8 @@ const MapLayersCard = ({
             if (window.platformManager && typeof window.platformManager.loadWeatherFeatures === 'function') {
               window.platformManager.loadWeatherFeatures();
               console.log('✅ Weather circles requested from PlatformManager');
-              // State will be synced by the existing sync logic
+              // Explicitly set state - no auto-sync to prevent re-enabling issues
+              setLayers(prev => ({ ...prev, weatherCircles: true }));
             } else if (weatherSegmentsHook?.segments && weatherSegmentsHook.segments.length > 0) {
               // Fallback: direct creation only if PlatformManager not available
               try {
@@ -437,11 +443,12 @@ const MapLayersCard = ({
                 window.currentWeatherCirclesLayer = weatherLayer;
                 console.log('✅ Created weather circles (fallback method)');
                 
-                // Auto-enable wind arrows when weather circles are created
-                if (window.rigWeatherIntegration) {
-                  window.rigWeatherIntegration.toggleVisibility(true);
-                  console.log('🌬️ Auto-enabled wind arrows with weather circles');
-                }
+                // DISABLED: Auto-enable wind arrows - let user control weather layers
+                // if (window.rigWeatherIntegration) {
+                //   window.rigWeatherIntegration.toggleVisibility(true);
+                //   console.log('🌬️ Auto-enabled wind arrows with weather circles');
+                // }
+                console.log('🚫 DISABLED: Auto-enable wind arrows with weather circles');
                 
                 setLayers(prev => ({ ...prev, weatherCircles: true }));
               } catch (error) {
@@ -938,6 +945,84 @@ const MapLayersCard = ({
     }
   };
   
+  // Master toggle function for all platform layers
+  const toggleAllPlatformLayers = () => {
+    // Determine if we should turn all on or all off
+    // Turn off if ANY platform layer is currently on, turn on if ALL are off
+    const platformLayerStates = [
+      layers.airfields,
+      layers.platforms, 
+      layers.movablePlatforms,
+      layers.blocks,
+      layers.bases,
+      layers.fuelAvailable,
+      layers.grid
+    ];
+    
+    const anyLayerOn = platformLayerStates.some(state => state);
+    const newState = !anyLayerOn; // If any layer is on, turn all off. If all off, turn all on.
+    
+    console.log(`🔄 MASTER TOGGLE: Setting all platform layers to: ${newState}`);
+    
+    // Emit master toggle event to notify MainCard
+    setTimeout(() => {
+      const masterEvent = new CustomEvent('master-layer-toggle', {
+        detail: { 
+          source: 'mapLayersCard-master', 
+          allVisible: newState,
+          timestamp: Date.now()
+        }
+      });
+      window.dispatchEvent(masterEvent);
+      console.log('🔄 MASTER TOGGLE: Emitted master toggle event to MainCard:', newState);
+    }, 10);
+    
+    // List of all platform layer types
+    const layerTypes = [
+      'airfields', 'platforms', 'movablePlatforms', 
+      'blocks', 'bases', 'fuelAvailable', 'grid'
+    ];
+    
+    // Toggle each layer by emitting the same events that individual toggles emit
+    layerTypes.forEach(layerType => {
+      // Only toggle if the current state is different from the target state
+      if (layers[layerType] !== newState) {
+        setTimeout(() => {
+          const event = new CustomEvent('layer-visibility-changed', {
+            detail: { layerType, visible: newState }
+          });
+          window.dispatchEvent(event);
+          console.log(`🔄 MASTER TOGGLE: Emitted event for ${layerType}: ${newState}`);
+        }, 50); // Small delay to ensure proper sequencing
+        
+        // Also trigger the individual toggle functions
+        switch (layerType) {
+          case 'airfields':
+            if (layers.airfields !== newState) toggleAirfieldsVisibility();
+            break;
+          case 'platforms': 
+            if (layers.platforms !== newState) togglePlatformsVisibility();
+            break;
+          case 'movablePlatforms':
+            if (layers.movablePlatforms !== newState) toggleMovablePlatformsVisibility();
+            break;
+          case 'blocks':
+            if (layers.blocks !== newState) toggleBlocksVisibility();
+            break;
+          case 'bases':
+            if (layers.bases !== newState) toggleBasesVisibility();
+            break;
+          case 'fuelAvailable':
+            if (layers.fuelAvailable !== newState) toggleFuelAvailableVisibility();
+            break;
+          case 'grid':
+            if (layers.grid !== newState) toggleLayer('grid');
+            break;
+        }
+      }
+    });
+  };
+  
   // Listen for global layer state changes from other components
   useEffect(() => {
     const handleGlobalLayerChange = (event) => {
@@ -953,6 +1038,73 @@ const MapLayersCard = ({
     window.addEventListener('layer-visibility-changed', handleGlobalLayerChange);
     return () => window.removeEventListener('layer-visibility-changed', handleGlobalLayerChange);
   }, []);
+
+  // Listen for master toggle events from MainCard to keep buttons synchronized
+  useEffect(() => {
+    const handleMasterToggleFromMainCard = (event) => {
+      if (event.detail && event.detail.source === 'mainCard-master') {
+        console.log('🔄 MAP LAYERS: Received master toggle from MainCard:', event.detail);
+        // The MainCard master button was used, trigger our master toggle
+        // but only if the states are different to avoid infinite loops
+        const { allVisible } = event.detail;
+        
+        const platformLayerStates = [
+          layers.airfields, layers.platforms, layers.movablePlatforms,
+          layers.blocks, layers.bases, layers.fuelAvailable, layers.grid
+        ];
+        const currentAnyLayerOn = platformLayerStates.some(state => state);
+        
+        // Only trigger if the target state is different from current state
+        if (allVisible !== currentAnyLayerOn) {
+          console.log('🔄 MAP LAYERS: Syncing with MainCard master toggle');
+          // Don't call toggleAllPlatformLayers() directly to avoid event loops
+          // Instead, update layers directly and trigger individual toggles
+          const layerTypes = [
+            'airfields', 'platforms', 'movablePlatforms', 
+            'blocks', 'bases', 'fuelAvailable', 'grid'
+          ];
+          
+          layerTypes.forEach(layerType => {
+            if (layers[layerType] !== allVisible) {
+              // Update the layer state
+              setLayers(prev => ({ ...prev, [layerType]: allVisible }));
+              
+              // Trigger the individual toggle function
+              setTimeout(() => {
+                switch (layerType) {
+                  case 'airfields':
+                    if (layers.airfields !== allVisible) toggleAirfieldsVisibility();
+                    break;
+                  case 'platforms': 
+                    if (layers.platforms !== allVisible) togglePlatformsVisibility();
+                    break;
+                  case 'movablePlatforms':
+                    if (layers.movablePlatforms !== allVisible) toggleMovablePlatformsVisibility();
+                    break;
+                  case 'blocks':
+                    if (layers.blocks !== allVisible) toggleBlocksVisibility();
+                    break;
+                  case 'bases':
+                    if (layers.bases !== allVisible) toggleBasesVisibility();
+                    break;
+                  case 'fuelAvailable':
+                    if (layers.fuelAvailable !== allVisible) toggleFuelAvailableVisibility();
+                    break;
+                  case 'grid':
+                    if (layers.grid !== allVisible) toggleLayer('grid');
+                    break;
+                }
+              }, 100 + Math.random() * 50); // Stagger the toggles slightly
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('master-layer-toggle', handleMasterToggleFromMainCard);
+    return () => window.removeEventListener('master-layer-toggle', handleMasterToggleFromMainCard);
+  }, [layers, toggleAirfieldsVisibility, togglePlatformsVisibility, toggleMovablePlatformsVisibility, 
+      toggleBlocksVisibility, toggleBasesVisibility, toggleFuelAvailableVisibility]);
 
   // Render layer toggle button
   const renderLayerToggle = (id, label, isAvailable = true) => {
@@ -986,6 +1138,70 @@ const MapLayersCard = ({
         
         <div className="layer-section">
           <h4>Platforms & Airfields</h4>
+          
+          {/* Master toggle button for all platform layers */}
+          <div className="button-row" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+            <button
+              onClick={toggleAllPlatformLayers}
+              style={{
+                flex: '1',
+                backgroundColor: (() => {
+                  const platformLayerStates = [
+                    layers.airfields, layers.platforms, layers.movablePlatforms,
+                    layers.blocks, layers.bases, layers.fuelAvailable, layers.grid
+                  ];
+                  const anyLayerOn = platformLayerStates.some(state => state);
+                  const allLayersOn = platformLayerStates.every(state => state);
+                  
+                  if (allLayersOn) return '#3b82f6'; // All on - blue
+                  if (anyLayerOn) return '#1f2937'; // Some on - dark gray with amber border
+                  return '#6b7280'; // All off - gray
+                })(),
+                color: '#ffffff',
+                border: (() => {
+                  const platformLayerStates = [
+                    layers.airfields, layers.platforms, layers.movablePlatforms,
+                    layers.blocks, layers.bases, layers.fuelAvailable, layers.grid
+                  ];
+                  const anyLayerOn = platformLayerStates.some(state => state);
+                  const allLayersOn = platformLayerStates.every(state => state);
+                  
+                  if (allLayersOn) return '1px solid #3b82f6'; // All on - blue border
+                  if (anyLayerOn) return '2px solid #f59e0b'; // Some on - amber border  
+                  return '1px solid rgba(255,255,255,0.2)'; // All off - default border
+                })(),
+                borderRadius: '4px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                textAlign: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.opacity = '0.8';
+                e.target.style.transform = 'scale(1.02)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.opacity = '1';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              {(() => {
+                const platformLayerStates = [
+                  layers.airfields, layers.platforms, layers.movablePlatforms,
+                  layers.blocks, layers.bases, layers.fuelAvailable, layers.grid
+                ];
+                const anyLayerOn = platformLayerStates.some(state => state);
+                const allLayersOn = platformLayerStates.every(state => state);
+                
+                if (allLayersOn) return '🔲 Hide All Platforms';
+                if (anyLayerOn) return '🔳 Show All Platforms'; 
+                return '☐ Show All Platforms';
+              })()}
+            </button>
+          </div>
+          
           <div className="button-row">
             {renderLayerToggle('airfields', 'Airfields')}
             {renderLayerToggle('platforms', 'Platforms')}

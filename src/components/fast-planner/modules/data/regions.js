@@ -59,7 +59,7 @@ const regions = [
       [-45, -26], // Southwest corner [lng, lat]
       [-31, -18]  // Northeast corner [lng, lat]
     ],
-    osdkRegion: 'EAST BRAZIL' // Updated to match Foundry database
+    osdkRegion: 'BRAZIL EAST' // Updated to match Foundry database
   },
   {
     id: 'australia',

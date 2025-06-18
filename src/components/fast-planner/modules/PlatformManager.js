@@ -108,6 +108,30 @@ class PlatformManager {
    * @returns {Promise} - Resolves when platforms are loaded
    */
   async loadPlatformsFromFoundry(client, regionName = "GULF OF MEXICO") {
+    // CRITICAL FIX: Map dropdown region names to OSDK region names FIRST
+    const originalRegionName = regionName;
+    if (typeof regionName === 'string') {
+      const lowerRegion = regionName.toLowerCase();
+      if (lowerRegion.includes('west africa') || lowerRegion.includes('nigeria')) {
+        regionName = "NIGERIA";
+      } else if (lowerRegion.includes('brazil') || lowerRegion.includes('south america')) {
+        // Try BRAZIL EAST first, fallback options for safety
+        regionName = "BRAZIL EAST";
+      } else if (lowerRegion.includes('norway')) {
+        regionName = "NORWAY";
+      } else if (lowerRegion.includes('gulf of mexico') || lowerRegion.includes('gulf')) {
+        regionName = "GULF OF MEXICO";
+      } else if (lowerRegion.includes('united kingdom') || lowerRegion.includes('uk')) {
+        regionName = "UNITED KINGDOM";
+      } else if (lowerRegion.includes('australia')) {
+        regionName = "WESTERN AUSTRALIA";
+      } else {
+        regionName = regionName.toUpperCase();
+      }
+    }
+    
+    console.log(`🌍 REGION MAPPING: "${originalRegionName}" → "${regionName}" for OSDK query`);
+    
     // Show loading indicator
     const loaderId = LoadingIndicator.show('.route-stats-title', 
       `Loading platform data for ${regionName}...`, 
@@ -185,15 +209,32 @@ class PlatformManager {
         LoadingIndicator.updateText(loaderId, `Querying for platforms in ${regionName}...`);
         
         // Fetch for this region, including all location types
-        const result = await client(locationObject)
-          .where({ 
-            region: regionName
-            // Removed filter: locationType: { $ne: "REPORTING POINT OFFSHORE" }
-          })
-          .fetchPage({
-            $pageSize: 20000, // Increased to handle 14K+ objects in Gulf of Mexico
-            // Removed additional filter: no longer excluding reporting points
-          });
+        let result;
+        
+        // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil data
+        if (regionName === "BRAZIL EAST") {
+          console.log(`🇧🇷 BRAZIL FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for complete coverage`);
+          result = await client(locationObject)
+            .where({ 
+              region: { $in: ["BRAZIL EAST", "BRAZIL"] }
+              // Removed filter: locationType: { $ne: "REPORTING POINT OFFSHORE" }
+            })
+            .fetchPage({
+              $pageSize: 20000, // Increased to handle 14K+ objects in Gulf of Mexico
+              // Removed additional filter: no longer excluding reporting points
+            });
+        } else {
+          // Standard single region query for all other regions
+          result = await client(locationObject)
+            .where({ 
+              region: regionName
+              // Removed filter: locationType: { $ne: "REPORTING POINT OFFSHORE" }
+            })
+            .fetchPage({
+              $pageSize: 20000, // Increased to handle 14K+ objects in Gulf of Mexico
+              // Removed additional filter: no longer excluding reporting points
+            });
+        }
         
         
         // Then filter for fixed platforms on the client side to catch all variations
@@ -329,12 +370,26 @@ class PlatformManager {
           console.log(`Specifically searching for airports in REGION: "${regionName}"`);
           
           // Simpler, more direct query to ensure proper filtering
-          const airportResult = await client(locationObject)
-            .where({ 
-              region: regionName,
-              // We'll filter by type on the client side instead
-            })
-            .fetchPage({ $pageSize: 20000 }); // Increased to handle 14K+ airports in Gulf of Mexico
+          let airportResult;
+          
+          // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil airports
+          if (regionName === "BRAZIL EAST") {
+            console.log(`🇧🇷 BRAZIL AIRPORT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for airports`);
+            airportResult = await client(locationObject)
+              .where({ 
+                region: { $in: ["BRAZIL EAST", "BRAZIL"] },
+                // We'll filter by type on the client side instead
+              })
+              .fetchPage({ $pageSize: 20000 }); // Increased to handle 14K+ airports in Gulf of Mexico
+          } else {
+            // Standard single region query for all other regions
+            airportResult = await client(locationObject)
+              .where({ 
+                region: regionName,
+                // We'll filter by type on the client side instead
+              })
+              .fetchPage({ $pageSize: 20000 }); // Increased to handle 14K+ airports in Gulf of Mexico
+          }
             
           // Filter for airports on client side
           let airports = [];
@@ -404,12 +459,25 @@ class PlatformManager {
               if (!existingNames.has(locName)) {
                 console.log(`Specifically searching for ${locName} in ${regionName}...`);
                 
-                const specificResult = await client(locationObject)
-                  .where({ 
-                    region: regionName,
-                    locName: locName 
-                  })
-                  .fetchPage({ $pageSize: 10 });
+                let specificResult;
+                
+                // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil critical locations
+                if (regionName === "BRAZIL EAST") {
+                  specificResult = await client(locationObject)
+                    .where({ 
+                      region: { $in: ["BRAZIL EAST", "BRAZIL"] },
+                      locName: locName 
+                    })
+                    .fetchPage({ $pageSize: 10 });
+                } else {
+                  // Standard single region query for all other regions
+                  specificResult = await client(locationObject)
+                    .where({ 
+                      region: regionName,
+                      locName: locName 
+                    })
+                    .fetchPage({ $pageSize: 10 });
+                }
                   
                 if (specificResult.data && specificResult.data.length > 0) {
                   
@@ -501,9 +569,17 @@ class PlatformManager {
         
         for (const item of result.data) {
           // CRITICAL: Skip items from other regions
-          if (item.region && item.region !== regionName) {
-            console.log(`Skipping item from wrong region: ${item.locName} (${item.region})`);
-            continue;
+          if (item.region) {
+            // For Brazil region, accept both "BRAZIL EAST" and "BRAZIL"
+            if (regionName === "BRAZIL EAST") {
+              if (item.region !== "BRAZIL EAST" && item.region !== "BRAZIL") {
+                console.log(`Skipping item from wrong region: ${item.locName} (${item.region})`);
+                continue;
+              }
+            } else if (item.region !== regionName) {
+              console.log(`Skipping item from wrong region: ${item.locName} (${item.region})`);
+              continue;
+            }
           }
           
           let name = '';
@@ -585,11 +661,48 @@ class PlatformManager {
                 (upperType.includes('FIXED') && upperType.includes('PLATFORM')) ||
                 (upperType === 'FIXED PLATFORM');
                 
-            // Don't skip navigation points in waypoint mode
+            // Skip platforms/rigs/airports in waypoint mode - only show navigation waypoints
+            if (window.isWaypointModeActive === true) {
+              const platformTypes = [
+                'AIR STRIP', 'AIRPORT', 'AIRPORTS', 'BASE/BASE AIRFIELD', 'BLOCKS', 
+                'BRISTOW BASE', 'CUSTOMERSITE', 'FIXED PLATFORM', 'FPSO', 'Fixed Platform',
+                'HELIPAD (ONSHORE ONLY)', 'HOSPITAL GROUND', 'HOSPITALS', 'HOTEL', 
+                'JACK-UP RIG', 'MOVEABLE', 'NON BASE AIRFIELD', 'OTHER_BASES', 'PLATFORMS',
+                'RADIO_STATION', 'RIGS', 'SEMI-SUBMERSIBLE', 'SHIP', 'TEMPLOCATION',
+                'TENSION LEG PLATFORM', 'TRAINING LOCATION', 'VESSEL'
+              ];
+              
+              // Check exact match AND partial matches to catch variations
+              const isPlatformType = platformTypes.some(platformType => 
+                upperType === platformType || 
+                type === platformType ||
+                upperType.includes(platformType) ||
+                platformType.includes(upperType) ||
+                // Additional checks for common variations
+                (platformType.includes('PLATFORM') && upperType.includes('PLATFORM')) ||
+                (platformType.includes('RIG') && upperType.includes('RIG')) ||
+                (platformType.includes('AIRPORT') && upperType.includes('AIRPORT'))
+              );
+              
+              if (isPlatformType) {
+                console.log(`Hiding platform/rig in waypoint mode: ${name} (${type})`);
+                continue;
+              }
+              
+              // Also hide if it's identified as a platform/vessel by the isPlatformOrVessel logic
+              if (isPlatformOrVessel) {
+                console.log(`Hiding platform/vessel in waypoint mode: ${name} (${type})`);
+                continue;
+              }
+            }
+            
+            // Don't skip navigation points in normal mode (preserve original logic)
             if (window.isWaypointModeActive !== true && 
                 !isPlatformOrVessel && 
                 (upperType.includes('WAYPOINT') || 
+                type.includes('Waypoint') ||  // Include lowercase Waypoint
                 upperType.includes('REPORTING POINT') || 
+                upperType.includes('REPORTING POINT OFFSHORE') ||  // Add offshore reporting points
                 upperType.includes('FIX') ||
                 upperType.includes('INTERSECTION') ||
                 upperType.includes('NAVAID'))) {
@@ -2071,11 +2184,25 @@ class PlatformManager {
         }
         
         // Convert region names to standard format
-        // Ensure upper case for OSDK regions (GULF OF MEXICO, NORWAY)
-        if (regionName && typeof regionName === 'string' && 
-            (regionName.toLowerCase() === 'norway' || 
-             regionName.toLowerCase() === 'gulf of mexico')) {
-          regionName = regionName.toUpperCase();
+        // Ensure upper case for OSDK regions (GULF OF MEXICO, NORWAY, NIGERIA, UNITED KINGDOM, etc.)
+        if (regionName && typeof regionName === 'string') {
+          const lowerRegion = regionName.toLowerCase();
+          if (lowerRegion === 'norway') {
+            regionName = "NORWAY";
+          } else if (lowerRegion === 'gulf of mexico') {
+            regionName = "GULF OF MEXICO";
+          } else if (lowerRegion === 'nigeria' || lowerRegion === 'west africa') {
+            regionName = "NIGERIA";
+          } else if (lowerRegion === 'united kingdom' || lowerRegion === 'uk') {
+            regionName = "UNITED KINGDOM";
+          } else if (lowerRegion === 'brazil') {
+            regionName = "BRAZIL EAST";
+          } else if (lowerRegion === 'australia nw shelf' || lowerRegion === 'australia') {
+            regionName = "WESTERN AUSTRALIA";
+          } else {
+            // For any other region, just convert to uppercase
+            regionName = regionName.toUpperCase();
+          }
         }
         
         
@@ -2214,10 +2341,22 @@ class PlatformManager {
     
     // Ensure uppercase for OSDK regions
     if (typeof regionName === 'string') {
-      if (regionName.toLowerCase() === 'norway') {
+      const lowerRegion = regionName.toLowerCase();
+      if (lowerRegion === 'norway') {
         regionName = "NORWAY";
-      } else if (regionName.toLowerCase() === 'gulf of mexico') {
+      } else if (lowerRegion === 'gulf of mexico') {
         regionName = "GULF OF MEXICO";
+      } else if (lowerRegion === 'nigeria' || lowerRegion === 'west africa') {
+        regionName = "NIGERIA";
+      } else if (lowerRegion === 'united kingdom' || lowerRegion === 'uk') {
+        regionName = "UNITED KINGDOM";
+      } else if (lowerRegion === 'brazil' || lowerRegion === 'south america') {
+        regionName = "BRAZIL EAST";
+      } else if (lowerRegion === 'australia nw shelf' || lowerRegion === 'australia') {
+        regionName = "WESTERN AUSTRALIA";
+      } else {
+        // For any other region, just convert to uppercase
+        regionName = regionName.toUpperCase();
       }
     }
     
@@ -2249,7 +2388,7 @@ class PlatformManager {
       // Define comprehensive waypoint location types for each region
       let waypointLocationTypes;
       
-      // Use different types based on region - include ALL possible waypoint types for Norway
+      // Use different types based on region - include ALL possible waypoint types for all regions
       if (regionName === "NORWAY") {
         // For Norway, we need to be VERY inclusive with waypoint types
         waypointLocationTypes = [
@@ -2279,6 +2418,22 @@ class PlatformManager {
           "POINT",
           "WAYPOINT FOR HELICOPTERS"
         ];
+      } else if (regionName === "NIGERIA" || regionName === "UNITED KINGDOM") {
+        // For Nigeria and UK, be as comprehensive as Norway since they were having issues
+        waypointLocationTypes = [
+          "WAYPOINT", 
+          "waypoint",
+          "REPORTING POINT OFFSHORE",
+          "REPORTING POINT ONSHORE",
+          "REPORTING POINT",
+          "NAVAID",
+          "FIX", 
+          "INTERSECTION",
+          "POINT",
+          "WAYPOINT FOR HELICOPTERS",
+          "CHECKPOINT",
+          "NAVAID"
+        ];
       } else {
         // Default for other regions - be inclusive with all types
         waypointLocationTypes = [
@@ -2289,7 +2444,10 @@ class PlatformManager {
           "REPORTING POINT",
           "INTERSECTION",
           "FIX",
-          "NAVAID"
+          "NAVAID",
+          "POINT",
+          "WAYPOINT FOR HELICOPTERS",
+          "CHECKPOINT"
         ];
       }
       
@@ -2298,27 +2456,50 @@ class PlatformManager {
       // Store client reference to global for later use if needed
       window.osdkClient = client;
 
-      // For Norway, make two queries to be extra thorough
+      // For problematic regions (Norway, Nigeria, UK), make two queries to be extra thorough
       let result;
-      if (regionName === "NORWAY") {
-        console.log(`PlatformManager: Using special Norway waypoint loading logic`);
+      if (regionName === "NORWAY" || regionName === "NIGERIA" || regionName === "UNITED KINGDOM" || regionName === "BRAZIL EAST") {
+        console.log(`PlatformManager: Using comprehensive waypoint loading logic for ${regionName}`);
         
         // First query: With locationType filter
-        console.log(`PlatformManager: First Norway query with locationType filter`);
-        const result1 = await client(locationObject)
-          .where({ 
-            region: regionName,
-            locationType: { $in: waypointLocationTypes }
-          })
-          .fetchPage({ $pageSize: 20000 });
+        console.log(`PlatformManager: First ${regionName} query with locationType filter`);
+        let result1, result2;
+        
+        // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil waypoints
+        if (regionName === "BRAZIL EAST") {
+          console.log(`🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
+          result1 = await client(locationObject)
+            .where({ 
+              region: { $in: ["BRAZIL EAST", "BRAZIL"] },
+              locationType: { $in: waypointLocationTypes }
+            })
+            .fetchPage({ $pageSize: 20000 });
+        } else {
+          // Standard single region query for all other regions
+          result1 = await client(locationObject)
+            .where({ 
+              region: regionName,
+              locationType: { $in: waypointLocationTypes }
+            })
+            .fetchPage({ $pageSize: 20000 });
+        }
         
         console.log(`PlatformManager: First query returned ${result1?.data?.length || 0} results`);
         
         // Second query: Without locationType filter to get everything
-        console.log(`PlatformManager: Second Norway query without locationType filter`);
-        const result2 = await client(locationObject)
-          .where({ region: regionName })
-          .fetchPage({ $pageSize: 20000 });
+        console.log(`PlatformManager: Second ${regionName} query without locationType filter`);
+        
+        // BRAZIL REGION FIX: Apply same logic to second query
+        if (regionName === "BRAZIL EAST") {
+          result2 = await client(locationObject)
+            .where({ region: { $in: ["BRAZIL EAST", "BRAZIL"] } })
+            .fetchPage({ $pageSize: 20000 });
+        } else {
+          // Standard single region query for all other regions
+          result2 = await client(locationObject)
+            .where({ region: regionName })
+            .fetchPage({ $pageSize: 20000 });
+        }
         
         console.log(`PlatformManager: Second query returned ${result2?.data?.length || 0} results`);
         
@@ -2348,7 +2529,8 @@ class PlatformManager {
                   type.includes('POINT') || 
                   type.includes('FIX') || 
                   type.includes('INTERSECTION') ||
-                  type.includes('NAVAID')) {
+                  type.includes('NAVAID') ||
+                  type.includes('CHECKPOINT')) {
                 combinedData.push(item);
                 processedNames.add(name);
               }
@@ -2356,7 +2538,7 @@ class PlatformManager {
           }
         }
         
-        console.log(`PlatformManager: Combined ${combinedData.length} unique results for Norway`);
+        console.log(`PlatformManager: Combined ${combinedData.length} unique results for ${regionName}`);
         
         // Create a result object similar to the OSDK response
         result = { data: combinedData };
@@ -2364,12 +2546,25 @@ class PlatformManager {
       else {
         // For other regions, use normal query
         console.log(`PlatformManager: Executing OSDK query for waypoints in ${regionName}`);
-        result = await client(locationObject)
-          .where({ 
-            region: regionName,
-            locationType: { $in: waypointLocationTypes }
-          })
-          .fetchPage({ $pageSize: 20000 });
+        
+        // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil waypoints
+        if (regionName === "BRAZIL EAST") {
+          console.log(`🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
+          result = await client(locationObject)
+            .where({ 
+              region: { $in: ["BRAZIL EAST", "BRAZIL"] },
+              locationType: { $in: waypointLocationTypes }
+            })
+            .fetchPage({ $pageSize: 20000 });
+        } else {
+          // Standard single region query for all other regions
+          result = await client(locationObject)
+            .where({ 
+              region: regionName,
+              locationType: { $in: waypointLocationTypes }
+            })
+            .fetchPage({ $pageSize: 20000 });
+        }
         
         console.log(`PlatformManager: OSDK query returned ${result?.data?.length || 0} raw results`);
       }
