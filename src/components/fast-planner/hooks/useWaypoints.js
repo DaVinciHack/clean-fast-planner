@@ -51,32 +51,43 @@ const useWaypoints = ({
     console.log('🌐 waypointManagerRef.current available:', !!waypointManagerRef.current);
     console.log('🌐 platformManagerRef.current available:', !!platformManagerRef.current);
     
-    // CRITICAL: Handle multiple waypoints separated by spaces (e.g., "ENFL ENOW ENOR ENPL")
-    if (typeof waypointData === 'string' && waypointData.includes(' ')) {
-      const waypointNames = waypointData.trim().split(/\s+/).filter(name => name.length > 0);
-      console.log(`🌐 Split into ${waypointNames.length} individual waypoints:`, waypointNames);
+    // ENHANCED: Handle multiple waypoints - ONLY split on commas (but check for coordinates first)
+    if (typeof waypointData === 'string' && waypointData.includes(',')) {
+      // CRITICAL: Check if the whole string looks like coordinates first
+      const looksLike = looksLikeCoordinates(waypointData);
+      console.log('🌐 Before comma split - looksLikeCoordinates result:', looksLike);
       
-      // Process each waypoint individually
-      for (let i = 0; i < waypointNames.length; i++) {
-        const waypointName = waypointNames[i];
+      if (!looksLike) {
+        // Not coordinates - treat as comma-separated list: "Delta House, Houma, Globe Trotter 1, Medusa"
+        const waypointNames = waypointData.trim().split(',').map(name => name.trim()).filter(name => name.length > 0);
+        console.log(`🌐 Comma-separated: Split into ${waypointNames.length} waypoints:`, waypointNames);
         
-        try {
-          // Recursively call addWaypoint for each individual waypoint
-          await addWaypoint(waypointName);
-          console.log(`🌐 Successfully added waypoint: ${waypointName}`);
-        } catch (error) {
-          console.error(`🌐 Error adding waypoint ${waypointName}:`, error);
-          // Continue with other waypoints even if one fails
+        if (waypointNames.length > 1) {
+          // Process each waypoint individually
+          for (let i = 0; i < waypointNames.length; i++) {
+            const waypointName = waypointNames[i];
+            
+            try {
+              // Recursively call addWaypoint for each individual waypoint
+              await addWaypoint(waypointName);
+              console.log(`🌐 Successfully added waypoint: ${waypointName}`);
+            } catch (error) {
+              console.error(`🌐 Error adding waypoint ${waypointName}:`, error);
+              // Continue with other waypoints even if one fails
+            }
+            
+            // Small delay between waypoints to avoid overwhelming the system
+            if (i < waypointNames.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+          
+          console.log('🌐 MULTIPLE WAYPOINTS PROCESSING COMPLETE');
+          return; // Exit early after processing all waypoints
         }
-        
-        // Small delay between waypoints to avoid overwhelming the system
-        if (i < waypointNames.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+      } else {
+        console.log('🌐 String with comma detected as coordinates - treating as single coordinate input');
       }
-      
-      console.log('🌐 MULTIPLE WAYPOINTS PROCESSING COMPLETE');
-      return; // Exit early after processing all waypoints
     }
     
     // Try to use the clean implementation first - TEMPORARILY DISABLED FOR COORDINATE TESTING
@@ -184,24 +195,66 @@ const useWaypoints = ({
             return;
           }
         } else {
-          // Original logic: try to find platform by name
+          // Enhanced multi-field search: locName → locationDescription → locationNotes → fuzzy search
           if (platformManagerRef.current) {
-            const platform = platformManagerRef.current.findPlatformByName(waypointData);
-            if (platform) {
-              coords = platform.coordinates;
-              name = platform.name;
-            } else {
-              console.log(`🌐 Platform "${waypointData}" not found in database`);
+            const searchResult = platformManagerRef.current.findPlatformByName(waypointData);
+            
+            if (searchResult.platform) {
+              // Found exact match in one of the fields
+              coords = searchResult.platform.coordinates;
               
-              // Instead of returning early, create a placeholder waypoint
-              // This allows the flight loading to continue even if some waypoints aren't in the database
-              console.log(`🌐 Creating placeholder waypoint for: ${waypointData}`);
-              name = waypointData; // Use the provided name
-              coords = null; // Will be handled later - maybe set a default or skip coordinates
+              // 🎯 ENHANCE: Show search term + found name if they differ
+              if (searchResult.matchField !== 'locName' && waypointData.toLowerCase() !== searchResult.platform.name.toLowerCase()) {
+                name = `${waypointData} (${searchResult.platform.name})`;
+              } else {
+                name = searchResult.platform.name;
+              }
+              
+              // Show match info to user
+              if (window.LoadingIndicator && searchResult.matchField !== 'locName') {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Found "${searchResult.platform.name}" in ${searchResult.matchField}`, 
+                  'success',
+                  2000
+                );
+              }
+              
+              console.log(`🔍 Enhanced search found: ${searchResult.platform.name} (matched in ${searchResult.matchField})`);
+            } else if (searchResult.matchType === 'fuzzy' && searchResult.fuzzyResults) {
+              // Fuzzy matches found - use the best match automatically for now
+              console.log(`🔍 Fuzzy matches found for "${waypointData}":`, searchResult.fuzzyResults);
+              
+              // Show fuzzy results in console
+              console.log('🔍 Fuzzy search results:');
+              searchResult.fuzzyResults.forEach((result, index) => {
+                console.log(`  ${index + 1}. ${result.platform.name} (${Math.round(result.score * 100)}% match in ${result.matchField})`);
+              });
+              
+              // 🎯 AUTO-USE BEST MATCH: Use the top fuzzy result automatically
+              const bestMatch = searchResult.fuzzyResults[0];
+              coords = bestMatch.platform.coordinates;
+              name = `${waypointData} (${bestMatch.platform.name})`;
               
               if (window.LoadingIndicator) {
                 window.LoadingIndicator.updateStatusIndicator(
-                  `Waypoint "${waypointData}" not found in database - added as placeholder`, 
+                  `Used fuzzy match: ${bestMatch.platform.name} (${Math.round(bestMatch.score * 100)}% match)`, 
+                  'success',
+                  3000
+                );
+              }
+              
+              console.log(`🎯 Auto-selected best fuzzy match: ${bestMatch.platform.name} (${Math.round(bestMatch.score * 100)}% match)`)
+            } else {
+              // No matches found at all
+              console.log(`🔍 No matches found for "${waypointData}" in any field`);
+              
+              // Create placeholder waypoint
+              name = waypointData;
+              coords = null;
+              
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Location "${waypointData}" not found in database - added as placeholder`, 
                   'warning',
                   3000
                 );
