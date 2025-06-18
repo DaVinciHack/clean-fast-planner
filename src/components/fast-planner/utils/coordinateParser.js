@@ -43,8 +43,9 @@ export const parseCoordinates = (input) => {
 export const looksLikeCoordinates = (input) => {
   if (!input || typeof input !== 'string') return false;
   const patterns = [
-    /^\s*[+-]?\d{1,3}(?:\.\d+)?\s*,\s*[+-]?\d{1,3}(?:\.\d+)?\s*$/,
-    /\d+°.*[NSEW]/i
+    /^\s*[+-]?\d{1,3}(?:\.\d+)?\s*,\s*[+-]?\d{1,3}(?:\.\d+)?\s*$/, // Comma-separated: "27.73333, -91.99383"
+    /^\s*[+-]?\d{1,3}(?:\.\d+)?\s+[+-]?\d{1,3}(?:\.\d+)?\s*$/,     // Space-separated: "27.73333 -91.99383"
+    /\d+°.*[NSEW]/i // Degrees format: "27°44'N 91°59'W"
   ];
   return patterns.some(pattern => pattern.test(input.trim()));
 };

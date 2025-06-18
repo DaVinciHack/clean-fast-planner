@@ -4,6 +4,7 @@
  * Handles loading, displaying, and interacting with platform/rig data
  */
 import LoadingIndicator from './LoadingIndicator';
+import EnhancedLocationSearch from './EnhancedLocationSearch.js';
 
 class PlatformManager {
   /**
@@ -68,6 +69,8 @@ class PlatformManager {
   constructor(mapManager) {
     this.mapManager = mapManager;
     this.platforms = [];
+    this.rawOSDKData = []; // Store raw OSDK data for enhanced search
+    this.enhancedLocationSearch = new EnhancedLocationSearch(); // Enhanced search instance
     this.isVisible = true;
     this.airfieldsVisible = true;
     this.fixedPlatformsVisible = true;
@@ -928,6 +931,11 @@ class PlatformManager {
         
         // Check if we have at least some locations
         if (locations.length > 0) {
+          // 🔍 ENHANCED SEARCH: Store raw OSDK data and initialize enhanced search
+          this.rawOSDKData = result.data || [];
+          this.enhancedLocationSearch.setPlatforms(locations, this.rawOSDKData);
+          console.log(`🔍 Enhanced search initialized with ${this.rawOSDKData.length} raw OSDK records`);
+          
           this.addPlatformsToMap(locations);
           
           // Hide loading indicator after adding to map (the map loading will show its own indicator)
@@ -2943,42 +2951,53 @@ class PlatformManager {
   }
   
   /**
-   * Find a single platform by name (exact or close match)
+   * Find a single platform by name using enhanced multi-field search
+   * Search hierarchy: locName → locationDescription → locationNotes → fuzzy search
    * @param {string} name - The platform name to find
-   * @returns {Object|null} - The platform object or null if not found
+   * @returns {Object} - Enhanced search result with platform and match details
    */
   findPlatformByName(name) {
     if (!name || !this.platforms || this.platforms.length === 0) {
-      return null;
+      return { platform: null, matchType: 'none', matchField: null };
     }
     
-    const normalizedName = name.toLowerCase().trim();
+    // Use enhanced search for multi-field searching
+    const searchResult = this.enhancedLocationSearch.findPlatformByName(name);
     
-    // If empty name after trimming, return null
-    if (!normalizedName) {
-      return null;
-    }
-    
-    console.log(`PlatformManager: Looking for platform with name: ${normalizedName}`);
-    
-    // First try exact match
-    let platform = this.platforms.find(p => 
-      p.name.toLowerCase() === normalizedName
-    );
-    
-    // If not found, try case-insensitive match
-    if (!platform) {
-      platform = this.platforms.find(p => 
-        p.name.toLowerCase().includes(normalizedName)
+    // For backward compatibility, also try the original logic as fallback
+    if (!searchResult.platform && searchResult.matchType === 'none') {
+      console.log(`🔍 Enhanced search failed, trying legacy search for: ${name}`);
+      
+      const normalizedName = name.toLowerCase().trim();
+      
+      // Legacy exact match
+      let platform = this.platforms.find(p => 
+        p.name.toLowerCase() === normalizedName
       );
+      
+      // Legacy partial match
+      if (!platform) {
+        platform = this.platforms.find(p => 
+          p.name.toLowerCase().includes(normalizedName)
+        );
+      }
+      
+      if (platform) {
+        return { platform, matchType: 'legacy', matchField: 'locName' };
+      }
     }
     
-    if (platform) {
-      return platform;
-    } else {
-      console.log(`PlatformManager: No platform found with name: ${normalizedName}`);
-      return null;
-    }
+    return searchResult;
+  }
+
+  /**
+   * Legacy function for backward compatibility
+   * @param {string} name - The platform name to find  
+   * @returns {Object|null} - The platform object or null if not found
+   */
+  findPlatformByNameLegacy(name) {
+    const result = this.findPlatformByName(name);
+    return result.platform;
   }
 
   /**
