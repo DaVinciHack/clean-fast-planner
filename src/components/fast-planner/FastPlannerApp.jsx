@@ -435,10 +435,6 @@ const FastPlannerCore = ({
 
   // AGGRESSIVE clearRoute that flushes all system state 
   const clearRoute = useCallback((preserveFlightData = false) => {
-    console.log('🟠 CLEAR ROUTE DEBUG: clearRoute() called, preserveFlightData:', preserveFlightData);
-    console.log('🟠 CLEAR ROUTE DEBUG: About to clear alternateRouteData - current value:', alternateRouteData);
-    console.log('🟠 CLEAR ROUTE DEBUG: About to clear loadedFlightData - current value:', loadedFlightData);
-    console.log('🟠 CLEAR ROUTE DEBUG: Stack trace:', new Error().stack);
     console.log('🧹 FastPlannerApp: AGGRESSIVE CLEARING - Flushing all system state');
     
     // Call the hook's clearRoute function
@@ -454,6 +450,11 @@ const FastPlannerCore = ({
       setLoadedFlightData(null); // Clear loaded flight data for AppHeader
     }
     clearWeatherSegments();
+    
+    // 🔧 FIX: Reset flight loading states to properly clear UI
+    setIsFlightLoaded(false);
+    setIsEditLocked(false);
+    window.isEditLocked = false;
     
     // AGGRESSIVE CLEANUP: Clear all persistent window state
     window.currentAlternateCard = null;
