@@ -1263,14 +1263,7 @@ const RightPanel = React.forwardRef(({
         currentRegion={currentRegion?.osdkRegion || currentRegion?.id} // Pass OSDK region for filtering
       />
       
-      <AutoPlanCard
-        id="autoplan"
-        onAutoPlan={handleAutoPlan}
-        waypoints={waypoints}
-        selectedAircraft={selectedAircraft}
-        isProcessing={false} // TODO: Add processing state
-        flightId={currentFlightId} // 🔧 FIX: Pass actual flight ID for new vs existing flight detection
-      />
+      {/* AutoPlan Card - Removed: Using MainCard AutoPlan button instead */}
     </RightPanelContainer>
     
     {/* Professional Flight Automation Loader */}
