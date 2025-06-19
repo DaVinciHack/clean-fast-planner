@@ -76,6 +76,75 @@ const MainCard = ({
     approachFuelType: typeof approachFuel
   });
 
+  // Calculate weather age from weather segments
+  const getWeatherAge = () => {
+    if (!weatherSegments || weatherSegments.length === 0) {
+      return null;
+    }
+
+    // Find the most recent timestamp from all weather segments
+    let mostRecentTimestamp = null;
+    weatherSegments.forEach(segment => {
+      if (segment.timestamp) {
+        const segmentTime = new Date(segment.timestamp);
+        if (!mostRecentTimestamp || segmentTime > mostRecentTimestamp) {
+          mostRecentTimestamp = segmentTime;
+        }
+      }
+    });
+
+    if (!mostRecentTimestamp) {
+      return null;
+    }
+
+    try {
+      const now = new Date();
+      const ageMs = now.getTime() - mostRecentTimestamp.getTime();
+      const ageMinutes = ageMs / (1000 * 60);
+
+      if (ageMinutes < 1) {
+        return {
+          text: `Weather is ${Math.round(ageMinutes * 60)} seconds old`,
+          isOld: false
+        };
+      } else if (ageMinutes < 60) {
+        const minutes = Math.floor(ageMinutes);
+        const seconds = Math.round((ageMinutes - minutes) * 60);
+        return {
+          text: `Weather is ${minutes}.${seconds.toString().padStart(2, '0')} mins old`,
+          isOld: ageMinutes > 180 // Warning if > 3 hours (180 minutes)
+        };
+      } else {
+        const hours = Math.floor(ageMinutes / 60);
+        const minutes = Math.round(ageMinutes % 60);
+        return {
+          text: `Weather is ${hours}h ${minutes}m old`,
+          isOld: ageMinutes > 180 // Warning if > 3 hours
+        };
+      }
+    } catch (error) {
+      console.error('Error calculating weather age:', error);
+      return null;
+    }
+  };
+
+  const [weatherAge, setWeatherAge] = useState(getWeatherAge());
+
+  // Update weather age every 30 seconds for real-time display
+  useEffect(() => {
+    const updateWeatherAge = () => {
+      setWeatherAge(getWeatherAge());
+    };
+
+    // Update immediately when weather segments change
+    updateWeatherAge();
+
+    // Set up interval for real-time updates
+    const interval = setInterval(updateWeatherAge, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [weatherSegments]); // Re-run when weather segments change
+
   // Listen for master toggle events from MapLayersCard to keep buttons synchronized
   useEffect(() => {
     const handleMasterToggle = (event) => {
@@ -708,6 +777,22 @@ const MainCard = ({
               </div>
             </div>
           </div>
+          
+          {/* Weather Age Display */}
+          {weatherAge && (
+            <div className="weather-age-display" style={{
+              marginTop: '4px',
+              fontSize: '0.75em',
+              color: weatherAge.isOld ? '#f59e0b' : '#6b7280', // Orange if old, gray if recent
+              fontWeight: weatherAge.isOld ? '600' : '400',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span style={{ fontSize: '0.9em' }}>{weatherAge.isOld ? '⚠️' : '🌤️'}</span>
+              <span>{weatherAge.text}</span>
+            </div>
+          )}
         </div>
       </div>
       

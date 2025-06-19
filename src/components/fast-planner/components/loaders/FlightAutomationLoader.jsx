@@ -1,125 +1,132 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './FlightAutomationLoader.css';
 
 /**
  * FlightAutomationLoader - Professional aviation automation progress display
- * Shows realistic flight planning steps during the 40-second automation process
+ * Shows real Palantir messages and responds to actual automation completion
  */
 const FlightAutomationLoader = ({ 
   isVisible, 
   flightNumber, 
   departureIcao, 
   destinationIcao,
-  onComplete 
+  onComplete,
+  onProgressUpdate = null // New prop for receiving real automation progress
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [currentDetail, setCurrentDetail] = useState('');
   const [progress, setProgress] = useState(0);
-  const [subProgress, setSubProgress] = useState(0);
-  const [currentTaff, setCurrentTaff] = useState('');
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [automationSteps, setAutomationSteps] = useState([]);
 
-  // Real automation steps - 6 seconds each for simple timing
-  const automationSteps = [
-    {
-      title: "Saving Flight and Checking Waypoints",
-      subtitle: "Validating route and saving to Palantir"
-    },
-    {
-      title: "Computing Sunrise and Sunset Times", 
-      subtitle: "Calculating daylight operations windows"
-    },
-    {
-      title: "Fetching Winds for Flight Track",
-      subtitle: "Fetching atmospheric conditions"
-    },
-    {
-      title: "Searching for Nearest Alternates",
-      subtitle: "Finding available alternate destinations"
-    },
-    {
-      title: "Analyzing Weather at Alternates",
-      subtitle: "Choosing best alternate and approach"
-    },
-    {
-      title: "Checking Aircraft Configuration",
-      subtitle: "Verifying performance parameters"
+  // Initialize default state
+  const initializeDefaultState = () => {
+    setCurrentMessage('Preparing automation...');
+    setCurrentDetail('Initializing Palantir flight automation system');
+    setProgress(0);
+    setIsCompleted(false);
+    setHasError(false);
+    setErrorMessage('');
+    setAutomationSteps([]);
+  };
+
+  // Handle progress updates from external automation
+  const handleProgressUpdate = useCallback((progressData) => {
+    console.log('🚀 FlightAutomationLoader: Received progress update:', progressData);
+    
+    const { type, message, detail, progress: newProgress, result, error } = progressData;
+    
+    // Add this step to our history
+    setAutomationSteps(prevSteps => {
+      const newStep = {
+        id: Date.now(),
+        message,
+        detail,
+        progress: newProgress,
+        type,
+        timestamp: new Date()
+      };
+      
+      // If this is a success step, mark the previous step as completed
+      if (type === 'step' && prevSteps.length > 0) {
+        const updatedSteps = [...prevSteps];
+        const lastStep = updatedSteps[updatedSteps.length - 1];
+        if (lastStep.type === 'step') {
+          lastStep.type = 'success'; // Mark previous step as completed
+        }
+        return [...updatedSteps, newStep];
+      }
+      
+      return [...prevSteps, newStep];
+    });
+    
+    // Update current display
+    setCurrentMessage(message);
+    setCurrentDetail(detail);
+    setProgress(newProgress);
+    
+    // Handle different types of updates
+    switch (type) {
+      case 'completed':
+        setIsCompleted(true);
+        // Mark the final step as completed
+        setAutomationSteps(prevSteps => {
+          if (prevSteps.length > 0) {
+            const updatedSteps = [...prevSteps];
+            const lastStep = updatedSteps[updatedSteps.length - 1];
+            if (lastStep.type === 'step') {
+              lastStep.type = 'completed';
+            }
+            return updatedSteps;
+          }
+          return prevSteps;
+        });
+        // Auto-complete after showing success message briefly
+        setTimeout(() => {
+          onComplete?.();
+        }, 2000); // Give user time to see completion message
+        break;
+        
+      case 'error':
+        setHasError(true);
+        setErrorMessage(detail);
+        // Auto-close after showing error
+        setTimeout(() => {
+          onComplete?.();
+        }, 4000); // Give more time to read error
+        break;
+        
+      default:
+        // Regular step updates
+        break;
     }
-  ];
+  }, [onComplete]); // Only depend on onComplete
 
-  // Sample TAF data for visual effect
-  const sampleTaffs = [
-    `${departureIcao || 'ENLE'} 101200Z 1012/1112 28008KT 9999 FEW020 SCT040`,
-    `${destinationIcao || 'ENHF'} 101200Z 1012/1112 31012KT 9999 BKN025`,
-    "ENOL 101200Z 1012/1112 25015G25KT 8000 -SHRA BKN015",
-    "ENZV 101200Z 1012/1112 22008KT 9999 FEW030 BKN080",
-    "ENVA 101200Z 1012/1112 29010KT 9999 SCT025 BKN045"
-  ];
+  // Set up progress update handler - only once when component mounts
+  useEffect(() => {
+    if (onProgressUpdate) {
+      onProgressUpdate(handleProgressUpdate);
+    }
+  }, []); // Empty dependency array - only run once
 
   useEffect(() => {
     console.log('🚀 FlightAutomationLoader useEffect triggered:', { isVisible, flightNumber, departureIcao, destinationIcao });
     if (!isVisible) {
       console.log('🚀 FlightAutomationLoader: Not visible, returning early');
       // RESET STATE: Always reset when becoming invisible
-      setCurrentStep(0);
-      setProgress(0);
-      setSubProgress(0);
-      setCurrentTaff('');
+      initializeDefaultState();
       return;
     }
     
-    console.log('🚀 FlightAutomationLoader: Starting automation animation');
+    console.log('🚀 FlightAutomationLoader: Starting automation display');
     
-    // FRESH START: Always reset state when starting new animation
-    setCurrentStep(0);
-    setProgress(0);
-    setSubProgress(0);
-    setCurrentTaff('');
-
-    let mainTimer;
-    let taffTimer;
-    let startTime = Date.now();
+    // FRESH START: Always reset state when starting new display
+    initializeDefaultState();
     
-    const STEP_DURATION = 7000; // 9 seconds per step
-    const TOTAL_STEPS = automationSteps.length;
-
-    const updateProgress = () => {
-      const elapsed = Date.now() - startTime;
-      const currentStepIndex = Math.floor(elapsed / STEP_DURATION);
-      const stepProgress = ((elapsed % STEP_DURATION) / STEP_DURATION) * 100;
-      const overallProgress = (elapsed / (TOTAL_STEPS * STEP_DURATION)) * 100;
-
-      if (currentStepIndex >= TOTAL_STEPS) {
-        // Animation complete
-        clearInterval(mainTimer);
-        clearInterval(taffTimer);
-        setCurrentStep(TOTAL_STEPS - 1);
-        setSubProgress(100);
-        setProgress(100);
-        setTimeout(() => {
-          onComplete?.();
-        }, 1000);
-        return;
-      }
-
-      // Update all state
-      setCurrentStep(currentStepIndex);
-      setSubProgress(stepProgress);
-      setProgress(overallProgress);
-    };
-
-    // Single timer that runs everything
-    mainTimer = setInterval(updateProgress, 100);
-
-    // TAF cycling timer  
-    let taffIndex = 0;
-    taffTimer = setInterval(() => {
-      setCurrentTaff(sampleTaffs[taffIndex % sampleTaffs.length]);
-      taffIndex++;
-    }, 2000);
-
-    return () => {
-      clearInterval(mainTimer);
-      clearInterval(taffTimer);
-    };
+    // No more fixed timers - we now respond to real progress updates
+    
   }, [isVisible]);
 
   if (!isVisible) {
@@ -132,48 +139,93 @@ const FlightAutomationLoader = ({
     flightNumber, 
     departureIcao, 
     destinationIcao,
-    currentStep,
-    progress 
+    currentMessage,
+    progress,
+    isCompleted,
+    hasError 
   });
-
-  const currentStepData = automationSteps[currentStep] || automationSteps[0];
 
   return (
     <div className="flight-automation-overlay">
       <div className="flight-automation-popup">
         {/* Current Step Display */}
-        <div className="current-step">
+        <div className={`current-step ${hasError ? 'error' : isCompleted ? 'completed' : 'active'}`}>
           <div className="step-info">
-            <h3>{currentStepData.title}</h3>
-            <p>{currentStepData.subtitle}</p>
+            <h3>
+              {hasError && <span style={{marginRight: '8px'}}>❌</span>}
+              {isCompleted && <span style={{marginRight: '8px'}}>✅</span>}
+              {!hasError && !isCompleted && <span style={{marginRight: '8px'}}>⚡</span>}
+              {currentMessage || 'Preparing automation...'}
+            </h3>
+            <p>{currentDetail || 'Initializing Palantir flight automation system'}</p>
+            {hasError && errorMessage && (
+              <p style={{color: '#ff6b6b', fontSize: '0.9em', marginTop: '8px'}}>
+                {errorMessage}
+              </p>
+            )}
             <div className="step-progress">
               <div 
                 className="step-progress-bar"
-                style={{ width: `${subProgress}%` }}
+                style={{ 
+                  width: `${progress}%`,
+                  background: hasError ? '#ff6b6b' : isCompleted ? '#22c55e' : 'linear-gradient(90deg, #1e8ffe, #3ba0ff)'
+                }}
               />
             </div>
           </div>
         </div>
 
-        {/* Steps List with Mini Loaders */}
-        <div className="steps-list">
-          {automationSteps.map((step, index) => (
-            <div 
-              key={index}
-              className={`step-item ${index < currentStep ? 'completed' : index === currentStep ? 'active' : 'pending'}`}
-            >
-              <div className="step-marker">
-                {index < currentStep ? (
-                  <div className="step-checkmark">✓</div>
-                ) : index === currentStep ? (
-                  <div className="step-loader"></div>
-                ) : (
-                  <div className="step-circle"></div>
-                )}
-              </div>
-              <span className="step-name">{step.title}</span>
+        {/* Flight Information */}
+        {flightNumber && (
+          <div className="flight-info">
+            <div className="flight-details">
+              <span>Flight: {flightNumber}</span>
+              {departureIcao && destinationIcao && (
+                <span>{departureIcao} → {destinationIcao}</span>
+              )}
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Real Automation Steps History */}
+        <div className="steps-list">
+          {automationSteps.length > 0 ? (
+            automationSteps.map((step, index) => (
+              <div 
+                key={step.id}
+                className={`step-item ${
+                  step.type === 'error' ? 'error' : 
+                  step.type === 'completed' || step.type === 'success' ? 'completed' : 
+                  'active'
+                }`}
+              >
+                <div className="step-marker">
+                  {step.type === 'error' ? (
+                    <div className="step-error">❌</div>
+                  ) : step.type === 'completed' || step.type === 'success' ? (
+                    <div className="step-checkmark">✓</div>
+                  ) : (
+                    <div className="step-loader"></div>
+                  )}
+                </div>
+                <div className="step-content">
+                  <span className="step-name">{step.message}</span>
+                  {step.detail && (
+                    <span className="step-detail">{step.detail}</span>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="step-item active">
+              <div className="step-marker">
+                <div className="step-loader"></div>
+              </div>
+              <div className="step-content">
+                <span className="step-name">Waiting for automation to start...</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

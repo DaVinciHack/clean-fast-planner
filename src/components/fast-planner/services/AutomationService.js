@@ -9,9 +9,10 @@ class AutomationService {
   /**
    * Run automation for a flight
    * @param {string} flightId - The ID of the flight to automate
+   * @param {Function} onProgress - Optional callback for progress updates
    * @returns {Promise<Object>} - The result of the automation
    */
-  static async runAutomation(flightId) {
+  static async runAutomation(flightId, onProgress = null) {
     if (!flightId) {
       throw new Error('Flight ID is required for automation');
     }
@@ -19,8 +20,39 @@ class AutomationService {
     try {
       console.log(`AutomationService: Running automation for flight ${flightId}`);
       
+      // Report initial progress
+      if (onProgress) {
+        onProgress({
+          type: 'step',
+          message: 'Starting flight automation...',
+          detail: 'Initializing Palantir automation system',
+          progress: 0
+        });
+      }
+      
       // Import the SDK
       const sdk = await this.getSDK();
+      
+      if (onProgress) {
+        onProgress({
+          type: 'step',
+          message: 'Connecting to Palantir Foundry',
+          detail: 'Establishing secure connection to automation engine',
+          progress: 10
+        });
+      }
+      
+      // Add a small delay to show the connection message
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (onProgress) {
+        onProgress({
+          type: 'step',
+          message: 'Running Palantir Flight Automation',
+          detail: `Processing flight ID: ${flightId}`,
+          progress: 20
+        });
+      }
       
       // CRITICAL: Don't pass any options parameter
       const result = await client(sdk.singleFlightAutomation).applyAction(
@@ -28,10 +60,43 @@ class AutomationService {
         // No options parameter - this is the key difference!
       );
       
+      if (onProgress) {
+        onProgress({
+          type: 'step',
+          message: 'Processing automation results',
+          detail: 'Validating and formatting flight data',
+          progress: 90
+        });
+      }
+      
+      // Add a brief delay to show processing
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (onProgress) {
+        onProgress({
+          type: 'completed',
+          message: 'Automation completed successfully',
+          detail: 'Flight automation finished - preparing to reload flight data',
+          progress: 100,
+          result
+        });
+      }
+      
       console.log('Automation successful!', result);
       return result;
     } catch (error) {
       console.error('Automation failed:', error);
+      
+      if (onProgress) {
+        onProgress({
+          type: 'error',
+          message: 'Automation failed',
+          detail: this.formatErrorMessage(error),
+          progress: 0,
+          error
+        });
+      }
+      
       throw error;
     }
   }
