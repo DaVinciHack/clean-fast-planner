@@ -2378,6 +2378,7 @@ const FastPlannerCore = ({
           weather={weather}
           waypoints={waypoints}
           loadedFlightData={loadedFlightData}
+          weatherSegments={weatherSegments}
         />
         
         {/* Map container - now full width below header */}

@@ -460,3 +460,101 @@
     width: 30%;
   }
 }
+
+/* Weather Age Indicator */
+.weather-age-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* Right-align the content */
+  gap: 6px; /* Increased gap between text and dot */
+  margin-top: 0px; /* Remove top margin for tighter spacing */
+  font-size: 9px;
+  font-weight: 400;
+  font-family: 'Arial', sans-serif;
+  opacity: 0.9;
+  width: 100%; /* Take full width to enable right alignment */
+}
+
+.weather-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.weather-status-dot.current {
+  background-color: #32d74b; /* Green - fresh weather */
+  box-shadow: 0 0 3px rgba(50, 215, 75, 0.6);
+}
+
+.weather-status-dot.caution {
+  background-color: #ffcc02; /* Yellow - getting old */
+  box-shadow: 0 0 3px rgba(255, 204, 2, 0.6);
+}
+
+.weather-status-dot.warning {
+  background-color: #ff9500; /* Orange - quite old */
+  box-shadow: 0 0 3px rgba(255, 149, 0, 0.6);
+}
+
+.weather-status-dot.critical {
+  background-color: #ff453a; /* Red - too old/unusable */
+  box-shadow: 0 0 3px rgba(255, 69, 58, 0.6);
+}
+
+.weather-age-text {
+  color: #87ceeb; /* Light blue - same as detail labels */
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Update user-info to support stacked layout */
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px; /* Even tighter gap between username and weather */
+  width: 100%;
+  justify-content: center;
+  margin-top: 3px; /* Move everything down slightly */
+}
+
+.user-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* Right-align to match weather indicator */
+  gap: 8px; /* Space between name and connection dot */
+  width: 100%; /* Take full width to enable right alignment */
+}
+
+/* Responsive behavior for weather indicator */
+@media (max-width: 1024px) {
+  .weather-age-indicator {
+    font-size: 8px;
+  }
+  
+  .weather-status-dot {
+    width: 5px;
+    height: 5px;
+  }
+}
+
+@media (max-width: 768px) {
+  .weather-age-indicator {
+    font-size: 7px;
+  }
+  
+  .weather-status-dot {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* Hide weather indicator on phones (same breakpoint as user info) */
+@media (max-width: 640px) {
+  .weather-age-indicator {
+    display: none !important;
+  }
+}
