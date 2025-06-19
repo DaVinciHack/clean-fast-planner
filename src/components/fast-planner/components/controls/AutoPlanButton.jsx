@@ -54,9 +54,46 @@ const AutoPlanButton = ({
       }
     } catch (error) {
       console.error('🎯 AUTO PLAN BUTTON: Error:', error);
-      if (onError) {
-        onError(`Auto Plan failed: ${error.message}`);
+      
+      // Enhanced error handling with user-friendly messages
+      let userMessage = 'Auto Plan failed';
+      let actionAdvice = '';
+      
+      if (error.message) {
+        if (error.message.includes('401') || error.message.includes('unauthorized')) {
+          userMessage = 'Authentication expired';
+          actionAdvice = 'Please log in again and try Auto Plan';
+        } else if (error.message.includes('network') || error.message.includes('timeout')) {
+          userMessage = 'Connection problem';
+          actionAdvice = 'Check your internet connection and try again';
+        } else if (error.message.includes('400') || error.message.includes('Bad Request')) {
+          userMessage = 'Invalid flight data';
+          actionAdvice = 'Check your aircraft selection and waypoints, then try again';
+        } else if (error.message.includes('Flight ID is required')) {
+          userMessage = 'Flight save failed';
+          actionAdvice = 'Unable to create flight - try the manual Save Flight button instead';
+        } else {
+          userMessage = `Auto Plan failed: ${error.message}`;
+          actionAdvice = 'Try using the manual Save Flight and Run Automation separately';
+        }
       }
+      
+      // Create detailed error message for LoadingIndicator
+      const detailedMessage = actionAdvice ? 
+        `${userMessage}. ${actionAdvice}` : 
+        userMessage;
+      
+      if (onError) {
+        onError(detailedMessage);
+      }
+      
+      // Also show a console group for developer debugging
+      console.group('🎯 AUTO PLAN ERROR DETAILS');
+      console.error('Original error:', error);
+      console.log('User message:', userMessage);
+      console.log('Action advice:', actionAdvice);
+      console.log('Auto Plan data was:', { isNewFlight: !flightId, hasWaypoints: waypoints && waypoints.length > 0 });
+      console.groupEnd();
     } finally {
       setIsProcessing(false);
     }

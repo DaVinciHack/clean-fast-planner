@@ -113,6 +113,7 @@ const RightPanel = React.forwardRef(({
   // Flight automation loader state
   const [showAutomationLoader, setShowAutomationLoader] = useState(false);
   const [automationFlightData, setAutomationFlightData] = useState(null);
+  const [automationProgressCallback, setAutomationProgressCallback] = useState(null);
   
   // Handle automation loader completion
   const handleAutomationComplete = () => {
@@ -150,6 +151,16 @@ const RightPanel = React.forwardRef(({
       
       // Show automation loader immediately
       setShowAutomationLoader(true);
+      
+      // Send initial "saving flight" message
+      if (automationProgressCallback) {
+        automationProgressCallback({
+          type: 'step',
+          message: 'Saving flight to Palantir...',
+          detail: `Creating flight "${flightNumber}" with ${waypoints?.length || 0} waypoints`,
+          progress: 5
+        });
+      }
     }
     
     // Import the PalantirFlightService
@@ -264,6 +275,16 @@ const RightPanel = React.forwardRef(({
         
         console.log(`Flight ${currentFlightId ? 'updated' : 'created'} successfully with ID: ${flightId}`);
         
+        // 🎯 IMMEDIATE PROGRESS UPDATE: Show save success in automation loader
+        if (flightData.runAutomation && automationProgressCallback) {
+          automationProgressCallback({
+            type: 'step',
+            message: `Flight "${flightData.flightName}" saved successfully`,
+            detail: `Flight ID: ${flightId} - preparing to run automation`,
+            progress: 15
+          });
+        }
+        
         // Show success message
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator(`Flight "${flightData.flightName}" created successfully!`, 'success');
@@ -287,7 +308,7 @@ const RightPanel = React.forwardRef(({
             // Add a slight delay to ensure flight creation is fully processed
             setTimeout(async () => {
               try {
-                const automationResult = await AutomationService.runAutomation(flightId);
+                const automationResult = await AutomationService.runAutomation(flightId, automationProgressCallback);
                 console.log('Automation successful!', automationResult);
                 
                 if (window.LoadingIndicator) {
@@ -459,9 +480,39 @@ const RightPanel = React.forwardRef(({
                 
               } catch (automationError) {
                 console.error('Automation failed:', automationError);
-                if (window.LoadingIndicator) {
-                  window.LoadingIndicator.updateStatusIndicator(`Flight saved but automation failed: ${automationError.message}`, 'warning');
+                
+                // Enhanced automation error handling
+                let automationErrorMessage = 'Flight saved successfully, but automation failed';
+                let automationAdvice = '';
+                
+                if (automationError.message?.includes('401') || automationError.message?.includes('unauthorized')) {
+                  automationAdvice = 'Authentication expired during automation. Try logging in again and running automation manually.';
+                } else if (automationError.message?.includes('timeout')) {
+                  automationAdvice = 'Automation timed out. The flight was saved - you can try running automation again manually.';
+                } else if (automationError.message?.includes('not found')) {
+                  automationAdvice = 'Automation service temporarily unavailable. Your flight was saved successfully.';
+                } else {
+                  automationAdvice = `Automation error: ${automationError.message}. Your flight was saved - try running automation manually from the flight list.`;
                 }
+                
+                const fullAutomationError = [
+                  `⚠️ ${automationErrorMessage}`,
+                  '',
+                  automationAdvice,
+                  '',
+                  'The flight is saved and can be found in Load Flights. You can run automation manually if needed.'
+                ].join('\n');
+                
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(fullAutomationError, 'warning');
+                }
+                
+                // Log automation error details
+                console.group('⚠️ AUTOMATION ERROR DETAILS');
+                console.error('Automation error:', automationError);
+                console.log('Flight was saved successfully with ID:', flightId);
+                console.log('User can run automation manually');
+                console.groupEnd();
               } finally {
                 // Note: Loader will be hidden by onComplete callback from FlightAutomationLoader
                 console.log('🚀 RIGHTPANEL: Automation finally block (loader will be hidden by onComplete callback)');
@@ -492,14 +543,81 @@ const RightPanel = React.forwardRef(({
     } catch (error) {
       console.error('Error creating flight:', error);
       
-      // Format the error message using the service
+      // Enhanced error handling with detailed context
       const PalantirFlightService = (await import('../../services/PalantirFlightService')).default;
-      const errorMessage = PalantirFlightService.formatErrorMessage(error);
+      const baseErrorMessage = PalantirFlightService.formatErrorMessage(error);
       
-      // Update loading indicator with error
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator(errorMessage, 'error');
+      // Add context-specific guidance based on the error type
+      let enhancedMessage = baseErrorMessage;
+      let recoveryAdvice = '';
+      
+      // Check what type of operation failed
+      const operationType = currentFlightId ? 'update' : 'create';
+      const hasAutomation = flightData.runAutomation;
+      
+      if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
+        recoveryAdvice = '→ Try logging out and back in to refresh your authentication';
+      } else if (error.message?.includes('400') || error.message?.includes('Bad Request')) {
+        recoveryAdvice = `→ Check: aircraft selected (${selectedAircraft?.registration || 'none'}), valid waypoints (${waypoints?.length || 0} total)`;
+      } else if (error.message?.includes('network') || error.message?.includes('timeout')) {
+        recoveryAdvice = '→ Check your internet connection and try again';
+      } else if (error.message?.includes('not found') || error.message?.includes('404')) {
+        recoveryAdvice = '→ The API may be temporarily unavailable - try again in a few minutes';
+      } else {
+        // Generic recovery advice based on operation
+        if (operationType === 'update') {
+          recoveryAdvice = '→ Try loading the flight again and making your changes';
+        } else {
+          recoveryAdvice = '→ Try using simpler flight data or contact support if the problem persists';
+        }
       }
+      
+      // Create comprehensive error message
+      const contextInfo = [
+        `Operation: ${operationType} flight${hasAutomation ? ' with automation' : ''}`,
+        `Aircraft: ${selectedAircraft?.registration || 'Not selected'}`,
+        `Waypoints: ${waypoints?.length || 0}`,
+        `Region: ${currentRegion?.name || 'Unknown'}`
+      ].join(' | ');
+      
+      const fullErrorMessage = [
+        `❌ Flight ${operationType} failed`,
+        '',
+        baseErrorMessage,
+        '',
+        recoveryAdvice,
+        '',
+        `Context: ${contextInfo}`
+      ].join('\n');
+      
+      // Update loading indicator with comprehensive error
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(fullErrorMessage, 'error');
+      }
+      
+      // 🚨 SAVE ERROR: Send error to automation loader if it's running
+      if (flightData.runAutomation && automationProgressCallback) {
+        automationProgressCallback({
+          type: 'error',
+          message: `Flight ${operationType} failed`,
+          detail: baseErrorMessage,
+          progress: 0,
+          error
+        });
+      }
+      
+      // Log detailed error information for debugging
+      console.group('🚨 FLIGHT SAVE ERROR DETAILS');
+      console.error('Original error:', error);
+      console.log('Operation type:', operationType);
+      console.log('Has automation:', hasAutomation);
+      console.log('Flight data:', flightData);
+      console.log('Selected aircraft:', selectedAircraft);
+      console.log('Waypoints count:', waypoints?.length);
+      console.log('Current region:', currentRegion);
+      console.groupEnd();
+      
+      // Note: Don't hide automation loader here - let the error callback handle it
     }
   };
   
@@ -964,6 +1082,10 @@ const RightPanel = React.forwardRef(({
       departureIcao={automationFlightData?.departureIcao}
       destinationIcao={automationFlightData?.destinationIcao}
       onComplete={handleAutomationComplete}
+      onProgressUpdate={useCallback((callback) => {
+        console.log('🚀 RightPanel: Setting automation progress callback');
+        setAutomationProgressCallback(() => callback);
+      }, [])}
     />
     </PanelProvider>
   );
