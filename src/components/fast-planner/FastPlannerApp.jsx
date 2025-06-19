@@ -2548,38 +2548,31 @@ const FastPlannerCore = ({
       );
     }
     
-    // If auto-run is requested, trigger auto-plan after React state updates
+    // If auto-run is requested, trigger the MainCard AutoPlan button
     if (flightData.autoRun) {
       console.log('🧙‍♂️ Auto-planning flight...');
       
       // Wait for React state updates to process before triggering automation
       setTimeout(() => {
-        console.log('🧙‍♂️ Triggering AutoPlan after state updates');
+        console.log('🧙‍♂️ Triggering MainCard AutoPlan button');
         console.log('🧙‍♂️ Current waypoints:', waypoints.length);
         console.log('🧙‍♂️ Current selectedAircraft:', selectedAircraft);
         
-        // Switch to autoplan card
-        if (rightPanelRef.current && rightPanelRef.current.handleCardChange) {
-          rightPanelRef.current.handleCardChange('autoplan');
-        }
+        // Simple approach: Find and click the AutoPlan button
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const autoPlanButton = buttons.find(btn => 
+          btn.textContent.includes('Auto Plan') || 
+          btn.textContent.includes('⚡') || 
+          btn.innerHTML.includes('⚡')
+        );
         
-        // Wait a bit more for card switch, then trigger
-        setTimeout(() => {
-          const autoPlanButton = document.querySelector('#autoplan button');
-          if (autoPlanButton) {
-            console.log('🧙‍♂️ Found AutoPlan button, clicking it');
-            autoPlanButton.click();
-          } else {
-            console.warn('🧙‍♂️ AutoPlan button not found, using function call');
-            const isNewFlight = true;
-            const hasWaypoints = waypoints && waypoints.length > 0;
-            const autoPlanData = { isNewFlight, hasWaypoints, skipWaypointGeneration: hasWaypoints };
-            
-            if (rightPanelRef.current && rightPanelRef.current.handleAutoPlan) {
-              rightPanelRef.current.handleAutoPlan(autoPlanData);
-            }
-          }
-        }, 500);
+        if (autoPlanButton) {
+          console.log('🧙‍♂️ Found AutoPlan button:', autoPlanButton.textContent);
+          autoPlanButton.click();
+        } else {
+          console.error('🧙‍♂️ No AutoPlan button found');
+          console.log('🧙‍♂️ Available buttons:', buttons.map(btn => btn.textContent.trim()).filter(text => text));
+        }
       }, 1000);
     }
   }, [setWaypoints, setAircraftRegistration, setSelectedAircraft]);
