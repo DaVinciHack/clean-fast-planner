@@ -6,10 +6,10 @@
   justify-content: space-between;
   width: 100%;
   height: 60px;
-  background: transparent; /* Remove background - let container show through */
-  border-bottom: none; /* Remove border */
-  padding: 0 10px; /* MUCH less padding to prevent cutoff */
-  box-shadow: none; /* Remove shadow - map will have shadow instead */
+  background: transparent;
+  border: none;
+  padding: 0 10px;
+  box-shadow: none;
   position: relative;
   z-index: 100;
 }

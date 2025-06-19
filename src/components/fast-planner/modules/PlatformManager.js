@@ -2869,6 +2869,14 @@ class PlatformManager {
   }
   
   /**
+   * Get raw OSDK data with all fields for enhanced search
+   * @returns {Array} - Array of raw OSDK data objects
+   */
+  getRawOSDKData() {
+    return this.rawOSDKData || [];
+  }
+  
+  /**
    * Find a platform/base by exact name match
    * @param {string} name - Name to search for
    * @returns {Object|null} - Platform object or null if not found

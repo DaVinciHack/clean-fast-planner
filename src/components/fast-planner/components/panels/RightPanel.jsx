@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useImperativeHandle } from 'react';
 import RightPanelContainer from './RightPanelContainer';
 import {
   MainCard,
@@ -197,8 +197,19 @@ const RightPanel = React.forwardRef(({
         })
         .map(wp => {
           // Clean up location names - trim whitespace to avoid issues
-          const locationName = wp.name ? wp.name.trim() : `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
-          return locationName;
+          // COORDINATE SAFETY: Check if waypoint has valid coordinates before accessing them
+          if (wp.name && wp.name.trim()) {
+            return wp.name.trim();
+          } else if (wp.coords && Array.isArray(wp.coords) && wp.coords.length === 2 && 
+                     typeof wp.coords[0] === 'number' && typeof wp.coords[1] === 'number') {
+            return `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
+          } else if (wp.coordinates && Array.isArray(wp.coordinates) && wp.coordinates.length === 2 && 
+                     typeof wp.coordinates[0] === 'number' && typeof wp.coordinates[1] === 'number') {
+            return `${wp.coordinates[1].toFixed(6)},${wp.coordinates[0].toFixed(6)}`;
+          } else {
+            console.warn('🚨 SAVE FLIGHT: Waypoint has invalid coordinates:', wp);
+            return wp.name || 'Invalid Waypoint';
+          }
         });
       
       // DEBUG: Check waypoint structure to understand types
@@ -948,6 +959,7 @@ const RightPanel = React.forwardRef(({
   // Handle Auto Plan action
   const handleAutoPlan = async (autoPlanData) => {
     console.log('🎯 AUTO PLAN: Starting auto plan with data:', autoPlanData);
+    console.log('🎯 AUTO PLAN: RightPanel waypoints prop:', waypoints);
     
     const { isNewFlight, hasWaypoints, skipWaypointGeneration } = autoPlanData;
     
@@ -959,8 +971,43 @@ const RightPanel = React.forwardRef(({
       // Create flight data exactly like SaveFlightCard but with auto-generated name
       const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const now = new Date();
+      
+      // CRITICAL FIX: Build locations array just like regular save flight
+      console.log('🎯 AUTO PLAN: All waypoints before filtering:', waypoints);
+      console.log('🎯 AUTO PLAN: Waypoints length:', waypoints.length);
+      console.log('🎯 AUTO PLAN: Waypoints type:', typeof waypoints);
+      
+      const filtered = waypoints.filter(wp => {
+        // Only include landing stops, not navigation waypoints
+        const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+        console.log(`🎯 AUTO PLAN: Waypoint "${wp.name}" - isWaypoint: ${wp.isWaypoint}, type: ${wp.type}, isWaypointType: ${isWaypointType}, included: ${!isWaypointType}`);
+        return !isWaypointType;
+      });
+      
+      console.log('🎯 AUTO PLAN: Filtered waypoints:', filtered);
+      
+      const locations = filtered.map(wp => {
+        // COORDINATE SAFETY: Check if waypoint has valid coordinates before accessing them
+        if (wp.name && wp.name.trim()) {
+          return wp.name.trim();
+        } else if (wp.coords && Array.isArray(wp.coords) && wp.coords.length === 2 && 
+                   typeof wp.coords[0] === 'number' && typeof wp.coords[1] === 'number') {
+          return `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
+        } else if (wp.coordinates && Array.isArray(wp.coordinates) && wp.coordinates.length === 2 && 
+                   typeof wp.coordinates[0] === 'number' && typeof wp.coordinates[1] === 'number') {
+          return `${wp.coordinates[1].toFixed(6)},${wp.coordinates[0].toFixed(6)}`;
+        } else {
+          console.warn('🚨 AUTO PLAN: Waypoint has invalid coordinates:', wp);
+          return wp.name || 'Invalid Waypoint';
+        }
+      });
+      
+      console.log('🎯 AUTO PLAN: Built locations array:', locations);
+      
       const flightData = {
         flightName: `Auto Plan ${timestamp}`, // Use flightName (not flightNumber)
+        locations: locations, // CRITICAL FIX: Add locations array
+        waypoints: waypoints, // Add waypoints for processing
         etd: now, // Send Date object, not ISO string
         captainId: null, // No crew for auto-generated flights
         copilotId: null,
@@ -985,8 +1032,36 @@ const RightPanel = React.forwardRef(({
       // but keep the user's waypoints and route structure
       const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const now = new Date();
+      
+      // CRITICAL FIX: Build locations array for existing flights too
+      const locations = waypoints
+        .filter(wp => {
+          // Only include landing stops, not navigation waypoints
+          const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+          return !isWaypointType;
+        })
+        .map(wp => {
+          // COORDINATE SAFETY: Check if waypoint has valid coordinates before accessing them
+          if (wp.name && wp.name.trim()) {
+            return wp.name.trim();
+          } else if (wp.coords && Array.isArray(wp.coords) && wp.coords.length === 2 && 
+                     typeof wp.coords[0] === 'number' && typeof wp.coords[1] === 'number') {
+            return `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
+          } else if (wp.coordinates && Array.isArray(wp.coordinates) && wp.coordinates.length === 2 && 
+                     typeof wp.coordinates[0] === 'number' && typeof wp.coordinates[1] === 'number') {
+            return `${wp.coordinates[1].toFixed(6)},${wp.coordinates[0].toFixed(6)}`;
+          } else {
+            console.warn('🚨 AUTO PLAN EXISTING: Waypoint has invalid coordinates:', wp);
+            return wp.name || 'Invalid Waypoint';
+          }
+        });
+      
+      console.log('🎯 AUTO PLAN: Built locations array for existing flight:', locations);
+      
       const flightData = {
         flightName: `Auto Plan Update ${timestamp}`, // Use flightName (not flightNumber)
+        locations: locations, // CRITICAL FIX: Add locations array
+        waypoints: waypoints, // Add waypoints for processing
         etd: now, // Send Date object, not ISO string
         captainId: null, // No crew for auto-generated flights
         copilotId: null,
@@ -1027,8 +1102,9 @@ const RightPanel = React.forwardRef(({
     }
   }, []);
 
-  // Expose handleCardChange method through ref for GlassMenuDock
+  // FIXED: Expose BOTH handleAutoPlan and handleCardChange methods via ref
   React.useImperativeHandle(ref, () => ({
+    handleAutoPlan,
     handleCardChange
   }), [handleCardChange]);
 

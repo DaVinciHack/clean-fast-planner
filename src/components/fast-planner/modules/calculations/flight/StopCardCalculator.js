@@ -365,7 +365,22 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
                           (segmentTo.coords && segmentTo.coords.length === 2);
         
         if (!fromHasCoords || !toHasCoords) {
-          console.error(`StopCardCalculator: Missing coordinates for segment in leg ${i+1}`);
+          console.error(`StopCardCalculator: Missing coordinates for segment in leg ${i+1}`, {
+            segmentFrom: {
+              name: segmentFrom.name,
+              lat: segmentFrom.lat,
+              lon: segmentFrom.lon,
+              coords: segmentFrom.coords,
+              hasCoords: fromHasCoords
+            },
+            segmentTo: {
+              name: segmentTo.name,
+              lat: segmentTo.lat,
+              lon: segmentTo.lon,
+              coords: segmentTo.coords,
+              hasCoords: toHasCoords
+            }
+          });
           continue;
         }
         

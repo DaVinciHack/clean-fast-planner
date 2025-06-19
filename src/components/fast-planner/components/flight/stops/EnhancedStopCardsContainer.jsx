@@ -292,7 +292,7 @@ const EnhancedStopCardsContainer = ({
             
             return (
               <StopCard
-                key={cardId}
+                key={`main-stop-${index}`}
                 id={cardId}
                 index={card.index}
                 stopName={card.stopName}
