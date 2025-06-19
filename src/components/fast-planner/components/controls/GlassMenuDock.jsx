@@ -6,6 +6,7 @@ import './GlassMenuDock.css';
  * 
  * Features a compact 3-button mode and an expanded mode with all menu items.
  * Clean design with icons above text, matching the iPad layout style.
+ * Includes smart edit button that appears in satellite+no-rigs mode.
  */
 const GlassMenuDock = ({
   isVisible = false,
@@ -16,13 +17,16 @@ const GlassMenuDock = ({
   // Panel states for visual feedback
   leftPanelVisible = false,
   rightPanelVisible = false,
+  // Smart toggle button props
+  showEditButton = false, // Shows when flight is loaded
+  currentMapMode = 'dark', // Current map style (dark/3d)
+  onEditMode, // Callback to toggle between modes
   // Card change handlers for expanded buttons
   onMainCard,
   onSettingsCard,
   onPerformanceCard,
   onWeatherCard,
   onFinanceCard,
-  onEvacuationCard,
   onSaveCard,
   onLoadCard,
   onLayersCard
@@ -100,18 +104,6 @@ const GlassMenuDock = ({
       ),
       label: 'Finance',
       action: onFinanceCard || (() => console.log('Finance clicked'))
-    },
-    {
-      id: 'evacuation',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-          <path d="M12 17h.01"/>
-        </svg>
-      ),
-      label: 'Evacuation',
-      action: onEvacuationCard || (() => console.log('Evacuation clicked'))
     },
     {
       id: 'save',
@@ -194,6 +186,42 @@ const GlassMenuDock = ({
             <span className="button-label">Route</span>
           </button>
         </div>
+
+        {/* Smart Toggle Button - shows when flight is loaded */}
+        {showEditButton && (
+          <div className="glass-button-container edit-button-container">
+            <button 
+              className={`glass-button icon-above-text ${currentMapMode === '3d' ? 'edit-button' : 'satellite-button'}`}
+              onClick={onEditMode}
+              title={currentMapMode === '3d' ? 
+                'Switch to editing mode - 2D view with all layers' : 
+                'Switch to satellite mode - 3D view for presentation'
+              }
+            >
+              <div className="glass-icon">
+                {currentMapMode === '3d' ? (
+                  // Edit icon when in 3D satellite mode
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                ) : (
+                  // Satellite icon when in dark edit mode
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                    <path d="M8 12h8"/>
+                    <path d="M12 8v8"/>
+                    <path d="M16.24 7.76l-8.48 8.48"/>
+                    <path d="M7.76 7.76l8.48 8.48"/>
+                  </svg>
+                )}
+              </div>
+              <span className="button-label">
+                {currentMapMode === '3d' ? 'Edit' : 'Satellite'}
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Expanded menu items - only show when expanded */}
         {isExpanded && expandedMenuItems.map((item, index) => (
