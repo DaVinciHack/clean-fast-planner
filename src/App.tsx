@@ -35,7 +35,7 @@ function App() {
         nav.style.zIndex = '1000';
         
         // Get the base path from the current URL
-        const basePath = '/planner';
+        const basePath = '/plan';
         
         // Create links
         const homeLink = document.createElement('a');
@@ -102,8 +102,8 @@ function App() {
   
   // Determine which component to render based on path
   const renderComponent = () => {
-    // Handle paths with or without the /planner prefix
-    const path = currentPath.replace(/^\/planner/, '');
+    // Handle paths with or without the /plan prefix
+    const path = currentPath.replace(/^\/plan/, '');
     
     switch (path) {
       case '/debug':
