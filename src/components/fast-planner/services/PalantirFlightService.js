@@ -198,7 +198,7 @@ class PalantirFlightService {
           "flightName": flightData.flightName || "Fast Planner Flight",
           "locations": cleanLocations,
           "displayWaypoints": displayWaypoints,  // Send structured waypoint information
-          "useOnlyProvidedWaypoints": true,  // TEST: Use ONLY Fast Planner waypoints
+          "useOnlyProvidedWaypoints": flightData.useOnlyProvidedWaypoints ?? false,  // 🔧 FIX: Respect Auto Plan setting for weather replanning
           "aircraftId": flightData.aircraftId || "190",
           "region": flightData.region || "NORWAY"
         };

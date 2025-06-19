@@ -62,6 +62,8 @@ const MainCard = ({
   waypointModeActive = false,
   // Weather segments for rig detection
   weatherSegments = null,
+  // Current flight ID for Auto Plan detection
+  currentFlightId = null,
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
@@ -224,7 +226,7 @@ const MainCard = ({
           <AutoPlanButton
             selectedAircraft={selectedAircraft}
             waypoints={waypoints}
-            flightId={null} // TODO: Add flight ID detection
+            flightId={currentFlightId} // 🔧 FIX: Pass actual flight ID for new vs existing flight detection
             style={{ flex: 1, margin: 0 }}
             onSuccess={handleSaveSuccess}
             onError={handleSaveError}
