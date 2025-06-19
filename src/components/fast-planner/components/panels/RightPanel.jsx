@@ -821,6 +821,15 @@ const RightPanel = React.forwardRef(({
         );
       }
       
+      // 🎯 SMART EDIT: Emit flight-loaded event for edit button detection
+      setTimeout(() => {
+        const flightLoadedEvent = new CustomEvent('flight-loaded', {
+          detail: { flightData, flightName: flight.name }
+        });
+        window.dispatchEvent(flightLoadedEvent);
+        console.log('🎯 SMART EDIT: Emitted flight-loaded event for:', flight.name);
+      }, 1200); // Wait for satellite mode to complete
+      
     } catch (error) {
       console.error('Error processing flight data:', error);
       

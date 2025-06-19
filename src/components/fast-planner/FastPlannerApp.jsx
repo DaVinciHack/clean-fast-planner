@@ -2307,6 +2307,126 @@ const FastPlannerCore = ({
     }
   };
 
+  // 🎯 SMART TOGGLE: Detect satellite + no-rigs mode and track current mode
+  const [showEditButton, setShowEditButton] = useState(false);
+  const [currentMapMode, setCurrentMapMode] = useState('dark'); // Track current map style
+  
+  // 🎯 SMART EDIT: Listen for flight load events to show edit button
+  useEffect(() => {
+    const handleFlightLoadComplete = (event) => {
+      console.log('🎯 SMART EDIT: Flight load event received:', event.detail?.flightName);
+      
+      // Show edit button when flight loads (simplified for now)
+      setTimeout(() => {
+        console.log('🎯 SMART EDIT: ✅ Flight loaded via event - showing edit button');
+        setShowEditButton(true);
+      }, 1000);
+    };
+    
+    // Listen for custom flight load events
+    window.addEventListener('flight-loaded', handleFlightLoadComplete);
+    
+    return () => {
+      window.removeEventListener('flight-loaded', handleFlightLoadComplete);
+    };
+  }, []); // No dependencies to avoid conflicts
+
+  // 🎯 SMART TOGGLE: Show button when flight is loaded, hide when cleared
+  useEffect(() => {
+    if (!loadedFlightData) {
+      console.log('🎯 SMART TOGGLE: No loaded flight data, hiding button');
+      setShowEditButton(false);
+    } else {
+      console.log('🎯 SMART TOGGLE: Flight loaded, showing toggle button');
+      setShowEditButton(true);
+    }
+  }, [loadedFlightData]);
+  
+  // 🎯 SMART TOGGLE: Toggle between satellite and edit modes (like 3D toggle button)
+  const handleToggleMode = async () => {
+    console.log('🎯 SMART TOGGLE: Using exact MapLayersCard 3D toggle logic...');
+    
+    try {
+      const mapManager = mapManagerRef?.current;
+      if (!mapManager) {
+        console.error('🎯 SMART TOGGLE: Map manager not available');
+        return;
+      }
+      
+      // Toggle between dark and 3D style (same as MapLayersCard)
+      const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
+      const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+      
+      console.log(`🎯 SMART TOGGLE: Switching from ${currentStyle} to ${newStyle}`);
+      
+      await mapManager.switchMapStyle(newStyle);
+      
+      // CRITICAL: Reset camera to top-down view when switching back to 2D
+      const map = mapManager.getMap();
+      if (newStyle === 'dark' && map) {
+        console.log('🎯 SMART TOGGLE: 📐 Resetting camera to top-down 2D view');
+        
+        // First reset terrain to avoid conflicts
+        if (map.getTerrain()) {
+          map.setTerrain(null);
+        }
+        
+        // Then smooth transition to vertical 
+        setTimeout(() => {
+          map.easeTo({
+            pitch: 0,     // Top-down view
+            bearing: 0,   // North up
+            duration: 1200 // Longer duration for smoother animation
+          });
+        }, 100); // Small delay after terrain removal
+      }
+      
+      console.log(`🎯 SMART TOGGLE: 🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
+      
+      // RESTORE LAYERS after style switch (same timing as MapLayersCard)
+      setTimeout(() => {
+        console.log('🎯 SMART TOGGLE: 🔄 Restoring layers after style switch...');
+        
+        // Emit the same events as MapLayersCard to restore all layers
+        setTimeout(() => {
+          const eventDetail = { 
+            newStyle, 
+            previousLayers: {}, 
+            restoreAlternateLines: true,
+            restoreWeatherCircles: true 
+          };
+
+          // Emit the same multiple event types as MapLayersCard
+          ['map-style-switched', 'map-style-changed'].forEach(eventName => {
+            const event = new CustomEvent(eventName, { detail: eventDetail });
+            window.dispatchEvent(event);
+          });
+          
+          console.log('🎯 SMART TOGGLE: 📢 Notified other components to restore layers');
+        }, 500);
+        
+        console.log('🎯 SMART TOGGLE: ✅ Layer restoration events dispatched');
+        
+      }, 1000); // Wait 1 second for style to fully load (same as MapLayersCard)
+      
+      // Update mode tracking and editing lock
+      setCurrentMapMode(newStyle);
+      
+      if (newStyle === 'dark') {
+        setIsEditLocked(false);
+        window.isEditLocked = false;
+        console.log('🎯 SMART TOGGLE: Unlocked editing (2D mode)');
+      } else {
+        setIsEditLocked(true);
+        window.isEditLocked = true;
+        console.log('🎯 SMART TOGGLE: Locked editing (3D satellite mode)');
+      }
+      
+    } catch (error) {
+      console.error('🎯 SMART TOGGLE: Error in toggle mode:', error);
+    }
+  };
+
   // Create ref for RightPanel to access its card change functionality
   const rightPanelRef = useRef(null);
   
@@ -2475,13 +2595,16 @@ const FastPlannerCore = ({
         onOpenMenu={handleOpenMenu}
         leftPanelVisible={leftPanelVisible}
         rightPanelVisible={rightPanelVisible}
+        // Smart toggle button props  
+        showEditButton={showEditButton}
+        currentMapMode={currentMapMode}
+        onEditMode={handleToggleMode}
         // Card change handlers for expanded buttons
         onMainCard={handleMainCard}
         onSettingsCard={handleSettingsCard}
         onPerformanceCard={handlePerformanceCard}
         onWeatherCard={handleWeatherCard}
         onFinanceCard={handleFinanceCard}
-        onEvacuationCard={handleEvacuationCard}
         onSaveCard={handleSaveCard}
         onLoadCard={handleLoadCard}
         onLayersCard={handleLayersCard}
