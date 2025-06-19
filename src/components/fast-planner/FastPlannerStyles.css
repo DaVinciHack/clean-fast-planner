@@ -2415,3 +2415,107 @@
     pointer-events: auto;
   }
 }
+
+/* Auto Plan Button - The Magic Button 🎯 */
+.auto-plan-button {
+  width: 100%;
+  padding: 12px 16px;
+  background: #2D3748; /* Dark grey background */
+  border: 2px solid #48BB78; /* Green border */
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.auto-plan-button:hover:not(:disabled) {
+  background: #48BB78; /* Green background on hover */
+  border-color: #38A169; /* Darker green border on hover */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.auto-plan-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+}
+
+.auto-plan-button:disabled {
+  background: #4A5568;
+  border-color: #718096;
+  color: #A0AEC0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.auto-plan-button .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #A0AEC0;
+  border-top: 2px solid #FFFFFF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Auto Plan Card Content */
+.auto-plan-content {
+  text-align: center;
+}
+
+.auto-plan-description {
+  font-size: 13px;
+  color: var(--text-color);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.flight-status-info {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.status-label {
+  font-size: 10px;
+  color: var(--label-color);
+  margin-bottom: 2px;
+}
+
+.status-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+/* Auto Plan Button - Uses same control-button class, just custom spinner */
+.control-button .spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #A0AEC0;
+  border-top: 1.5px solid #FFFFFF;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}

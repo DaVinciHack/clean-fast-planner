@@ -40,7 +40,8 @@ const RightPanelContainer = React.forwardRef(({
     { id: 'evacuation', name: 'Evacuation' },
     { id: 'maplayers', name: 'Map Layers' }, // Added Map Layers tab
     { id: 'saveflight', name: 'Save Flight', hidden: true }, // Hidden card for Save Flight
-    { id: 'loadflights', name: 'Load Flights', hidden: true } // Hidden card for Load Flights
+    { id: 'loadflights', name: 'Load Flights', hidden: true }, // Hidden card for Load Flights
+    { id: 'autoplan', name: 'Auto Plan', hidden: true } // Hidden card for Auto Plan
   ];
   
   // Filter children to get the current active card
