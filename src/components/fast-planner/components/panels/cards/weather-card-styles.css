@@ -83,11 +83,15 @@
   margin-bottom: 8px;
   font-size: 12px;
   line-height: 1.3;
+  display: flex;
+  flex-direction: column; /* Force vertical stacking */
 }
 
 .flight-details > div {
-  margin-bottom: 2px;
+  margin-bottom: 4px; /* Increased margin for better spacing */
   color: #ccc;
+  display: block; /* Ensure each div is a block element */
+  width: 100%; /* Take full width */
 }
 
 .flight-category {
@@ -172,10 +176,10 @@
 }
 
 .segment-badge {
-  padding: 3px 6px;
+  padding: 1px 3px; /* Reduced from 3px 6px - much tighter padding */
   margin-right: 4px;
   margin-bottom: 4px;
-  font-size: 11px;
+  font-size: 10px; /* Reduced from 11px - smaller font */
   font-weight: 600;
   cursor: help;
   transition: opacity 0.2s ease;
@@ -195,9 +199,9 @@
 
 /* Best approach badge - same style as weather segments */
 .approach-badge {
-  padding: 3px 6px;
+  padding: 1px 3px; /* Reduced from 3px 6px - match segment badges */
   margin-left: 4px;
-  font-size: 11px;
+  font-size: 10px; /* Reduced from 11px - match segment badges */
   font-weight: 600;
   display: inline-block;
   border: 1px solid var(--outline-color, #1976D2);
@@ -213,9 +217,9 @@
 }
 
 .warning-outline {
-  padding: 3px 6px;
+  padding: 1px 3px; /* Reduced from 3px 6px - match segment badges */
   margin-left: 4px;
-  font-size: 11px;
+  font-size: 10px; /* Reduced from 11px - match segment badges */
   font-weight: 600;
   display: inline-block;
   border: 1px solid #F57C00;

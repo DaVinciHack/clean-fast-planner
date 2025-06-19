@@ -725,89 +725,118 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
-      // 🛰️ IMMEDIATE CLEAN SATELLITE: Switch immediately, no delays, no conflicts
-      setTimeout(() => {
-        console.log('🛰️ IMMEDIATE CLEAN SATELLITE: Applying immediate clean satellite view');
-        
-        try {
-          if (window.mapManager?.map) {
-            const map = window.mapManager.map;
+      // 🛰️ STEP 1: Change map style to satellite first (before flight loading)
+      console.log('🛰️ STEP 1: Changing to satellite map style first');
+      
+      try {
+        if (window.mapManager?.map) {
+          const map = window.mapManager.map;
+          
+          // Check current style to avoid unnecessary switches
+          const currentStyleUrl = map.getStyle()?.sources ? 
+            (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
+          
+          console.log('🛰️ STEP 1: Current style type:', currentStyleUrl);
+          
+          // Only switch to satellite if we're not already on satellite
+          if (currentStyleUrl !== 'satellite') {
+            console.log('🛰️ STEP 1: Switching to satellite background');
             
-            // Check current style to avoid unnecessary switches
-            const currentStyleUrl = map.getStyle()?.sources ? 
-              (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
+            // IMMEDIATE switch to satellite for clean look
+            map.setStyle('mapbox://styles/mapbox/satellite-v9');
             
-            console.log('🛰️ IMMEDIATE: Current style type:', currentStyleUrl);
-            
-            // Only switch to satellite if we're not already on satellite
-            if (currentStyleUrl !== 'satellite') {
-              console.log('🛰️ IMMEDIATE: Switching to clean satellite (not already on satellite)');
+            // Handle style load for 3D terrain (but no angle change yet)
+            map.once('style.load', () => {
+              console.log('🛰️ STEP 1: Satellite loaded, adding 3D terrain (no angle change yet)');
               
-              // IMMEDIATE switch to satellite for clean look
-              map.setStyle('mapbox://styles/mapbox/satellite-v9');
-              
-              // Handle style load for 3D terrain
-              map.once('style.load', () => {
-                console.log('🛰️ IMMEDIATE: Satellite loaded, adding 3D terrain');
-                
-                try {
-                  // Add terrain source
-                  if (!map.getSource('mapbox-dem')) {
-                    map.addSource('mapbox-dem', {
-                      'type': 'raster-dem',
-                      'url': 'mapbox://mapbox.terrain-rgb',
-                      'tileSize': 512,
-                      'maxzoom': 14
-                    });
-                  }
-                  
-                  // Enable 3D terrain
-                  map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                  console.log('🛰️ IMMEDIATE: ✅ 3D terrain enabled');
-                  
-                  // Gentle 3D angle (no aggressive movements)
-                  setTimeout(() => {
-                    map.easeTo({
-                      pitch: 30, // Gentler angle to avoid conflicts
-                      bearing: map.getBearing(),
-                      duration: 2000
-                    });
-                    console.log('🛰️ IMMEDIATE: ✅ Gentle 3D angle applied');
-                  }, 300);
-                  
-                } catch (terrainError) {
-                  console.warn('🛰️ IMMEDIATE: Error adding terrain:', terrainError.message);
-                }
-              });
-              
-            } else {
-              console.log('🛰️ IMMEDIATE: Already on satellite, just ensuring 3D terrain');
-              
-              // Already on satellite, just ensure 3D terrain is enabled
               try {
-                if (!map.getTerrain()) {
-                  if (!map.getSource('mapbox-dem')) {
-                    map.addSource('mapbox-dem', {
-                      'type': 'raster-dem',
-                      'url': 'mapbox://mapbox.terrain-rgb',
-                      'tileSize': 512,
-                      'maxzoom': 14
-                    });
-                  }
-                  map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                  console.log('🛰️ IMMEDIATE: ✅ Added 3D terrain to existing satellite');
+                // Add terrain source
+                if (!map.getSource('mapbox-dem')) {
+                  map.addSource('mapbox-dem', {
+                    'type': 'raster-dem',
+                    'url': 'mapbox://mapbox.terrain-rgb',
+                    'tileSize': 512,
+                    'maxzoom': 14
+                  });
                 }
+                
+                // Enable 3D terrain
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                console.log('🛰️ STEP 1: ✅ 3D terrain enabled (angle change deferred)');
+                
+                // STEP 3: Apply 3D angle AFTER flight loading is complete
+                setTimeout(() => {
+                  console.log('🛰️ STEP 3: Now applying FULL 3D angle after flight loading completed');
+                  map.easeTo({
+                    pitch: 60, // Full 3D angle to complete the transition
+                    bearing: map.getBearing(),
+                    duration: 2000
+                  });
+                  console.log('🛰️ STEP 3: ✅ FULL 60° angle applied - no camera jumping!');
+                  
+                  // 🎯 SMART TOGGLE: Notify that we're now in 3D mode
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('map-mode-changed', {
+                      detail: { mode: '3d', source: 'flight-loading' }
+                    }));
+                    console.log('🎯 SMART TOGGLE: Notified button that we are now in 3D mode - should show "Edit"');
+                  }, 2200); // Wait for camera transition to complete
+                }, 4000); // Wait longer for flight loading to completely finish
+                
               } catch (terrainError) {
-                console.warn('🛰️ IMMEDIATE: Error adding terrain to existing satellite:', terrainError.message);
+                console.warn('🛰️ STEP 1: Error adding terrain:', terrainError.message);
               }
-            }
+            });
             
+          } else {
+            console.log('🛰️ STEP 1: Already on satellite, just ensuring 3D terrain and deferred angle');
+            
+            // Already on satellite, just ensure 3D terrain is enabled
+            try {
+              if (!map.getTerrain()) {
+                if (!map.getSource('mapbox-dem')) {
+                  map.addSource('mapbox-dem', {
+                    'type': 'raster-dem',
+                    'url': 'mapbox://mapbox.terrain-rgb',
+                    'tileSize': 512,
+                    'maxzoom': 14
+                  });
+                }
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                console.log('🛰️ STEP 1: ✅ Added 3D terrain to existing satellite');
+              }
+              
+              // STEP 3: Apply 3D angle AFTER flight loading (even if already on satellite)
+              setTimeout(() => {
+                console.log('🛰️ STEP 3: Applying deferred FULL 3D angle to existing satellite');
+                map.easeTo({
+                  pitch: 60, // Full 3D angle to complete the transition
+                  bearing: map.getBearing(),
+                  duration: 2000
+                });
+                console.log('🛰️ STEP 3: ✅ FULL 60° angle applied to existing satellite - complete transition!');
+                
+                // 🎯 SMART TOGGLE: Notify that we're now in 3D mode
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('map-mode-changed', {
+                    detail: { mode: '3d', source: 'flight-loading' }
+                  }));
+                  console.log('🎯 SMART TOGGLE: Notified button that we are now in 3D mode - should show "Edit"');
+                }, 2200); // Wait for camera transition to complete
+              }, 4000); // Wait longer for flight loading to completely finish
+              
+            } catch (terrainError) {
+              console.warn('🛰️ STEP 1: Error adding terrain to existing satellite:', terrainError.message);
+            }
           }
           
-        } catch (error) {
-          console.warn('🛰️ IMMEDIATE: Error in immediate satellite mode:', error.message);
         }
-      }, 500); // Very short delay just to let flight loading start
+        
+      } catch (error) {
+        console.warn('🛰️ STEP 1: Error in satellite mode setup:', error.message);
+      }
+      
+      // STEP 2: Flight loading happens here (in the main flow) between style change and angle application
       
       // 🚁 DISABLED: Old separate rig weather system - now using unified weather arrows
       // The WeatherCirclesLayer now automatically adds arrows to ALL weather circles (airports, rigs, alternates)
