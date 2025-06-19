@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
 import './AppHeader.css';
 
@@ -21,7 +21,8 @@ const AppHeader = ({
   loadingText = "",         // New prop for loading text
   weather, // CRITICAL: Weather must be provided from parent
   waypoints = [],            // CRITICAL: Add waypoints prop for real-time calculations
-  loadedFlightData = null  // ADD THIS
+  loadedFlightData = null,  // ADD THIS
+  weatherSegments = null   // NEW: Weather segments for age calculation
 }) => {
   // DEBUG: Log props received
   console.log('🔍 AppHeader PROPS DEBUG: loadedFlightData =', loadedFlightData);
@@ -35,6 +36,89 @@ const AppHeader = ({
   
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
+  
+  // Weather age state for real-time updates
+  const [weatherAge, setWeatherAge] = useState(null);
+  
+  // Calculate weather age from weather segments
+  const calculateWeatherAge = useCallback(() => {
+    if (!weatherSegments || weatherSegments.length === 0) {
+      return null;
+    }
+
+    // Find the most recent timestamp from all weather segments
+    let mostRecentTimestamp = null;
+    weatherSegments.forEach(segment => {
+      if (segment.timestamp) {
+        const segmentTime = new Date(segment.timestamp);
+        if (!mostRecentTimestamp || segmentTime > mostRecentTimestamp) {
+          mostRecentTimestamp = segmentTime;
+        }
+      }
+    });
+
+    if (!mostRecentTimestamp) {
+      return null;
+    }
+
+    try {
+      const now = new Date();
+      const ageMs = now.getTime() - mostRecentTimestamp.getTime();
+      const ageMinutes = ageMs / (1000 * 60);
+
+      // Determine status level based on age
+      let status = 'current'; // Green
+      if (ageMinutes > 360) { // > 6 hours
+        status = 'critical'; // Red
+      } else if (ageMinutes > 180) { // > 3 hours  
+        status = 'warning'; // Orange
+      } else if (ageMinutes > 120) { // > 2 hours
+        status = 'caution'; // Yellow
+      }
+
+      // Format the age text
+      let ageText;
+      if (ageMinutes < 1) {
+        ageText = `${Math.round(ageMinutes * 60)}s`;
+      } else if (ageMinutes < 60) {
+        ageText = `${Math.round(ageMinutes)}m`;
+      } else {
+        const hours = Math.floor(ageMinutes / 60);
+        const minutes = Math.round(ageMinutes % 60);
+        if (hours < 24) {
+          ageText = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+        } else {
+          const days = Math.floor(hours / 24);
+          const remainingHours = hours % 24;
+          ageText = `${days}d ${remainingHours}h`;
+        }
+      }
+
+      return {
+        text: `Weather ${ageText}`,
+        status,
+        isOld: ageMinutes > 360 // Critical if > 6 hours
+      };
+    } catch (error) {
+      console.error('Error calculating weather age:', error);
+      return null;
+    }
+  }, [weatherSegments]);
+
+  // Update weather age every 30 seconds
+  useEffect(() => {
+    const updateWeatherAge = () => {
+      setWeatherAge(calculateWeatherAge());
+    };
+
+    // Update immediately when weather segments change
+    updateWeatherAge();
+
+    // Set up interval for real-time updates
+    const interval = setInterval(updateWeatherAge, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [calculateWeatherAge]);
   
   // Integrate with LoadingIndicator for dynamic status messages
   useEffect(() => {
@@ -344,8 +428,17 @@ const AppHeader = ({
       <div className="header-right">
         {isAuthenticated && userName ? (
           <div className="user-info">
-            <span className="username">{userName}</span>
-            <span className="connection-dot connected"></span>
+            <div className="user-line">
+              <span className="username">{userName}</span>
+              <span className="connection-dot connected"></span>
+            </div>
+            {/* Weather Age Indicator */}
+            {weatherAge && (
+              <div className={`weather-age-indicator ${weatherAge.status}`}>
+                <span className="weather-age-text">Weather updated {weatherAge.text.replace('Weather ', '')}</span>
+                <span className={`weather-status-dot ${weatherAge.status}`}></span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="user-info">

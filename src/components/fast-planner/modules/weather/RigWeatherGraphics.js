@@ -405,7 +405,10 @@ class RigWeatherGraphics {
                 'icon-size': 1.0, // Fixed size, no zoom dependency
                 'icon-rotate': ['get', 'rotation'],
                 'icon-allow-overlap': true,
-                'icon-ignore-placement': true
+                'icon-ignore-placement': true,
+                // 🎯 3D FIX: Make arrows lie flat on 3D terrain like weather circles
+                'icon-pitch-alignment': 'map', // Align with map pitch (3D terrain)
+                'icon-rotation-alignment': 'map' // Keep rotation relative to map, not viewport
             },
             paint: {
                 'icon-color': ['get', 'windColor'], // Use wind speed color for arrow

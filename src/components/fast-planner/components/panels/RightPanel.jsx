@@ -725,6 +725,89 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
+      // 🌦️ AUTO-3D MODE: Automatically enable 3D mode with lightning and radar when loading flights
+      setTimeout(() => {
+        console.log('🌦️ AUTO-3D: Enabling 3D mode with weather visualization for loaded flight');
+        
+        try {
+          // Enable 3D terrain mode
+          if (window.mapManager?.map) {
+            const map = window.mapManager.map;
+            
+            // Check if terrain is already enabled
+            const currentTerrain = map.getTerrain();
+            if (!currentTerrain) {
+              console.log('🌦️ AUTO-3D: Enabling 3D terrain');
+              
+              // Add terrain source if not exists
+              if (!map.getSource('mapbox-dem')) {
+                map.addSource('mapbox-dem', {
+                  'type': 'raster-dem',
+                  'url': 'mapbox://mapbox.terrain-rgb',
+                  'tileSize': 512,
+                  'maxzoom': 14
+                });
+              }
+              
+              // Enable 3D terrain
+              map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+              console.log('🌦️ AUTO-3D: ✅ 3D terrain enabled');
+            } else {
+              console.log('🌦️ AUTO-3D: 3D terrain already enabled');
+            }
+            
+            // Enable weather radar layer if available
+            if (window.weatherLayerRef?.current) {
+              console.log('🌦️ AUTO-3D: Enabling weather radar layer');
+              try {
+                // Toggle weather layer on if it's off
+                window.weatherLayerRef.current.setVisibility(true);
+                console.log('🌦️ AUTO-3D: ✅ Weather radar enabled');
+              } catch (radarError) {
+                console.warn('🌦️ AUTO-3D: Could not enable weather radar:', radarError.message);
+              }
+            }
+            
+            // Enable lightning data if weather visualization manager is available
+            if (window.weatherVisualizationManager) {
+              console.log('🌦️ AUTO-3D: Enabling lightning visualization');
+              try {
+                // This would enable lightning overlays if implemented
+                if (window.weatherVisualizationManager.enableLightning) {
+                  window.weatherVisualizationManager.enableLightning();
+                  console.log('🌦️ AUTO-3D: ✅ Lightning visualization enabled');
+                } else {
+                  console.log('🌦️ AUTO-3D: Lightning visualization not yet implemented');
+                }
+              } catch (lightningError) {
+                console.warn('🌦️ AUTO-3D: Could not enable lightning:', lightningError.message);
+              }
+            }
+            
+            // Set optimal 3D viewing angle for weather assessment
+            setTimeout(() => {
+              console.log('🌦️ AUTO-3D: Setting optimal 3D viewing angle for weather assessment');
+              try {
+                map.easeTo({
+                  pitch: 45, // Good angle to see both terrain and weather
+                  bearing: map.getBearing(), // Keep current bearing
+                  duration: 2000 // 2 second smooth transition
+                });
+                console.log('🌦️ AUTO-3D: ✅ Optimal 3D angle set');
+              } catch (angleError) {
+                console.warn('🌦️ AUTO-3D: Could not set viewing angle:', angleError.message);
+              }
+            }, 500);
+            
+          } else {
+            console.warn('🌦️ AUTO-3D: Map manager not available for 3D mode');
+          }
+          
+        } catch (error) {
+          console.error('🌦️ AUTO-3D: Error enabling auto-3D mode:', error);
+        }
+      }, 1000); // Wait 1 second for flight data to load properly
+      
       // 🚁 DISABLED: Old separate rig weather system - now using unified weather arrows
       // The WeatherCirclesLayer now automatically adds arrows to ALL weather circles (airports, rigs, alternates)
       console.log('🚁 UNIFIED: Using unified weather arrow system (no separate rig weather needed)');
