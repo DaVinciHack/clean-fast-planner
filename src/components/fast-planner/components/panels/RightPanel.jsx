@@ -737,13 +737,12 @@ const RightPanel = React.forwardRef(({
       // Use existing save flight logic
       await handleSaveFlightSubmit(flightData);
     } else {
-      // For existing flights: Save first (with checkbox ticked), then run automation
-      console.log('🎯 AUTO PLAN: Existing flight - saving changes first, then running automation');
-      console.log('🎯 AUTO PLAN: skipWaypointGeneration = true (existing flight - user may have made changes)');
+      // For existing flights: Save first, then run automation WITH weather update
+      console.log('🎯 AUTO PLAN: Existing flight - saving changes first, then running automation with weather update');
+      console.log('🎯 AUTO PLAN: useOnlyProvidedWaypoints = false (allow Palantir to update weather and replan)');
       
-      // For existing flights, always save with skipWaypointGeneration = true
-      // This ensures any user changes (fuel, aircraft, etc.) are saved
-      // and we don't let Palantir add more waypoints
+      // For existing flights in Auto Plan, we want Palantir to update weather and replan
+      // but keep the user's waypoints and route structure
       const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const now = new Date();
       const flightData = {
@@ -756,7 +755,7 @@ const RightPanel = React.forwardRef(({
         rswId: null,
         alternateLocation: alternateRouteData?.name || null, // Include alternate if available
         runAutomation: true,
-        useOnlyProvidedWaypoints: true // Always true for existing flights
+        useOnlyProvidedWaypoints: false // 🔧 FIX: Allow Palantir to update weather and replan for Auto Plan
       };
       
       console.log('🎯 AUTO PLAN: Saving existing flight changes with:', flightData);
@@ -845,6 +844,7 @@ const RightPanel = React.forwardRef(({
         toggleWaypointMode={toggleWaypointMode}
         waypointModeActive={waypointModeActive}
         weatherSegments={weatherSegments}
+        currentFlightId={currentFlightId} // 🔧 FIX: Pass flight ID for Auto Plan detection
       />
       
       {/* Settings Card */}
@@ -953,7 +953,7 @@ const RightPanel = React.forwardRef(({
         waypoints={waypoints}
         selectedAircraft={selectedAircraft}
         isProcessing={false} // TODO: Add processing state
-        flightId={null} // TODO: Add flight ID detection
+        flightId={currentFlightId} // 🔧 FIX: Pass actual flight ID for new vs existing flight detection
       />
     </RightPanelContainer>
     
