@@ -26,6 +26,7 @@ class MapInteractions {
     
     // Bound methods to maintain proper 'this' context
     this.handleMapClick = this.handleMapClick.bind(this);
+    this.handleRightClick = this.handleRightClick.bind(this);
     this.handlePlatformClick = this.handlePlatformClick.bind(this);
     this.handleRouteClick = this.handleRouteClick.bind(this);
     this.setupEventHandlers = this.setupEventHandlers.bind(this);
@@ -109,6 +110,11 @@ class MapInteractions {
         map.off('click', this.handleMapClick);
         map.on('click', this.handleMapClick);
         console.log('Added map click handler');
+        
+        // 🖱️ RIGHT-CLICK: Add separate contextmenu handler for right-click detection
+        map.off('contextmenu', this.handleRightClick);
+        map.on('contextmenu', this.handleRightClick);
+        console.log('Added map right-click (contextmenu) handler');
       }
       
       // Set up platform layer handlers if they exist or when they're created
@@ -392,6 +398,73 @@ class MapInteractions {
       point: e.point,
       nearestPlatform: nearestPlatform
     });
+  }
+  
+  /**
+   * Handle right-click to delete the last waypoint
+   */
+  handleRightClick(e) {
+    // Prevent default browser context menu
+    e.preventDefault();
+    console.log('🖱️ MapInteractions: Right-click contextmenu event received');
+    
+    // LOCK CHECK: Respect editing lock for right-click too
+    if (window.isEditLocked === true) {
+      console.log('🔒 MapInteractions: Ignoring right-click - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
+    // Check if we have waypoints to remove - try multiple sources
+    let waypointManager = this.waypointManager;
+    
+    // If not available directly, try to get from window global
+    if (!waypointManager && window.waypointManager) {
+      waypointManager = window.waypointManager;
+      console.log('🔍 MapInteractions: Using global window.waypointManager');
+    }
+    
+    if (!waypointManager) {
+      console.error('MapInteractions: WaypointManager not available for right-click handling');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('❌ WaypointManager not available', 'error', 2000);
+      }
+      return;
+    }
+    
+    const waypoints = waypointManager.getWaypoints();
+    if (!waypoints || waypoints.length === 0) {
+      console.log('🖱️ MapInteractions: No waypoints to remove');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('No waypoints to remove', 'info', 1500);
+      }
+      return;
+    }
+    
+    // Get the last waypoint
+    const lastWaypoint = waypoints[waypoints.length - 1];
+    const lastIndex = waypoints.length - 1;
+    
+    console.log(`🗑️ MapInteractions: Removing last waypoint "${lastWaypoint.name}" at index ${lastIndex}`);
+    
+    // Remove the last waypoint
+    try {
+      waypointManager.removeWaypoint(lastWaypoint.id, lastIndex);
+      
+      // Show success message
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(`✅ Removed waypoint: ${lastWaypoint.name}`, 'success', 2000);
+      }
+      
+      console.log(`✅ MapInteractions: Successfully removed waypoint "${lastWaypoint.name}"`);
+    } catch (error) {
+      console.error('MapInteractions: Error removing last waypoint:', error);
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('❌ Error removing waypoint', 'error', 2000);
+      }
+    }
   }
   
   /**
