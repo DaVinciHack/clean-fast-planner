@@ -123,6 +123,13 @@ class MapInteractionHandler {
   }
 
   handleMapClick(e) {
+    // RIGHT-CLICK CHECK: Handle right-click to delete last waypoint
+    if (e.originalEvent.button === 2) {
+      console.log('🖱️ MapInteractionHandler: Right-click detected - attempting to delete last waypoint');
+      this.handleRightClick(e);
+      return;
+    }
+    
     // LOCK CHECK: Prevent map clicks when editing is locked
     if (this.isMapClicksDisabled || window.isEditLocked === true) {
       console.log('🔒 MapInteractionHandler: Ignoring click - editing is locked');
@@ -245,6 +252,60 @@ class MapInteractionHandler {
       setTimeout(() => {
         window._processingMapClick = false;
       }, 300);
+    }
+  }
+
+  handleRightClick(e) {
+    // Prevent default browser context menu
+    if (e.originalEvent && e.originalEvent.preventDefault) {
+      e.originalEvent.preventDefault();
+    }
+    
+    // LOCK CHECK: Respect editing lock for right-click too
+    if (this.isMapClicksDisabled || window.isEditLocked === true) {
+      console.log('🔒 MapInteractionHandler: Ignoring right-click - editing is locked');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
+    // Check if we have waypoints to remove
+    if (!this.waypointManager) {
+      console.error('MapInteractionHandler: WaypointManager not available for right-click handling');
+      return;
+    }
+    
+    const waypoints = this.waypointManager.getWaypoints();
+    if (!waypoints || waypoints.length === 0) {
+      console.log('🖱️ MapInteractionHandler: No waypoints to remove');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('No waypoints to remove', 'info', 1500);
+      }
+      return;
+    }
+    
+    // Get the last waypoint
+    const lastWaypoint = waypoints[waypoints.length - 1];
+    const lastIndex = waypoints.length - 1;
+    
+    console.log(`🗑️ MapInteractionHandler: Removing last waypoint "${lastWaypoint.name}" at index ${lastIndex}`);
+    
+    // Remove the last waypoint
+    try {
+      this.waypointManager.removeWaypoint(lastWaypoint.id, lastIndex);
+      
+      // Show success message
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(`Removed waypoint: ${lastWaypoint.name}`, 'success', 2000);
+      }
+      
+      console.log(`✅ MapInteractionHandler: Successfully removed waypoint "${lastWaypoint.name}"`);
+    } catch (error) {
+      console.error('MapInteractionHandler: Error removing last waypoint:', error);
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Error removing waypoint', 'error', 2000);
+      }
     }
   }
 

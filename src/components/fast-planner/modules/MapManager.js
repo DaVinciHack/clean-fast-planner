@@ -132,6 +132,8 @@ class MapManager {
           reject(e); 
         });
 
+        // Note: Context menu handling moved to MapInteractions.js for right-click delete functionality
+
         // Resolve the promise immediately after map instance creation
         resolve(this.map); 
 
