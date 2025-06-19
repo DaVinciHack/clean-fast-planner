@@ -7,6 +7,7 @@ import FinanceCard from './FinanceCard';
 import EvacuationCard from './EvacuationCard';
 import SaveFlightCard from './SaveFlightCard';
 import LoadFlightsCard from './LoadFlightsCard';
+import AutoPlanCard from './AutoPlanCard';
 import MapLayersCard from './MapLayersCard';
 
 export {
@@ -18,5 +19,6 @@ export {
   EvacuationCard,
   SaveFlightCard,
   LoadFlightsCard,
+  AutoPlanCard,
   MapLayersCard
 };

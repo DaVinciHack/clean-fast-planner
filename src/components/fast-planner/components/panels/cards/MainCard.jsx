@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useReserveFuel } from '../../../hooks/useReserveFuel';
 import RegionSelector from '../../controls/RegionSelector';
 import { SaveFlightButton, LoadFlightsButton } from '../../controls';
+import AutoPlanButton from '../../controls/AutoPlanButton';
 import EnhancedStopCardsContainer from '../../flight/stops/EnhancedStopCardsContainer.jsx';
 import '../../flight/stops/StopCards.css';
 
@@ -16,6 +17,7 @@ const MainCard = ({
   onClearRoute,
   onLoadRigData,
   onToggleChart,
+  onAutoPlan, // Add onAutoPlan prop
   chartsVisible,
   aircraftType,
   onAircraftTypeChange,
@@ -193,7 +195,7 @@ const MainCard = ({
       )}
       
       <div className="control-section" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '15px' }}>
-        {/* Save and Load Flight buttons - Side by Side with exactly 7px gap to match left buttons */}
+        {/* Save, Load, and Auto Plan buttons - Side by Side with exactly 7px gap */}
         <div style={{ display: 'flex', width: '100%', gap: '7px' }}>
           <SaveFlightButton
             selectedAircraft={selectedAircraft}
@@ -218,6 +220,15 @@ const MainCard = ({
                 window.LoadingIndicator.updateStatusIndicator(error, 'error');
               }
             }}
+          />
+          <AutoPlanButton
+            selectedAircraft={selectedAircraft}
+            waypoints={waypoints}
+            flightId={null} // TODO: Add flight ID detection
+            style={{ flex: 1, margin: 0 }}
+            onSuccess={handleSaveSuccess}
+            onError={handleSaveError}
+            onAutoPlan={onAutoPlan} // Pass the onAutoPlan function from props
           />
         </div>
       </div>

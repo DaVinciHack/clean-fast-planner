@@ -9,6 +9,7 @@ import {
   EvacuationCard,
   SaveFlightCard,
   LoadFlightsCard,
+  AutoPlanCard,
   MapLayersCard
 } from './cards';
 import '../../FastPlannerStyles.css';
@@ -703,6 +704,67 @@ const RightPanel = React.forwardRef(({
     // Switch back to main card
     handleCardChange('main');
   };
+
+  // Handle Auto Plan action
+  const handleAutoPlan = async (autoPlanData) => {
+    console.log('🎯 AUTO PLAN: Starting auto plan with data:', autoPlanData);
+    
+    const { isNewFlight, hasWaypoints, skipWaypointGeneration } = autoPlanData;
+    
+    if (isNewFlight) {
+      // For new flights: Save first, then run automation
+      console.log('🎯 AUTO PLAN: New flight - saving and running automation');
+      console.log(`🎯 AUTO PLAN: skipWaypointGeneration = ${skipWaypointGeneration} (user ${hasWaypoints ? 'has' : 'has no'} waypoints)`);
+      
+      // Create flight data exactly like SaveFlightCard but with auto-generated name
+      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+      const now = new Date();
+      const flightData = {
+        flightName: `Auto Plan ${timestamp}`, // Use flightName (not flightNumber)
+        etd: now, // Send Date object, not ISO string
+        captainId: null, // No crew for auto-generated flights
+        copilotId: null,
+        medicId: null,
+        soId: null,
+        rswId: null,
+        alternateLocation: alternateRouteData?.name || null, // Include alternate if available
+        runAutomation: true,
+        useOnlyProvidedWaypoints: skipWaypointGeneration // Use correct field name
+      };
+      
+      console.log('🎯 AUTO PLAN: Calling handleSaveFlightSubmit with:', flightData);
+      
+      // Use existing save flight logic
+      await handleSaveFlightSubmit(flightData);
+    } else {
+      // For existing flights: Save first (with checkbox ticked), then run automation
+      console.log('🎯 AUTO PLAN: Existing flight - saving changes first, then running automation');
+      console.log('🎯 AUTO PLAN: skipWaypointGeneration = true (existing flight - user may have made changes)');
+      
+      // For existing flights, always save with skipWaypointGeneration = true
+      // This ensures any user changes (fuel, aircraft, etc.) are saved
+      // and we don't let Palantir add more waypoints
+      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+      const now = new Date();
+      const flightData = {
+        flightName: `Auto Plan Update ${timestamp}`, // Use flightName (not flightNumber)
+        etd: now, // Send Date object, not ISO string
+        captainId: null, // No crew for auto-generated flights
+        copilotId: null,
+        medicId: null,
+        soId: null,
+        rswId: null,
+        alternateLocation: alternateRouteData?.name || null, // Include alternate if available
+        runAutomation: true,
+        useOnlyProvidedWaypoints: true // Always true for existing flights
+      };
+      
+      console.log('🎯 AUTO PLAN: Saving existing flight changes with:', flightData);
+      
+      // Use existing save flight logic
+      await handleSaveFlightSubmit(flightData);
+    }
+  };
   
   // Reference to the RightPanelContainer for triggering card changes
   const rightPanelRef = React.useRef();
@@ -748,6 +810,7 @@ const RightPanel = React.forwardRef(({
         onClearRoute={onClearRoute}
         onLoadRigData={onLoadRigData}
         onToggleChart={onToggleChart}
+        onAutoPlan={handleAutoPlan}
         chartsVisible={chartsVisible}
         aircraftType={aircraftType}
         onAircraftTypeChange={onAircraftTypeChange}
@@ -882,6 +945,15 @@ const RightPanel = React.forwardRef(({
         onCancel={handleLoadFlightsCancel}
         isLoading={false}
         currentRegion={currentRegion?.osdkRegion || currentRegion?.id} // Pass OSDK region for filtering
+      />
+      
+      <AutoPlanCard
+        id="autoplan"
+        onAutoPlan={handleAutoPlan}
+        waypoints={waypoints}
+        selectedAircraft={selectedAircraft}
+        isProcessing={false} // TODO: Add processing state
+        flightId={null} // TODO: Add flight ID detection
       />
     </RightPanelContainer>
     

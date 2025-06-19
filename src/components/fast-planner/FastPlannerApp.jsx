@@ -1211,39 +1211,63 @@ const FastPlannerCore = ({
       // Wait for clear to complete
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Build and set the route from stops using the proper handler
-      // BUT ONLY if we don't have waypoint data (to avoid double loading)
-      const hasWaypointData = (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) ||
-                            (flightData.waypoints && flightData.waypoints.length > 0);
+      // 🚨 CRITICAL FIX: Always check for displayWaypoints in raw flight data first
+      // The issue was that extracted waypoints were incomplete, causing fallback to route string
+      const hasRawDisplayWaypoints = flightData._rawFlight?.displayWaypoints;
+      const hasExtractedWaypoints = (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) ||
+                                  (flightData.waypoints && flightData.waypoints.length > 0);
       
-      if (flightData.stops && flightData.stops.length > 0 && !hasWaypointData) {
-        console.log(`Loading ${flightData.stops.length} stops as route (no waypoint data available)`);
+      console.log('🚨 FLIGHT LOAD DEBUG:', {
+        hasRawDisplayWaypoints: !!hasRawDisplayWaypoints,
+        hasExtractedWaypoints,
+        stopsLength: flightData.stops?.length || 0,
+        rawDisplayWaypoints: hasRawDisplayWaypoints,
+        extractedWaypoints: flightData.waypoints?.length || 0
+      });
+      
+      // 🚨 NEVER use hookAddWaypoint for flight loading - it puts data in route input!
+      // Only process stops as a route string if we have NO waypoint data at all
+      if (flightData.stops && flightData.stops.length > 0 && !hasRawDisplayWaypoints && !hasExtractedWaypoints) {
+        console.log('🚨 FALLBACK: Loading stops as simple route (NO waypoint data found anywhere)');
         
-        // Create a route string by joining the stops
-        const routeString = flightData.stops.join(' ');
-        console.log(`Setting route input to: ${routeString}`);
-        
-        // Set the route input field for display
-        setRouteInput(routeString);
-        
-        // Actually process the route to create waypoints using the hookAddWaypoint function
-        console.log('Processing route string to create waypoints...');
+        // 🚨 CRITICAL: Use direct waypoint manager instead of hookAddWaypoint
+        // hookAddWaypoint puts data in route input field, not waypoint list!
         try {
-          if (hookAddWaypoint) {
-            await hookAddWaypoint(routeString);
-            console.log('Route processing completed via hookAddWaypoint');
-          } else {
-            console.warn('hookAddWaypoint not available, trying alternative method');
-            // Alternative: use the addWaypointDirectImpl if available
-            if (window.addWaypointClean) {
-              await window.addWaypointClean(routeString);
-              console.log('Route processing completed via addWaypointClean');
-            } else {
-              console.error('No waypoint processing function available');
+          if (appManagers.waypointManagerRef?.current) {
+            console.log('🚨 FALLBACK: Using WaypointManager to create waypoints from stops');
+            
+            // Clear existing waypoints first
+            if (typeof appManagers.waypointManagerRef.current.clearWaypoints === 'function') {
+              appManagers.waypointManagerRef.current.clearWaypoints();
             }
+            
+            // Add each stop as a landing stop waypoint
+            for (let i = 0; i < flightData.stops.length; i++) {
+              const stopName = flightData.stops[i];
+              console.log(`🚨 FALLBACK: Adding stop ${i + 1}/${flightData.stops.length}: ${stopName}`);
+              
+              try {
+                if (appManagers.waypointManagerRef.current.addWaypointByName) {
+                  await appManagers.waypointManagerRef.current.addWaypointByName(stopName, {
+                    isWaypoint: false, // This is a landing stop
+                    type: 'LANDING_STOP'
+                  });
+                  console.log(`🚨 FALLBACK: Successfully added stop: ${stopName}`);
+                }
+                
+                // Small delay between additions
+                await new Promise(resolve => setTimeout(resolve, 100));
+              } catch (error) {
+                console.error(`🚨 FALLBACK: Error adding stop ${stopName}:`, error);
+              }
+            }
+            
+            console.log('🚨 FALLBACK: All stops processed via WaypointManager');
+          } else {
+            console.error('🚨 FALLBACK: WaypointManager not available for stop processing');
           }
         } catch (error) {
-          console.error('Error processing route:', error);
+          console.error('🚨 FALLBACK: Error processing stops via WaypointManager:', error);
         }
         
         // Wait for waypoint processing to complete with improved timing
@@ -1694,16 +1718,42 @@ const FastPlannerCore = ({
         console.log('Flight loading complete - returning to main view');
       }, 2000);
       
+      // 🚨 CRITICAL FIX: Ensure waypoint processing uses proper sources
       // Process waypoints - handle both displayWaypoints (strings) and waypoints (objects)
       let waypointsToProcess = [];
       
+      console.log('🚨 WAYPOINT PROCESSING DEBUG:', {
+        'flightData.displayWaypoints': flightData.displayWaypoints,
+        'flightData.waypoints length': flightData.waypoints?.length || 0,
+        '_rawFlight.displayWaypoints': flightData._rawFlight?.displayWaypoints,
+        'stops': flightData.stops
+      });
+      
+      // Priority 1: Use flightData.displayWaypoints if available
       if (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) {
-        console.log('Using displayWaypoints format');
+        console.log('🚨 Using flightData.displayWaypoints format');
         waypointsToProcess = flightData.displayWaypoints;
-      } else if (flightData.waypoints && flightData.waypoints.length > 0) {
-        console.log('Using waypoints format - converting to displayWaypoints format');
-        console.log('Flight waypoints:', flightData.waypoints);
-        console.log('Flight stops:', flightData.stops);
+      } 
+      // Priority 2: Check raw flight displayWaypoints
+      else if (flightData._rawFlight?.displayWaypoints) {
+        console.log('🚨 Using _rawFlight.displayWaypoints format');
+        const rawDisplayWaypoints = flightData._rawFlight.displayWaypoints;
+        
+        if (typeof rawDisplayWaypoints === 'string' && rawDisplayWaypoints.includes('|')) {
+          waypointsToProcess = rawDisplayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
+          console.log('🚨 Parsed raw displayWaypoints:', waypointsToProcess);
+        } else if (Array.isArray(rawDisplayWaypoints)) {
+          waypointsToProcess = rawDisplayWaypoints;
+          console.log('🚨 Using raw displayWaypoints array:', waypointsToProcess);
+        } else {
+          console.log('🚨 Raw displayWaypoints is neither string nor array:', typeof rawDisplayWaypoints, rawDisplayWaypoints);
+        }
+      }
+      // Priority 3: Fall back to extracted waypoints + stops reconstruction  
+      else if (flightData.waypoints && flightData.waypoints.length > 0) {
+        console.log('🚨 Using extracted waypoints format - converting to displayWaypoints format');
+        console.log('🚨 Flight waypoints:', flightData.waypoints);
+        console.log('🚨 Flight stops:', flightData.stops);
         
         // We need to reconstruct the full sequence from the original displayWaypoints
         // Check if we have the raw flight data with the original displayWaypoints
@@ -1755,12 +1805,7 @@ const FastPlannerCore = ({
       if (waypointsToProcess.length > 0) {
         console.log(`Loading flight waypoints with coordinate placement - ${waypointsToProcess.length} waypoints`);
         
-        // Set the route input for display (just the stops)
-        if (flightData.stops && flightData.stops.length > 0) {
-          const routeString = flightData.stops.join(' ');
-          console.log(`Setting route input to: ${routeString}`);
-          setRouteInput(routeString);
-        }
+        // Process the route data (stops are processed via waypoint loading, no need to fill input field)
         
         try {
           // Get the full route coordinates from the raw flight data
