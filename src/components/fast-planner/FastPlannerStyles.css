@@ -782,7 +782,7 @@
   writing-mode: vertical-rl;
   text-orientation: mixed;
   padding: 10px 0;
-  transition: all 0.3s ease;
+  transition: all 0.3s ease; /* Smooth transitions for all properties */
   opacity: 0.95;
   margin-bottom: 10px;
   font-size: 11px;
@@ -794,6 +794,9 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   letter-spacing: 0.5px;
   z-index: 16;
+  
+  /* Ensure smooth transform origin */
+  transform-origin: left center;
 }
 
 /* Left panel tab specific style */
@@ -815,8 +818,19 @@
 
 /* Enhanced shadow for active right panel tab */
 .tab-selector.right-panel-tab.active {
-  /* Smaller, darker upward shadow for active tabs */
-  box-shadow: 0 -6px 10px -3px rgba(0, 0, 0, 1);
+  /* Make right panel active tab even more prominent */
+  transform: translateX(12px); /* Stick out even more for right panel */
+  width: 40px; /* Even wider for right panel */
+  height: 90px; /* Slightly taller for more presence */
+  
+  /* Enhanced visual styling */
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); /* Blue gradient background */
+  box-shadow: 0 -8px 15px -3px rgba(0, 0, 0, 1), 0 0 20px rgba(0, 123, 255, 0.8); /* Stronger shadow and glow */
+  border: 2px solid #007bff; /* Strong blue border */
+  border-right: none;
+  
+  /* Add a left accent border for extra visibility */
+  border-left: 4px solid #00d4ff; /* Bright cyan accent */
 }
 
 .tab-selector:hover {
@@ -824,12 +838,34 @@
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.7);
 }
 
+/* Ensure active tabs maintain their enhanced styling on hover */
+.tab-selector.active:hover {
+  transform: translateX(8px); /* Keep the stick-out effect */
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); /* Keep blue background */
+  box-shadow: 0 -6px 10px -2px rgba(0, 0, 0, 1), 0 0 20px rgba(0, 123, 255, 0.8); /* Enhanced glow on hover */
+}
+
+/* Enhanced hover for right panel active tabs */
+.tab-selector.right-panel-tab.active:hover {
+  transform: translateX(12px); /* Keep right panel stick-out */
+  box-shadow: 0 -8px 15px -3px rgba(0, 0, 0, 1), 0 0 25px rgba(0, 123, 255, 1); /* Even stronger glow */
+}
+
 .tab-selector.active {
   opacity: 1;
-  box-shadow: 0 -6px 10px -2px rgba(0, 0, 0, 1); /* Smaller, darker UPWARD shadow */
-  border: 1px solid rgba(255, 255, 255, 0.3); /* More subtle white border */
+  /* Make active tab stick out more to the right */
+  transform: translateX(8px);
+  width: 36px; /* Increased from default 28px to make it wider */
+  
+  /* Enhanced visual styling for active tab */
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); /* Blue gradient background */
+  box-shadow: 0 -6px 10px -2px rgba(0, 0, 0, 1), 0 0 15px rgba(0, 123, 255, 0.6); /* Add blue glow */
+  border: 2px solid #007bff; /* Stronger blue border */
   border-right: none;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); /* Stronger text shadow */
+  
+  /* Add smooth transition */
+  transition: all 0.3s ease;
 }
 
 /* Tab color classes */
