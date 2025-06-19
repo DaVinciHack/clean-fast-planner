@@ -137,6 +137,9 @@ class RigWeatherGraphics {
         // SIMPLIFIED: Don't auto-cleanup, just update data
         this.rigWeatherData = rigWeatherData;
         
+        // Store for 3D view protection system
+        window.lastRigWeatherData = rigWeatherData;
+        
         // DEBUG: Log what we received
         console.log(`🚁 RECEIVED ${rigWeatherData.length} weather items:`, rigWeatherData.map(r => ({
             name: r.rigName,
