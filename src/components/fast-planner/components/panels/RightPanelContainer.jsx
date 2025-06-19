@@ -120,7 +120,7 @@ const RightPanelContainer = React.forwardRef(({
           key={card.id}
           className={`panel-tab right-panel-tab tab-selector tab-${card.id} ${activeCard === card.id ? 'active' : ''}`}
           style={{ 
-            top: `${90 + (index + 1) * 80}px` // More spacing between buttons
+            top: `${90 + (index + 1) * 95}px` // Increased from 80px to 95px - more vertical spread
           }}
           onClick={() => handleCardChange(card.id)}
           title={card.name}
