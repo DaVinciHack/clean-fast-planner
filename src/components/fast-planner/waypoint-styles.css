@@ -2,7 +2,7 @@
 
 /* Style for navigation waypoints markers */
 .mapboxgl-marker[data-marker-type="waypoint"] {
-  filter: drop-shadow(0 0 2px rgba(255, 0, 221, 0.9));
+  filter: drop-shadow(0 0 2px rgba(218, 165, 32, 0.8)); /* Golden shadow to match pin color */
 }
 
 /* Style for landing stop markers */

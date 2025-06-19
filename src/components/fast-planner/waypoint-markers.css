@@ -14,41 +14,22 @@
   animation: unset !important;
 }
 
-/* Style for waypoint markers */
+/* Style for waypoint markers - removed size/color overrides to let JS settings work */
 .mapboxgl-marker[data-marker-type="waypoint"] {
   /* IMPORTANT: DO NOT override transform here as it breaks positioning */
-  filter: drop-shadow(0 0 2px rgba(64, 224, 208, 0.7)) !important;
-  /* Ensure proper appearance while keeping positioning intact */
-  width: 5px !important;
-  height: 5px !important;
-  background-color: turquoise !important;
-  border-radius: 50% !important;
+  filter: drop-shadow(0 0 2px rgba(218, 165, 32, 0.7)) !important; /* Golden shadow to match pin color */
+  /* Let JavaScript control size and color - don't override with CSS */
   margin: 0 !important;
   padding: 0 !important;
 }
 
-/* Style for waypoint marker SVG fill */
+/* Style for waypoint marker SVG fill - let JavaScript control the colors */
 .mapboxgl-marker[data-marker-type="waypoint"] svg {
-  fill: white !important;
-  stroke: turquoise !important;
-  stroke-width: 1px !important;
   display: block !important; /* Ensure SVG is visible */
+  /* Removed fill and stroke overrides to let JavaScript pin styling work */
 }
 
-/* Add a white dot in the center of waypoint markers */
-.mapboxgl-marker[data-marker-type="waypoint"]::after {
-  content: '';
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  background-color: rgb(178, 73, 220);
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  pointer-events: none;
-}
+/* Removed pseudo-element dot that was conflicting with pin styling */
 
 /* Style for stop markers */
 .mapboxgl-marker[data-marker-type="stop"] {
