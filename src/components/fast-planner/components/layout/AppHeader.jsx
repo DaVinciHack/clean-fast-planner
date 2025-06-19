@@ -166,20 +166,20 @@ const AppHeader = ({
           return { text: `Dep. ${depTime} (${hoursAgo}h ago)`, color: '#888888' };
         }
       } else if (diffMinutes < 1440) {
-        // Today - blue
+        // Today - blue - put countdown in brackets for clarity
         if (diffMinutes < 60) {
-          return { text: `Dep. ${depTime} ${diffMinutes} min`, color: '#2196F3' };
+          return { text: `Dep. ${depTime} (${diffMinutes} min)`, color: '#2196F3' };
         } else {
           const hours = Math.floor(diffMinutes / 60);
           const mins = diffMinutes % 60;
-          return { text: `Dep. ${depTime} ${hours}:${mins.toString().padStart(2, '0')} min`, color: '#2196F3' };
+          return { text: `Dep. ${depTime} (${hours}:${mins.toString().padStart(2, '0')})`, color: '#2196F3' };
         }
       } else {
-        // Future (more than 24h) - green
+        // Future (more than 24h) - green - put countdown in brackets
         const days = Math.floor(diffMinutes / 1440);
         const remainingMins = diffMinutes % 1440;
         const hours = Math.floor(remainingMins / 60);
-        return { text: `Dep. ${depTime} ${days}d ${hours}h`, color: '#4CAF50' };
+        return { text: `Dep. ${depTime} (${days}d ${hours}h)`, color: '#4CAF50' };
       }
     } catch (error) {
       console.error('Error calculating departure time:', error);
