@@ -725,128 +725,67 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
-      // 🌦️ AUTO-3D MODE: Automatically enable 3D mode with lightning and radar when loading flights
+      // 🛰️ IMMEDIATE CLEAN SATELLITE: Switch immediately, no delays, no conflicts
       setTimeout(() => {
-        console.log('🌦️ AUTO-3D: Enabling 3D satellite mode with weather visualization for loaded flight');
+        console.log('🛰️ IMMEDIATE CLEAN SATELLITE: Applying immediate clean satellite view');
         
         try {
-          // Enable 3D terrain mode
           if (window.mapManager?.map) {
             const map = window.mapManager.map;
             
-            console.log('🌦️ AUTO-3D: Current map style:', map.getStyle()?.name || 'Unknown');
+            // Check current style to avoid unnecessary switches
+            const currentStyleUrl = map.getStyle()?.sources ? 
+              (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
             
-            // STEP 1: Switch to satellite style first
-            console.log('🌦️ AUTO-3D: Switching to satellite view');
-            map.setStyle('mapbox://styles/mapbox/satellite-v9');
+            console.log('🛰️ IMMEDIATE: Current style type:', currentStyleUrl);
             
-            // STEP 2: Wait for style to load, then enable 3D terrain
-            map.once('style.load', () => {
-              console.log('🌦️ AUTO-3D: Satellite style loaded, enabling 3D terrain');
+            // Only switch to satellite if we're not already on satellite
+            if (currentStyleUrl !== 'satellite') {
+              console.log('🛰️ IMMEDIATE: Switching to clean satellite (not already on satellite)');
               
-              try {
-                // Add terrain source
-                if (!map.getSource('mapbox-dem')) {
-                  map.addSource('mapbox-dem', {
-                    'type': 'raster-dem',
-                    'url': 'mapbox://mapbox.terrain-rgb',
-                    'tileSize': 512,
-                    'maxzoom': 14
-                  });
-                }
+              // IMMEDIATE switch to satellite for clean look
+              map.setStyle('mapbox://styles/mapbox/satellite-v9');
+              
+              // Handle style load for 3D terrain
+              map.once('style.load', () => {
+                console.log('🛰️ IMMEDIATE: Satellite loaded, adding 3D terrain');
                 
-                // Enable 3D terrain with satellite background
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                console.log('🌦️ AUTO-3D: ✅ 3D satellite terrain enabled');
-                
-                // STEP 3: Set 3D viewing angle after terrain is enabled
-                setTimeout(() => {
-                  console.log('🌦️ AUTO-3D: Setting optimal 3D viewing angle');
-                  try {
-                    map.easeTo({
-                      pitch: 60, // Higher pitch for dramatic 3D effect
-                      bearing: map.getBearing(), // Keep current bearing
-                      duration: 3000 // Longer transition to see the effect
-                    });
-                    console.log('🌦️ AUTO-3D: ✅ 3D viewing angle set');
-                  } catch (angleError) {
-                    console.warn('🌦️ AUTO-3D: Could not set viewing angle:', angleError.message);
-                  }
-                }, 500);
-                
-                // STEP 4: Smart weather layer activation (region-aware)
-                setTimeout(() => {
-                  // Get current region to determine available weather features
-                  const currentRegionName = currentRegion?.name || currentRegion?.osdkRegion || 'Unknown';
-                  console.log('🌦️ AUTO-3D: Current region for weather features:', currentRegionName);
-                  
-                  // DON'T auto-enable radar - it's Gulf-specific and user can manually enable if needed
-                  console.log('🌦️ AUTO-3D: Skipping radar auto-activation (region-specific feature)');
-                  
-                  // Smart lightning activation - only in supported regions
-                  if (window.weatherVisualizationManager) {
-                    console.log('🌦️ AUTO-3D: Checking lightning availability for region:', currentRegionName);
-                    try {
-                      if (window.weatherVisualizationManager.enableLightning) {
-                        // Only enable in regions where lightning data is available
-                        const lightningRegions = ['GULF OF MEXICO', 'NORTH SEA', 'NORWAY'];
-                        const hasLightning = lightningRegions.some(region => 
-                          currentRegionName.toUpperCase().includes(region)
-                        );
-                        
-                        if (hasLightning) {
-                          window.weatherVisualizationManager.enableLightning();
-                          console.log('🌦️ AUTO-3D: ✅ Lightning visualization enabled for', currentRegionName);
-                        } else {
-                          console.log('🌦️ AUTO-3D: Lightning not available for region:', currentRegionName);
-                        }
-                      } else {
-                        console.log('🌦️ AUTO-3D: Lightning visualization not yet implemented');
-                      }
-                    } catch (lightningError) {
-                      console.warn('🌦️ AUTO-3D: Could not enable lightning:', lightningError.message);
-                    }
-                  }
-                  
-                  // Focus on maintaining 3D view stability
-                  console.log('🌦️ AUTO-3D: Weather layers configured, maintaining 3D view');
-                  
-                  // PROTECTION: Re-establish 3D view after flight loading completes
-                  // (Flight loading sometimes resets the view back to vertical)
-                  setTimeout(() => {
-                    console.log('🌦️ AUTO-3D: PROTECTION - Re-establishing 3D view after flight loading');
-                    try {
-                      const currentPitch = map.getPitch();
-                      console.log('🌦️ AUTO-3D: Current pitch after flight loading:', currentPitch);
-                      
-                      if (currentPitch < 30) { // If it went back to flat/low angle
-                        console.log('🌦️ AUTO-3D: View was reset, restoring 3D angle');
-                        map.easeTo({
-                          pitch: 45, // Slightly lower than initial to be less aggressive
-                          bearing: map.getBearing(),
-                          duration: 2000
-                        });
-                        console.log('🌦️ AUTO-3D: ✅ 3D view protection activated');
-                      } else {
-                        console.log('🌦️ AUTO-3D: 3D view maintained, no protection needed');
-                      }
-                    } catch (protectionError) {
-                      console.warn('🌦️ AUTO-3D: View protection failed:', protectionError.message);
-                    }
-                  }, 3000); // Wait 3 seconds after all flight loading is done
-                }, 1000);
-                
-              } catch (terrainError) {
-                console.error('🌦️ AUTO-3D: Error enabling 3D terrain:', terrainError);
-              }
-            });
-            
-            // FALLBACK: If style doesn't load within 5 seconds, try enabling terrain anyway
-            setTimeout(() => {
-              const currentTerrain = map.getTerrain();
-              if (!currentTerrain) {
-                console.log('🌦️ AUTO-3D: FALLBACK - Enabling terrain without style change');
                 try {
+                  // Add terrain source
+                  if (!map.getSource('mapbox-dem')) {
+                    map.addSource('mapbox-dem', {
+                      'type': 'raster-dem',
+                      'url': 'mapbox://mapbox.terrain-rgb',
+                      'tileSize': 512,
+                      'maxzoom': 14
+                    });
+                  }
+                  
+                  // Enable 3D terrain
+                  map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                  console.log('🛰️ IMMEDIATE: ✅ 3D terrain enabled');
+                  
+                  // Gentle 3D angle (no aggressive movements)
+                  setTimeout(() => {
+                    map.easeTo({
+                      pitch: 30, // Gentler angle to avoid conflicts
+                      bearing: map.getBearing(),
+                      duration: 2000
+                    });
+                    console.log('🛰️ IMMEDIATE: ✅ Gentle 3D angle applied');
+                  }, 300);
+                  
+                } catch (terrainError) {
+                  console.warn('🛰️ IMMEDIATE: Error adding terrain:', terrainError.message);
+                }
+              });
+              
+            } else {
+              console.log('🛰️ IMMEDIATE: Already on satellite, just ensuring 3D terrain');
+              
+              // Already on satellite, just ensure 3D terrain is enabled
+              try {
+                if (!map.getTerrain()) {
                   if (!map.getSource('mapbox-dem')) {
                     map.addSource('mapbox-dem', {
                       'type': 'raster-dem',
@@ -856,21 +795,19 @@ const RightPanel = React.forwardRef(({
                     });
                   }
                   map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                  console.log('🌦️ AUTO-3D: ✅ Fallback terrain enabled');
-                } catch (fallbackError) {
-                  console.error('🌦️ AUTO-3D: Fallback terrain failed:', fallbackError);
+                  console.log('🛰️ IMMEDIATE: ✅ Added 3D terrain to existing satellite');
                 }
+              } catch (terrainError) {
+                console.warn('🛰️ IMMEDIATE: Error adding terrain to existing satellite:', terrainError.message);
               }
-            }, 5000);
+            }
             
-          } else {
-            console.warn('🌦️ AUTO-3D: Map manager not available for 3D mode');
           }
           
         } catch (error) {
-          console.error('🌦️ AUTO-3D: Error enabling auto-3D mode:', error);
+          console.warn('🛰️ IMMEDIATE: Error in immediate satellite mode:', error.message);
         }
-      }, 1500); // Wait 1.5 seconds for flight data to load properly
+      }, 500); // Very short delay just to let flight loading start
       
       // 🚁 DISABLED: Old separate rig weather system - now using unified weather arrows
       // The WeatherCirclesLayer now automatically adds arrows to ALL weather circles (airports, rigs, alternates)
