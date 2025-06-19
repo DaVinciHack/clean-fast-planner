@@ -30,6 +30,9 @@ import {
 // Import GlassMenuDock for flight-loaded controls
 import GlassMenuDock from './components/controls/GlassMenuDock';
 
+// Import FlightWizard for guided flight planning
+import FlightWizard from './components/wizard/FlightWizard';
+
 // Import MapZoomHandler for waypoint display
 import MapZoomHandler from './components/map/MapZoomHandler';
 
@@ -89,6 +92,21 @@ const FastPlannerCore = ({
   // State for tracking current loaded flight for weather segments
   const [currentFlightId, setCurrentFlightId] = useState(null);
   const [loadedFlightData, setLoadedFlightData] = useState(null); // Track loaded flight data for AppHeader
+  
+  // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
+  const [isWizardVisible, setIsWizardVisible] = useState(false);
+  
+  // Check if wizard should show on load (first time users)
+  useEffect(() => {
+    const wizardDisabled = localStorage.getItem('fastplanner-wizard-disabled');
+    if (!wizardDisabled && isAuthenticated) {
+      // Show wizard after a brief delay to let the app load
+      const timer = setTimeout(() => {
+        setIsWizardVisible(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated]);
   
   // DEBUG: Track loadedFlightData state changes
   useEffect(() => {
@@ -2500,8 +2518,301 @@ const FastPlannerCore = ({
   const handleLoadCard = () => handleCardChange('loadflights');
   const handleLayersCard = () => handleCardChange('maplayers');
 
+  // 🧙‍♂️ WIZARD HANDLERS: Flight planning wizard functionality
+  const handleWizardComplete = useCallback((flightData) => {
+    console.log('🧙‍♂️ Wizard completed with flight data:', flightData);
+    
+    // Set aircraft if selected
+    if (flightData.aircraft) {
+      setAircraftRegistration(flightData.aircraft.registration);
+      setSelectedAircraft(flightData.aircraft);
+    } else if (flightData.aircraftType) {
+      setAircraftType(flightData.aircraftType);
+    }
+    
+    // Set departure time if provided
+    if (flightData.departureTime) {
+      console.log('🧙‍♂️ Setting departure time:', flightData.departureTime);
+      setFlightSettings(prev => ({
+        ...prev,
+        etd: new Date(flightData.departureTime)
+      }));
+    }
+    
+    // Show success message
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator(
+        `✈️ Flight created: ${flightData.departure?.name} → ${flightData.destination?.name}`, 
+        'success', 
+        3000
+      );
+    }
+    
+    // If auto-run is requested, trigger auto-plan after React state updates
+    if (flightData.autoRun) {
+      console.log('🧙‍♂️ Auto-planning flight...');
+      
+      // Wait for React state updates to process before triggering automation
+      setTimeout(() => {
+        console.log('🧙‍♂️ Triggering AutoPlan after state updates');
+        console.log('🧙‍♂️ Current waypoints:', waypoints.length);
+        console.log('🧙‍♂️ Current selectedAircraft:', selectedAircraft);
+        
+        // Switch to autoplan card
+        if (rightPanelRef.current && rightPanelRef.current.handleCardChange) {
+          rightPanelRef.current.handleCardChange('autoplan');
+        }
+        
+        // Wait a bit more for card switch, then trigger
+        setTimeout(() => {
+          const autoPlanButton = document.querySelector('#autoplan button');
+          if (autoPlanButton) {
+            console.log('🧙‍♂️ Found AutoPlan button, clicking it');
+            autoPlanButton.click();
+          } else {
+            console.warn('🧙‍♂️ AutoPlan button not found, using function call');
+            const isNewFlight = true;
+            const hasWaypoints = waypoints && waypoints.length > 0;
+            const autoPlanData = { isNewFlight, hasWaypoints, skipWaypointGeneration: hasWaypoints };
+            
+            if (rightPanelRef.current && rightPanelRef.current.handleAutoPlan) {
+              rightPanelRef.current.handleAutoPlan(autoPlanData);
+            }
+          }
+        }, 500);
+      }, 1000);
+    }
+  }, [setWaypoints, setAircraftRegistration, setSelectedAircraft]);
+  
+  const handleWizardSkip = useCallback(() => {
+    console.log('🧙‍♂️ Wizard skipped - using manual mode');
+    setIsWizardVisible(false);
+  }, []);
+  
+  const handleWizardClose = useCallback(() => {
+    console.log('🧙‍♂️ Wizard closed');
+    setIsWizardVisible(false);
+  }, []);
+  
+  // Real search function for wizard using existing platform data
+  const handleWizardSearch = useCallback(async (searchTerm) => {
+    console.log('🧙‍♂️ Wizard: Searching for:', searchTerm);
+    
+    if (!searchTerm || !searchTerm.trim()) {
+      return [];
+    }
+    
+    const normalizedSearch = searchTerm.toLowerCase().trim();
+    
+    // Get real platforms data from PlatformManager
+    const platformManager = platformManagerRef?.current;
+    if (!platformManager) {
+      console.warn('🧙‍♂️ Wizard: PlatformManager not available');
+      return [];
+    }
+    
+    // Get raw OSDK data with all fields for comprehensive search
+    const rawOSDKData = platformManager.getRawOSDKData() || [];
+    const osdkWaypoints = platformManager.getOsdkWaypoints() || [];
+    
+    // Use raw OSDK data which has all the fields (locationDescription, LOCATION NOTES, etc.)
+    const allLocations = [...rawOSDKData, ...osdkWaypoints];
+    
+    console.log(`🧙‍♂️ Wizard: Searching ${allLocations.length} real locations`);
+    
+    // DEBUG: Let's see what fields we have for a few sample locations
+    console.log('🔍 DEBUG: Sample of location data structure:');
+    allLocations.slice(0, 3).forEach((loc, i) => {
+      console.log(`Location ${i + 1}:`, {
+        name: loc.name,
+        locationDescription: loc.locationDescription,
+        'LOCATION NOTES': loc['LOCATION NOTES'],
+        locationNotes: loc.locationNotes,
+        'LOC ALIAS': loc['LOC ALIAS'], 
+        locAlias: loc.locAlias,
+        allKeys: Object.keys(loc)
+      });
+    });
+    
+    // DEBUG: Specifically search for anything with "delta" in any field
+    const deltaMatches = allLocations.filter(loc => {
+      const allValues = Object.values(loc).join(' ').toLowerCase();
+      return allValues.includes('delta');
+    });
+    console.log(`🔍 DEBUG: Found ${deltaMatches.length} locations containing "delta":`, deltaMatches.map(loc => ({
+      name: loc.name,
+      matchingFields: Object.entries(loc).filter(([key, value]) => 
+        typeof value === 'string' && value.toLowerCase().includes('delta')
+      )
+    })));
+    
+    // Enhanced hierarchical search like the existing fuzzy search
+    const searchResults = [];
+    
+    // 1. EXACT MATCH: locName (primary name field)
+    allLocations.forEach(location => {
+      const name = (location.locName || location.name || '').toLowerCase();
+      if (name && name === normalizedSearch) {
+        searchResults.push({
+          location,
+          matchType: 'exact',
+          matchField: 'locName',
+          priority: 1
+        });
+      }
+    });
+    
+    // 2. EXACT MATCH: locationDescription 
+    if (searchResults.length === 0) {
+      allLocations.forEach(location => {
+        const description = (location.locationDescription || '').toLowerCase();
+        if (description === normalizedSearch) {
+          searchResults.push({
+            location,
+            matchType: 'exact', 
+            matchField: 'locationDescription',
+            priority: 2
+          });
+        }
+      });
+    }
+    
+    // 3. EXACT MATCH: LOCATION NOTES
+    if (searchResults.length === 0) {
+      allLocations.forEach(location => {
+        const locationNotes = (location['LOCATION NOTES'] || location.locationNotes || '').toLowerCase();
+        if (locationNotes === normalizedSearch) {
+          searchResults.push({
+            location,
+            matchType: 'exact',
+            matchField: 'locationNotes', 
+            priority: 3
+          });
+        }
+      });
+    }
+    
+    // 4. EXACT MATCH: LOC ALIAS
+    if (searchResults.length === 0) {
+      allLocations.forEach(location => {
+        const locAlias = (location['LOC ALIAS'] || location.locAlias || '').toLowerCase();
+        if (locAlias === normalizedSearch) {
+          searchResults.push({
+            location,
+            matchType: 'exact',
+            matchField: 'locAlias',
+            priority: 4
+          });
+        }
+      });
+    }
+    
+    // 5. STARTS WITH: locName
+    if (searchResults.length === 0) {
+      allLocations.forEach(location => {
+        const name = (location.locName || location.name || '').toLowerCase();
+        if (name && name.startsWith(normalizedSearch)) {
+          searchResults.push({
+            location,
+            matchType: 'startsWith',
+            matchField: 'locName', 
+            priority: 5
+          });
+        }
+      });
+    }
+    
+    // 6. CONTAINS: locName, locationDescription, LOCATION NOTES, LOC ALIAS, or type
+    if (searchResults.length === 0) {
+      allLocations.forEach(location => {
+        const name = (location.locName || location.name || '').toLowerCase();
+        const description = (location.locationDescription || '').toLowerCase();
+        const locationNotes = (location['LOCATION NOTES'] || location.locationNotes || '').toLowerCase();
+        const locAlias = (location['LOC ALIAS'] || location.locAlias || '').toLowerCase();
+        const type = (location.type || location.locationType || '').toLowerCase();
+        
+        if (name.includes(normalizedSearch) || 
+            description.includes(normalizedSearch) ||
+            locationNotes.includes(normalizedSearch) ||
+            locAlias.includes(normalizedSearch) ||
+            type.includes(normalizedSearch)) {
+          searchResults.push({
+            location,
+            matchType: 'contains',
+            matchField: name.includes(normalizedSearch) ? 'locName' : 
+                       description.includes(normalizedSearch) ? 'locationDescription' :
+                       locationNotes.includes(normalizedSearch) ? 'locationNotes' :
+                       locAlias.includes(normalizedSearch) ? 'locAlias' : 'type',
+            priority: 6
+          });
+        }
+      });
+    }
+    
+    // Sort by priority and limit to 5 results
+    const results = searchResults
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 5)
+      .map(result => {
+        const primaryName = result.location.locName || result.location.name;
+        let displayName = primaryName;
+        
+        // If match was found in a field other than the primary name, show what was matched
+        if (result.matchField !== 'locName' && primaryName) {
+          const matchedValue = (() => {
+            switch (result.matchField) {
+              case 'locationDescription':
+                return result.location.locationDescription;
+              case 'locationNotes':
+                return result.location['LOCATION NOTES'] || result.location.locationNotes;
+              case 'locAlias':
+                return result.location['LOC ALIAS'] || result.location.locAlias;
+              default:
+                return null;
+            }
+          })();
+          
+          if (matchedValue && matchedValue.toLowerCase() !== primaryName.toLowerCase()) {
+            displayName = `${primaryName} (${matchedValue})`;
+          }
+        }
+        
+        return {
+          name: displayName, // Display name with brackets for user
+          originalName: primaryName, // Original locName for system use
+          type: result.location.type || result.location.locationType || 'Location',
+          id: result.location.id || result.location.locName || result.location.name,
+          coordinates: result.location.geoPoint?.coordinates || result.location.coordinates,
+          lat: result.location.geoPoint?.coordinates ? result.location.geoPoint.coordinates[1] : 
+               result.location.coordinates ? result.location.coordinates[1] : result.location.lat,
+          lng: result.location.geoPoint?.coordinates ? result.location.geoPoint.coordinates[0] : 
+               result.location.coordinates ? result.location.coordinates[0] : result.location.lng,
+          matchType: result.matchType,
+          matchField: result.matchField,
+          locationDescription: result.location.locationDescription || ''
+        };
+      });
+    
+    console.log(`🧙‍♂️ Wizard: Found ${results.length} real matches`);
+    return results;
+  }, [platformManagerRef]);
+
   return (
     <>
+      {/* Flight Planning Wizard for Non-Aviation Users */}
+      <FlightWizard
+        isVisible={isWizardVisible}
+        onClose={handleWizardClose}
+        onComplete={handleWizardComplete}
+        onSkip={handleWizardSkip}
+        searchLocation={handleWizardSearch}
+        onAddWaypoint={hookAddWaypoint}
+        aircraftTypes={aircraftTypes}
+        aircraftsByType={aircraftsByType}
+        selectedAircraft={selectedAircraft}
+        onAircraftSelect={setSelectedAircraft}
+      />
+      
       {/* RegionAircraftConnector removed - using only event-based region sync */}
       <div className="fast-planner-container">
         
@@ -2609,8 +2920,6 @@ const FastPlannerCore = ({
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
-          waypoints={waypoints} // Pass current flight waypoints for AutoFlight
-          routeStats={routeStats} // Pass route statistics for AutoFlight
           ref={rightPanelRef} // Add ref to access card change functionality
         />
       </div>

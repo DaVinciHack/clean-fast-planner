@@ -256,7 +256,7 @@ const LeftPanel = ({
             return (
               <div 
                 className={`stop-entry ${isRecentlyAdded(waypointId) ? 'highlight-new' : ''}`}
-                key={waypointId} 
+                key={`waypoint-${index}-${waypointId}`}
                 data-id={waypointId} 
                 data-waypoint={isWaypointType ? 'true' : 'false'}
                 draggable={true}
@@ -589,7 +589,7 @@ const LeftPanel = ({
               
               return (
                 <div
-                  key={locationId}
+                  key={`favorite-${index}-${locationId}`}
                   className={`favorite-item ${recentFavorites[locationId] ? 'highlight-new' : ''}`}
                   style={{ 
                     display: "flex", 
