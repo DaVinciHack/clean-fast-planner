@@ -2311,23 +2311,46 @@ const FastPlannerCore = ({
   const [showEditButton, setShowEditButton] = useState(false);
   const [currentMapMode, setCurrentMapMode] = useState('dark'); // Track current map style
   
-  // 🎯 SMART EDIT: Listen for flight load events to show edit button
+  // 🎯 SMART TOGGLE: Listen for flight load events and detect final mode
   useEffect(() => {
     const handleFlightLoadComplete = (event) => {
-      console.log('🎯 SMART EDIT: Flight load event received:', event.detail?.flightName);
+      console.log('🎯 SMART TOGGLE: Flight load event received:', event.detail?.flightName);
       
-      // Show edit button when flight loads (simplified for now)
+      // Show button and detect mode after flight loads with 3D transition
       setTimeout(() => {
-        console.log('🎯 SMART EDIT: ✅ Flight loaded via event - showing edit button');
+        console.log('🎯 SMART TOGGLE: ✅ Flight loaded - showing toggle button');
         setShowEditButton(true);
+        
+        // Detect the final mode after 3D transition completes
+        setTimeout(() => {
+          const mapManager = mapManagerRef?.current;
+          if (mapManager && mapManager.getCurrentStyle) {
+            const currentStyle = mapManager.getCurrentStyle();
+            console.log('🎯 SMART TOGGLE: Detected final mode after flight load:', currentStyle);
+            setCurrentMapMode(currentStyle);
+          }
+        }, 3000); // Wait for 3D transition to complete
       }, 1000);
+    };
+    
+    // 🎯 SMART TOGGLE: Listen for map mode changes from flight loading
+    const handleMapModeChanged = (event) => {
+      console.log('🎯 SMART TOGGLE: Map mode changed event received:', event.detail);
+      const { mode, source } = event.detail;
+      
+      if (source === 'flight-loading') {
+        console.log('🎯 SMART TOGGLE: ✅ Flight loading completed 3D transition - updating button to show "Edit"');
+        setCurrentMapMode(mode); // This will make the button show "Edit" instead of "Satellite"
+      }
     };
     
     // Listen for custom flight load events
     window.addEventListener('flight-loaded', handleFlightLoadComplete);
+    window.addEventListener('map-mode-changed', handleMapModeChanged);
     
     return () => {
       window.removeEventListener('flight-loaded', handleFlightLoadComplete);
+      window.removeEventListener('map-mode-changed', handleMapModeChanged);
     };
   }, []); // No dependencies to avoid conflicts
 
@@ -2344,7 +2367,7 @@ const FastPlannerCore = ({
   
   // 🎯 SMART TOGGLE: Toggle between satellite and edit modes (like 3D toggle button)
   const handleToggleMode = async () => {
-    console.log('🎯 SMART TOGGLE: Using exact MapLayersCard 3D toggle logic...');
+    console.log('🎯 SMART TOGGLE: Toggle clicked! Current mode:', currentMapMode);
     
     try {
       const mapManager = mapManagerRef?.current;
@@ -2353,22 +2376,25 @@ const FastPlannerCore = ({
         return;
       }
       
-      // Toggle between dark and 3D style (same as MapLayersCard)
-      const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
-      const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+      // Use our tracked state instead of map detection (more reliable)
+      const newStyle = currentMapMode === '3d' ? 'dark' : '3d';
       
-      console.log(`🎯 SMART TOGGLE: Switching from ${currentStyle} to ${newStyle}`);
+      console.log(`🎯 SMART TOGGLE: Switching from ${currentMapMode} to ${newStyle}`);
+      
+      // Update state immediately to prevent double-clicks
+      setCurrentMapMode(newStyle);
       
       await mapManager.switchMapStyle(newStyle);
       
       // CRITICAL: Reset camera to top-down view when switching back to 2D
       const map = mapManager.getMap();
       if (newStyle === 'dark' && map) {
-        console.log('🎯 SMART TOGGLE: 📐 Resetting camera to top-down 2D view');
+        console.log('🎯 SMART TOGGLE: 📐 Switching to EDIT MODE - resetting camera to top-down 2D view');
         
         // First reset terrain to avoid conflicts
         if (map.getTerrain()) {
           map.setTerrain(null);
+          console.log('🎯 SMART TOGGLE: Removed 3D terrain');
         }
         
         // Then smooth transition to vertical 
@@ -2378,7 +2404,10 @@ const FastPlannerCore = ({
             bearing: 0,   // North up
             duration: 1200 // Longer duration for smoother animation
           });
+          console.log('🎯 SMART TOGGLE: Applied top-down camera for edit mode');
         }, 100); // Small delay after terrain removal
+      } else if (newStyle === '3d') {
+        console.log('🎯 SMART TOGGLE: 🛰️ Switching to SATELLITE MODE - maintaining 3D view');
       }
       
       console.log(`🎯 SMART TOGGLE: 🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);

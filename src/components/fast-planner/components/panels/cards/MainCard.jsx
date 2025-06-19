@@ -5,6 +5,7 @@ import { SaveFlightButton, LoadFlightsButton } from '../../controls';
 import AutoPlanButton from '../../controls/AutoPlanButton';
 import EnhancedStopCardsContainer from '../../flight/stops/EnhancedStopCardsContainer.jsx';
 import '../../flight/stops/StopCards.css';
+import FAASubmissionButton from '../../../../faa/FAASubmissionButton.jsx';
 
 /**
  * MainCard Component
@@ -336,88 +337,79 @@ const MainCard = ({
           >
             Clear Route
           </button>
+          <div style={{ flex: 1, height: '24px' }}>
+            <FAASubmissionButton
+              flightPlanData={{
+                // Aircraft Information
+                tailNumber: aircraftRegistration || selectedAircraft?.registration || "N-UNKNOWN",
+                aircraftType: aircraftType || selectedAircraft?.type || "UNK",
+                wakeCategory: selectedAircraft?.wakeCategory || "L",
+                equipment: selectedAircraft?.equipment || "SG",
+                
+                // Route Information  
+                departure: {
+                  airport: waypoints.length > 0 ? (waypoints[0]?.name || waypoints[0]?.id || "UNKN") : "UNKN",
+                  time: new Date().toISOString().substr(11, 5).replace(':', '') // Current time in HHMM
+                },
+                destination: {
+                  airport: waypoints.length > 1 ? (waypoints[waypoints.length - 1]?.name || waypoints[waypoints.length - 1]?.id || "UNKN") : "UNKN",
+                  estimatedTime: routeStats?.totalTime ? Math.floor(routeStats.totalTime / 60).toString().padStart(2, '0') + (routeStats.totalTime % 60).toString().padStart(2, '0') : "0100"
+                },
+                route: waypoints.length > 2 ? waypoints.slice(1, -1).map(wp => wp.name || wp.id || 'WPT').join(' ') : "DCT",
+                altitude: "1000", // Default helicopter altitude
+                airspeed: selectedAircraft?.cruiseSpeed || "120", // Use aircraft cruise speed or default
+                flightRules: "VFR", // Default for helicopter ops
+                
+                // Pilot Information
+                pilotName: authUserName || "Unknown Pilot",
+                pilotPhone: "",
+                
+                // Passengers & Fuel
+                personsOnBoard: Math.ceil(passengerWeight / 170) || 1, // Estimate from passenger weight
+                fuelOnBoard: routeStats?.fuelRequired ? Math.floor(routeStats.fuelRequired / 60).toString().padStart(2, '0') + Math.floor((routeStats.fuelRequired % 60) * 60 / 60).toString().padStart(2, '0') : "0400",
+                endurance: selectedAircraft?.endurance || "0600", // 6 hours default
+                
+                // Emergency Equipment (standard for commercial helicopters)
+                emergencyEquipment: "R/V/S/J", // Radio, VHF, Survival equipment, Jackets
+                lifeJackets: "L/F/U/V", // Light, Fluorescein, UHF, VHF
+                dinghies: "D/4/C", // Dinghies, 4 persons, Color
+                
+                // Operational Information
+                remarks: `BRISTOW HELICOPTER ${routeStats?.distance ? Math.round(routeStats.distance) + 'NM' : ''}`,
+                alternateAirport: waypoints.length > 2 ? (waypoints[1]?.name || waypoints[1]?.id) : undefined
+              }}
+              onSubmissionSuccess={(flightPlanId) => {
+                console.log('✈️ Flight plan submitted successfully:', flightPlanId);
+              }}
+              style={{
+                width: '100%',
+                height: '24px',
+                fontSize: '11px',
+                fontWeight: '500',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                background: 'linear-gradient(to bottom, #1f2937, #111827)',
+                color: '#ffffff',
+                border: '1px solid #28a745',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            />
+          </div>
+          {/* Manual reload button - hidden by default but useful for development */}
           <button 
-            onClick={() => {
-              console.log('🔄 TOGGLE ALL: Button clicked, current state:', chartsVisible);
-              
-              // Call the original toggle function
-              onToggleChart();
-              
-              // Emit global events to notify MapLayersCard about the state change
-              const newState = !chartsVisible;
-              console.log(`🔄 TOGGLE ALL: Emitting events for new state: ${newState}`);
-              
-              // List of layer types that should be affected by "Show/Hide All Layers"
-              const layerTypes = [
-                'platforms', 'airfields', 'movablePlatforms', 'blocks', 
-                'bases', 'fuelAvailable', 'grid'
-              ];
-              
-              // Emit master toggle event to notify MapLayersCard
-              setTimeout(() => {
-                const masterEvent = new CustomEvent('master-layer-toggle', {
-                  detail: { 
-                    source: 'mainCard-master', 
-                    allVisible: newState,
-                    timestamp: Date.now()
-                  }
-                });
-                window.dispatchEvent(masterEvent);
-                console.log('🔄 TOGGLE ALL: Emitted master toggle event to MapLayersCard:', newState);
-              }, 10);
-
-              // Emit events for each layer type
-              layerTypes.forEach(layerType => {
-                const event = new CustomEvent('layer-visibility-changed', {
-                  detail: { layerType, visible: newState }
-                });
-                window.dispatchEvent(event);
-                console.log(`🔄 TOGGLE ALL: Emitted event for ${layerType}: ${newState}`);
-              });
-            }}
-            style={{
-              flex: 1,
-              background: 'linear-gradient(to bottom, #1f2937, #111827)',
-              color: '#ffffff',
-              border: chartsVisible ? '1px solid #3b82f6' : '1px solid #6b7280',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              fontSize: '11px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            onMouseOver={(e) => {
-              if (chartsVisible) {
-                e.target.style.background = '#3b82f6';
-                e.target.style.borderColor = '#3b82f6';
-              } else {
-                e.target.style.background = '#6b7280';
-                e.target.style.borderColor = '#6b7280';
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = 'linear-gradient(to bottom, #1f2937, #111827)';
-              e.target.style.borderColor = chartsVisible ? '#3b82f6' : '#6b7280';
-            }}
+            id="reload-data" 
+            className="control-button" 
+            onClick={onLoadRigData}
+            disabled={rigsLoading}
+            style={{ display: 'none' }} /* Hidden by default */
           >
-            {chartsVisible ? 'Hide All Layers' : 'Show All Layers'}
+            {rigsLoading ? 'Loading...' : 'Reload Data'}
           </button>
         </div>
-        {/* Manual reload button - hidden by default but useful for development */}
-        <button 
-          id="reload-data" 
-          className="control-button" 
-          onClick={onLoadRigData}
-          disabled={rigsLoading}
-          style={{ display: 'none' }} /* Hidden by default */
-        >
-          {rigsLoading ? 'Loading...' : 'Reload Data'}
-        </button>
       </div>
       
       <div className="control-section">
