@@ -704,8 +704,8 @@ class WaypointManager {
       const marker = new window.mapboxgl.Marker({ 
         color: isWaypoint ? "#DAA520" : "#FF4136", // Golden for waypoints, red for stops
         draggable: true,
-        scale: isWaypoint ? 0.25 : 0.5, // Make waypoints even smaller and sharper
-        anchor: 'bottom' // Use bottom anchor for proper pin positioning
+        scale: isWaypoint ? 0.4 : 0.5, // Sharp size - 0.4 for waypoints, 0.5 for stops
+        anchor: 'center' // Use center anchor for perfect line alignment
       })
       .setLngLat(coords)
       .addTo(map);
