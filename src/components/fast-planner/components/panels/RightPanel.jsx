@@ -969,8 +969,10 @@ const RightPanel = React.forwardRef(({
       console.log(`🎯 AUTO PLAN: skipWaypointGeneration = ${skipWaypointGeneration} (user ${hasWaypoints ? 'has' : 'has no'} waypoints)`);
       
       // Create flight data exactly like SaveFlightCard but with auto-generated name
-      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const now = new Date();
+      
+      // Create short date format: YY-MM-DD, HH:MM
+      const shortDate = now.toISOString().slice(2, 16).replace('T', ', ');
       
       // CRITICAL FIX: Build locations array just like regular save flight
       console.log('🎯 AUTO PLAN: All waypoints before filtering:', waypoints);
@@ -1004,8 +1006,13 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Built locations array:', locations);
       
+      // Generate flight name using departure + first location + short date format
+      const departure = locations[0] || 'Unknown';
+      const firstLocation = locations[1] || 'Direct';
+      const flightName = `${departure} ${firstLocation} ${shortDate}`;
+      
       const flightData = {
-        flightName: `Auto Plan ${timestamp}`, // Use flightName (not flightNumber)
+        flightName: flightName, // Use departure + first location + short date format
         locations: locations, // CRITICAL FIX: Add locations array
         waypoints: waypoints, // Add waypoints for processing
         etd: now, // Send Date object, not ISO string
@@ -1030,8 +1037,10 @@ const RightPanel = React.forwardRef(({
       
       // For existing flights in Auto Plan, we want Palantir to update weather and replan
       // but keep the user's waypoints and route structure
-      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       const now = new Date();
+      
+      // Create short date format: YY-MM-DD, HH:MM
+      const shortDate = now.toISOString().slice(2, 16).replace('T', ', ');
       
       // CRITICAL FIX: Build locations array for existing flights too
       const locations = waypoints
@@ -1058,8 +1067,13 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Built locations array for existing flight:', locations);
       
+      // Generate flight name using departure + first location + short date format
+      const departure = locations[0] || 'Unknown';
+      const firstLocation = locations[1] || 'Direct';
+      const flightName = `${departure} ${firstLocation} ${shortDate}`;
+      
       const flightData = {
-        flightName: `Auto Plan Update ${timestamp}`, // Use flightName (not flightNumber)
+        flightName: flightName, // Use departure + first location + short date format
         locations: locations, // CRITICAL FIX: Add locations array
         waypoints: waypoints, // Add waypoints for processing
         etd: now, // Send Date object, not ISO string
