@@ -1,0 +1,30 @@
+class a{constructor(e){this.map=e,this.isActive=!1,this.isDragging=!1,this.lastMousePos=null,this.constraints={minPitch:0,maxPitch:85,minZoom:1,maxZoom:20,pitchSensitivity:.3,bearingSensitivity:.5,zoomSensitivity:.1},this.camera={pitch:0,bearing:0,zoom:6,center:null},console.log("🎮 Enhanced 3D Controls initialized")}activate(){!this.map||this.isActive||(this.isActive=!0,this.camera.pitch=this.map.getPitch(),this.camera.bearing=this.map.getBearing(),this.camera.zoom=this.map.getZoom(),this.camera.center=this.map.getCenter(),this.addMouseControls(),this.addKeyboardControls(),this.addScrollControls(),this.createControlPanel(),console.log("✅ Enhanced 3D controls activated"))}deactivate(){this.isActive&&(this.isActive=!1,this.removeEventListeners(),this.removeControlPanel(),this.map.easeTo({pitch:0,bearing:0,duration:1e3}),console.log("📐 Enhanced 3D controls deactivated"))}addMouseControls(){this.onMouseDown=t=>{t.button===2&&(t.preventDefault(),this.isDragging=!0,this.lastMousePos={x:t.clientX,y:t.clientY},this.map.getContainer().style.cursor="move")},this.onMouseMove=t=>{if(!this.isDragging||!this.lastMousePos)return;const i=t.clientX-this.lastMousePos.x,n=t.clientY-this.lastMousePos.y,o=this.camera.bearing+i*this.constraints.bearingSensitivity,s=Math.max(this.constraints.minPitch,Math.min(this.constraints.maxPitch,this.camera.pitch-n*this.constraints.pitchSensitivity));this.map.easeTo({bearing:o,pitch:s,duration:0}),this.camera.bearing=o,this.camera.pitch=s,this.lastMousePos={x:t.clientX,y:t.clientY},this.updateControlPanel()},this.onMouseUp=t=>{t.button===2&&(this.isDragging=!1,this.lastMousePos=null,this.map.getContainer().style.cursor="")},this.onContextMenu=t=>t.preventDefault();const e=this.map.getContainer();e.addEventListener("mousedown",this.onMouseDown),e.addEventListener("mousemove",this.onMouseMove),e.addEventListener("mouseup",this.onMouseUp),e.addEventListener("contextmenu",this.onContextMenu)}addKeyboardControls(){this.onKeyDown=e=>{if(!this.isActive)return;let t=!1;const i=5,n=10,o=.5;switch(e.key){case"ArrowUp":case"w":case"W":this.adjustPitch(i),t=!0;break;case"ArrowDown":case"s":case"S":this.adjustPitch(-5),t=!0;break;case"ArrowLeft":case"a":case"A":this.adjustBearing(-10),t=!0;break;case"ArrowRight":case"d":case"D":this.adjustBearing(n),t=!0;break;case"q":case"Q":this.adjustZoom(o),t=!0;break;case"e":case"E":this.adjustZoom(-.5),t=!0;break;case" ":this.resetToLevelFlight(),t=!0;break}t&&(e.preventDefault(),this.updateControlPanel())},document.addEventListener("keydown",this.onKeyDown)}addScrollControls(){this.onWheel=e=>{if(this.isActive){if(e.preventDefault(),e.shiftKey){const t=e.deltaY*.1;this.adjustPitch(-t)}else{const t=e.deltaY*-.01*this.constraints.zoomSensitivity;this.adjustZoom(t)}this.updateControlPanel()}},this.map.getContainer().addEventListener("wheel",this.onWheel,{passive:!1})}adjustPitch(e){const t=Math.max(this.constraints.minPitch,Math.min(this.constraints.maxPitch,this.camera.pitch+e));this.map.easeTo({pitch:t,duration:200}),this.camera.pitch=t}adjustBearing(e){const t=(this.camera.bearing+e)%360;this.map.easeTo({bearing:t,duration:200}),this.camera.bearing=t}adjustZoom(e){const t=Math.max(this.constraints.minZoom,Math.min(this.constraints.maxZoom,this.camera.zoom+e));this.map.easeTo({zoom:t,duration:200}),this.camera.zoom=t}resetToLevelFlight(){this.map.easeTo({pitch:0,bearing:0,duration:1e3}),this.camera.pitch=0,this.camera.bearing=0}createControlPanel(){if(document.getElementById("enhanced-3d-controls"))return;const e=document.createElement("div");e.id="enhanced-3d-controls",e.style.cssText=`
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-width: 200px;
+        `,e.innerHTML=`
+            <div style="font-weight: bold; margin-bottom: 8px; color: #4CAF50;">🎮 Flight Controls</div>
+            <div id="camera-info">
+                <div>Pitch: <span id="pitch-value">0°</span></div>
+                <div>Bearing: <span id="bearing-value">0°</span></div>
+                <div>Altitude: <span id="altitude-value">0ft</span></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 10px; color: #ccc;">
+                <div>🖱️ Right-click + drag: Look around</div>
+                <div>⌨️ WASD/Arrows: Pitch/Turn</div>
+                <div>🖱️ Scroll: Altitude</div>
+                <div>⇧ Shift+Scroll: Pitch</div>
+                <div>⎵ Space: Level flight</div>
+                <div>🎚️ Q/E: Fine altitude</div>
+            </div>
+        `,document.body.appendChild(e),this.updateControlPanel()}updateControlPanel(){const e=document.getElementById("pitch-value"),t=document.getElementById("bearing-value"),i=document.getElementById("altitude-value");if(e&&(e.textContent=`${Math.round(this.camera.pitch)}°`),t&&(t.textContent=`${Math.round(this.camera.bearing)}°`),i){const n=Math.round(Math.pow(2,15-this.camera.zoom)*100);i.textContent=`${n.toLocaleString()}ft`}}removeControlPanel(){const e=document.getElementById("enhanced-3d-controls");e&&e.remove()}removeEventListeners(){const e=this.map.getContainer();this.onMouseDown&&e.removeEventListener("mousedown",this.onMouseDown),this.onMouseMove&&e.removeEventListener("mousemove",this.onMouseMove),this.onMouseUp&&e.removeEventListener("mouseup",this.onMouseUp),this.onContextMenu&&e.removeEventListener("contextmenu",this.onContextMenu),this.onWheel&&e.removeEventListener("wheel",this.onWheel),this.onKeyDown&&document.removeEventListener("keydown",this.onKeyDown)}getCameraState(){return{...this.camera,estimatedAltitude:Math.round(Math.pow(2,15-this.camera.zoom)*100)}}}typeof window<"u"&&(window.Enhanced3DControls=a,console.log("🎮 Enhanced 3D Controls available at: window.Enhanced3DControls"));export{a as default};
+//# sourceMappingURL=Enhanced3DControls-QB_DdNK0.js.map
