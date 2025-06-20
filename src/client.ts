@@ -19,8 +19,20 @@ const clientId = "7db2ec0841ba7cd5697f25eebde0a64e";
 const getRedirectUrl = () => {
   const protocol = window.location.protocol;
   const hostname = window.location.hostname;
-  const port = window.location.port ? `:${window.location.port}` : '';
-  return `${protocol}//${hostname}${port}/auth/callback`;
+  
+  // 🛡️ Production-safe port handling
+  let port = '';
+  if (window.location.port && 
+      !((protocol === 'https:' && window.location.port === '443') || 
+        (protocol === 'http:' && window.location.port === '80'))) {
+    port = `:${window.location.port}`;
+  }
+  
+  // 🛡️ Ensure base path is included for subdirectory deployments
+  const basePath = (import.meta as any).env?.BASE_URL || '/plan/';
+  const normalizedBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  
+  return `${protocol}//${hostname}${port}${normalizedBasePath}/auth/callback`;
 };
 
 const redirectUrl = getRedirectUrl();

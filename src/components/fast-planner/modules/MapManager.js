@@ -29,12 +29,18 @@ class MapManager {
         
         const mapContainer = document.getElementById(containerId);
         if (!mapContainer) {
-          reject(new Error('Map container element not found'));
+          console.error(`🚨 MAP CONTAINER NOT FOUND: ${containerId}`);
+          console.error('Available elements:', document.querySelectorAll('[id]'));
+          reject(new Error(`Map container element '${containerId}' not found - DOM might not be ready`));
           return;
         }
         
         // Set Mapbox access token
         window.mapboxgl.accessToken = this.mapboxToken;
+        
+        // 🛡️ PRODUCTION DEBUG: Log token status
+        console.log('MapBox token set, creating instance...');
+        console.log('Token starts with:', this.mapboxToken.substring(0, 20) + '...');
         
         console.log('Creating MapBox instance...');
         
@@ -128,7 +134,18 @@ class MapManager {
         
         // Handle map errors
         this.map.on('error', (e) => {
-          console.error('MapBox error:', e);
+          console.error('🚨 MAPBOX ERROR - This will break the map:', e);
+          console.error('Error type:', e.error?.type || 'unknown');
+          console.error('Error message:', e.error?.message || e.message || 'no message');
+          
+          // 🛡️ Check for common production issues
+          if (e.error?.message?.includes('401') || e.error?.message?.includes('Unauthorized')) {
+            console.error('🚨 LIKELY CAUSE: Invalid or expired MapBox token');
+          }
+          if (e.error?.message?.includes('network') || e.error?.message?.includes('fetch')) {
+            console.error('🚨 LIKELY CAUSE: Network connectivity issue or firewall blocking MapBox');
+          }
+          
           reject(e); 
         });
 
@@ -151,40 +168,58 @@ class MapManager {
   loadScripts() {
     return new Promise((resolve, reject) => {
       try {
-        // Create and load MapBox script
-        const mapboxScript = document.createElement('script');
-        mapboxScript.src = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js';
-        mapboxScript.async = true;
-        document.body.appendChild(mapboxScript);
+        // 🛡️ PRODUCTION FIX: Check if scripts are already loaded (from HTML)
+        if (window.mapboxgl && window.turf) {
+          console.log('✅ Scripts already loaded from HTML - skipping dynamic loading');
+          resolve();
+          return;
+        }
         
-        // Create and load MapBox CSS
-        const mapboxCss = document.createElement('link');
-        mapboxCss.href = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
-        mapboxCss.rel = 'stylesheet';
-        document.head.appendChild(mapboxCss);
+        console.log('📦 Scripts not pre-loaded, loading dynamically...');
         
-        // Create and load Turf.js
-        const turfScript = document.createElement('script');
-        turfScript.src = 'https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js';
-        turfScript.async = true;
-        document.body.appendChild(turfScript);
+        // Only load scripts if they're not already available
+        if (!window.mapboxgl) {
+          const mapboxScript = document.createElement('script');
+          mapboxScript.src = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js';
+          mapboxScript.async = true;
+          document.body.appendChild(mapboxScript);
+          
+          // Add MapBox CSS if not already present
+          if (!document.querySelector('link[href*="mapbox-gl.css"]')) {
+            const mapboxCss = document.createElement('link');
+            mapboxCss.href = 'https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css';
+            mapboxCss.rel = 'stylesheet';
+            document.head.appendChild(mapboxCss);
+          }
+        }
+        
+        if (!window.turf) {
+          const turfScript = document.createElement('script');
+          // 🛡️ Use same CDN as production to avoid conflicts
+          turfScript.src = 'https://unpkg.com/@turf/turf@6/turf.min.js';
+          turfScript.async = true;
+          document.body.appendChild(turfScript);
+        }
         
         // Check if scripts are loaded
         const checkScriptsLoaded = setInterval(() => {
           if (window.mapboxgl && window.turf) {
             clearInterval(checkScriptsLoaded);
-            console.log('MapBox and Turf scripts loaded successfully');
+            console.log('✅ Dynamic scripts loaded successfully');
             resolve();
           }
         }, 100);
         
-        // Set a timeout to avoid infinite waiting
+        // Set a timeout to avoid infinite waiting - increased for production
         setTimeout(() => {
           if (!window.mapboxgl || !window.turf) {
             clearInterval(checkScriptsLoaded);
-            reject(new Error('Timeout loading map scripts'));
+            console.error('🚨 SCRIPT LOADING FAILED - This will break the map completely!');
+            console.error('MapBox loaded:', !!window.mapboxgl);
+            console.error('Turf loaded:', !!window.turf);
+            reject(new Error('Timeout loading map scripts - check network connectivity and firewall settings'));
           }
-        }, 10000);
+        }, 30000); // 🛡️ Increased to 30 seconds for slower networks
       } catch (error) {
         console.error('Error loading map scripts:', error);
         reject(error);

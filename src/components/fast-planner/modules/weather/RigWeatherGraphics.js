@@ -134,18 +134,22 @@ class RigWeatherGraphics {
      * @param {Array} rigWeatherData - Array of rig weather data
      */
     updateRigWeather(rigWeatherData) {
-        // SIMPLIFIED: Don't auto-cleanup, just update data
+        // 🔗 TEMPORARY: Disable deduplication to restore arrows and popups
+        // TODO: Implement smarter deduplication that handles split points correctly
+        console.log(`🚁 RECEIVED ${rigWeatherData.length} weather items (deduplication disabled temporarily)`);
+        
         this.rigWeatherData = rigWeatherData;
         
         // Store for 3D view protection system
         window.lastRigWeatherData = rigWeatherData;
         
         // DEBUG: Log what we received
-        console.log(`🚁 RECEIVED ${rigWeatherData.length} weather items:`, rigWeatherData.map(r => ({
+        console.log(`🚁 PROCESSING ${rigWeatherData.length} weather items:`, rigWeatherData.map(r => ({
             name: r.rigName,
             type: r.locationType,
             isAirport: r.isAirport,
-            windSpeed: r.windSpeed
+            windSpeed: r.windSpeed,
+            coordinates: `${r.latitude?.toFixed(4)}, ${r.longitude?.toFixed(4)}`
         })));
         
         // ALWAYS render arrows when weather data is updated
@@ -488,7 +492,7 @@ class RigWeatherGraphics {
         const hoverFeatures = [];
         
         for (const rig of this.rigWeatherData) {
-            const hoverArea = this.createCircle([rig.longitude, rig.latitude], 1000, 32);
+            const hoverArea = this.createCircle([rig.longitude, rig.latitude], 3000, 32); // Increased from 1000m to 3000m (3km) for easier hovering
             
             hoverFeatures.push({
                 type: 'Feature',
@@ -582,12 +586,35 @@ class RigWeatherGraphics {
     }
     
     /**
+     * Clean up rig name for display in popups
+     * @private
+     */
+    getCleanRigName(rigName, locationType) {
+        // Handle split point identifiers
+        if (rigName && rigName.includes('_SPLIT')) {
+            const cleanName = rigName.replace('_SPLIT', '');
+            return `${cleanName} (Split Point)`;
+        }
+        
+        // Handle alternate destinations
+        if (locationType === 'alternate') {
+            return `${rigName} (Alternate)`;
+        }
+        
+        // Default: return the original name
+        return rigName;
+    }
+    
+    /**
      * Create unified weather popup that combines TAF + Real-time data in ONE popup
      * This eliminates the "two separate popups" issue
      * @private
      */
     createUnifiedWeatherPopup(rigData) {
         console.log('🔗 UNIFIED POPUP: Creating unified popup for rig:', rigData.rigName);
+        
+        // 🎯 Clean up rig name for split points
+        const displayName = this.getCleanRigName(rigData.rigName, rigData.locationType);
         
         const gustInfo = rigData.windGust && rigData.windGust > rigData.windSpeed ? 
             `G${Math.round(rigData.windGust)}` : '';
@@ -792,7 +819,7 @@ class RigWeatherGraphics {
         return `
             <div style="padding: 10px; max-width: 340px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
                 <div style="font-weight: bold; color: #40c8f0; margin-bottom: 8px; font-size: 14px;">
-                    🚁 ${rigData.rigName} - Comprehensive Weather
+                    🚁 ${displayName} - Comprehensive Weather
                 </div>
                 
                 <!-- REAL-TIME WEATHER SECTION -->
@@ -1372,6 +1399,37 @@ class RigWeatherGraphics {
         this.removeWeatherGraphics();
         this.rigWeatherData = [];
         console.log('🚁 RigWeatherGraphics destroyed');
+    }
+    
+    /**
+     * Deduplicate rig weather data by location and rig name
+     * Fixes issue where split points appear multiple times (once per alternate)
+     * @param {Array} rigWeatherData - Array of rig weather data 
+     * @returns {Array} Deduplicated array
+     */
+    deduplicateRigWeatherData(rigWeatherData) {
+        const seen = new Map();
+        const deduplicatedData = [];
+        
+        rigWeatherData.forEach((rig, index) => {
+            // Create unique key ONLY from coordinates (ignore rig name for location-based deduplication)
+            const lat = Math.round((rig.latitude || 0) * 10000) / 10000;
+            const lng = Math.round((rig.longitude || 0) * 10000) / 10000;
+            const locationKey = `${lat},${lng}`;
+            
+            // Only deduplicate by location, not by rig name
+            // This ensures one arrow per location regardless of how many alternates use that split point
+            if (!seen.has(locationKey)) {
+                seen.set(locationKey, true);
+                deduplicatedData.push(rig);
+                console.log(`🔗 DEDUP: Keeping ${rig.rigName} at ${locationKey} (type: ${rig.locationType || 'unknown'}) - first at this location`);
+            } else {
+                console.log(`🔗 DEDUP: Skipping duplicate at ${locationKey} for ${rig.rigName} - location already has arrow`);
+            }
+        });
+        
+        console.log(`🔗 DEDUP: Processed ${rigWeatherData.length} items, kept ${deduplicatedData.length} unique locations`);
+        return deduplicatedData;
     }
 }
 

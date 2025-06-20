@@ -48,11 +48,38 @@ const MapComponent = ({
         if (window.REGION_CHANGE_IN_PROGRESS) {
           console.log(`%c MAP COMPONENT DIAGNOSTIC: ⚠️ Skipping map reinitialization during region change!`, 
                       'background: green; color: white; font-weight: bold');
-          return;
+          
+          // 🛡️ EMERGENCY BYPASS: If region flag has been stuck for too long, force initialize anyway
+          const flagTime = window.REGION_CHANGE_TIME ? new Date(window.REGION_CHANGE_TIME) : null;
+          const now = new Date();
+          const timeSinceFlag = flagTime ? (now.getTime() - flagTime.getTime()) : 0;
+          
+          if (timeSinceFlag > 30000) { // 30 seconds
+            console.warn(`%c EMERGENCY BYPASS: Region flag stuck for ${timeSinceFlag/1000}s, forcing initialization!`, 
+                        'background: red; color: white; font-weight: bold;');
+            // Reset the flags and continue
+            window.REGION_CHANGE_IN_PROGRESS = false;
+            window.regionState = { isChangingRegion: false };
+          } else {
+            return;
+          }
         }
         
         setLoading(true);
         setLoadingMessage('Loading map scripts...');
+        
+        // 🛡️ PRODUCTION FIX: Ensure DOM is ready before proceeding
+        if (document.readyState !== 'complete') {
+          console.log('🛡️ Waiting for DOM to be ready...');
+          await new Promise(resolve => {
+            if (document.readyState === 'complete') {
+              resolve();
+            } else {
+              window.addEventListener('load', resolve, { once: true });
+            }
+          });
+        }
+        
         await mapManager.loadScripts();
         
         setLoadingMessage('Initializing map...');

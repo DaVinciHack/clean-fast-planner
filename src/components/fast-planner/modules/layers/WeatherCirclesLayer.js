@@ -202,8 +202,10 @@ class WeatherCirclesLayer {
           console.log(`🌬️ SKIP: No wind data for alternate ${segment.airportIcao}`);
         }
         
-        // SKIP split point circles - they were creating unwanted rig weather
-        console.log(`⏭️ Skipping split point for ${segment.airportIcao} - only showing alternate destination`);
+        // 🎯 SPLIT POINT: Skip creating individual split point arrows here
+        // Split points get duplicated because each alternate creates its own split point arrow
+        // The split point should only have ONE arrow regardless of how many alternates use it
+        console.log(`🎯 SKIP: Not creating separate split point arrow for ${segment.airportIcao} - prevents duplicates`);
       }
       
       // Handle RIGS - find coordinates from current waypoints/route
@@ -709,8 +711,8 @@ class WeatherCirclesLayer {
       
       console.log('WeatherCirclesLayer: Added 5 concentric ring layers');
       
-      // Add hover popups for weather info
-      this.addWeatherHoverPopups(deduplicatedSegments);
+      // 🔗 UNIFIED POPUP: New RigWeatherGraphics popup system handles all popups (has more detailed data)
+      console.log('🔗 POPUP: WeatherCirclesLayer popup disabled - RigWeatherGraphics has more detailed weather data');
     }
     
     if (hasPointGeometry) {
@@ -773,44 +775,37 @@ class WeatherCirclesLayer {
       
       console.log('WeatherCirclesLayer: Added concentric ring layers for points');
       
-      // Add hover popups for weather info (pass deduplicated segments)
-      this.addWeatherHoverPopups(deduplicatedSegments);
+      // 🔗 UNIFIED POPUP: New RigWeatherGraphics popup system handles all popups (has more detailed data)
+      console.log('🔗 POPUP: WeatherCirclesLayer popup disabled - RigWeatherGraphics has more detailed weather data');
     }
     
     this.isVisible = true;
     console.log('WeatherCirclesLayer: Added', outerFeatures.length, 'weather circles');
     
-    // CONSOLIDATED ARROW SYSTEM: Create ALL arrows at once to prevent overwrites
-    if (allArrowData.length > 0 && window.rigWeatherIntegration) {
-      console.log(`🌬️ CONSOLIDATED: Creating ${allArrowData.length} wind arrows for all locations:`, 
+    // 🌬️ ARROW SYSTEM: Create wind arrows (weather/RigWeatherGraphics handles arrows and popups)
+    if (allArrowData.length > 0 && window.rigWeatherIntegration && window.rigWeatherIntegration.updateRigWeather) {
+      console.log(`🌬️ CREATING ARROWS: ${allArrowData.length} wind arrows for all locations:`, 
         allArrowData.map(a => `${a.rigName}(${a.locationType})`));
       
-      // DEBUG: Show detailed breakdown of all arrow data
-      console.log(`🌬️ CONSOLIDATED DEBUG: Full arrow data:`, allArrowData.map(a => ({
-        name: a.rigName,
-        type: a.locationType,
-        windSpeed: a.windSpeed,
-        windDirection: a.windDirection,
-        isAirport: a.isAirport
-      })));
-      
       try {
-        // Create ALL arrows in one batch operation
+        // Create ALL arrows in one batch operation - this is the weather/RigWeatherGraphics system
         window.rigWeatherIntegration.updateRigWeather(allArrowData);
-        console.log(`🌬️ CONSOLIDATED: ✅ Successfully created ${allArrowData.length} wind arrows`);
+        console.log(`🌬️ ARROWS: ✅ Successfully created ${allArrowData.length} wind arrows`);
         
         // Debug: Log what types of arrows were created
         const arrowTypes = allArrowData.reduce((acc, arrow) => {
           acc[arrow.locationType] = (acc[arrow.locationType] || 0) + 1;
           return acc;
         }, {});
-        console.log(`🌬️ CONSOLIDATED: Arrow breakdown:`, arrowTypes);
+        console.log(`🌬️ ARROWS: Arrow breakdown:`, arrowTypes);
         
       } catch (error) {
-        console.error(`🌬️ CONSOLIDATED: Error creating wind arrows:`, error);
+        console.error(`🌬️ ARROWS: Error creating wind arrows:`, error);
       }
     } else {
-      console.log(`🌬️ CONSOLIDATED: No wind arrows to create (${allArrowData.length} arrow data, rigWeatherIntegration: ${!!window.rigWeatherIntegration})`);
+      console.log(`🌬️ ARROWS: Cannot create arrows - rigWeatherIntegration not available or missing updateRigWeather method`);
+      console.log(`🌬️ DEBUG: rigWeatherIntegration exists: ${!!window.rigWeatherIntegration}`);
+      console.log(`🌬️ DEBUG: updateRigWeather method exists: ${!!window.rigWeatherIntegration?.updateRigWeather}`);
     }
     
     // Clear the creation lock on successful completion
@@ -1290,246 +1285,17 @@ class WeatherCirclesLayer {
     }
   }
   
-  /**
-   * Add hover popups to show weather information
-   */
-  addWeatherHoverPopups(deduplicatedSegments) {
-    // 🔗 UNIFIED POPUP: OLD POPUP SYSTEM DISABLED
-    // The old Palantir popup system has been disabled to prevent conflicts with the new unified popup system.
-    // TAF/METAR data is now displayed in the unified rig weather graphics popup system instead.
-    
-    console.log('🔗 UNIFIED POPUP: Old weather circle popups disabled - using unified popup system for weather data');
-    
-    // Clean up any existing popup instances
-    if (this.popup) {
-      this.popup.remove();
-      this.popup = null;
-    }
-    
-    // Remove any existing event listeners
-    const hoverLayer = this.layerId + '-hover-areas';
-    if (this.map.getLayer(hoverLayer)) {
-      this.map.off('mouseenter', hoverLayer);
-      this.map.off('mouseleave', hoverLayer);
-    }
-    
-    // Still create invisible hover areas for potential future use, but without popups
-    // This maintains the layer structure but removes the competing popup system
-    this.addInvisibleHoverAreas(deduplicatedSegments);
-    
-    console.log('🔗 UNIFIED POPUP: Weather circles maintained without competing popups');
-  }
+  // 🗑️ OLD POPUP SYSTEM REMOVED
+  // The old popup system has been permanently removed to prevent confusion.
+  // All popups are now handled by RigWeatherGraphics which has more detailed weather data.
 
-  /**
-   * Add invisible filled circles for easy hover targeting
-   */
-  addInvisibleHoverAreas(segments) {
-    // Use the passed segments (deduplicated)
-    if (!segments || segments.length === 0) {
-      console.warn('No weather segments provided for hover areas');
-      return;
-    }
+  // 🗑️ OLD HOVER AREAS REMOVED
+  // Hover areas are now handled by RigWeatherGraphics
 
-    // Create filled circle features for each weather segment (using innermost size)
-    const hoverFeatures = segments
-      .filter(segment => segment.extractedCoordinates)
-      .map(segment => this.createHoverAreaFeature(segment))
-      .filter(f => f !== null);
+  // 🗑️ OLD HOVER FEATURE CREATION REMOVED
 
-    console.log(`🎯 Creating ${hoverFeatures.length} hover areas from ${segments.length} segments`);
-
-    if (hoverFeatures.length === 0) {
-      console.log('No hover area features to create');
-      return;
-    }
-
-    // Add source for hover areas
-    this.map.addSource(this.sourceId + '-hover-areas', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: hoverFeatures
-      }
-    });
-
-    // Add invisible filled layer for hover detection
-    this.map.addLayer({
-      id: this.layerId + '-hover-areas',
-      type: 'fill',
-      source: this.sourceId + '-hover-areas',
-      paint: {
-        'fill-color': 'transparent',
-        'fill-opacity': 0 // Completely invisible
-      },
-      layout: {
-        'visibility': 'visible'
-      }
-    });
-
-    console.log('🎯 Added invisible hover areas for easy targeting');
-  }
-
-  /**
-   * Create a filled circle feature for hover detection
-   * @param {Object} segment - Weather segment with coordinates
-   * @returns {Object} GeoJSON feature for hover
-   */
-  createHoverAreaFeature(segment) {
-    const coords = segment.extractedCoordinates;
-    
-    if (!coords || !Array.isArray(coords) || coords.length !== 2) {
-      return null;
-    }
-
-    // Use innermost ring size for hover area
-    const ranking = segment.ranking2;
-    const baseRadius = this.getCircleRadius(ranking);
-    const radius = baseRadius * 0.4; // Same as innermost ring
-
-    // Check if Turf.js is available
-    if (!window.turf) {
-      console.warn('WeatherCirclesLayer: Turf.js not available for hover areas');
-      return null;
-    }
-
-    // Create filled circle using Turf.js
-    const center = window.turf.point(coords);
-    const circle = window.turf.buffer(center, radius, { units: 'kilometers' });
-
-    return {
-      type: 'Feature',
-      geometry: circle.geometry,
-      properties: {
-        airportIcao: segment.airportIcao || 'Unknown',
-        ranking: segment.ranking2,
-        isRig: segment.isRig || false,
-        ringType: segment.circleType || 'weather'
-      }
-    };
-  }
-
-  /**
-   * Find weather segment by ICAO code
-   * @param {string} icao - Airport ICAO code
-   * @returns {Object|null} Weather segment data
-   */
-  findWeatherSegmentByIcao(icao) {
-    if (!this.currentWeatherSegments) return null;
-    
-    return this.currentWeatherSegments.find(segment => 
-      segment.airportIcao === icao || segment.airportIcao === icao.replace('-SPLIT', '')
-    );
-  }
-
-  /**
-   * Create detailed weather popup content (same info as weather card)
-   * @param {string} icao - Airport ICAO  
-   * @param {number} ranking - Weather ranking
-   * @param {Object} segment - Weather segment data
-   * @param {string} circleType - Type of circle
-   * @returns {string} HTML content
-   */
-  createDetailedWeatherPopup(icao, ranking, segment, circleType) {
-    // Simple fuel status instead of technical ranking
-    const fuelStatus = this.getFuelStatus(ranking);
-    const color = this.getAviationRankingColor(ranking);
-    
-    let content = `
-      <div class="weather-popup-content" style="font-size: 13px; line-height: 1.4;">
-        <h4 style="margin: 0 0 8px 0; color: ${color}; font-size: 16px;">
-          ${icao}
-        </h4>
-    `;
-
-    if (segment) {
-      // Add arrival time if available
-      if (segment.arrivalTime) {
-        const arrivalTime = new Date(segment.arrivalTime).toLocaleTimeString();
-        content += `
-          <div style="margin-bottom: 6px; font-size: 13px;">
-            <strong>Arrival:</strong> ${arrivalTime}
-          </div>
-        `;
-      }
-
-      // Add simple fuel status
-      content += `
-        <div style="margin-bottom: 8px; font-size: 13px; color: ${color};">
-          <strong>${fuelStatus}</strong>
-        </div>
-      `;
-
-      // Add full METAR if available
-      if (segment.rawMetar) {
-        content += `
-          <div style="margin-bottom: 8px;">
-            <strong>METAR:</strong><br>
-            <span style="font-family: monospace; font-size: 11px; word-break: break-all;">${segment.rawMetar}</span>
-          </div>
-        `;
-      }
-
-      // Add FULL TAF if available (no truncation)
-      if (segment.rawTaf) {
-        content += `
-          <div style="margin-bottom: 6px;">
-            <strong>TAF:</strong><br>
-            <span style="font-family: monospace; font-size: 11px; word-break: break-all;">${segment.rawTaf}</span>
-          </div>
-        `;
-      }
-    }
-
-    content += `
-      </div>
-    `;
-
-    return content;
-  }
-
-  /**
-   * Get simple fuel status for users
-   * @param {number} ranking - Weather ranking (5, 8, 10, 15, 20)
-   * @returns {string} Simple fuel status
-   */
-  getFuelStatus(ranking) {
-    switch (ranking) {
-      case 5:
-        return 'Below Minimums';
-      case 8:
-        return 'ARA Fuel Needed';
-      case 10:
-        return 'Approach Fuel Needed';
-      case 15:
-        return 'Good Conditions';
-      case 20:
-        return 'Good Conditions';
-      default:
-        return 'Weather Conditions';
-    }
-  }
-
-  /**
-   * Get weather description from ranking
-   * @param {number} ranking - Weather ranking (5, 8, 10, 15, 20)
-   * @returns {string} Human readable description
-   */
-  getWeatherDescription(ranking) {
-    switch (ranking) {
-      case 5:
-        return 'Below Minimums - Cannot Land';
-      case 8:
-        return 'ARA Fuel Required - Poor Conditions';
-      case 10:
-        return 'Warning Conditions - Approach Fuel Needed';
-      case 15:
-        return 'Good Conditions - Safe to Land';
-      case 20:
-        return 'Not Applicable - No Landing Restrictions';
-      default:
-        return `Ranking ${ranking} - Custom Conditions`;
-    }
-  }
+  // 🗑️ OLD POPUP HELPER METHODS REMOVED
+  // All popup functionality now handled by RigWeatherGraphics
 
   /**
    * Deduplicate circles by location (only keep one circle per unique location)
