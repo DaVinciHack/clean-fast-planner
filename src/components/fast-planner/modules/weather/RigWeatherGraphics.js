@@ -557,8 +557,31 @@ class RigWeatherGraphics {
                 const rigData = JSON.parse(e.features[0].properties.rigData);
                 console.log('🔗 UNIFIED POPUP: Creating popup for rig:', rigData.rigName);
                 
+                // AGGRESSIVE CLEANUP: Remove ALL existing popups to prevent duplicates
+                if (this.popup) {
+                    this.popup.remove();
+                }
+                
+                // Also remove any other weather popups that might exist
+                const existingPopups = document.querySelectorAll('.mapboxgl-popup');
+                existingPopups.forEach(popup => {
+                    if (popup.classList.contains('rig-weather-popup') || 
+                        popup.classList.contains('unified-weather-popup') ||
+                        popup.classList.contains('weather-popup')) {
+                        popup.remove();
+                    }
+                });
+                
                 // Create unified popup content combining TAF + Real-time data
                 const unifiedContent = this.createUnifiedWeatherPopup(rigData);
+                
+                // Create fresh popup instance
+                this.popup = new mapboxgl.Popup({
+                    closeButton: false,
+                    closeOnClick: false,
+                    className: 'rig-weather-popup unified-weather-popup',
+                    maxWidth: '320px'
+                });
                 
                 this.popup.setLngLat(e.lngLat)
                          .setHTML(unifiedContent)
@@ -801,7 +824,7 @@ class RigWeatherGraphics {
             const arrivalTimeString = new Date(rigData.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             weatherTimeInfo = `<div style="font-size: 10px; color: #4CAF50; margin-top: 4px;">📅 Weather for ${arrivalTimeString} arrival</div>`;
         } else {
-            weatherTimeInfo = '<div style="font-size: 10px; color: #FFC107; margin-top: 4px;">⏰ Current weather conditions</div>';
+            weatherTimeInfo = `<div style="font-size: 10px; color: #FFC107; margin-top: 4px;">(NOAA GFS) ${this.getUpdatedTimeText(rigData)}</div>`;
         }
         
         // Add data freshness indicator
@@ -818,22 +841,15 @@ class RigWeatherGraphics {
         
         return `
             <div style="padding: 10px; max-width: 340px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-                <div style="font-weight: bold; color: #40c8f0; margin-bottom: 8px; font-size: 14px;">
-                    🚁 ${displayName} - Comprehensive Weather
+                <div style="font-weight: bold; color: #40c8f0; margin-bottom: 8px; font-size: 14px; display: flex; align-items: center;">
+                    <span>${displayName}</span>
+                    <span style="color: ${categoryColor}; font-weight: bold; margin-left: 8px; padding: 2px 6px; border-radius: 3px; background-color: rgba(${categoryColor === '#66BB6A' ? '102,187,106' : categoryColor === '#FFA726' ? '255,167,38' : categoryColor === '#EF5350' ? '239,83,80' : '156,39,176'}, 0.2);">${rigData.flightCategory || 'Unknown'}</span>
                 </div>
                 
                 <!-- REAL-TIME WEATHER SECTION -->
                 <div style="margin-bottom: 10px; padding: 8px; background-color: rgba(25, 118, 210, 0.15); border-radius: 6px; ${warningStyle}">
-                    <div style="color: #1976d2; font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-                        <span>🌦️ ${rigData.weatherTimeInfo || (rigData.arrivalTime ? `Weather for ${new Date(rigData.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} arrival` : 'Live Weather')} (NOAA GFS)</span>
-                        ${hasWarnings ? '<span style="color: #FF5722; margin-left: 8px;">⚠️</span>' : ''}
-                    </div>
                     <div style="font-size: 12px; color: #e0e0e0; line-height: 1.4;">
                         ${arrivalInfo}
-                        <div style="margin-bottom: 4px; display: flex; align-items: center;">
-                            <strong>Flight Category:</strong> 
-                            <span style="color: ${categoryColor}; font-weight: bold; margin-left: 6px; padding: 2px 6px; border-radius: 3px; background-color: rgba(${categoryColor === '#66BB6A' ? '102,187,106' : categoryColor === '#FFA726' ? '255,167,38' : categoryColor === '#EF5350' ? '239,83,80' : '156,39,176'}, 0.2);">${rigData.flightCategory || 'Unknown'}</span>
-                        </div>
                         <div><strong>Visibility:</strong> ${this.formatVisibilityRegionally(rigData.visibility || rigData.visibilityMeters)}</div>
                         <div><strong>Wind:</strong> ${windString}</div>
                         ${this.generateCloudLayersHTML(rigData.clouds || [])}
@@ -853,6 +869,121 @@ class RigWeatherGraphics {
                 </div>
             </div>
         `;
+    }
+    
+    /**
+     * Get updated time text for weather data
+     * @param {Object} rigData - Rig weather data
+     * @returns {string} Updated time text
+     * @private
+     */
+    /**
+     * Parse METAR observation time from the METAR string
+     * Format: DDHHMMZ where DD=day, HHMM=time UTC, Z=Zulu
+     * Example: "202127Z" = day 20, 21:27 UTC
+     * @private
+     */
+    parseMetarObservationTime(metarString) {
+        if (!metarString) return null;
+        
+        // Look for pattern DDHHMMZ at start of METAR
+        const timeMatch = metarString.match(/\b(\d{6})Z\b/);
+        if (!timeMatch) return null;
+        
+        const timeGroup = timeMatch[1]; // e.g., "202127"
+        const day = parseInt(timeGroup.substring(0, 2)); // "20"
+        const hour = parseInt(timeGroup.substring(2, 4)); // "21"
+        const minute = parseInt(timeGroup.substring(4, 6)); // "27"
+        
+        // Create observation time for current month/year
+        const now = new Date();
+        const observationTime = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            day,
+            hour,
+            minute,
+            0
+        ));
+        
+        // Handle month rollover (if observation day is in future, it's from last month)
+        if (observationTime > now) {
+            observationTime.setUTCMonth(observationTime.getUTCMonth() - 1);
+        }
+        
+        console.log('🕐 PARSED METAR TIME:', {
+            metarString: metarString.substring(0, 50) + '...',
+            timeGroup,
+            day, hour, minute,
+            observationTime: observationTime.toISOString(),
+            nowUTC: now.toISOString()
+        });
+        
+        return observationTime;
+    }
+
+    getUpdatedTimeText(rigData) {
+        // Try to parse real METAR observation time first
+        if (rigData.rawMetar) {
+            const metarObsTime = this.parseMetarObservationTime(rigData.rawMetar);
+            if (metarObsTime) {
+                const minutesAgo = Math.round((new Date() - metarObsTime) / 60000);
+                const hoursAgo = Math.round(minutesAgo / 60);
+                const daysAgo = Math.round(hoursAgo / 24);
+                
+                console.log('🕐 USING METAR OBSERVATION TIME:', {
+                    rigName: rigData.rigName,
+                    metarObsTime: metarObsTime.toISOString(),
+                    minutesAgo,
+                    hoursAgo,
+                    daysAgo
+                });
+                
+                if (minutesAgo < 1) {
+                    return 'Updated just now';
+                } else if (minutesAgo < 60) {
+                    return `Updated ${minutesAgo} min${minutesAgo > 1 ? 's' : ''} ago`;
+                } else if (hoursAgo < 24) {
+                    return `Updated ${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+                } else {
+                    return `Updated ${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+                }
+            }
+        }
+        
+        // Fallback to API provided observation time
+        if (rigData.observationTime) {
+            const observationTime = new Date(rigData.observationTime);
+            const minutesAgo = Math.round((new Date() - observationTime) / 60000);
+            const hoursAgo = Math.round(minutesAgo / 60);
+            const daysAgo = Math.round(hoursAgo / 24);
+            
+            console.log('🕐 USING API OBSERVATION TIME:', {
+                observationTime: rigData.observationTime,
+                minutesAgo,
+                hoursAgo,
+                daysAgo
+            });
+            
+            if (minutesAgo < 1) {
+                return 'Updated just now';
+            } else if (minutesAgo < 60) {
+                return `Updated ${minutesAgo} min${minutesAgo > 1 ? 's' : ''} ago`;
+            } else if (hoursAgo < 24) {
+                return `Updated ${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+            } else {
+                return `Updated ${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+            }
+        }
+        
+        // ERROR: No real timing data available - should not show fake time
+        console.error('🚨 AVIATION SAFETY ERROR: No real weather timing data available for', rigData.rigName);
+        console.error('🚨 Available data:', {
+            hasRawMetar: !!rigData.rawMetar,
+            hasObservationTime: !!rigData.observationTime,
+            rawMetar: rigData.rawMetar?.substring(0, 50)
+        });
+        return 'Weather time unknown';
     }
     
     /**
