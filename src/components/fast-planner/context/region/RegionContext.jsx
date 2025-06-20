@@ -488,6 +488,18 @@ export const RegionProvider = ({
       window.regionState = window.regionState || {};
       window.regionState.isChangingRegion = true;
       
+      // 🛡️ SAFETY: Always reset flags after maximum timeout to prevent permanent blocking
+      const safetyTimeoutId = setTimeout(() => {
+        console.warn(`%c SAFETY RESET: Forcing region flags reset after timeout`, 'background: red; color: white; font-weight: bold;');
+        setRegionChangeInProgress(false);
+        window.regionState.isChangingRegion = false;
+        window.REGION_CHANGE_IN_PROGRESS = false;
+        setRegionLoading(false);
+      }, 15000); // 15 second safety timeout
+      
+      // Store safety timeout globally so it can be cleared
+      window.regionSafetyTimeoutId = safetyTimeoutId;
+      
       if (!mapReady) {
         console.warn(`RegionContext: Map not ready, deferring platform loading for ${currentRegion.name}`);
         setTimeout(() => {
@@ -727,6 +739,13 @@ export const RegionProvider = ({
       // Schedule reset of state flags after a delay
       setTimeout(() => {
         console.log(`%c REGION DIAGNOSTIC: Final cleanup - reset flags`, 'background: #ffcc00; color: black;');
+        
+        // 🛡️ Clear safety timeout since normal cleanup is happening
+        if (window.regionSafetyTimeoutId) {
+          clearTimeout(window.regionSafetyTimeoutId);
+          window.regionSafetyTimeoutId = null;
+        }
+        
         setRegionChangeInProgress(false);
         window.regionState.isChangingRegion = false;
         window.REGION_CHANGE_IN_PROGRESS = false;

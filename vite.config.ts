@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 8080,
-    strictPort: true, // This will force Vite to use exactly port 8080
+    strictPort: false, // 🛡️ Allow fallback ports in production
     host: true,
     proxy: {
       // Proxy NOAA nowCOAST weather services to avoid CORS issues

@@ -748,6 +748,9 @@ class WaypointManager {
         // Add clear CSS class for styling
         markerElement.setAttribute('data-marker-type', isWaypoint ? 'waypoint' : 'stop');
         
+        // 🚫 COORDINATE POPUPS DISABLED
+        // Coordinate popups have been disabled to reduce clutter
+        /*
         if (isWaypoint) {
           // Use click instead of hover for waypoints
           markerElement.addEventListener('click', () => {
@@ -768,6 +771,7 @@ class WaypointManager {
             popup.remove();
           });
         }
+        */
       }
       
       // Return the created marker
