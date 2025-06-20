@@ -267,8 +267,17 @@ const MainCard = ({
       )}
       
       <div className="control-section" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginBottom: '15px' }}>
-        {/* Save, Load, and Auto Plan buttons - Side by Side with exactly 7px gap */}
+        {/* Auto Plan, Save, and Load buttons - Side by Side with exactly 7px gap */}
         <div style={{ display: 'flex', width: '100%', gap: '7px' }}>
+          <AutoPlanButton
+            selectedAircraft={selectedAircraft}
+            waypoints={waypoints}
+            flightId={currentFlightId} // 🔧 FIX: Pass actual flight ID for new vs existing flight detection
+            style={{ flex: 1, margin: 0 }}
+            onSuccess={handleSaveSuccess}
+            onError={handleSaveError}
+            onAutoPlan={onAutoPlan} // Pass the onAutoPlan function from props
+          />
           <SaveFlightButton
             selectedAircraft={selectedAircraft}
             waypoints={waypoints}
@@ -292,15 +301,6 @@ const MainCard = ({
                 window.LoadingIndicator.updateStatusIndicator(error, 'error');
               }
             }}
-          />
-          <AutoPlanButton
-            selectedAircraft={selectedAircraft}
-            waypoints={waypoints}
-            flightId={currentFlightId} // 🔧 FIX: Pass actual flight ID for new vs existing flight detection
-            style={{ flex: 1, margin: 0 }}
-            onSuccess={handleSaveSuccess}
-            onError={handleSaveError}
-            onAutoPlan={onAutoPlan} // Pass the onAutoPlan function from props
           />
         </div>
       </div>
