@@ -126,10 +126,24 @@ const AutoPlanButton = ({
   const isNewFlight = !flightId;
   const hasWaypoints = waypoints && waypoints.length > 0;
 
+  // Button style to match other buttons - minimal overrides to preserve CSS class gradient
+  const buttonStyle = {
+    padding: '5px 10px',
+    fontSize: '14px',
+    margin: '0 5px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'normal',
+    height: '32px'
+    // Don't override backgroundColor - let the CSS class handle the gradient
+  };
+
   return (
     <button
-      className={`control-button ${className}`}
+      className="control-button"
       style={{
+        ...buttonStyle,
         ...style
       }}
       onClick={handleClick}
@@ -142,7 +156,21 @@ const AutoPlanButton = ({
         'Run automation on saved flight'
       }
     >
-      {isProcessing && <span className="spinner"></span>}
+      {isProcessing && (
+        <span 
+          className="spinner" 
+          style={{
+            display: 'inline-block',
+            width: '14px',
+            height: '14px',
+            border: '2px solid rgba(255,255,255,0.3)',
+            borderRadius: '50%',
+            borderTopColor: 'white',
+            animation: 'spin 1s ease-in-out infinite',
+            marginRight: '8px'
+          }}
+        />
+      )}
       {!isProcessing && <span style={{ marginRight: '4px' }}>⚡</span>}
       <span>{buttonState.text}</span>
     </button>
