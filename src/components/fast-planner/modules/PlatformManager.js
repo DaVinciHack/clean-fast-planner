@@ -144,10 +144,10 @@ class PlatformManager {
     
     console.log(`🌍 REGION MAPPING: "${originalRegionName}" → "${regionName}" for OSDK query`);
     
-    // Show loading indicator
+    // Show loading indicator - use fallback container if main one not found
     const loaderId = LoadingIndicator.show('.route-stats-title', 
       `Loading platform data for ${regionName}...`, 
-      { position: 'bottom' });
+      { position: 'bottom', fallbackContainer: 'body' });
     
     // Only clear platforms if skipNextClear is false
     if (!this.skipNextClear) {
@@ -2378,10 +2378,10 @@ class PlatformManager {
     }
     
     
-    // Show loading indicator
+    // Show loading indicator - use fallback container if main one not found
     const loaderId = LoadingIndicator.show('.route-stats-title', 
       `Loading navigation waypoints for ${regionName}...`, 
-      { position: 'bottom' });
+      { position: 'bottom', fallbackContainer: 'body' });
 
     try {
       // Import the SDK

@@ -7,6 +7,7 @@ import {
   WeatherCard,
   FinanceCard,
   EvacuationCard,
+  SARCard,
   SaveFlightCard,
   LoadFlightsCard,
   AutoPlanCard,
@@ -105,7 +106,11 @@ const RightPanel = React.forwardRef(({
   weatherSegments = null,
   weatherSegmentsHook = null, // Full weather segments hook for layer controls
   // Fuel policy props
-  fuelPolicy = null
+  fuelPolicy = null,
+  // SAR mode callback
+  onSARUpdate,
+  // SAR calculation data
+  sarData = null
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -1226,8 +1231,17 @@ const RightPanel = React.forwardRef(({
         waypoints={waypoints}
       />
       
-      {/* Evacuation Card */}
-      <EvacuationCard id="evacuation" />
+      {/* SAR Range Calculator Card */}
+      <SARCard 
+        id="sar"
+        selectedAircraft={selectedAircraft}
+        routeStats={routeStats}
+        alternateStats={alternateRouteData?.stats}
+        fuelPolicy={fuelPolicy}
+        waypoints={waypoints}
+        stopCards={stopCards}
+        onSARUpdate={onSARUpdate}
+      />
       
       {/* Map Layers Card */}
       <MapLayersCard

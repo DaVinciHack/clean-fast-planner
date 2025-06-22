@@ -36,6 +36,12 @@ import FlightWizard from './components/wizard/FlightWizard';
 // Import MapZoomHandler for waypoint display
 import MapZoomHandler from './components/map/MapZoomHandler';
 
+// Import SAR Range Circle for SAR mode visualization
+import SARRangeCircle from './components/map/SARRangeCircle';
+
+// Import SAR Manager for SAR state and calculations
+import { sarManager } from './managers/SARManager';
+
 // Import ModeHandler for backup
 import ModeHandler from './modules/waypoints/ModeHandler';
 
@@ -95,6 +101,9 @@ const FastPlannerCore = ({
   
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
+  
+  // 🚁 SAR STATE: Search and Rescue mode state
+  const [sarData, setSarData] = useState(null);
   
   // Check if wizard should show on load (first time users)
   useEffect(() => {
@@ -229,6 +238,46 @@ const FastPlannerCore = ({
       console.log(`⚠️ AIRCRAFT: Cannot select aircraft policy - hasPolicies: ${fuelPolicy.hasPolicies}, selectFunction: ${!!fuelPolicy.selectDefaultPolicyForAircraft}`);
     }
   }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length]);
+
+  // 🚁 SAR CALCULATION: Calculate SAR data when relevant parameters change (with race condition prevention)
+  useEffect(() => {
+    // Create a stable string key for comparison
+    const dataKey = JSON.stringify({
+      aircraft: selectedAircraft?.registration,
+      routeFuel: routeStats?.totalFuelRequired || routeStats?.fuelRequired,
+      alternateFuel: alternateRouteData?.totalFuelRequired || alternateRouteData?.fuelRequired,
+      waypointCount: waypoints?.length,
+      hasFuelPolicy: fuelPolicy?.hasPolicies
+    });
+    
+    // Only calculate if SAR is enabled
+    if (!sarManager.sarEnabled) {
+      setSarData(null);
+      return;
+    }
+
+    const flightData = {
+      selectedAircraft,
+      routeStats,
+      alternateStats: alternateRouteData,
+      fuelPolicy,
+      waypoints
+    };
+    
+    const sarCalculation = sarManager.calculateSAR(flightData);
+    
+    // Only update state if the calculation result is actually different
+    setSarData(prevSarData => {
+      // Quick comparison of key properties to avoid expensive JSON.stringify on every render
+      if (prevSarData && 
+          prevSarData.operationalRadius === sarCalculation.operationalRadius &&
+          prevSarData.timeOnTask === sarCalculation.timeOnTask &&
+          prevSarData.sarWeight === sarCalculation.sarWeight) {
+        return prevSarData; // No meaningful change
+      }
+      return sarCalculation;
+    });
+  }, [selectedAircraft?.registration, routeStats?.totalFuelRequired, alternateRouteData?.totalFuelRequired, waypoints?.length, fuelPolicy?.hasPolicies]);
 
   // 🚫 DISABLED: Manual route auto-zoom was causing unwanted second zoom during flight loading
   // Only keep the flight loading auto-zoom (after direct coordinate placement)
@@ -2513,10 +2562,32 @@ const FastPlannerCore = ({
   const handlePerformanceCard = () => handleCardChange('performance');
   const handleWeatherCard = () => handleCardChange('weather');
   const handleFinanceCard = () => handleCardChange('finance');
-  const handleEvacuationCard = () => handleCardChange('evacuation');
+  const handleSARCard = () => {
+    console.log('🚁 handleSARCard called - switching to SAR card');
+    handleCardChange('sar');
+  };
   const handleSaveCard = () => handleCardChange('saveflight');
   const handleLoadCard = () => handleCardChange('loadflights');
   const handleLayersCard = () => handleCardChange('maplayers');
+
+  // 🚁 SAR HANDLERS: Search and Rescue mode functionality
+  const handleSARUpdate = useCallback((sarUpdate) => {
+    console.log('🚁 FastPlannerApp: SAR update received:', {
+      enabled: sarUpdate?.enabled,
+      hasCalculation: !!sarUpdate?.calculation,
+      hasFinalWaypoint: !!sarUpdate?.finalWaypoint,
+      finalWaypoint: sarUpdate?.finalWaypoint,
+      operationalRadiusNM: sarUpdate?.calculation?.operationalRadiusNM
+    });
+    
+    // Sync SARManager state with the useSARMode state
+    if (sarManager) {
+      sarManager.sarEnabled = sarUpdate?.enabled || false;
+    }
+    
+    console.log('🚁 FastPlannerApp: Setting sarData state:', sarUpdate);
+    setSarData(sarUpdate);
+  }, []);
 
   // 🧙‍♂️ WIZARD HANDLERS: Flight planning wizard functionality
   const handleWizardComplete = useCallback((flightData) => {
@@ -2843,6 +2914,38 @@ const FastPlannerCore = ({
           </div>
           <MapComponent mapManagerRef={mapManagerRef} onMapReady={handleMapReadyImpl} className="fast-planner-map" />
           <MapZoomHandler mapManagerRef={mapManagerRef} />
+          {/* SAR Range Circle for Search and Rescue mode */}
+          {(() => {
+            const sarEnabled = sarData?.enabled || sarManager.sarEnabled;
+            const calculation = sarData?.calculation;
+            const finalWaypoint = sarData?.finalWaypoint;
+            const operationalRadiusNM = calculation?.operationalRadiusNM;
+            
+            const shouldShow = sarEnabled && sarData && !calculation?.error && finalWaypoint && operationalRadiusNM;
+            console.log('🚁 SAR Circle Render Check:', {
+              sarEnabled,
+              sarData: !!sarData,
+              hasCalculation: !!calculation,
+              hasError: !!calculation?.error,
+              hasFinalWaypoint: !!finalWaypoint,
+              hasRadius: !!operationalRadiusNM,
+              operationalRadiusNM,
+              shouldShow,
+              mapManager: !!appManagers.mapManagerRef?.current
+            });
+            
+            return shouldShow && (
+              <SARRangeCircle
+                mapManager={appManagers.mapManagerRef?.current}
+                center={finalWaypoint}
+                radiusNM={operationalRadiusNM}
+                visible={true}
+                aircraft={selectedAircraft}
+                color="#FF6B35"
+                opacity={0.2}
+              />
+            );
+          })()}
         </div>
         <LeftPanel
           visible={leftPanelVisible} onToggleVisibility={toggleLeftPanel} waypoints={waypoints}
@@ -2913,6 +3016,8 @@ const FastPlannerCore = ({
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
+          onSARUpdate={handleSARUpdate} // Add SAR update handler
+          sarData={sarData} // Pass SAR calculation data
           ref={rightPanelRef} // Add ref to access card change functionality
         />
       </div>
@@ -2936,6 +3041,7 @@ const FastPlannerCore = ({
         onPerformanceCard={handlePerformanceCard}
         onWeatherCard={handleWeatherCard}
         onFinanceCard={handleFinanceCard}
+        onSARCard={handleSARCard}
         onSaveCard={handleSaveCard}
         onLoadCard={handleLoadCard}
         onLayersCard={handleLayersCard}
@@ -2980,6 +3086,14 @@ const FastPlannerApp = () => {
   const [favoriteLocations, setFavoriteLocations] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
   const [stopCards, setStopCards] = useState([]);
+  
+  // Debug waypoints state changes
+  useEffect(() => {
+    console.log('🎯 FastPlannerApp: waypoints state changed:', waypoints.length, 'waypoints');
+    if (waypoints.length > 0) {
+      console.log('🎯 FastPlannerApp: waypoints data:', waypoints.map(wp => ({ name: wp.name, coords: wp.coords, id: wp.id })));
+    }
+  }, [waypoints]);
   const [routeStats, setRouteStats] = useState(null);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [routeInput, setRouteInput] = useState('');

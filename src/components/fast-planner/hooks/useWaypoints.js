@@ -25,10 +25,12 @@ const useWaypoints = ({
     if (waypointManagerRef.current) {
       // Set up a callback to synchronize state when waypoints change
       waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
-        console.log('WaypointManager onChange callback triggered with', updatedWaypoints.length, 'waypoints');
+        console.log('🔄 useWaypoints: onChange callback triggered with', updatedWaypoints.length, 'waypoints');
+        console.log('🔄 useWaypoints: waypoints data:', updatedWaypoints.map(wp => ({ name: wp.name, coords: wp.coords, id: wp.id })));
         
         // Update React state with a copy of the waypoints array to ensure proper re-rendering
         setWaypoints([...updatedWaypoints]);
+        console.log('🔄 useWaypoints: setWaypoints called with', updatedWaypoints.length, 'waypoints');
       });
       
       return () => {

@@ -123,6 +123,9 @@ class MapInteractionHandler {
   }
 
   handleMapClick(e) {
+    console.log("🗺️ MapInteractionHandler: Map clicked at coordinates:", e.lngLat);
+    console.log("🗺️ MapInteractionHandler: Click event:", { button: e.originalEvent.button, type: e.type });
+    
     // RIGHT-CLICK CHECK: Handle right-click to delete last waypoint
     if (e.originalEvent.button === 2) {
       console.log('🖱️ MapInteractionHandler: Right-click detected - attempting to delete last waypoint');

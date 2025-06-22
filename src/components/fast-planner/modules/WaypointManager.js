@@ -248,6 +248,9 @@ class WaypointManager {
       this.triggerCallback('onWaypointAdded', waypoint);
       this.triggerCallback('onChange', this.waypoints);
       
+      console.log('🗺️ WaypointManager: addWaypoint complete, total waypoints:', this.waypoints.length);
+      console.log('🗺️ WaypointManager: triggerCallback onChange called with waypoints:', this.waypoints.map(wp => ({ name: wp.name, coords: wp.coords })));
+      
       return waypoint;
     } catch (error) {
       console.error('Error adding waypoint:', error);
