@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AlternateModeButton from '../controls/AlternateModeButton';
 
 /**
  * Left Panel Component
@@ -554,6 +555,28 @@ const LeftPanel = ({
           </button>
         </div>
 
+        {/* Alternate Mode Button */}
+        <AlternateModeButton
+          waypoints={waypoints}
+          fuelLocations={[]} // Will be populated from platform manager
+          airports={[]} // Will be populated from platform manager  
+          onAlternateUpdate={(alternate, splitPoint) => {
+            console.log('Alternate selected:', alternate, splitPoint);
+            // Integration with route update logic would go here
+          }}
+          onToggleFuelLocations={(enabled) => {
+            console.log('Toggle fuel locations:', enabled);
+            // Integration with map layers would go here
+          }}
+          onToggleAirports={(enabled) => {
+            console.log('Toggle airports:', enabled);
+            // Integration with map layers would go here
+          }}
+          onRegisterMapClickHandler={(handlerName, handler) => {
+            console.log('Register map click handler:', handlerName);
+            // Integration with map manager would go here
+          }}
+        />
         
         {/* Favorite Locations Section */}
         <div style={{ marginTop: "20px" }}>

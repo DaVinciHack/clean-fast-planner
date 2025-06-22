@@ -658,14 +658,14 @@ class WeatherVisualizationManager {
             if (!liveWeather) {
                 return `
                     <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #ff9800;">
-                        <strong style="color: #ff9800;">🚁 Aviation Weather</strong><br>
+                        <strong style="color: #ff9800;">Aviation Weather</strong><br>
                         <span style="color: #ccc; font-size: 12px;">Weather data unavailable</span>
                     </div>
                 `;
             }
             
             // Determine data source and icon (aviation only)
-            const dataIcon = '🚁';
+            const dataIcon = '';
             const dataSource = 'Aviation Weather (AWC)';
             const stationInfo = liveWeather.stationId ? ` - ${liveWeather.stationId}` : '';
             
@@ -754,7 +754,7 @@ class WeatherVisualizationManager {
             
             return `
                 <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #40c8f0;">
-                    <strong style="color: #40c8f0;">${dataIcon} ${dataSource}${stationInfo}</strong><br>
+                    <strong style="color: #40c8f0;">${dataSource}${stationInfo}</strong><br>
                     <div style="font-size: 12px; color: #e0e0e0; margin-top: 4px;">
                         ${weatherDetails}
                         <span style="font-size: 10px; color: #888; margin-top: 4px; display: block;">${timeInfo}</span>
@@ -766,7 +766,7 @@ class WeatherVisualizationManager {
             console.warn('Failed to create live weather section:', error.message);
             return `
                 <div style="margin-top: 10px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid #f44336;">
-                    <strong style="color: #f44336;">🚁 Aviation Weather</strong><br>
+                    <strong style="color: #f44336;">Aviation Weather</strong><br>
                     <span style="color: #ccc; font-size: 12px;">Error loading weather data</span>
                 </div>
             `;

@@ -5,6 +5,7 @@ import PerformanceCard from './PerformanceCard';
 import WeatherCard from './WeatherCard';
 import FinanceCard from './FinanceCard';
 import EvacuationCard from './EvacuationCard';
+import SARCard from './SARCard';
 import SaveFlightCard from './SaveFlightCard';
 import LoadFlightsCard from './LoadFlightsCard';
 import AutoPlanCard from './AutoPlanCard';
@@ -17,6 +18,7 @@ export {
   WeatherCard,
   FinanceCard,
   EvacuationCard,
+  SARCard,
   SaveFlightCard,
   LoadFlightsCard,
   AutoPlanCard,

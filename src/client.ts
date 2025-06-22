@@ -28,11 +28,8 @@ const getRedirectUrl = () => {
     port = `:${window.location.port}`;
   }
   
-  // 🛡️ Ensure base path is included for subdirectory deployments
-  const basePath = (import.meta as any).env?.BASE_URL || '/plan/';
-  const normalizedBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
-  
-  return `${protocol}//${hostname}${port}${normalizedBasePath}/auth/callback`;
+  // Use the plan base path to match Vite configuration
+  return `${protocol}//${hostname}${port}/plan/auth/callback`;
 };
 
 const redirectUrl = getRedirectUrl();
@@ -44,7 +41,7 @@ export const auth = createPublicOauthClient(
   url,
   redirectUrl,
   true,
-  undefined,
+  '', // Use empty string instead of undefined
   window.location.toString(),
   scopes,
 );

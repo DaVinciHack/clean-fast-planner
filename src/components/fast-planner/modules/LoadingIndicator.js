@@ -218,12 +218,20 @@ const LoadingIndicator = (() => {
     }
     
     // Make sure we have a DOM element
-    const containerEl = typeof container === 'string' 
+    let containerEl = typeof container === 'string' 
       ? document.querySelector(container) 
       : container;
     
+    // If container not found and fallback provided, try fallback
+    if (!containerEl && options.fallbackContainer) {
+      containerEl = typeof options.fallbackContainer === 'string'
+        ? document.querySelector(options.fallbackContainer)
+        : options.fallbackContainer;
+    }
+    
     if (!containerEl) {
-      console.error('LoadingIndicator: Container element not found');
+      console.error('LoadingIndicator: Container element not found, tried:', 
+        container, options.fallbackContainer ? `fallback: ${options.fallbackContainer}` : '');
       return -1;
     }
     
