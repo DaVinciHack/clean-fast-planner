@@ -241,12 +241,19 @@ const LeftPanel = ({
         className={`route-editor-panel ${!visible ? "hidden" : ""}`}
       >
         <h3>Flight Stops</h3>
-        <p style={{ fontSize: '0.8em', color: 'var(--label-color)', margin: '0 0 10px 0' }}>
-          Click map to add stops or enter names below
-        </p>
         
-        <div id="stops-container">
-          {safeWaypoints.map((waypoint, index) => {
+        {/* ROUTE BUILDING SECTION */}
+        <div style={{ 
+          border: "1px solid #4FC3F7", 
+          borderRadius: "6px", 
+          padding: "12px", 
+          marginTop: "10px"
+        }}>
+          <h4 style={{ margin: "0 0 10px 0", color: "#1976D2", fontSize: "14px", fontWeight: "600" }}>Route Building</h4>
+          
+          {/* Current Route List */}
+          <div id="stops-container" style={{ marginBottom: "15px" }}>
+            {safeWaypoints.map((waypoint, index) => {
             // Extract all needed properties from the waypoint object
             const waypointId = waypoint.id || `waypoint-${index}`;
             const waypointName = waypoint.name || `${waypoint.isWaypoint || waypoint.type === 'WAYPOINT' ? 'WP' : 'Stop'} ${index + 1}`;
@@ -377,169 +384,88 @@ const LeftPanel = ({
               </div>
             );
           })}
-        </div>
-        
-        {/* Add Stop by Name Input */}
-        <div style={{ marginTop: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <input 
-              type="text" 
-              className="route-input"
-              placeholder="Enter rig name, platform, or coordinates"
-              style={{ 
-                flex: 1, 
-                marginRight: "5px", 
-                marginBottom: 0, 
-                height: "36px"
-              }}
-              value={routeInput}
-              onChange={(e) => {
-                if (onRouteInputChange) {
-                  onRouteInputChange(e.target.value);
-                }
-              }}
-              onKeyPress={handleKeyPress}
-            />
-            <button 
-              className="control-button" 
-              style={{
-                marginTop: 0,
-                height: "36px",
-                padding: "0 15px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              onClick={() => {
-                console.log('=== LeftPanel: Add button clicked ===');
-                console.log('onAddWaypoint function available:', !!onAddWaypoint);
-                console.log('routeInput value:', JSON.stringify(routeInput));
-                console.log('routeInput trimmed:', JSON.stringify(routeInput.trim()));
-                console.log('routeInput length:', routeInput.trim().length);
-                
-                if (onAddWaypoint && routeInput.trim()) {
-                  console.log('LeftPanel: Calling onAddWaypoint with input:', routeInput.trim());
-                  try {
-                    onAddWaypoint(routeInput.trim());
-                    console.log('LeftPanel: onAddWaypoint call completed successfully');
-                  } catch (error) {
-                    console.error('LeftPanel: Error calling onAddWaypoint:', error);
-                  }
-                  
-                  // Clear the input field after adding
+          </div>
+          
+          {/* Add Stop by Name Input */}
+          <div style={{ marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <input 
+                type="text" 
+                className="route-input"
+                placeholder="Enter rig name, platform, or coordinates"
+                style={{ 
+                  flex: 1, 
+                  marginRight: "5px", 
+                  marginBottom: 0, 
+                  height: "36px"
+                }}
+                value={routeInput}
+                onChange={(e) => {
                   if (onRouteInputChange) {
-                    console.log('LeftPanel: Clearing input field');
-                    onRouteInputChange('');
+                    onRouteInputChange(e.target.value);
                   }
-                } else {
-                  console.log('LeftPanel: Cannot add waypoint - missing function or empty input');
-                  console.log('  - onAddWaypoint available:', !!onAddWaypoint);
-                  console.log('  - routeInput has content:', !!routeInput.trim());
-                }
-              }}
-            >
-              Add
-            </button>
+                }}
+                onKeyPress={handleKeyPress}
+              />
+              <button 
+                className="control-button" 
+                style={{
+                  marginTop: 0,
+                  height: "36px",
+                  padding: "0 15px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+                onClick={() => {
+                  console.log('=== LeftPanel: Add button clicked ===');
+                  console.log('onAddWaypoint function available:', !!onAddWaypoint);
+                  console.log('routeInput value:', JSON.stringify(routeInput));
+                  console.log('routeInput trimmed:', JSON.stringify(routeInput.trim()));
+                  console.log('routeInput length:', routeInput.trim().length);
+                  
+                  if (onAddWaypoint && routeInput.trim()) {
+                    console.log('LeftPanel: Calling onAddWaypoint with input:', routeInput.trim());
+                    try {
+                      onAddWaypoint(routeInput.trim());
+                      console.log('LeftPanel: onAddWaypoint call completed successfully');
+                    } catch (error) {
+                      console.error('LeftPanel: Error calling onAddWaypoint:', error);
+                    }
+                    
+                    // Clear the input field after adding
+                    if (onRouteInputChange) {
+                      console.log('LeftPanel: Clearing input field');
+                      onRouteInputChange('');
+                    }
+                  } else {
+                    console.log('LeftPanel: Cannot add waypoint - missing function or empty input');
+                    console.log('  - onAddWaypoint available:', !!onAddWaypoint);
+                    console.log('  - routeInput has content:', !!routeInput.trim());
+                  }
+                }}
+              >
+                Add
+              </button>
+            </div>
+            
+            {/* Coordinate format help text */}
+            <div style={{ 
+              fontSize: "11px", 
+              color: "#666", 
+              marginTop: "3px",
+              lineHeight: "1.3"
+            }}>
+              Examples: STAVANGER, 60.7917,5.3417, 60° 47.502' N, 5° 20.502' E
+            </div>
           </div>
-          
-          {/* Coordinate format help text */}
-          <div style={{ 
-            fontSize: "11px", 
-            color: "#888", 
-            marginTop: "3px",
-            lineHeight: "1.3"
-          }}>
-            Examples: STAVANGER, 60.7917,5.3417, 60° 47.502' N, 5° 20.502' E
-          </div>
-        </div>
 
-        {/* Alternate Route Input */}
-        <div style={{ marginTop: "15px" }}>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <input 
-              type="text" 
-              className="route-input"
-              placeholder="Alternate Name (e.g., ENXW ENZV or ENZV)"
-              style={{ 
-                flex: 1, 
-                marginRight: "5px", 
-                marginBottom: 0, 
-                height: "36px"
-              }}
-              value={alternateRouteInput || ''}
-              onChange={(e) => {
-                if (onAlternateRouteInputChange) {
-                  onAlternateRouteInputChange(e.target.value);
-                }
-              }}
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && alternateRouteInput && alternateRouteInput.trim() !== "") {
-                  if (onAlternateRouteSubmit) {
-                    console.log('LeftPanel: Alternate route Enter key pressed with input:', alternateRouteInput.trim());
-                    onAlternateRouteSubmit(alternateRouteInput.trim());
-                  }
-                }
-              }}
-            />
-            <button 
-              className="control-button" 
-              style={{
-                marginTop: 0,
-                height: "36px",
-                padding: "0 15px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              onClick={() => {
-                console.log('=== LeftPanel: Alternate Route Add button clicked ===');
-                console.log('onAlternateRouteSubmit function available:', !!onAlternateRouteSubmit);
-                console.log('alternateRouteInput value:', JSON.stringify(alternateRouteInput));
-                
-                if (onAlternateRouteSubmit && alternateRouteInput && alternateRouteInput.trim()) {
-                  console.log('LeftPanel: Calling onAlternateRouteSubmit with input:', alternateRouteInput.trim());
-                  try {
-                    onAlternateRouteSubmit(alternateRouteInput.trim());
-                    console.log('LeftPanel: onAlternateRouteSubmit call completed successfully');
-                  } catch (error) {
-                    console.error('LeftPanel: Error calling onAlternateRouteSubmit:', error);
-                  }
-                } else {
-                  console.log('LeftPanel: Cannot submit alternate route - missing function or empty input');
-                  console.log('  - onAlternateRouteSubmit available:', !!onAlternateRouteSubmit);
-                  console.log('  - alternateRouteInput has content:', !!(alternateRouteInput && alternateRouteInput.trim()));
-                }
-              }}
-            >
-              Set
-            </button>
-          </div>
-          
-          {/* Alternate route help text */}
-          <div style={{ 
-            fontSize: "11px", 
-            color: "#888", 
-            marginTop: "3px",
-            lineHeight: "1.3"
-          }}>
-            Single: ENZV (uses current split) | Pair: ENXW ENZV (custom route)
-          </div>
-        </div>
-        
-        {/* Mode Buttons - Side by Side */}
-        <div style={{ 
-          width: "100%", 
-          marginTop: "10px", 
-          marginBottom: "7px",
-          display: "flex",
-          gap: "8px"
-        }}>
           {/* Add Waypoints Button */}
           <button 
             id="add-waypoints" 
             className={`control-button ${waypointModeActive ? 'active' : ''}`}
             style={{
-              flex: 1,
+              width: "100%",
               padding: "6px 4px",
               display: "flex",
               alignItems: "center",
@@ -562,22 +488,105 @@ const LeftPanel = ({
             }}
           >
             {waypointModeActive ? 
-              "✅ WAYPOINTS" : 
-              "Add Waypoints"}
+              "✅ Insert Waypoints Active" : 
+              "Click Map to Insert Waypoints"}
           </button>
+        </div>
+
+        {/* ALTERNATES SECTION */}
+        <div style={{ 
+          border: "1px solid #9C27B0", 
+          borderRadius: "6px", 
+          padding: "12px", 
+          marginTop: "15px"
+        }}>
+          <h4 style={{ margin: "0 0 10px 0", color: "#7B1FA2", fontSize: "14px", fontWeight: "600" }}>Alternate Routes</h4>
+          
+          {/* Alternate Route Input */}
+          <div style={{ marginBottom: "10px" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <input 
+                type="text" 
+                className="route-input"
+                placeholder="Alternate Name (e.g., ENXW ENZV or ENZV)"
+                style={{ 
+                  flex: 1, 
+                  marginRight: "5px", 
+                  marginBottom: 0, 
+                  height: "36px"
+                }}
+                value={alternateRouteInput || ''}
+                onChange={(e) => {
+                  if (onAlternateRouteInputChange) {
+                    onAlternateRouteInputChange(e.target.value);
+                  }
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter" && alternateRouteInput && alternateRouteInput.trim() !== "") {
+                    if (onAlternateRouteSubmit) {
+                      console.log('LeftPanel: Alternate route Enter key pressed with input:', alternateRouteInput.trim());
+                      onAlternateRouteSubmit(alternateRouteInput.trim());
+                    }
+                  }
+                }}
+              />
+              <button 
+                className="control-button" 
+                style={{
+                  marginTop: 0,
+                  height: "36px",
+                  padding: "0 15px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+                onClick={() => {
+                  console.log('=== LeftPanel: Alternate Route Add button clicked ===');
+                  console.log('onAlternateRouteSubmit function available:', !!onAlternateRouteSubmit);
+                  console.log('alternateRouteInput value:', JSON.stringify(alternateRouteInput));
+                  
+                  if (onAlternateRouteSubmit && alternateRouteInput && alternateRouteInput.trim()) {
+                    console.log('LeftPanel: Calling onAlternateRouteSubmit with input:', alternateRouteInput.trim());
+                    try {
+                      onAlternateRouteSubmit(alternateRouteInput.trim());
+                      console.log('LeftPanel: onAlternateRouteSubmit call completed successfully');
+                    } catch (error) {
+                      console.error('LeftPanel: Error calling onAlternateRouteSubmit:', error);
+                    }
+                  } else {
+                    console.log('LeftPanel: Cannot submit alternate route - missing function or empty input');
+                    console.log('  - onAlternateRouteSubmit available:', !!onAlternateRouteSubmit);
+                    console.log('  - alternateRouteInput has content:', !!(alternateRouteInput && alternateRouteInput.trim()));
+                  }
+                }}
+              >
+                Set
+              </button>
+            </div>
+            
+            {/* Alternate route help text */}
+            <div style={{ 
+              fontSize: "11px", 
+              color: "#666", 
+              marginTop: "3px",
+              lineHeight: "1.3"
+            }}>
+              Single: ENZV (uses current split) | Pair: ENXW ENZV (custom route)
+            </div>
+          </div>
 
           {/* Add Alternate Button */}
           <button 
             className="control-button"
             style={{ 
-              flex: 1,
+              width: "100%",
               padding: "6px 4px", 
               display: "flex", 
               alignItems: "center", 
               justifyContent: "center", 
               fontSize: "12px",
               height: "32px",
-              backgroundColor: alternateModeActive ? "#00cc66" : "#0066cc",
+              backgroundColor: alternateModeActive ? "#00cc66" : "#9C27B0",
               color: "white",
               fontWeight: alternateModeActive ? "bold" : "normal",
               border: alternateModeActive ? "2px solid #ffcc00" : "none"
@@ -593,31 +602,36 @@ const LeftPanel = ({
             }}
           >
             {alternateModeActive ? 
-              "✅ ALTERNATE" : 
-              "Add Alternate"}
+              "✅ Alternate Mode Active" : 
+              "Click Map to Set Alternates"}
           </button>
         </div>
         
-        {/* Favorite Locations Section */}
-        <div style={{ marginTop: "20px" }}>
-          <h4>Favorite Locations</h4>
-          {/* Input for adding new favorite location */}
-          <div style={{ marginBottom: "15px" }}>
-            <p style={{ fontSize: '0.8em', color: 'var(--label-color)', margin: '0 0 5px 0' }}>
-              Click the heart icon ❤️ next to a waypoint or in any popup to add to favorites
+        {/* FAVORITES SECTION */}
+        <div style={{ 
+          border: "1px solid #E91E63", 
+          borderRadius: "6px", 
+          padding: "12px", 
+          marginTop: "20px"
+        }}>
+          <h4 style={{ margin: "0 0 8px 0", color: "#C2185B", fontSize: "14px", fontWeight: "600" }}>Favorite Locations</h4>
+          <div style={{ marginBottom: "12px" }}>
+            <p style={{ fontSize: '11px', color: '#666', margin: '0 0 6px 0', lineHeight: "1.3" }}>
+              Click ❤️ next to any location to save as favorite
             </p>
             <p style={{ 
-              fontSize: '0.8em', 
-              color: 'var(--accent-cyan)', 
-              margin: '0 0 10px 0',
-              padding: '6px',
-              backgroundColor: 'rgba(0,123,255,0.1)',
-              borderRadius: '3px'
+              fontSize: '12px', 
+              color: '#E91E63', 
+              margin: '0 0 8px 0',
+              padding: '4px 6px',
+              backgroundColor: 'rgba(233, 30, 99, 0.1)',
+              borderRadius: '4px',
+              border: '1px solid rgba(233, 30, 99, 0.2)'
             }}>
               <strong>{internalFavorites.length}</strong> favorites in this region
             </p>
           </div>
-          <div style={{ fontSize: "0.85em" }}>
+          <div style={{ fontSize: "0.8em" }}>
             {safeFavoriteLocations.map((location, index) => {
               // Ensure each location has an ID (use index as fallback)
               const locationId = location.id || `favorite-${index}`;
@@ -637,8 +651,8 @@ const LeftPanel = ({
                   style={{ 
                     display: "flex", 
                     alignItems: "center", 
-                    padding: "5px 3px",
-                    marginBottom: "4px",
+                    padding: "3px",
+                    marginBottom: "2px",
                     borderRadius: "4px",
                     backgroundColor: "rgba(0,0,0,0.1)",
                     transition: "background-color 0.2s"
