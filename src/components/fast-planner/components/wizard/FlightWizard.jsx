@@ -27,6 +27,10 @@ const FlightWizard = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   
+  // Name animation state
+  const [showFirstName, setShowFirstName] = useState(false);
+  const [showLastName, setShowLastName] = useState(false);
+  
   // Flight building state
   const [flightData, setFlightData] = useState({
     departure: null,
@@ -43,6 +47,29 @@ const FlightWizard = ({
   const [searchResults, setSearchResults] = useState([]);
   const [validationStatus, setValidationStatus] = useState(null); // 'valid', 'invalid', 'searching'
   
+  // Animate names when wizard becomes visible and user data is actually loaded
+  useEffect(() => {
+    if (isVisible && currentStep === 0 && userDetails) {
+      // Reset animation state
+      setShowFirstName(false);
+      setShowLastName(false);
+      
+      // Wait for wizard to appear, then animate first name
+      const firstNameTimer = setTimeout(() => {
+        setShowFirstName(true);
+        
+        // Then animate last name after first name animation starts
+        const lastNameTimer = setTimeout(() => {
+          setShowLastName(true);
+        }, 600); // Delay for last name
+        
+        return () => clearTimeout(lastNameTimer);
+      }, 300); // Initial delay for first name
+      
+      return () => clearTimeout(firstNameTimer);
+    }
+  }, [isVisible, currentStep, userDetails]);
+
   // Steps definition
   const steps = [
     { id: 'welcome', title: 'Welcome to FastPlanner' },
@@ -210,14 +237,20 @@ const FlightWizard = ({
                 Welcome to Flight Planning
               </div>
               <div className="user-name-display">
-                {userDetails?.givenName && (
-                  <div className="user-first-name">{userDetails.givenName}</div>
+                {userDetails && userDetails.givenName && (
+                  <div className={`user-first-name ${showFirstName ? 'fade-in' : ''}`}>
+                    {userDetails.givenName}
+                  </div>
                 )}
-                {userDetails?.familyName && (
-                  <div className="user-last-name">{userDetails.familyName}</div>
+                {userDetails && userDetails.familyName && (
+                  <div className={`user-last-name ${showLastName ? 'fade-in' : ''}`}>
+                    {userDetails.familyName}
+                  </div>
                 )}
-                {!userDetails?.givenName && !userDetails?.familyName && (
-                  <div className="user-first-name">Pilot</div>
+                {userDetails && !userDetails.givenName && !userDetails.familyName && (
+                  <div className={`user-first-name ${showFirstName ? 'fade-in' : ''}`}>
+                    Pilot
+                  </div>
                 )}
               </div>
               <p>Let's plan your flight step by step.<br/>It only takes a minute!</p>

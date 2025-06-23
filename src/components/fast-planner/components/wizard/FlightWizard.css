@@ -150,6 +150,14 @@
   white-space: nowrap;
   pointer-events: none;
   text-align: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 1.2s ease, transform 1.2s ease;
+}
+
+.user-first-name.fade-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .user-last-name {
@@ -164,6 +172,14 @@
   margin-top: -35px;
   padding-top: 0px;
   text-align: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.user-last-name.fade-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Route icons */
@@ -663,3 +679,4 @@
     opacity: 1;
   }
 }
+
