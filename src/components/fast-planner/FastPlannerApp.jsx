@@ -329,6 +329,10 @@ const FastPlannerCore = ({
     client, currentRegion: activeRegionFromContext, setRouteStats, setStopCards
   });
   
+  // Alternate mode state (toggle function defined later after handleAlternateRouteInputChange)
+  const [alternateModeActive, setAlternateModeActive] = useState(false);
+  const [alternateSplitPoint, setAlternateSplitPoint] = useState(null);
+  
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
     console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
@@ -871,6 +875,235 @@ const FastPlannerCore = ({
     setAlternateRouteInput(value);
   };
 
+  // Alternate mode toggle function (defined after handleAlternateRouteInputChange to avoid reference error)
+  const toggleAlternateMode = useCallback((active) => {
+    console.log(`🎯 ALTERNATE MODE: ${active ? 'ENTERING' : 'EXITING'} alternate mode`);
+    
+    setAlternateModeActive(active);
+    window.isAlternateModeActive = active;
+    
+    // Call PlatformManager directly for visibility toggle (same pattern as waypoint mode)
+    if (platformManagerRef.current && typeof platformManagerRef.current.toggleAlternateMode === 'function') {
+      console.log('🎯 ALTERNATE MODE: Calling PlatformManager.toggleAlternateMode');
+      platformManagerRef.current.toggleAlternateMode(active);
+    } else {
+      console.warn('🎯 ALTERNATE MODE: PlatformManager.toggleAlternateMode not available');
+    }
+    
+    // Store alternate mode click handler for map integration
+    if (active) {
+      // Don't automatically reset split point - let it persist between clicks
+      // ✅ SOLUTION: Use window variable to avoid React closure issues
+      window.currentSplitPoint = null;
+      
+      window.alternateModeClickHandler = (clickPoint, clickedFeature) => {
+        console.log('🎯 Alternate mode click:', clickPoint, clickedFeature);
+        console.log('🎯 Current alternate input:', alternateRouteInput);
+        console.log('🎯 Current split point state:', alternateSplitPoint);
+        console.log('🎯 Handler timestamp:', Date.now());
+        
+        // First check if this click is on an existing route waypoint
+        const clickedWaypoint = waypoints.find(wp => {
+          if (!wp.lat || !wp.lng) return false;
+          // More robust distance calculation using haversine formula or simple approximation
+          const latDiff = Math.abs(wp.lat - clickPoint.lat);
+          const lngDiff = Math.abs(wp.lng - clickPoint.lng);
+          // Approximate: 0.01 degrees ≈ ~1km at most latitudes
+          return latDiff < 0.05 && lngDiff < 0.05; // Within ~5km tolerance for easier clicking
+        });
+        
+        if (clickedWaypoint) {
+          // Click on existing route waypoint - set as new split point
+          console.log('🎯 Setting new split point:', clickedWaypoint.name);
+          setAlternateSplitPoint(clickedWaypoint.name);
+          
+          // Clear the alternate input and set only the split point (no submission)
+          console.log('🎯 Clearing alternate input and setting split point only:', clickedWaypoint.name);
+          handleAlternateRouteInputChange(clickedWaypoint.name);
+          
+          // Show user feedback that we're waiting for alternate destination
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              `Split point set: ${clickedWaypoint.name}. Now click to select alternate destination.`,
+              'info',
+              3000
+            );
+          }
+          
+          return true; // Click handled
+        }
+        
+        // Handle platform clicks (clickedFeature will be platform properties)
+        if (clickedFeature && clickedFeature.name) {
+          // Check if this is a fuel-capable location, airport, or route waypoint
+          const isFuelCapable = clickedFeature.hasFuel === true || clickedFeature.hasFuel === 'true';
+          const isAirfield = clickedFeature.isAirfield === true || clickedFeature.isAirfield === 'true';
+          const isRouteWaypoint = clickedFeature.isInRoute === true;
+          
+          if (isFuelCapable || isAirfield || isRouteWaypoint) {
+            const locationName = clickedFeature.name || clickedFeature.Name || 'Selected Location';
+            
+            // FIRST: Check if this is explicitly marked as a route waypoint OR if it's in the route
+            const isLocationInRoute = isRouteWaypoint || waypoints.some(wp => wp.name === locationName);
+            
+            if (isLocationInRoute) {
+              // This location is in the route - set as split point and wait for alternate
+              console.log('🎯 ROUTE WAYPOINT DETECTED: Location is in route, setting as split point:', locationName);
+              console.log('🎯 ROUTE WAYPOINT: isRouteWaypoint =', isRouteWaypoint);
+              console.log('🎯 ROUTE WAYPOINT: Setting input only, NO SUBMIT');
+              // Use the state variable to track the split point reliably
+              console.log('🎯 ROUTE WAYPOINT: Setting split point using window variable:', locationName);
+              // ✅ SOLUTION: Use window variable to avoid React closure issues completely
+              window.currentSplitPoint = locationName;
+              console.log('🎯 ROUTE WAYPOINT: window.currentSplitPoint set to:', window.currentSplitPoint);
+              handleAlternateRouteInputChange(locationName);
+              console.log('🎯 ROUTE WAYPOINT: Input updated to:', locationName);
+              
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Split point set: ${locationName}. Now click alternate destination.`,
+                  'info',
+                  3000
+                );
+              }
+              console.log('🎯 ROUTE WAYPOINT: Returning early, should NOT submit');
+              return true; // Click handled, waiting for next click
+            }
+            
+            // Location is NOT in route - proceed with normal alternate logic
+            console.log('🎯 ALTERNATE LOCATION CLICKED. Checking for split point...');
+            console.log('🎯 window.currentSplitPoint:', window.currentSplitPoint);
+            console.log('🎯 alternateRouteInput state:', alternateRouteInput);
+            
+            let alternateString;
+            if (window.currentSplitPoint) {
+              // ✅ SOLUTION: Use window variable instead of React state
+              console.log('🎯 FOUND SPLIT POINT IN WINDOW:', window.currentSplitPoint);
+              console.log('🎯 CREATING PAIR WITH ALTERNATE:', locationName);
+              alternateString = `${window.currentSplitPoint} ${locationName}`;
+              console.log('🎯 CREATED PAIR FROM WINDOW:', alternateString);
+              window.currentSplitPoint = null; // Reset for next time
+            } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
+              // We have a single location in input (split point from route click), add destination to complete pair
+              console.log('🎯 FOUND SPLIT POINT IN INPUT:', alternateRouteInput.trim());
+              console.log('🎯 CREATING PAIR WITH ALTERNATE:', locationName);
+              alternateString = `${alternateRouteInput.trim()} ${locationName}`;
+              console.log('🎯 CREATED PAIR STRING:', alternateString);
+              // Clear the split point state since we're using it
+              setAlternateSplitPoint(null);
+            } else {
+              // No split point, use default (single location alternate)
+              console.log('🎯 NO SPLIT POINT FOUND, using single location:', locationName);
+              console.log('🎯 alternateRouteInput:', alternateRouteInput);
+              console.log('🎯 alternateRouteInput.trim():', alternateRouteInput?.trim());
+              console.log('🎯 includes space:', alternateRouteInput?.includes(' '));
+              alternateString = locationName;
+            }
+            
+            console.log('🎯 Final alternate input string:', alternateString);
+            handleAlternateRouteInputChange(alternateString);
+            // Automatically trigger the alternate route submission to create the orange line
+            setTimeout(() => {
+              handleAlternateRouteSubmit(alternateString);
+            }, 100); // Small delay to ensure input is set first
+            return true; // Click handled
+          } else {
+            console.log('🎯 Platform clicked but not fuel-capable or airport, ignoring');
+            return false; // Not a valid alternate
+          }
+        }
+        
+        // Handle map clicks (clickedFeature will be nearestPlatform if any)
+        if (clickedFeature && clickedFeature.distance !== undefined) {
+          // This is a nearestPlatform result from map click
+          const isFuelCapable = clickedFeature.hasFuel === true;
+          const isAirfield = clickedFeature.isAirfield === true;
+          
+          if (isFuelCapable || isAirfield) {
+            const locationName = clickedFeature.name || 'Nearby Location';
+            
+            // FIRST: Check if this location is already in the route
+            const isLocationInRoute = waypoints.some(wp => wp.name === locationName);
+            
+            if (isLocationInRoute) {
+              // This location is in the route - set as split point and wait for alternate
+              console.log('🎯 Location is in route, setting as split point:', locationName);
+              // Clear the state variable and only use the input field for route clicks
+              setAlternateSplitPoint(null);
+              handleAlternateRouteInputChange(locationName);
+              
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Split point set: ${locationName}. Now click alternate destination.`,
+                  'info',
+                  3000
+                );
+              }
+              return true; // Click handled, waiting for next click
+            }
+            
+            // Location is NOT in route - proceed with normal alternate logic
+            console.log('🎯 ALTERNATE LOCATION CLICKED. Checking for split point...');
+            console.log('🎯 window.currentSplitPoint:', window.currentSplitPoint);
+            console.log('🎯 alternateRouteInput state:', alternateRouteInput);
+            
+            let alternateString;
+            if (window.currentSplitPoint) {
+              // ✅ SOLUTION: Use window variable instead of React state
+              console.log('🎯 FOUND SPLIT POINT IN WINDOW:', window.currentSplitPoint);
+              console.log('🎯 CREATING PAIR WITH ALTERNATE:', locationName);
+              alternateString = `${window.currentSplitPoint} ${locationName}`;
+              console.log('🎯 CREATED PAIR FROM WINDOW:', alternateString);
+              window.currentSplitPoint = null; // Reset for next time
+            } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
+              // We have a single location in input (split point from route click), add destination to complete pair
+              console.log('🎯 FOUND SPLIT POINT IN INPUT:', alternateRouteInput.trim());
+              console.log('🎯 CREATING PAIR WITH ALTERNATE:', locationName);
+              alternateString = `${alternateRouteInput.trim()} ${locationName}`;
+              console.log('🎯 CREATED PAIR STRING:', alternateString);
+              console.log('🎯 ✅ CRITICAL: About to pass complete pair to handleAlternateRouteSubmit');
+              // ✅ DON'T clear the input state here - let the submission handle clearing after success
+            } else {
+              // No split point, use default (single location alternate)
+              console.log('🎯 NO SPLIT POINT FOUND, using single location:', locationName);
+              console.log('🎯 alternateRouteInput:', alternateRouteInput);
+              console.log('🎯 alternateRouteInput.trim():', alternateRouteInput?.trim());
+              console.log('🎯 includes space:', alternateRouteInput?.includes(' '));
+              alternateString = locationName;
+            }
+            
+            console.log('🎯 Final alternate input string:', alternateString);
+            console.log('🎯 ✅ CRITICAL: Passing to handleAlternateRouteSubmit:', alternateString);
+            handleAlternateRouteInputChange(alternateString);
+            // ✅ CRITICAL FIX: Pass the complete pair string to handleAlternateRouteSubmit
+            // This ensures that when we have a pair like "ENLE EI346-A", it's treated as a pair, not single location
+            setTimeout(() => {
+              handleAlternateRouteSubmit(alternateString);
+            }, 100); // Small delay to ensure input is set first
+            return true; // Click handled
+          }
+        }
+        
+        // No suitable alternate found
+        console.log('🎯 No suitable alternate at click location');
+        return false; // Click not handled
+      };
+    } else {
+      window.alternateModeClickHandler = null;
+      window.currentSplitPoint = null; // Clear window variable too
+      setAlternateSplitPoint(null); // Reset when exiting alternate mode
+    }
+  }, [platformManagerRef, handleAlternateRouteInputChange, waypoints]);
+
+  // DEBUG: Track state changes
+  useEffect(() => {
+    console.log('🔍 alternateSplitPoint state changed to:', alternateSplitPoint);
+  }, [alternateSplitPoint]);
+
+  useEffect(() => {
+    console.log('🔍 alternateRouteInput state changed to:', alternateRouteInput);
+  }, [alternateRouteInput]);
+
   // Helper function to determine split point for new flights
   const determineNewFlightSplitPoint = useCallback((currentWaypoints) => {
     console.log('🎯 Determining split point for new flight');
@@ -932,7 +1165,10 @@ const FastPlannerCore = ({
       const trimmedInput = input.trim();
       const locations = trimmedInput.split(/\s+/).filter(loc => loc.length > 0);
       
+      console.log('🛣️ handleAlternateRouteSubmit called with input:', input);
       console.log('🛣️ Parsed locations:', locations);
+      console.log('🛣️ Current alternateRouteInput state:', alternateRouteInput);
+      console.log('🛣️ Current alternateSplitPoint state:', alternateSplitPoint);
       
       // Helper function to look up coordinates for a location
       const getLocationCoordinates = async (locationName) => {
@@ -967,7 +1203,12 @@ const FastPlannerCore = ({
         // ENHANCED SPLIT POINT LOGIC
         let currentSplitPoint;
         
-        if (alternateRouteData?.splitPoint) {
+        // Check if we have a manual split point in the input (from route click)
+        if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
+          // We have a single location in input - this is a manual split point from route click
+          currentSplitPoint = alternateRouteInput.trim();
+          console.log('🛣️ Using manual split point from input:', currentSplitPoint);
+        } else if (alternateRouteData?.splitPoint) {
           // LOADED FLIGHT: Use existing split point from flight data
           currentSplitPoint = alternateRouteData.splitPoint;
           console.log('🛣️ Using existing split point from loaded flight:', currentSplitPoint);
@@ -2957,6 +3198,7 @@ const FastPlannerCore = ({
           onAddFavoriteLocation={handleAddFavoriteLocation} onRemoveFavoriteLocation={handleRemoveFavoriteLocation}
           onClearRoute={clearRoute} onToggleChart={togglePlatformsVisibility} chartsVisible={platformsVisible}
           onToggleWaypointMode={toggleWaypointMode} waypointModeActive={waypointModeActive}
+          onToggleAlternateMode={toggleAlternateMode} alternateModeActive={alternateModeActive}
         />
         
         <RightPanel

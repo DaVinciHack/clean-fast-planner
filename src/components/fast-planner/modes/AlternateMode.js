@@ -17,6 +17,7 @@ import { isPointOnRoute, findNearestFuelLocation, findNearestAirport } from '../
  * @param {Array} params.waypoints - Current route waypoints
  * @param {Array} params.fuelLocations - Available fuel-capable locations
  * @param {Array} params.airports - Available airports
+ * @param {Object} params.platformManager - PlatformManager instance for layer control
  * @param {Function} params.onAlternateUpdate - Callback when alternate is selected
  * @param {Function} params.onToggleFuelLocations - Callback to toggle fuel locations visibility
  * @param {Function} params.onToggleAirports - Callback to toggle airports visibility
@@ -26,6 +27,7 @@ export const useAlternateMode = ({
   waypoints = [],
   fuelLocations = [],
   airports = [],
+  platformManager,
   onAlternateUpdate,
   onToggleFuelLocations,
   onToggleAirports
@@ -48,12 +50,19 @@ export const useAlternateMode = ({
     setIsAlternateMode(newMode);
     
     if (newMode) {
-      // Entering alternate mode - auto-enable fuel locations and airports
-      if (onToggleFuelLocations) {
-        onToggleFuelLocations(true);
-      }
-      if (onToggleAirports) {
-        onToggleAirports(true);
+      // Entering alternate mode - call PlatformManager to change map layers
+      if (platformManager && typeof platformManager.toggleAlternateMode === 'function') {
+        console.log('🎯 AlternateMode: Calling PlatformManager.toggleAlternateMode(true)');
+        platformManager.toggleAlternateMode(true);
+      } else {
+        console.warn('🎯 AlternateMode: PlatformManager.toggleAlternateMode not available, falling back to individual toggles');
+        // Fallback to individual layer toggles
+        if (onToggleFuelLocations) {
+          onToggleFuelLocations(true);
+        }
+        if (onToggleAirports) {
+          onToggleAirports(true);
+        }
       }
       
       // Reset state
@@ -65,13 +74,19 @@ export const useAlternateMode = ({
         message: 'Alternate Mode Active: Click on route to set split point, or off route to select alternate directly'
       });
     } else {
-      // Exiting alternate mode - clear all state
+      // Exiting alternate mode - call PlatformManager to restore normal layers
+      if (platformManager && typeof platformManager.toggleAlternateMode === 'function') {
+        console.log('🎯 AlternateMode: Calling PlatformManager.toggleAlternateMode(false)');
+        platformManager.toggleAlternateMode(false);
+      }
+      
+      // Clear all state
       setSplitPoint(null);
       setAwaitingAlternate(false);
       setSelectedAlternate(null);
       setClickFeedback(null);
     }
-  }, [isAlternateMode, onToggleFuelLocations, onToggleAirports]);
+  }, [isAlternateMode, platformManager, onToggleFuelLocations, onToggleAirports]);
   
   /**
    * Handle map click events in alternate mode

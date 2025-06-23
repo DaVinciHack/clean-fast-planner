@@ -351,7 +351,21 @@ const useManagers = ({
 
       mapInteractionHandlerRef.current.setCallback('onMapClick', async (data) => {
         console.log('🗺️ Map click callback received in useManagers', data);
+        console.log('🗺️ Window.isAlternateModeActive:', window.isAlternateModeActive);
+        console.log('🗺️ Window.alternateModeClickHandler exists:', !!window.alternateModeClickHandler);
+        
         try {
+          // Check if alternate mode is active and handle click differently
+          if (window.isAlternateModeActive && window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+            console.log('🎯 Routing click to alternate mode handler');
+            const handled = window.alternateModeClickHandler(data.lngLat, data.nearestPlatform);
+            console.log('🎯 Alternate mode handler result:', handled);
+            if (handled) {
+              console.log('🎯 Click handled by alternate mode, stopping normal waypoint addition');
+              return; // Click was handled by alternate mode
+            }
+          }
+          
           // Create a local copy of the data to avoid reference issues
           const clickData = {...data};
           
@@ -371,7 +385,21 @@ const useManagers = ({
 
       mapInteractionHandlerRef.current.setCallback('onPlatformClick', async (data) => {
         console.log('🏢 Platform click callback received in useManagers', data);
+        console.log('🏢 Window.isAlternateModeActive:', window.isAlternateModeActive);
+        console.log('🏢 Window.alternateModeClickHandler exists:', !!window.alternateModeClickHandler);
+        
         try {
+          // Check if alternate mode is active and handle click differently
+          if (window.isAlternateModeActive && window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+            console.log('🎯 Routing platform click to alternate mode handler');
+            const handled = window.alternateModeClickHandler(data.lngLat, data.properties);
+            console.log('🎯 Platform alternate mode handler result:', handled);
+            if (handled) {
+              console.log('🎯 Platform click handled by alternate mode, stopping normal waypoint addition');
+              return; // Click was handled by alternate mode
+            }
+          }
+          
           // Create a local copy of the data to avoid reference issues
           const clickData = {...data};
 
@@ -392,6 +420,17 @@ const useManagers = ({
       mapInteractionHandlerRef.current.setCallback('onRouteClick', async (data) => {
         console.log('🛣️ Route click callback received in useManagers', data);
         try {
+          // Check if alternate mode is active first
+          if (window.isAlternateModeActive && window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+            console.log('🎯 Routing route click to alternate mode handler');
+            const handled = window.alternateModeClickHandler(data.lngLat, null);
+            console.log('🎯 Route alternate mode handler result:', handled);
+            if (handled) {
+              console.log('🎯 Route click handled by alternate mode, stopping normal waypoint insertion');
+              return; // Click was handled by alternate mode
+            }
+          }
+          
           // Create a local copy of the data
           const clickData = {...data};
           

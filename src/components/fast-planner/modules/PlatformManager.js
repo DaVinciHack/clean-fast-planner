@@ -2295,6 +2295,101 @@ class PlatformManager {
   }
 
   /**
+   * Toggle alternate mode - show only fuel locations and airports for alternate selection
+   * @param {boolean} active - Whether to activate alternate mode
+   */
+  toggleAlternateMode(active) {
+    console.log(`PlatformManager: ENTERING toggleAlternateMode. Active: ${active}`);
+    this.alternateModeActive = active;
+    window.isAlternateModeActive = active;
+
+    this.mapManager.onMapLoaded(() => {
+      const map = this.mapManager.getMap();
+      console.log(`PlatformManager: toggleAlternateMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
+      if (!map) {
+        console.error("PlatformManager: Map not available for toggleAlternateMode even after onMapLoaded. Exiting.");
+        return;
+      }
+
+      if (active) {
+        // Entering alternate mode
+        console.log("PlatformManager: Entering alternate mode - hiding non-fuel platforms, showing fuel locations and airports");
+        
+        // Store current visibility states before changing anything
+        this._preAlternateModeStates = {
+          blocksVisible: this.blocksVisible,
+          basesVisible: this.basesVisible,
+          fuelAvailableVisible: this.fuelAvailableVisible,
+          airfieldsVisible: this.airfieldsVisible,
+          platformsVisible: this.isVisible
+        };
+        
+        // Hide regular platform layers
+        this._setPlatformLayersVisibility(false);
+        
+        // Hide blocks and bases (non-fuel infrastructure)
+        this.toggleBlocksVisibility(false);
+        this.toggleBasesVisibility(false);
+        
+        // Show fuel-capable locations and airports only
+        this.toggleFuelAvailableVisibility(true);
+        this.toggleAirfieldsVisibility(true);
+        
+        // Hide base map features to reduce clutter
+        this._hideBaseMapFeatures();
+        
+        // Show status message
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            'Alternate Mode Active: Showing fuel-capable locations and airports. Click to select alternate destination.',
+            'info',
+            3000
+          );
+        }
+        
+      } else {
+        // Exiting alternate mode
+        console.log("PlatformManager: Exiting alternate mode - restoring normal platform visibility");
+        
+        // Restore platform layers
+        this._setPlatformLayersVisibility(true);
+        
+        // Restore base map features
+        this._showBaseMapFeatures();
+        
+        // Restore layer visibility states
+        if (this._preAlternateModeStates) {
+          console.log("🔄 PlatformManager: Restoring alternate mode layer visibility states");
+          this.toggleBlocksVisibility(this._preAlternateModeStates.blocksVisible);
+          this.toggleBasesVisibility(this._preAlternateModeStates.basesVisible);
+          this.toggleFuelAvailableVisibility(this._preAlternateModeStates.fuelAvailableVisible);
+          this.toggleAirfieldsVisibility(this._preAlternateModeStates.airfieldsVisible);
+          this._preAlternateModeStates = null; // Clear stored states
+        } else {
+          console.log("⚠️ PlatformManager: No stored alternate mode states, using defaults");
+          // Default restoration
+          this.toggleBlocksVisibility(true);
+          this.toggleBasesVisibility(true);
+          this.toggleFuelAvailableVisibility(false);
+          this.toggleAirfieldsVisibility(false);
+        }
+        
+        // Show status message
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            'Normal mode restored: All platform layers visible.',
+            'success',
+            2000
+          );
+        }
+      }
+      
+      // Trigger visibility change callback
+      this.triggerCallback('onVisibilityChanged', this.isVisible && !active);
+    }); // End of onMapLoaded wrapper
+  }
+
+  /**
    * Clear OSDK waypoint layers from the map
    */
   _clearOsdkWaypointLayers() {

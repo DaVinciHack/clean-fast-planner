@@ -177,10 +177,19 @@ class MapInteractions {
       
       // Set up route layer handlers
       const setupRouteHandlers = () => {
-        if (map.getLayer('route')) {
-          // Route click handler
-          map.off('click', 'route', this.handleRouteClick);
-          map.on('click', 'route', this.handleRouteClick);
+        // Check if any route layer exists - updated with actual layer names
+        const routeLayers = ['route', 'route-pills', 'route-drag-detection-layer'];
+        const hasRouteLayer = routeLayers.some(layerId => map.getLayer(layerId));
+        
+        if (hasRouteLayer) {
+          // Register route click handlers on all route layers
+          routeLayers.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              console.log(`🎯 MapInteractions: Registering click handler on layer: ${layerId}`);
+              map.off('click', layerId, this.handleRouteClick);
+              map.on('click', layerId, this.handleRouteClick);
+            }
+          });
           
           // Setup route drag functionality if enabled
           if (this.config.enableDrag) {
@@ -536,6 +545,89 @@ class MapInteractions {
   handleRouteClick(e) {
     // Skip if we're dragging the route (will be handled by drag handler)
     if (this.isRouteDragging) return;
+    
+    // ALTERNATE MODE: Handle route clicks for split point selection
+    if (window.isAlternateModeActive === true) {
+      console.log('🎯 MapInteractions: Route clicked in alternate mode');
+      console.log('🎯 MapInteractions: Event details:', e.lngLat);
+      e.preventDefault();
+      e.originalEvent.stopPropagation();
+      
+      // Find the nearest waypoint to this click
+      console.log('🎯 MapInteractions: Checking for waypoint manager...', !!this.waypointManager);
+      if (this.waypointManager && typeof this.waypointManager.getWaypoints === 'function') {
+        const waypoints = this.waypointManager.getWaypoints();
+        console.log('🎯 MapInteractions: Got waypoints:', waypoints?.length, waypoints);
+        let nearestWaypoint = null;
+        let minDistance = Infinity;
+        
+        // Find the closest waypoint to the click
+        waypoints.forEach((waypoint, index) => {
+          console.log(`🎯 MapInteractions: Checking waypoint ${index}:`, waypoint);
+          
+          // Handle different coordinate formats (including Palantir OSDK geoPoint)
+          let lat, lng;
+          if (waypoint.lat !== undefined && waypoint.lng !== undefined) {
+            lat = waypoint.lat;
+            lng = waypoint.lng;
+          } else if (waypoint.latitude !== undefined && waypoint.longitude !== undefined) {
+            lat = waypoint.latitude;
+            lng = waypoint.longitude;
+          } else if (waypoint.geoPoint) {
+            // Palantir OSDK geoPoint format
+            lat = waypoint.geoPoint.latitude;
+            lng = waypoint.geoPoint.longitude;
+          } else if (waypoint.coordinates && Array.isArray(waypoint.coordinates) && waypoint.coordinates.length >= 2) {
+            lng = waypoint.coordinates[0];
+            lat = waypoint.coordinates[1];
+          } else if (waypoint.coords && Array.isArray(waypoint.coords) && waypoint.coords.length >= 2) {
+            lng = waypoint.coords[0];
+            lat = waypoint.coords[1];
+          }
+          
+          console.log(`🎯 MapInteractions: Waypoint ${waypoint.name} coords: lat=${lat}, lng=${lng}`);
+          
+          if (lat !== undefined && lng !== undefined) {
+            const distance = Math.sqrt(
+              Math.pow(lat - e.lngLat.lat, 2) + 
+              Math.pow(lng - e.lngLat.lng, 2)
+            );
+            console.log(`🎯 MapInteractions: Distance to ${waypoint.name}:`, distance);
+            if (distance < minDistance) {
+              minDistance = distance;
+              nearestWaypoint = waypoint;
+              console.log(`🎯 MapInteractions: New nearest waypoint:`, waypoint.name, 'distance:', distance);
+            }
+          } else {
+            console.log(`🎯 MapInteractions: Waypoint ${waypoint.name} has no valid coordinates`);
+          }
+        });
+        
+        console.log('🎯 MapInteractions: Final nearest waypoint:', nearestWaypoint?.name, 'distance:', minDistance);
+        
+        if (nearestWaypoint) {
+          console.log('🎯 MapInteractions: Found nearest waypoint for split point:', nearestWaypoint.name);
+          
+          // Call alternate mode handler
+          if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+            const waypointAsFeature = {
+              name: nearestWaypoint.name,
+              hasFuel: true,
+              isInRoute: true
+            };
+            console.log('🎯 MapInteractions: Calling alternateModeClickHandler with:', waypointAsFeature);
+            window.alternateModeClickHandler(e.lngLat, waypointAsFeature);
+          } else {
+            console.log('🎯 MapInteractions: alternateModeClickHandler not available');
+          }
+        } else {
+          console.log('🎯 MapInteractions: No nearest waypoint found');
+        }
+      } else {
+        console.log('🎯 MapInteractions: WaypointManager not available or getWaypoints not a function');
+      }
+      return; // Exit early for alternate mode
+    }
     
     // Prevent rapid clicks
     const now = Date.now();

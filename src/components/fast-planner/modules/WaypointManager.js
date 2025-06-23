@@ -2395,6 +2395,33 @@ class WaypointManager {
         return;
       }
       
+      // ALTERNATE MODE CHECK: Allow route clicks but prevent dragging
+      if (window.isAlternateModeActive === true) {
+        console.log('🎯 WaypointManager: Alternate mode - allowing route click detection but preventing drag');
+        // Continue to detect route clicks, but don't start dragging operation
+        const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+        if (closestInfo) {
+          // Find the nearest waypoint to the click
+          let nearestWaypointIndex = closestInfo.index;
+          if (nearestWaypointIndex >= 0 && nearestWaypointIndex < this.waypoints.length) {
+            const nearestWaypoint = this.waypoints[nearestWaypointIndex];
+            console.log('🎯 WaypointManager: Route clicked in alternate mode, nearest waypoint:', nearestWaypoint.name);
+            
+            // Trigger alternate mode handler directly
+            if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+              // Pass the waypoint as a clickedFeature to the alternate handler
+              const waypointAsFeature = {
+                name: nearestWaypoint.name,
+                hasFuel: true, // Assume route waypoints can be split points
+                isInRoute: true // Mark this as a route waypoint
+              };
+              window.alternateModeClickHandler(e.lngLat, waypointAsFeature);
+            }
+          }
+        }
+        return; // Don't proceed with normal drag operation
+      }
+      
       // Skip if no route or if right-click (context menu)
       if (!map.getSource('route') || e.originalEvent.button === 2) return;
       

@@ -844,6 +844,12 @@ class MapManager {
       // Don't start drag if right-click
       if (e.originalEvent.button === 2) return;
       
+      // ALTERNATE MODE CHECK: Skip route dragging in alternate mode
+      if (window.isAlternateModeActive === true) {
+        console.log('🎯 MapManager: Skipping route drag - alternate mode is active');
+        return;
+      }
+      
       // Check for platform markers and don't start drag if clicked on one
       const platformLayerIds = ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].filter(id => map.getLayer(id));
       if (platformLayerIds.length > 0) {
