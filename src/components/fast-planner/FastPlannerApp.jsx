@@ -583,6 +583,31 @@ const FastPlannerCore = ({
     // Reset weather fuel state
     setWeatherFuel({ araFuel: 0, approachFuel: 0 });
     
+    // 🚁 Clear SAR mode elements (helicopter and range circles)
+    console.log('🚁 CLEAR: Clearing SAR mode elements');
+    setSarData(null);
+    
+    // Reset SAR manager to clear helicopter and range circles
+    if (sarManager) {
+      try {
+        sarManager.reset();
+        console.log('🚁 CLEAR: SAR manager reset successfully');
+      } catch (e) {
+        console.warn('🚁 CLEAR: Error resetting SAR manager:', e.message);
+      }
+    }
+    
+    // Clear SAR range circles directly if they exist
+    if (window.currentSARRangeCircle) {
+      try {
+        window.currentSARRangeCircle.removeRangeCircle();
+        window.currentSARRangeCircle = null;
+        console.log('🚁 CLEAR: SAR range circles removed');
+      } catch (e) {
+        console.warn('🚁 CLEAR: Error removing SAR range circles:', e.message);
+      }
+    }
+    
     console.log('✅ FastPlannerApp: AGGRESSIVE CLEAR COMPLETE - All system state flushed');
   }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel]);
   

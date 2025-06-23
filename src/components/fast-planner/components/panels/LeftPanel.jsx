@@ -526,18 +526,25 @@ const LeftPanel = ({
           </div>
         </div>
         
-        {/* Add Insert Waypoints Button - Full Width */}
-        <div style={{ width: "100%", marginTop: "10px", marginBottom: "7px" }}>
+        {/* Mode Buttons - Side by Side */}
+        <div style={{ 
+          width: "100%", 
+          marginTop: "10px", 
+          marginBottom: "7px",
+          display: "flex",
+          gap: "8px"
+        }}>
+          {/* Add Waypoints Button */}
           <button 
             id="add-waypoints" 
             className={`control-button ${waypointModeActive ? 'active' : ''}`}
             style={{
-              width: "100%",
-              padding: "6px 0",
+              flex: 1,
+              padding: "6px 4px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "14px",
+              fontSize: "12px",
               height: "32px",
               backgroundColor: waypointModeActive ? "#00cc66" : "#0066cc",
               color: "white",
@@ -546,27 +553,29 @@ const LeftPanel = ({
             }}
             onClick={() => {
               if (onToggleWaypointMode) {
+                // If alternate mode is active, turn it off first
+                if (alternateModeActive && onToggleAlternateMode) {
+                  onToggleAlternateMode(false);
+                }
                 onToggleWaypointMode(!waypointModeActive);
               }
             }}
           >
             {waypointModeActive ? 
-              "✅ WAYPOINT MODE ACTIVE" : 
-              "Add Insert Waypoints"}
+              "✅ WAYPOINTS" : 
+              "Add Waypoints"}
           </button>
-        </div>
 
-        {/* Alternate Mode Button */}
-        <div style={{ marginTop: "10px" }}>
+          {/* Add Alternate Button */}
           <button 
             className="control-button"
             style={{ 
-              width: "100%", 
-              padding: "6px 0", 
+              flex: 1,
+              padding: "6px 4px", 
               display: "flex", 
               alignItems: "center", 
               justifyContent: "center", 
-              fontSize: "14px",
+              fontSize: "12px",
               height: "32px",
               backgroundColor: alternateModeActive ? "#00cc66" : "#0066cc",
               color: "white",
@@ -575,13 +584,17 @@ const LeftPanel = ({
             }}
             onClick={() => {
               if (onToggleAlternateMode) {
+                // If waypoint mode is active, turn it off first
+                if (waypointModeActive && onToggleWaypointMode) {
+                  onToggleWaypointMode(false);
+                }
                 onToggleAlternateMode(!alternateModeActive);
               }
             }}
           >
             {alternateModeActive ? 
-              "✅ ALTERNATE MODE ACTIVE" : 
-              "Alternate Mode"}
+              "✅ ALTERNATE" : 
+              "Add Alternate"}
           </button>
         </div>
         
