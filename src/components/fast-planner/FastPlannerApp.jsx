@@ -102,17 +102,49 @@ const FastPlannerCore = ({
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
   
+  // Simple loading overlay to prevent flash before wizard
+  const [showInitialOverlay, setShowInitialOverlay] = useState(true);
+  
   // 🚁 SAR STATE: Search and Rescue mode state
   const [sarData, setSarData] = useState(null);
   
   // Check if wizard should show on load (first time users)
   useEffect(() => {
     const wizardDisabled = localStorage.getItem('fastplanner-wizard-disabled');
-    if (!wizardDisabled && isAuthenticated) {
-      // Show wizard after a brief delay to let the app load
-      const timer = setTimeout(() => {
+    
+    // Helper function to smoothly fade out the HTML overlay
+    const fadeOutHtmlOverlay = () => {
+      const htmlOverlay = document.getElementById('initial-loading-overlay');
+      if (htmlOverlay) {
+        htmlOverlay.style.opacity = '0';
+        // Remove from DOM after fade completes
+        setTimeout(() => {
+          htmlOverlay.style.display = 'none';
+        }, 500);
+      }
+      setShowInitialOverlay(false);
+    };
+    
+    // If not authenticated yet, keep overlay showing
+    if (!isAuthenticated) {
+      return;
+    }
+    
+    if (!wizardDisabled) {
+      // Show wizard first, then fade out base overlay after wizard is visible
+      const wizardTimer = setTimeout(() => {
         setIsWizardVisible(true);
-      }, 1000);
+        // Give wizard time to appear, then fade out base overlay
+        setTimeout(() => {
+          fadeOutHtmlOverlay();
+        }, 300); // Quick fade after wizard shows
+      }, 500); // Shorter delay since layering works
+      return () => clearTimeout(wizardTimer);
+    } else {
+      // Wizard disabled, fade out overlay after app is fully ready
+      const timer = setTimeout(() => {
+        fadeOutHtmlOverlay();
+      }, 800); // Shorter delay since no wizard needed
       return () => clearTimeout(timer);
     }
   }, [isAuthenticated]);
