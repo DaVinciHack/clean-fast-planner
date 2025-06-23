@@ -17,6 +17,7 @@ import { useAlternateMode } from '../../modes/AlternateMode';
  * @param {Array} props.waypoints - Current route waypoints
  * @param {Array} props.fuelLocations - Available fuel-capable locations
  * @param {Array} props.airports - Available airports
+ * @param {Object} props.platformManager - PlatformManager instance for layer control
  * @param {Function} props.onAlternateUpdate - Callback when alternate is selected
  * @param {Function} props.onToggleFuelLocations - Callback to toggle fuel locations visibility
  * @param {Function} props.onToggleAirports - Callback to toggle airports visibility
@@ -26,6 +27,7 @@ const AlternateModeButton = ({
   waypoints = [],
   fuelLocations = [],
   airports = [],
+  platformManager,
   onAlternateUpdate,
   onToggleFuelLocations,
   onToggleAirports,
@@ -46,6 +48,7 @@ const AlternateModeButton = ({
     waypoints,
     fuelLocations,
     airports,
+    platformManager,
     onAlternateUpdate,
     onToggleFuelLocations,
     onToggleAirports

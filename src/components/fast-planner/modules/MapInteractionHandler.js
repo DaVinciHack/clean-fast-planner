@@ -165,7 +165,8 @@ class MapInteractionHandler {
     
     try {
       const isWaypointMode = window.isWaypointModeActive === true;
-      console.log(`MapInteractionHandler: Map clicked in ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'} mode.`);
+      const isAlternateMode = window.isAlternateModeActive === true;
+      console.log(`MapInteractionHandler: Map clicked in ${isWaypointMode ? 'WAYPOINT' : isAlternateMode ? 'ALTERNATE' : 'NORMAL'} mode.`);
 
       if (!this.mapManager || !this.waypointManager || !this.platformManager) {
         console.error('MapInteractionHandler: Essential managers missing!');
@@ -216,10 +217,49 @@ class MapInteractionHandler {
         }
       }
       
+      // ALTERNATE MODE: Handle alternate mode clicks
+      if (isAlternateMode) {
+        console.log("MapInteractionHandler: Alternate mode active - checking for alternate mode handler");
+        if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+          console.log("MapInteractionHandler: Deferring click to alternate mode handler");
+          
+          // Check for platform at click point
+          let nearestPlatform = null;
+          // In alternate mode, only fuel and airport layers are visible
+          const platformLayerIds = ['fuel-available-layer', 'airfields-layer'];
+          const activePlatformLayers = platformLayerIds.filter(id => map.getLayer(id));
+          console.log("MapInteractionHandler: Alternate mode - checking layers:", activePlatformLayers);
+          
+          if (activePlatformLayers.length > 0) {
+            const features = map.queryRenderedFeatures(e.point, { layers: activePlatformLayers });
+            console.log("MapInteractionHandler: Platform query result:", features?.length || 0, "features found");
+            if (features && features.length > 0) {
+              nearestPlatform = features[0].properties;
+              console.log("MapInteractionHandler: Found platform at click:", nearestPlatform);
+            }
+          }
+          
+          // If no platform clicked, check for nearby platforms
+          if (!nearestPlatform && this.platformManager && typeof this.platformManager.findNearestPlatform === 'function') {
+            nearestPlatform = this.platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng, 1);
+            console.log("MapInteractionHandler: findNearestPlatform result:", nearestPlatform);
+          }
+          
+          // Call the alternate mode handler
+          const handled = window.alternateModeClickHandler(e.lngLat, nearestPlatform);
+          console.log("MapInteractionHandler: Alternate mode handler result:", handled);
+          
+          window._processingMapClick = false;
+          return; // Exit here regardless of whether it was handled
+        } else {
+          console.warn("MapInteractionHandler: Alternate mode active but no handler found");
+        }
+      }
+      
       this.triggerCallback('onLeftPanelOpen'); 
 
       let featuresClicked = false;
-      if (!isWaypointMode) { 
+      if (!isWaypointMode && !isAlternateMode) { 
           const platformLayerIds = ['platforms-layer', 'platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'];
           const activePlatformLayers = platformLayerIds.filter(id => map.getLayer(id));
           
@@ -322,6 +362,31 @@ class MapInteractionHandler {
 
   handleRouteClick(lngLat, insertIndex, nearestRig) { 
     const isWaypointMode = window.isWaypointModeActive === true;
+    const isAlternateMode = window.isAlternateModeActive === true;
+    
+    // ALTERNATE MODE: Handle route clicks for split point selection
+    if (isAlternateMode) {
+      console.log('🎯 MapInteractionHandler: Route clicked in alternate mode');
+      
+      // Find the nearest waypoint for the split point
+      const waypoints = this.waypointManager.getWaypoints();
+      if (waypoints && waypoints.length > insertIndex) {
+        const nearestWaypoint = waypoints[insertIndex];
+        console.log('🎯 MapInteractionHandler: Setting route waypoint as split point:', nearestWaypoint.name);
+        
+        // Call alternate mode handler directly
+        if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
+          const waypointAsFeature = {
+            name: nearestWaypoint.name,
+            hasFuel: true,
+            isInRoute: true
+          };
+          window.alternateModeClickHandler(lngLat, waypointAsFeature);
+        }
+      }
+      return; // Exit early for alternate mode
+    }
+    
     let nearestWaypoint = null;
 
     if (isWaypointMode) {
@@ -374,6 +439,16 @@ class MapInteractionHandler {
       console.log('🔒 MapInteractionHandler: Ignoring route drag completion - editing is locked');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
+      }
+      return;
+    }
+    
+    // ALTERNATE MODE CHECK: Prevent route drag completion in alternate mode
+    const isAlternateMode = window.isAlternateModeActive === true;
+    if (isAlternateMode) {
+      console.log('🎯 MapInteractionHandler: Ignoring route drag completion - alternate mode is active');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
       }
       return;
     }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import AlternateModeButton from '../controls/AlternateModeButton';
 
 /**
  * Left Panel Component
@@ -26,7 +25,9 @@ const LeftPanel = ({
   onToggleChart, // Added for toggle rigs button
   chartsVisible, // Added for toggle rigs button state
   onToggleWaypointMode, // Handler for the "Add Insert Waypoints" button
-  waypointModeActive // State to track if waypoint insertion mode is active
+  waypointModeActive, // State to track if waypoint insertion mode is active
+  onToggleAlternateMode, // Handler for the "Alternate Mode" button
+  alternateModeActive // State to track if alternate mode is active
 }) => {
   // Initialize with safe, sanitized defaults
   const safeWaypoints = Array.isArray(waypoints) ? waypoints : [];
@@ -556,27 +557,33 @@ const LeftPanel = ({
         </div>
 
         {/* Alternate Mode Button */}
-        <AlternateModeButton
-          waypoints={waypoints}
-          fuelLocations={[]} // Will be populated from platform manager
-          airports={[]} // Will be populated from platform manager  
-          onAlternateUpdate={(alternate, splitPoint) => {
-            console.log('Alternate selected:', alternate, splitPoint);
-            // Integration with route update logic would go here
-          }}
-          onToggleFuelLocations={(enabled) => {
-            console.log('Toggle fuel locations:', enabled);
-            // Integration with map layers would go here
-          }}
-          onToggleAirports={(enabled) => {
-            console.log('Toggle airports:', enabled);
-            // Integration with map layers would go here
-          }}
-          onRegisterMapClickHandler={(handlerName, handler) => {
-            console.log('Register map click handler:', handlerName);
-            // Integration with map manager would go here
-          }}
-        />
+        <div style={{ marginTop: "10px" }}>
+          <button 
+            className="control-button"
+            style={{ 
+              width: "100%", 
+              padding: "6px 0", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              fontSize: "14px",
+              height: "32px",
+              backgroundColor: alternateModeActive ? "#00cc66" : "#0066cc",
+              color: "white",
+              fontWeight: alternateModeActive ? "bold" : "normal",
+              border: alternateModeActive ? "2px solid #ffcc00" : "none"
+            }}
+            onClick={() => {
+              if (onToggleAlternateMode) {
+                onToggleAlternateMode(!alternateModeActive);
+              }
+            }}
+          >
+            {alternateModeActive ? 
+              "✅ ALTERNATE MODE ACTIVE" : 
+              "Alternate Mode"}
+          </button>
+        </div>
         
         {/* Favorite Locations Section */}
         <div style={{ marginTop: "20px" }}>
