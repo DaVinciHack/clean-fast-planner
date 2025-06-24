@@ -37,9 +37,6 @@ const MapLayersCard = ({
 }) => {
   const { currentRegion } = useRegion();
   
-  // State for real-time altitude display updates
-  const [altitudeDisplay, setAltitudeDisplay] = useState(0);
-  
   // State for auto flight controls
   const [flightControls, setFlightControls] = useState({
     isPlaying: false,
@@ -136,13 +133,7 @@ const MapLayersCard = ({
         }
       }
       
-      // DISABLED: Auto-sync weather circles state - let user control toggles
-      // const weatherCirclesVisible = !!window.currentWeatherCirclesLayer;
-      // if (weatherCirclesVisible !== layers.weatherCircles) {
-      //   console.log('🔄 SYNC: Weather circles state mismatch detected, correcting:', { current: layers.weatherCircles, actual: weatherCirclesVisible });
-      //   setLayers(prev => ({ ...prev, weatherCircles: weatherCirclesVisible }));
-      // }
-      console.log('🚫 DISABLED: Weather circles auto-sync - user controls toggle state');
+      // Weather circles state is user-controlled
     };
     
     // Sync immediately
@@ -154,130 +145,7 @@ const MapLayersCard = ({
     return () => clearInterval(interval);
   }, [layers.grid, layers.gulfCoastHeli, layers.weatherCircles, mapManagerRef, gulfCoastMapRef]);
 
-  // REMOVED: Auto-enable rig weather graphics - now automatic with weather circles
-
-  // DISABLED: Update rig weather graphics when waypoints change - causing conflicts
-  // useEffect(() => {
-  //   // This was causing graphics to disappear after 4 seconds
-  //   console.log('🚫 DISABLED: Auto-update on waypoint changes (causing conflicts)');
-  // }, [waypoints, weatherSegmentsHook?.weatherSegments, layers.rigWeatherGraphics]);
-
-  // DISABLED: Auto-initialize default weather layers - let user enable manually
-  useEffect(() => {
-    const initializeDefaultWeatherLayers = async () => {
-      console.log('🚫 DISABLED: Auto-initialization of weather layers - user can manually enable');
-      // if (!mapManagerRef?.current?.map) return;
-      // 
-      // const mapInstance = mapManagerRef.current.map;
-      // 
-      // // Auto-enable lightning (global safety layer) - only if not already present
-      // if (!mapInstance.getLayer('simple-lightning-layer')) {
-      //   console.log('🌩️ Auto-initializing lightning detection...');
-      //   try {
-      //     const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
-      //     await addSimpleLightningOverlay(mapInstance);
-      //     // Set default opacity after enabling
-      //     setTimeout(() => {
-      //       try {
-      //         mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', weatherOpacities.lightning);
-      //         console.log(`✅ Lightning auto-enabled with ${weatherOpacities.lightning * 100}% opacity`);
-      //       } catch (error) {
-      //         console.warn('⚠️ Could not set lightning default opacity:', error);
-      //       }
-      //     }, 500);
-      //   } catch (error) {
-      //     console.warn('⚠️ Failed to auto-enable lightning:', error);
-      //   }
-      // }
-      // 
-      // // Auto-enable CONUS radar for Gulf region - only if not already present
-      // if (currentRegion?.id === 'gulf-of-mexico' && !mapInstance.getLayer('noaa-conus-layer')) {
-      //   console.log('🌧️ Auto-initializing CONUS radar for Gulf region...');
-      //   try {
-      //     const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
-      //     const success = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
-      //     if (success) {
-      //       // Set default opacity
-      //       setTimeout(() => {
-      //         try {
-      //           mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', weatherOpacities.satelliteConus);
-      //           console.log(`✅ CONUS auto-enabled with ${weatherOpacities.satelliteConus * 100}% opacity`);
-      //         } catch (error) {
-      //           console.warn('⚠️ Could not set CONUS default opacity:', error);
-      //         }
-      //       }, 500);
-      //     }
-      //   } catch (error) {
-      //     console.warn('⚠️ Failed to auto-enable CONUS:', error);
-      //   }
-      // }
-      
-      // TEMPORARILY DISABLE shortwave IR auto-enable to test waypoint mode
-      /*
-      // Auto-enable Shortwave IR - only if not already present and not already attempted
-      if (!mapInstance.getLayer('noaa-shortwave-layer') && !window._shortwaveInitAttempted) {
-        window._shortwaveInitAttempted = true; // Prevent multiple attempts
-        console.log('🛰️ Auto-initializing Shortwave IR...');
-        try {
-          const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
-          const success = await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
-          if (success) {
-            // Set custom opacity and z-index
-            setTimeout(() => {
-              try {
-                mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', weatherOpacities.satelliteShortwave);
-                console.log(`✅ Shortwave IR auto-enabled with ${weatherOpacities.satelliteShortwave * 100}% opacity (NOAA default positioning)`);
-              } catch (error) {
-                console.warn('⚠️ Could not set Shortwave IR default properties:', error);
-              }
-            }, 1000);
-          } else {
-            window._shortwaveInitAttempted = false; // Reset on failure so we can try again
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to auto-enable Shortwave IR:', error);
-          window._shortwaveInitAttempted = false; // Reset on failure
-        }
-      }
-      */
-    };
-    
-    // DISABLED: Auto-initialization timeout
-    // const timeoutId = setTimeout(initializeDefaultWeatherLayers, 1000);
-    // return () => clearTimeout(timeoutId);
-    
-    // Run once to log that auto-init is disabled
-    initializeDefaultWeatherLayers();
-  }, [mapManagerRef, currentRegion, weatherOpacities.lightning, weatherOpacities.satelliteConus, weatherOpacities.satelliteShortwave]);
-
-  // Real-time altitude display update when 3D clouds are active
-  useEffect(() => {
-    let intervalId;
-    
-    if (layers.cloud3DEffects && window.threeDCloudManager) {
-      intervalId = setInterval(() => {
-        if (window.threeDCloudManager) {
-          const currentAltitude = window.threeDCloudManager.cameraAltitude || 0;
-          setAltitudeDisplay(currentAltitude);
-        }
-      }, 100); // Update every 100ms for smooth display
-    }
-    
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [layers.cloud3DEffects]);
-
-  // DISABLED: Auto-enable weather circles - these were the ugly discs!
-  // useEffect(() => {
-  //   // Weather circles auto-enable disabled - user can manually toggle them
-  //   console.log('🚫 Weather circles auto-enable DISABLED');
-  // }, []);
-
-  // DISABLED: Force-enable events for weather circles
-  // useEffect(() => {
-  //   console.log('🚫 Weather circles force-enable events DISABLED');
-  // }, []);
+  // All weather features are user-controlled via toggle buttons
   
   // Update layer states for map layers when references change
   useEffect(() => {
@@ -451,12 +319,7 @@ const MapLayersCard = ({
                 window.currentWeatherCirclesLayer = weatherLayer;
                 console.log('✅ Created weather circles (fallback method)');
                 
-                // DISABLED: Auto-enable wind arrows - let user control weather layers
-                // if (window.rigWeatherIntegration) {
-                //   window.rigWeatherIntegration.toggleVisibility(true);
-                //   console.log('🌬️ Auto-enabled wind arrows with weather circles');
-                // }
-                console.log('🚫 DISABLED: Auto-enable wind arrows with weather circles');
+                // Wind arrows are managed separately by user
                 
                 setLayers(prev => ({ ...prev, weatherCircles: true }));
               } catch (error) {
@@ -468,7 +331,7 @@ const MapLayersCard = ({
           }
           break;
           
-        // REMOVED: rigWeatherGraphics case - arrows now automatic with weather circles
+        // Weather graphics handled by weather circles toggle
           
         case 'vfrCharts':
           if (vfrChartsRef?.current) {
@@ -721,84 +584,7 @@ const MapLayersCard = ({
           }
           break;
           
-        case 'cloud3DEffects':
-          console.log('🌩️ 3D CLOUDS: Toggling altitude-based cloud effects...');
-          try {
-            const mapInstance = mapManagerRef?.current?.map;
-            if (!mapInstance) {
-              console.error('❌ No map instance available for 3D clouds');
-              break;
-            }
-            
-            const currentVisible = layers.cloud3DEffects;
-            if (currentVisible) {
-              // Disable 3D cloud effects
-              if (window.threeDCloudManager) {
-                window.threeDCloudManager.deactivate();
-                window.threeDCloudManager = null;
-                console.log('🧹 3D cloud effects disabled');
-              }
-              setLayers(prev => ({ ...prev, cloud3DEffects: false }));
-            } else {
-              // Enable 3D cloud effects
-              const { default: ThreeDCloudManager } = await import('../../../modules/weather/3DCloudManager.js');
-              const cloudManager = new ThreeDCloudManager(mapInstance);
-              
-              if (cloudManager.initialize()) {
-                window.threeDCloudManager = cloudManager;
-                
-                // Enable cloud layers that are currently active
-                if (layers.satelliteShortwave) {
-                  cloudManager.enableCloudLayer('LOW_CLOUDS', weatherOpacities.satelliteShortwave);
-                }
-                if (layers.satelliteLongwave) {
-                  cloudManager.enableCloudLayer('MID_CLOUDS', weatherOpacities.satelliteLongwave);
-                }
-                
-                console.log('✅ 3D cloud effects enabled - Ready for flight simulation!');
-                setLayers(prev => ({ ...prev, cloud3DEffects: true }));
-              } else {
-                console.error('❌ Failed to initialize 3D cloud system');
-              }
-            }
-          } catch (error) {
-            console.error('❌ Error toggling 3D cloud effects:', error);
-          }
-          break;
-          
-        case 'enhanced3DControls':
-          console.log('🎮 3D CONTROLS: Toggling enhanced flight simulation controls...');
-          try {
-            const mapInstance = mapManagerRef?.current?.map;
-            if (!mapInstance) {
-              console.error('❌ No map instance available for 3D controls');
-              break;
-            }
-            
-            const currentVisible = layers.enhanced3DControls;
-            if (currentVisible) {
-              // Disable enhanced controls
-              if (window.enhanced3DControls) {
-                window.enhanced3DControls.deactivate();
-                window.enhanced3DControls = null;
-                console.log('🧹 Enhanced 3D controls disabled');
-              }
-              setLayers(prev => ({ ...prev, enhanced3DControls: false }));
-            } else {
-              // Enable enhanced controls
-              const { default: Enhanced3DControls } = await import('../../../modules/weather/Enhanced3DControls.js');
-              const controls = new Enhanced3DControls(mapInstance);
-              
-              controls.activate();
-              window.enhanced3DControls = controls;
-              
-              console.log('✅ Enhanced 3D controls enabled - Ready for flight simulation!');
-              setLayers(prev => ({ ...prev, enhanced3DControls: true }));
-            }
-          } catch (error) {
-            console.error('❌ Error toggling enhanced 3D controls:', error);
-          }
-          break;
+        // 3D features consolidated into Auto Flight section
           
         case 'autoFlight':
           console.log('🛩️ AUTO FLIGHT: Toggling automatic route following...');
@@ -832,9 +618,8 @@ const MapLayersCard = ({
               
               const { default: AutoFlightManager } = await import('../../../modules/weather/AutoFlightManager.js');
               
-              // Get enhanced 3D controls if available
-              const controls = window.enhanced3DControls || null;
-              const flightManager = new AutoFlightManager(mapInstance, controls);
+              // Create flight manager (no longer needs enhanced3DControls)
+              const flightManager = new AutoFlightManager(mapInstance, null);
               
               // Try to get REAL flight route from your existing system
               let flightRoute = null;
