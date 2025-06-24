@@ -112,12 +112,19 @@ const FlightWizard = ({
       );
     }
     
-    // Filter by date
+    // Filter by date - check all date fields like the display logic does
     if (flightSearchDate) {
       filtered = filtered.filter(flight => {
-        if (flight.etd) {
-          const flightDate = new Date(flight.etd).toISOString().split('T')[0];
-          return flightDate === flightSearchDate;
+        // Check all possible date fields (same as display logic)
+        const dateStr = flight.date || flight.etd || flight.departureTime || flight.createdAt;
+        if (dateStr) {
+          try {
+            const flightDate = new Date(dateStr).toISOString().split('T')[0];
+            return flightDate === flightSearchDate;
+          } catch (e) {
+            console.warn('🧙‍♂️ Wizard: Invalid date format for flight:', flight.flightNumber, dateStr);
+            return false;
+          }
         }
         return false;
       });
