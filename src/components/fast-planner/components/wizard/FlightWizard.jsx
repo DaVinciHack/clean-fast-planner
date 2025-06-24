@@ -169,6 +169,33 @@ const FlightWizard = ({
   
   // Handle next step
   const handleNext = () => {
+    // If advancing to complete step, generate flight name if not already set
+    if (currentStep === steps.length - 2) { // Going to complete step
+      if (!flightData.flightName && flightData.departure && flightData.landings.length > 0) {
+        // Generate auto flight name using same format as Auto Plan
+        const departure = flightData.departure.name || 'DEP';
+        const firstLocation = flightData.landings[0]?.name || 'DEST';
+        
+        // Use departure time for date formatting
+        let shortDate;
+        if (flightData.departureTime) {
+          const depDate = new Date(flightData.departureTime);
+          shortDate = depDate.toISOString().slice(2, 16).replace('T', ', ');
+        } else {
+          const now = new Date();
+          shortDate = now.toISOString().slice(2, 16).replace('T', ', ');
+        }
+        
+        const autoFlightName = `${departure} ${firstLocation} ${shortDate}`;
+        console.log('🧙‍♂️ Auto-generated flight name:', autoFlightName);
+        
+        setFlightData(prev => ({
+          ...prev,
+          flightName: autoFlightName
+        }));
+      }
+    }
+    
     // If advancing from landings to aircraft, send buffered landings to main planner
     if (currentStepData.id === 'landings' && currentStep < steps.length - 1) {
       console.log('🧙‍♂️ Sending buffered landings to main flight planner');
@@ -587,6 +614,18 @@ const FlightWizard = ({
               <p>Your flight is ready to be planned automatically.</p>
               
               <div className="flight-summary">
+                {/* 🧙‍♂️ FLIGHT NAME: Add editable flight name to summary */}
+                <div className="summary-flight-name">
+                  <strong>Flight Name:</strong>
+                  <input
+                    type="text"
+                    value={flightData.flightName || ''}
+                    onChange={(e) => setFlightData(prev => ({ ...prev, flightName: e.target.value }))}
+                    className="wizard-input flight-name-input"
+                    placeholder="Auto-generated flight name"
+                  />
+                </div>
+                
                 {flightData.departureTime && (
                   <div className="summary-departure-time">
                     <strong>Departure:</strong> {new Date(flightData.departureTime).toLocaleString()}
