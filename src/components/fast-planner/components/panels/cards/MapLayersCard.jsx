@@ -843,17 +843,48 @@ const MapLayersCard = ({
                 console.log('🛩️ Method 1: Found waypoints prop with', waypoints.length, 'waypoints');
                 console.log('🛩️ Sample waypoint:', waypoints[0]);
                 
-                flightRoute = waypoints.map((wp, index) => ({
-                  lat: wp.lat || wp.latitude,
-                  lng: wp.lng || wp.longitude || wp.lon,
-                  name: wp.name || wp.id || `${wp.type || 'WP'} ${index + 1}`,
-                  altitude: wp.altitude || (wp.type === 'departure' ? 0 : (wp.type === 'destination' ? 0 : 2000)),
-                  type: wp.type || 'waypoint'
-                }));
+                flightRoute = waypoints.map((wp, index) => {
+                  // Extract coordinates from multiple possible formats
+                  let lat = wp.lat || wp.latitude;
+                  let lng = wp.lng || wp.longitude || wp.lon;
+                  
+                  // Check if coordinates are in coords array format [lng, lat]
+                  if (!lat && !lng && wp.coords && Array.isArray(wp.coords) && wp.coords.length >= 2) {
+                    lng = wp.coords[0]; // MapBox format: [lng, lat]
+                    lat = wp.coords[1];
+                    console.log(`🛩️ Extracted coords from array for ${wp.name}: [${lng}, ${lat}]`);
+                  }
+                  
+                  // Check if coordinates are in coordinates property
+                  if (!lat && !lng && wp.coordinates) {
+                    if (Array.isArray(wp.coordinates) && wp.coordinates.length >= 2) {
+                      lng = wp.coordinates[0];
+                      lat = wp.coordinates[1];
+                    } else if (wp.coordinates.lat && wp.coordinates.lng) {
+                      lat = wp.coordinates.lat;
+                      lng = wp.coordinates.lng;
+                    }
+                  }
+                  
+                  console.log(`🛩️ Waypoint ${index + 1} (${wp.name}): lat=${lat}, lng=${lng}`);
+                  
+                  return {
+                    lat: lat,
+                    lng: lng,
+                    name: wp.name || wp.id || `${wp.type || 'WP'} ${index + 1}`,
+                    altitude: wp.altitude || (wp.type === 'departure' ? 0 : (wp.type === 'destination' ? 0 : 2000)),
+                    type: wp.type || 'waypoint'
+                  };
+                }).filter(wp => wp.lat && wp.lng); // Only keep waypoints with valid coordinates
                 
-                console.log('🛩️ ✅ SUCCESS! Using REAL FLIGHT WAYPOINTS!');
-                console.log('🛩️ Converted route:', flightRoute);
-                console.log(`🛩️ Flight route: ${flightRoute.map(wp => wp.name).join(' → ')}`);
+                if (flightRoute.length >= 2) {
+                  console.log('🛩️ ✅ SUCCESS! Using REAL FLIGHT WAYPOINTS!');
+                  console.log('🛩️ Converted route:', flightRoute);
+                  console.log(`🛩️ Flight route: ${flightRoute.map(wp => wp.name).join(' → ')}`);
+                } else {
+                  console.log('🛩️ Method 1: Not enough waypoints with valid coordinates after processing');
+                  flightRoute = null;
+                }
               } else {
                 console.log('🛩️ Method 1: No waypoints prop or insufficient waypoints');
               }
@@ -928,6 +959,20 @@ const MapLayersCard = ({
                 console.log(`✅ Auto flight enabled with ${flightRoute.length} waypoints!`);
                 console.log(`🛩️ Route: ${flightRoute.map(wp => wp.name).join(' → ')}`);
                 setLayers(prev => ({ ...prev, autoFlight: true }));
+                
+                // 🛫 AUTO-START: Automatically start the flight like the old behavior
+                setTimeout(() => {
+                  console.log('🛫 Auto-starting flight in 1 second...');
+                  if (flightManager && !flightManager.isFlying) {
+                    const started = flightManager.startFlight();
+                    if (started) {
+                      console.log('🛫 ✅ Flight started automatically!');
+                    } else {
+                      console.log('🛫 ❌ Failed to auto-start flight - use Start button in control panel');
+                    }
+                  }
+                }, 1000); // Give the panel a moment to be created
+                
               } else {
                 console.error('❌ Failed to initialize auto flight system');
               }
