@@ -194,6 +194,25 @@
   min-width: 35px;
   text-align: center;
   display: inline-block;
+  transition: all 0.2s ease;
+}
+
+/* Enhanced route icons with custom colors */
+.route-item .route-icon {
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  min-width: 40px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.route-item.departure .route-icon {
+  background: #28a745;
+}
+
+.route-item.destination .route-icon {
+  background: #dc3545;
 }
 
 .wizard-step h2 {

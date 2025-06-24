@@ -2858,16 +2858,25 @@ const FastPlannerCore = ({
     // Set departure time if provided
     if (flightData.departureTime) {
       console.log('🧙‍♂️ Setting departure time:', flightData.departureTime);
-      setFlightSettings(prev => ({
-        ...prev,
-        etd: new Date(flightData.departureTime)
-      }));
+      const etdDate = new Date(flightData.departureTime);
+      console.log('🧙‍♂️ Converted to Date object:', etdDate);
+      setFlightSettings(prev => {
+        const newSettings = {
+          ...prev,
+          etd: etdDate
+        };
+        console.log('🧙‍♂️ New flight settings:', newSettings);
+        return newSettings;
+      });
     }
     
     // Show success message
     if (window.LoadingIndicator) {
+      const destinationName = flightData.landings && flightData.landings.length > 0 
+        ? flightData.landings[flightData.landings.length - 1]?.name 
+        : 'Unknown';
       window.LoadingIndicator.updateStatusIndicator(
-        `✈️ Flight created: ${flightData.departure?.name} → ${flightData.destination?.name}`, 
+        `✈️ Flight created: ${flightData.departure?.name} → ${destinationName}`, 
         'success', 
         3000
       );
@@ -3125,6 +3134,7 @@ const FastPlannerCore = ({
         onSkip={handleWizardSkip}
         searchLocation={handleWizardSearch}
         onAddWaypoint={hookAddWaypoint}
+        onClearRoute={clearRoute}
         aircraftTypes={aircraftTypes}
         aircraftsByType={aircraftsByType}
         selectedAircraft={selectedAircraft}
@@ -3233,6 +3243,7 @@ const FastPlannerCore = ({
           approachFuel={weatherFuel.approachFuel} // Use calculated weather fuel from state
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
           reserveFuel={flightSettings.reserveFuel} reserveMethod={reserveMethod}
+          etd={flightSettings.etd} // Pass current ETD from wizard to auto plan
           onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}
           onDeckFuelFlowChange={(value) => updateFlightSetting('deckFuelFlow', value)}
           onPassengerWeightChange={(value) => updateFlightSetting('passengerWeight', value)}

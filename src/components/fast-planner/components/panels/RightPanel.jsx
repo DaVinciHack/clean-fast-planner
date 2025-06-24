@@ -110,7 +110,9 @@ const RightPanel = React.forwardRef(({
   // SAR mode callback
   onSARUpdate,
   // SAR calculation data
-  sarData = null
+  sarData = null,
+  // ETD from flight settings (wizard departure time)
+  etd = null
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -258,6 +260,10 @@ const RightPanel = React.forwardRef(({
         aircraftId: finalAircraftId,
         region: regionCode, // Use current region
         etd: new Date(flightData.etd).toISOString(), // Ensure proper ISO format
+        // 🧙‍♂️ DEBUG: Log ETD conversion for debugging
+        ...(console.log('🧙‍♂️ SAVE DEBUG: flightData.etd =', flightData.etd) || {}),
+        ...(console.log('🧙‍♂️ SAVE DEBUG: new Date(flightData.etd) =', new Date(flightData.etd)) || {}),
+        ...(console.log('🧙‍♂️ SAVE DEBUG: toISOString() =', new Date(flightData.etd).toISOString()) || {}),
         locations: locations,
         alternateLocation: flightData.alternateLocation || "",
         
@@ -281,6 +287,10 @@ const RightPanel = React.forwardRef(({
       console.log('Sending flight data to Palantir:', apiParams);
       
       // Call the service to create the flight
+      // 🧙‍♂️ DEBUG: Log final API params being sent to Palantir
+      console.log('🧙‍♂️ SAVE DEBUG: Final apiParams.etd being sent to Palantir:', apiParams.etd);
+      console.log('🧙‍♂️ SAVE DEBUG: Full apiParams object:', apiParams);
+      
       const result = await PalantirFlightService.createFlight(apiParams);
       console.log('Flight creation result:', result);
       
@@ -974,10 +984,19 @@ const RightPanel = React.forwardRef(({
       console.log(`🎯 AUTO PLAN: skipWaypointGeneration = ${skipWaypointGeneration} (user ${hasWaypoints ? 'has' : 'has no'} waypoints)`);
       
       // Create flight data exactly like SaveFlightCard but with auto-generated name
-      const now = new Date();
+      // 🧙‍♂️ WIZARD FIX: Use wizard ETD if available, otherwise default to 1 hour from now
+      let departureTime;
+      if (etd && etd instanceof Date) {
+        console.log('🧙‍♂️ Using wizard departure time:', etd);
+        departureTime = etd;
+      } else {
+        console.log('🧙‍♂️ No wizard ETD found, defaulting to 1 hour from now');
+        departureTime = new Date();
+        departureTime.setHours(departureTime.getHours() + 1);
+      }
       
-      // Create short date format: YY-MM-DD, HH:MM
-      const shortDate = now.toISOString().slice(2, 16).replace('T', ', ');
+      // Create short date format: YY-MM-DD, HH:MM using departure time
+      const shortDate = departureTime.toISOString().slice(2, 16).replace('T', ', ');
       
       // CRITICAL FIX: Build locations array just like regular save flight
       console.log('🎯 AUTO PLAN: All waypoints before filtering:', waypoints);
@@ -1020,7 +1039,7 @@ const RightPanel = React.forwardRef(({
         flightName: flightName, // Use departure + first location + short date format
         locations: locations, // CRITICAL FIX: Add locations array
         waypoints: waypoints, // Add waypoints for processing
-        etd: now, // Send Date object, not ISO string
+        etd: departureTime, // Use wizard ETD or 1 hour from now
         captainId: null, // No crew for auto-generated flights
         copilotId: null,
         medicId: null,
@@ -1042,10 +1061,19 @@ const RightPanel = React.forwardRef(({
       
       // For existing flights in Auto Plan, we want Palantir to update weather and replan
       // but keep the user's waypoints and route structure
-      const now = new Date();
+      // 🧙‍♂️ WIZARD FIX: Use wizard ETD if available, otherwise default to 1 hour from now
+      let existingFlightTime;
+      if (etd && etd instanceof Date) {
+        console.log('🧙‍♂️ Using wizard departure time for existing flight:', etd);
+        existingFlightTime = etd;
+      } else {
+        console.log('🧙‍♂️ No wizard ETD for existing flight, defaulting to 1 hour from now');
+        existingFlightTime = new Date();
+        existingFlightTime.setHours(existingFlightTime.getHours() + 1);
+      }
       
       // Create short date format: YY-MM-DD, HH:MM
-      const shortDate = now.toISOString().slice(2, 16).replace('T', ', ');
+      const shortDate = existingFlightTime.toISOString().slice(2, 16).replace('T', ', ');
       
       // CRITICAL FIX: Build locations array for existing flights too
       const locations = waypoints
@@ -1081,7 +1109,7 @@ const RightPanel = React.forwardRef(({
         flightName: flightName, // Use departure + first location + short date format
         locations: locations, // CRITICAL FIX: Add locations array
         waypoints: waypoints, // Add waypoints for processing
-        etd: now, // Send Date object, not ISO string
+        etd: existingFlightTime, // Use wizard ETD or 1 hour from now
         captainId: null, // No crew for auto-generated flights
         copilotId: null,
         medicId: null,
@@ -1280,6 +1308,7 @@ const RightPanel = React.forwardRef(({
         isSaving={false}
         alternateRouteData={alternateRouteData}
         alternateRouteInput={alternateRouteInput}
+        initialETD={etd} // 🧙‍♂️ WIZARD FIX: Pass wizard ETD to save card
       />
       
       {/* Load Flights Card */}

@@ -16,6 +16,7 @@ const FlightWizard = ({
   regions = [],
   searchLocation,
   onAddWaypoint,
+  onClearRoute,
   aircraftTypes = [],
   aircraftsByType = {},
   selectedAircraft,
@@ -34,8 +35,7 @@ const FlightWizard = ({
   // Flight building state
   const [flightData, setFlightData] = useState({
     departure: null,
-    stops: [],
-    destination: null,
+    landings: [], // Combined stops + destination (last item is destination)
     aircraft: null,
     aircraftType: null,
     departureTime: null,
@@ -70,12 +70,25 @@ const FlightWizard = ({
     }
   }, [isVisible, currentStep, userDetails]);
 
+  // Color array for landings (blues and purples like passenger colors)
+  const getLandingColor = (index) => {
+    const colors = [
+      '#007bff', // Blue
+      '#6610f2', // Purple
+      '#6f42c1', // Indigo  
+      '#e83e8c', // Pink
+      '#20c997', // Teal
+      '#fd7e14', // Orange
+      '#dc3545'  // Red
+    ];
+    return colors[index % colors.length];
+  };
+
   // Steps definition
   const steps = [
     { id: 'welcome', title: 'Welcome to FastPlanner' },
     { id: 'departure', title: 'Where are you departing from?' },
-    { id: 'stops', title: 'Any stops along the way?' },
-    { id: 'destination', title: 'What\'s your final destination?' },
+    { id: 'landings', title: 'Add any rigs and final destination' },
     { id: 'aircraft', title: 'Which aircraft will you use?' },
     { id: 'time', title: 'When do you want to depart?' },
     { id: 'complete', title: 'Ready to plan your flight!' }
@@ -129,32 +142,24 @@ const FlightWizard = ({
       }
       // Auto-advance to next step after selecting departure
       setTimeout(() => handleNext(), 500);
-    } else if (stepId === 'stops') {
-      setFlightData(prev => ({ 
-        ...prev, 
-        stops: [...prev.stops, location] 
-      }));
-      // Add to actual flight planner immediately - use originalName for clean locName
+    } else if (stepId === 'landings') {
+      // Check for duplicates before adding
       const locName = location.originalName || location.locName || location.name || location.location_name;
-      if (locName && onAddWaypoint) {
-        console.log('🧙‍♂️ Adding waypoint to flight planner:', locName);
-        onAddWaypoint(locName);
+      const isDuplicate = flightData.landings.some(landing => 
+        (landing.originalName || landing.locName || landing.name || landing.location_name) === locName
+      );
+      
+      if (!isDuplicate) {
+        setFlightData(prev => ({ 
+          ...prev, 
+          landings: [...prev.landings, location] 
+        }));
+        // DON'T add to flight planner yet - buffer in wizard until "Choose Aircraft"
+        console.log('🧙‍♂️ Buffered landing in wizard:', locName);
       } else {
-        console.warn('🧙‍♂️ Cannot add waypoint - missing locName or onAddWaypoint function');
+        console.log('🧙‍♂️ Duplicate location ignored:', locName);
       }
-      // For stops, just clear the input - don't auto-advance (user might want more stops)
-    } else if (stepId === 'destination') {
-      setFlightData(prev => ({ ...prev, destination: location }));
-      // Add to actual flight planner immediately - use originalName for clean locName
-      const locName = location.originalName || location.locName || location.name || location.location_name;
-      if (locName && onAddWaypoint) {
-        console.log('🧙‍♂️ Adding waypoint to flight planner:', locName);
-        onAddWaypoint(locName);
-      } else {
-        console.warn('🧙‍♂️ Cannot add waypoint - missing locName or onAddWaypoint function');
-      }
-      // Auto-advance to aircraft selection after selecting destination
-      setTimeout(() => handleNext(), 500);
+      // For landings, just clear the input - don't auto-advance (user might want more landings)
     }
     
     setCurrentInput('');
@@ -164,10 +169,51 @@ const FlightWizard = ({
   
   // Handle next step
   const handleNext = () => {
+    // If advancing from landings to aircraft, send buffered landings to main planner
+    if (currentStepData.id === 'landings' && currentStep < steps.length - 1) {
+      console.log('🧙‍♂️ Sending buffered landings to main flight planner');
+      
+      // Send all landings to the flight planner now
+      flightData.landings.forEach(landing => {
+        const locName = landing.originalName || landing.locName || landing.name || landing.location_name;
+        if (locName && onAddWaypoint) {
+          console.log('🧙‍♂️ Adding buffered waypoint to flight planner:', locName);
+          onAddWaypoint(locName);
+        }
+      });
+    }
+    
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleComplete();
+    }
+  };
+
+  // Handle going back - clear main planner if going back to edit landings
+  const handleBack = () => {
+    if (currentStep > 0) {
+      const newStep = currentStep - 1;
+      
+      // If going back to landings step from aircraft, clear the main planner
+      // so user can rebuild the list cleanly without duplicates
+      if (steps[newStep].id === 'landings' && onClearRoute) {
+        console.log('🧙‍♂️ Going back to edit landings - clearing main planner to prevent duplicates');
+        onClearRoute(true); // Preserve flight data, just clear waypoints
+        
+        // Re-add the departure since we're only editing landings
+        if (flightData.departure) {
+          const locName = flightData.departure.originalName || flightData.departure.locName || flightData.departure.name;
+          if (locName && onAddWaypoint) {
+            setTimeout(() => {
+              console.log('🧙‍♂️ Re-adding departure after clear:', locName);
+              onAddWaypoint(locName);
+            }, 100);
+          }
+        }
+      }
+      
+      setCurrentStep(newStep);
     }
   };
   
@@ -183,17 +229,11 @@ const FlightWizard = ({
         name: flightData.departure.originalName || flightData.departure.name
       });
     }
-    if (flightData.stops) {
-      waypoints.push(...flightData.stops.map(stop => ({
-        ...stop,
-        name: stop.originalName || stop.name
+    if (flightData.landings) {
+      waypoints.push(...flightData.landings.map(landing => ({
+        ...landing,
+        name: landing.originalName || landing.name
       })));
-    }
-    if (flightData.destination) {
-      waypoints.push({
-        ...flightData.destination,
-        name: flightData.destination.originalName || flightData.destination.name
-      });
     }
     
     // Pass complete flight data to parent for auto-planning
@@ -204,6 +244,8 @@ const FlightWizard = ({
     };
     
     console.log('🧙‍♂️ Wizard: Using original names for system:', waypoints.map(w => w.name));
+    console.log('🧙‍♂️ Wizard: Complete flight data being sent:', completeFlightData);
+    console.log('🧙‍♂️ Wizard: Departure time being sent:', completeFlightData.departureTime);
     
     onComplete(completeFlightData);
     handleClose();
@@ -268,7 +310,7 @@ const FlightWizard = ({
             </div>
           )}
           
-          {(currentStepData.id === 'departure' || currentStepData.id === 'stops' || currentStepData.id === 'destination') && (
+          {(currentStepData.id === 'departure' || currentStepData.id === 'landings') && (
             <div className="wizard-step location-step">
               <h2>{currentStepData.title}</h2>
               
@@ -276,15 +318,12 @@ const FlightWizard = ({
               {currentStepData.id === 'departure' && (
                 <p>Search for your departure location and select it from the results below.</p>
               )}
-              {currentStepData.id === 'stops' && (
-                <p>Add any <strong>offshore stops</strong> (rigs, platforms) along your route, or click "Add Final Destination" to continue.</p>
-              )}
-              {currentStepData.id === 'destination' && (
-                <p>Search for your final destination and select it from the results below.</p>
+              {currentStepData.id === 'landings' && (
+                <p>Add any <strong>rigs, platforms, and your final destination</strong>. The last location you add will be your final destination.</p>
               )}
               
               {/* Show current route being built */}
-              {(flightData.departure || flightData.stops.length > 0) && (
+              {(flightData.departure || flightData.landings.length > 0) && (
                 <div className="route-preview">
                   <h4>Your Route:</h4>
                   <div className="route-list">
@@ -293,28 +332,37 @@ const FlightWizard = ({
                         <span className="route-icon">FROM</span> {flightData.departure.name}
                       </div>
                     )}
-                    {flightData.stops.map((stop, index) => (
-                      <div key={index} className="route-item stop">
-                        <span className="route-icon">STOP</span> {stop.name}
-                        <button 
-                          className="remove-stop-btn"
-                          onClick={() => {
-                            setFlightData(prev => ({
-                              ...prev,
-                              stops: prev.stops.filter((_, i) => i !== index)
-                            }));
-                          }}
-                          title="Remove this stop"
+                    {flightData.landings.map((landing, index) => {
+                      const isLast = index === flightData.landings.length - 1;
+                      const color = getLandingColor(index);
+                      return (
+                        <div 
+                          key={index} 
+                          className={`route-item ${isLast ? 'destination' : 'stop'}`}
+                          style={{ borderLeftColor: color }}
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    {currentStepData.id === 'destination' && (
-                      <div className="route-item destination building">
-                        <span className="route-icon">TO</span> Adding destination...
-                      </div>
-                    )}
+                          <span 
+                            className="route-icon"
+                            style={{ backgroundColor: color }}
+                          >
+                            {isLast ? 'TO' : `${index + 1}`}
+                          </span> 
+                          {landing.name}
+                          <button 
+                            className="remove-stop-btn"
+                            onClick={() => {
+                              setFlightData(prev => ({
+                                ...prev,
+                                landings: prev.landings.filter((_, i) => i !== index)
+                              }));
+                            }}
+                            title="Remove this landing"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -338,8 +386,7 @@ const FlightWizard = ({
                     }}
                     placeholder={
                       currentStepData.id === 'departure' ? "Enter departure location (e.g. Houston, KHOU, platform name...)" :
-                      currentStepData.id === 'stops' ? "Enter stop location (e.g. rig name, platform, airport...)" :
-                      currentStepData.id === 'destination' ? "Enter destination location (e.g. rig name, airport code...)" :
+                      currentStepData.id === 'landings' ? "Enter rig, platform, or destination (e.g. rig name, airport code...)" :
                       "Enter location name, code, or coordinates..."
                     }
                     className="wizard-input"
@@ -369,16 +416,16 @@ const FlightWizard = ({
               {/* Navigation buttons */}
               <div className="wizard-buttons">
                 {currentStep > 1 && (
-                  <button className="wizard-btn secondary" onClick={() => setCurrentStep(currentStep - 1)}>
+                  <button className="wizard-btn secondary" onClick={handleBack}>
                     Back
                   </button>
                 )}
-                {currentStepData.id === 'stops' && (
+                {currentStepData.id === 'landings' && flightData.landings.length > 0 && (
                   <button className="wizard-btn primary" onClick={handleNext}>
-                    Add Final Destination
+                    Choose Aircraft
                   </button>
                 )}
-                {currentStepData.id !== 'stops' && validationStatus === 'valid' && (
+                {currentStepData.id !== 'landings' && validationStatus === 'valid' && (
                   <button className="wizard-btn primary" onClick={handleNext}>
                     Next
                   </button>
@@ -550,14 +597,17 @@ const FlightWizard = ({
                   <strong>Route:</strong> 
                   <div className="route-flow">
                     <span className="route-location departure">{flightData.departure?.name}</span>
-                    {flightData.stops.map((stop, index) => (
-                      <React.Fragment key={index}>
-                        <span className="route-arrow">→</span>
-                        <span className="route-location stop">{stop.name}</span>
-                      </React.Fragment>
-                    ))}
-                    <span className="route-arrow">→</span>
-                    <span className="route-location destination">{flightData.destination?.name}</span>
+                    {flightData.landings.map((landing, index) => {
+                      const isLast = index === flightData.landings.length - 1;
+                      return (
+                        <React.Fragment key={index}>
+                          <span className="route-arrow">→</span>
+                          <span className={`route-location ${isLast ? 'destination' : 'stop'}`}>
+                            {landing.name}
+                          </span>
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 </div>
                 
