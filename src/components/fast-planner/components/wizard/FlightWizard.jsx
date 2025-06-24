@@ -12,6 +12,7 @@ const FlightWizard = ({
   onClose, 
   onComplete,
   onSkip,
+  onLoadFlight, // NEW: Handler to load selected flight
   // Data and handlers from parent
   regions = [],
   searchLocation,
@@ -46,6 +47,13 @@ const FlightWizard = ({
   const [currentInput, setCurrentInput] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [validationStatus, setValidationStatus] = useState(null); // 'valid', 'invalid', 'searching'
+  
+  // Flight list state
+  const [flights, setFlights] = useState([]);
+  const [filteredFlights, setFilteredFlights] = useState([]);
+  const [flightSearchTerm, setFlightSearchTerm] = useState('');
+  const [flightSearchDate, setFlightSearchDate] = useState('');
+  const [isLoadingFlights, setIsLoadingFlights] = useState(false);
   
   // Animate names when wizard becomes visible and user data is actually loaded
   useEffect(() => {
@@ -84,9 +92,130 @@ const FlightWizard = ({
     return colors[index % colors.length];
   };
 
+  // Load flights when flight list step is accessed
+  useEffect(() => {
+    if (currentStep === 1 && flights.length === 0) { // Step 1 is flightList
+      loadFlights();
+    }
+  }, [currentStep]);
+
+  // Filter flights based on search criteria
+  useEffect(() => {
+    let filtered = flights;
+    
+    // Filter by search term
+    if (flightSearchTerm) {
+      filtered = filtered.filter(flight => 
+        flight.flightNumber?.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+        flight.flightName?.toLowerCase().includes(flightSearchTerm.toLowerCase()) ||
+        flight.name?.toLowerCase().includes(flightSearchTerm.toLowerCase())
+      );
+    }
+    
+    // Filter by date
+    if (flightSearchDate) {
+      filtered = filtered.filter(flight => {
+        if (flight.etd) {
+          const flightDate = new Date(flight.etd).toISOString().split('T')[0];
+          return flightDate === flightSearchDate;
+        }
+        return false;
+      });
+    }
+    
+    setFilteredFlights(filtered);
+  }, [flights, flightSearchTerm, flightSearchDate]);
+
+  // Load flights using FlightService (same as LoadFlightsCard)
+  const loadFlights = async () => {
+    setIsLoadingFlights(true);
+    try {
+      // Import FlightService
+      const FlightService = (await import('../../services/FlightService')).default;
+      
+      console.log('🧙‍♂️ Wizard: Loading flights via FlightService...');
+      
+      const result = await FlightService.loadFlights(null, 100); // Load all regions, max 100 flights
+      
+      if (result.success) {
+        console.log('🧙‍♂️ Wizard: Loaded flights:', result.flights.length);
+        
+        // Debug: Log first flight's date properties
+        if (result.flights.length > 0) {
+          const firstFlight = result.flights[0];
+          console.log('🧙‍♂️ Wizard: First flight date properties:', {
+            etd: firstFlight.etd,
+            departureTime: firstFlight.departureTime,
+            createdAt: firstFlight.createdAt,
+            allKeys: Object.keys(firstFlight)
+          });
+        }
+        
+        setFlights(result.flights);
+      } else {
+        console.error('🧙‍♂️ Wizard: Failed to load flights:', result.error);
+        setFlights([]);
+      }
+    } catch (error) {
+      console.error('🧙‍♂️ Wizard: Error loading flights:', error);
+      console.error('🧙‍♂️ Wizard: Error details:', error.message);
+      setFlights([]);
+    } finally {
+      setIsLoadingFlights(false);
+    }
+  };
+
+  // Handle flight selection - use EXACT same workflow as LoadFlightsCard
+  const handleFlightSelect = (flight) => {
+    console.log('🧙‍♂️ Wizard: Selected flight:', flight.flightNumber || flight.name);
+    console.log('🧙‍♂️ Wizard: Using EXACT LoadFlightsCard workflow');
+    
+    // 🛰️ SIMPLE FIX: Switch to satellite BEHIND wizard, then delay before closing
+    if (window.mapManager?.map) {
+      const map = window.mapManager.map;
+      
+      // Check if we're already on satellite
+      const currentStyleUrl = map.getStyle()?.sources ? 
+        (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
+      
+      if (currentStyleUrl !== 'satellite') {
+        console.log('🛰️ Wizard: Quick switch to satellite behind wizard to prevent flash');
+        map.setStyle('mapbox://styles/mapbox/satellite-v9');
+        // Don't wait for style load - let the existing RightPanel logic handle terrain and angles
+      }
+    }
+    
+    // 🎬 SMOOTH CLOSE: Keep dark overlay up briefly, then fade out
+    const wizardOverlay = document.querySelector('.flight-wizard-overlay');
+    if (wizardOverlay) {
+      // Wait a moment for satellite to load, then smooth fade
+      setTimeout(() => {
+        console.log('🧙‍♂️ Wizard: Starting smooth fade after satellite switch');
+        wizardOverlay.style.transition = 'opacity 0.3s ease-out';
+        wizardOverlay.style.opacity = '0';
+        
+        // Remove wizard after fade completes
+        setTimeout(() => {
+          onClose();
+        }, 300);
+      }, 150); // Brief delay for satellite to take effect
+    } else {
+      // Fallback - close immediately if overlay not found
+      onClose();
+    }
+    
+    // 🎯 CRITICAL: Use the exact same function call as LoadFlightsCard
+    // This preserves all existing transition logic in RightPanel
+    if (onLoadFlight) {
+      // Pass the raw flight object exactly as LoadFlightsCard does
+      onLoadFlight(flight);
+    }
+  };
+
   // Steps definition
   const steps = [
     { id: 'welcome', title: 'Welcome to FastPlanner' },
+    { id: 'flightList', title: 'Select Flight to Load/Edit' },
     { id: 'departure', title: 'Where are you departing from?' },
     { id: 'landings', title: 'Add any rigs and final destination' },
     { id: 'aircraft', title: 'Which aircraft will you use?' },
@@ -94,7 +223,7 @@ const FlightWizard = ({
     { id: 'complete', title: 'Ready to plan your flight!' }
   ];
   
-  const currentStepData = steps[currentStep];
+  const currentStepData = steps[currentStep] || { id: 'unknown', title: 'Unknown Step' };
   
   // Handle closing with "don't show again" option
   const handleClose = () => {
@@ -322,10 +451,15 @@ const FlightWizard = ({
                   </div>
                 )}
               </div>
-              <p>Let's plan your flight step by step.<br/>It only takes a minute!</p>
-              <button className="wizard-btn primary" onClick={handleNext}>
-                Start Planning
-              </button>
+              <p>Choose how you'd like to continue:</p>
+              <div className="wizard-choice-buttons">
+                <button className="wizard-btn primary" onClick={() => setCurrentStep(2)}>
+                  Build New Flight
+                </button>
+                <button className="wizard-btn secondary" onClick={() => setCurrentStep(1)}>
+                  Load/Edit Flight
+                </button>
+              </div>
               <label className="wizard-checkbox">
                 <input 
                   type="checkbox" 
@@ -334,6 +468,90 @@ const FlightWizard = ({
                 />
                 Don't show this again
               </label>
+            </div>
+          )}
+          
+          {currentStepData.id === 'flightList' && (
+            <div className="wizard-step flight-list-step">
+              <h2>{currentStepData.title}</h2>
+              <p>Select an existing flight to load and edit:</p>
+              
+              {/* Search controls */}
+              <div className="flight-search-controls">
+                <div className="search-row">
+                  <input
+                    type="text"
+                    placeholder="Search flights by name..."
+                    value={flightSearchTerm}
+                    onChange={(e) => setFlightSearchTerm(e.target.value)}
+                    className="wizard-search-input"
+                  />
+                  <input
+                    type="date"
+                    value={flightSearchDate}
+                    onChange={(e) => setFlightSearchDate(e.target.value)}
+                    className="wizard-date-input"
+                  />
+                </div>
+              </div>
+              
+              {/* Flight list */}
+              <div className="flight-list-container">
+                {isLoadingFlights ? (
+                  <div className="flight-loading">
+                    <div className="loading-spinner"></div>
+                    <p>Loading flights...</p>
+                  </div>
+                ) : filteredFlights.length > 0 ? (
+                  <div className="flight-list">
+                    {filteredFlights.map((flight, index) => (
+                      <div 
+                        key={flight.__primaryKey || flight.flightId || flight.id || index}
+                        className="flight-item"
+                        onClick={() => handleFlightSelect(flight)}
+                      >
+                        <div className="flight-name">
+                          {flight.flightNumber || flight.flightName || flight.name || 'Unnamed Flight'}
+                        </div>
+                        <div className="flight-route">
+                          {flight.stops && flight.stops.length > 0 ? 
+                            flight.stops.join(' → ') :
+                            flight.departure && flight.destination ? 
+                              `${flight.departure} → ${flight.destination}` :
+                              'No route information'
+                          }
+                        </div>
+                        <div className="flight-details">
+                          {(flight.date || flight.etd || flight.departureTime || flight.createdAt) && (
+                            <span className="flight-date">
+                              {(() => {
+                                const dateStr = flight.date || flight.etd || flight.departureTime || flight.createdAt;
+                                try {
+                                  const date = new Date(dateStr);
+                                  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                                } catch (e) {
+                                  return dateStr; // Fallback to raw string if parsing fails
+                                }
+                              })()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-flights">
+                    <p>No flights found matching your search criteria.</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Back button */}
+              <div className="wizard-nav-buttons">
+                <button className="wizard-btn secondary" onClick={() => setCurrentStep(0)}>
+                  Back to Start
+                </button>
+              </div>
             </div>
           )}
           

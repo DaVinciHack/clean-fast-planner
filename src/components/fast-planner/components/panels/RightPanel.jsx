@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useImperativeHandle } from 'react';
+import React, { useState, useCallback, useImperativeHandle, useEffect } from 'react';
 import RightPanelContainer from './RightPanelContainer';
 import {
   MainCard,
@@ -1178,6 +1178,16 @@ const RightPanel = React.forwardRef(({
     handleAutoPlan,
     handleCardChange
   }), [handleCardChange]);
+
+  // 🎯 FIX: Expose handleLoadFlight to window for FlightWizard access
+  useEffect(() => {
+    window.rightPanelHandleLoadFlight = handleLoadFlight;
+    
+    // Cleanup on unmount
+    return () => {
+      window.rightPanelHandleLoadFlight = null;
+    };
+  }, [handleLoadFlight]);
 
   return (
     <PanelProvider value={{

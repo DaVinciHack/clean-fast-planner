@@ -2845,6 +2845,54 @@ const FastPlannerCore = ({
   };
   const handleSaveCard = () => handleCardChange('saveflight');
   const handleLoadCard = () => handleCardChange('loadflights');
+  
+  // Handle flight loading from wizard - use EXACT same path as RightPanel
+  const handleLoadFlight = async (flight) => {
+    console.log('🧙‍♂️ Wizard: Loading flight via handleLoadFlight - using EXACT LoadFlightsCard workflow');
+    
+    // 🎯 CRITICAL: Process flight data exactly like RightPanel.handleLoadFlight does
+    // This ensures the exact same stereolight mode, 3D camera, object clearing workflow
+    
+    console.log('🟠 WIZARD LOAD: Load flight data from wizard:', flight);
+    console.log('🟠 WIZARD LOAD: Raw flight available:', !!flight._rawFlight);
+    
+    // 🧹 CRITICAL: Clear all old weather graphics before loading new flight
+    console.log('🧹 FLIGHT LOAD: Clearing old weather graphics');
+    if (window.clearRigWeatherGraphics) {
+      window.clearRigWeatherGraphics();
+    }
+    
+    try {
+      // Extract flight data for the main application (EXACT same as RightPanel)
+      const flightData = {
+        flightId: flight.id,
+        flightNumber: flight.flightNumber,
+        
+        // Extract stops (landing locations) from the stops array
+        stops: flight.stops || [],
+        
+        // Extract aircraft ID if available
+        aircraftId: flight.aircraftId,
+        
+        // Pass through the raw flight data for alternate routes and other data
+        _rawFlight: flight._rawFlight,
+        
+        // Include other flight properties
+        name: flight.name,
+        status: flight.status,
+        date: flight.date,
+        etd: flight.etd
+      };
+      
+      console.log('🟠 WIZARD LOAD: Processed flight data for main app:', flightData);
+      
+      // Now call the main flight load handler (same as RightPanel does)
+      await handleFlightLoad(flightData);
+      
+    } catch (error) {
+      console.error('🧙‍♂️ Wizard: Error in flight loading workflow:', error);
+    }
+  };
   const handleLayersCard = () => handleCardChange('maplayers');
 
   // 🚁 SAR HANDLERS: Search and Rescue mode functionality
@@ -2950,6 +2998,23 @@ const FastPlannerCore = ({
     console.log('🧙‍♂️ Wizard closed');
     setIsWizardVisible(false);
   }, []);
+  
+  // 🎯 FIX: Handle flight loading from wizard through proper RightPanel workflow
+  const handleWizardFlightLoad = useCallback((flight) => {
+    console.log('🧙‍♂️ Wizard: Flight selected for loading:', flight.flightNumber || flight.name);
+    console.log('🧙‍♂️ Wizard: Using CORRECT RightPanel workflow for satellite mode and map clearing');
+    
+    // Get reference to the right panel's handleLoadFlight function
+    // This ensures the wizard gets the same satellite mode switching and map clearing behavior
+    if (window.rightPanelHandleLoadFlight) {
+      console.log('🧙‍♂️ Wizard: ✅ Using RightPanel.handleLoadFlight for proper processing');
+      window.rightPanelHandleLoadFlight(flight);
+    } else {
+      console.warn('🧙‍♂️ Wizard: ⚠️ RightPanel.handleLoadFlight not available, falling back to direct call');
+      // Fallback to direct call if RightPanel function not available
+      handleFlightLoad(flight);
+    }
+  }, [handleFlightLoad]);
   
   // Real search function for wizard using existing platform data
   const handleWizardSearch = useCallback(async (searchTerm) => {
@@ -3162,6 +3227,7 @@ const FastPlannerCore = ({
         onClose={handleWizardClose}
         onComplete={handleWizardComplete}
         onSkip={handleWizardSkip}
+        onLoadFlight={handleWizardFlightLoad}
         searchLocation={handleWizardSearch}
         onAddWaypoint={hookAddWaypoint}
         onClearRoute={clearRoute}
