@@ -40,6 +40,16 @@ const MapLayersCard = ({
   // State for real-time altitude display updates
   const [altitudeDisplay, setAltitudeDisplay] = useState(0);
   
+  // State for auto flight controls
+  const [flightControls, setFlightControls] = useState({
+    isPlaying: false,
+    speed: 5,
+    progress: 0,
+    phase: 'PREFLIGHT',
+    currentWaypoint: '',
+    estimatedTime: 0
+  });
+  
   const [layers, setLayers] = useState({
     gulfCoastHeli: false,
     weather: false,
@@ -58,10 +68,8 @@ const MapLayersCard = ({
     satelliteConus: false, // User can enable when needed
     satelliteLongwave: false, // User can enable when needed
     satelliteShortwave: false, // User can enable when needed
-    // 3D Cloud Effects
-    cloud3DEffects: false, // GENIUS altitude-based cloud opacity
-    enhanced3DControls: false, // Advanced flight simulation controls
-    autoFlight: false // Automatic route following
+    // 3D Flight Simulation (consolidated)
+    autoFlight: false // Automatic route following with integrated controls
   });
 
   // State for Gulf Coast map opacity
@@ -990,6 +998,128 @@ const MapLayersCard = ({
     }
   };
   
+  // Auto Flight Control Handlers
+  const handleFlightControl = (action) => {
+    const manager = window.autoFlightManager;
+    if (!manager) {
+      console.warn('🛩️ No auto flight manager available');
+      return;
+    }
+    
+    switch (action) {
+      case 'play':
+        if (manager.isFlying && !manager.isPaused) {
+          // Currently playing - pause it
+          manager.togglePause();
+          setFlightControls(prev => ({ ...prev, isPlaying: false }));
+          console.log('🛩️ Flight paused');
+        } else if (manager.isFlying && manager.isPaused) {
+          // Currently paused - resume it
+          manager.togglePause();
+          setFlightControls(prev => ({ ...prev, isPlaying: true }));
+          console.log('🛩️ Flight resumed');
+        } else {
+          // Not flying - start it from current position (don't reset to beginning)
+          const started = manager.startFlight();
+          if (started) {
+            setFlightControls(prev => ({ ...prev, isPlaying: true }));
+            console.log('🛩️ Flight started from current position');
+          }
+        }
+        break;
+        
+      case 'stop':
+        manager.stopFlight();
+        setFlightControls(prev => ({ 
+          ...prev, 
+          isPlaying: false, 
+          progress: 0,
+          phase: 'PREFLIGHT'
+        }));
+        console.log('🛩️ Flight stopped');
+        break;
+    }
+  };
+  
+  // Jump to approach view for specific waypoint
+  const handleWaypointJump = (waypointIndex) => {
+    const manager = window.autoFlightManager;
+    if (!manager || !manager.route?.waypoints?.length) return;
+    
+    // Calculate progress to show approach TO each waypoint (not AT the waypoint)
+    let progress;
+    if (waypointIndex === 0) {
+      // For departure, start at 0% (can't show approach to departure)
+      progress = 0;
+      console.log(`🛩️ Jumping to departure: ${manager.route.waypoints[waypointIndex]?.name} (${progress}%)`);
+    } else {
+      // For all other waypoints, position 1% before the waypoint to show final approach
+      const waypointProgress = (waypointIndex / (manager.route.waypoints.length - 1)) * 100;
+      const approachOffset = 1; // 1% before the waypoint for close approach view
+      progress = Math.max(0, waypointProgress - approachOffset);
+      
+      console.log(`🛩️ Jumping to final approach for: ${manager.route.waypoints[waypointIndex]?.name} (${progress}% - approaching from ${approachOffset}% out)`);
+    }
+    
+    // Use the existing setFlightProgress method
+    if (manager.setFlightProgress) {
+      manager.setFlightProgress(progress);
+      setFlightControls(prev => ({ ...prev, progress }));
+    }
+  };
+  
+  const handleFlightProgress = (progress) => {
+    const manager = window.autoFlightManager;
+    if (!manager) return;
+    
+    // Set flight progress (0-100%)
+    if (manager.setFlightProgress) {
+      manager.setFlightProgress(progress);
+      setFlightControls(prev => ({ ...prev, progress }));
+      console.log(`🛩️ Flight progress set to ${progress}%`);
+    }
+  };
+  
+  const handleFlightSpeed = (speed) => {
+    const manager = window.autoFlightManager;
+    if (!manager) return;
+    
+    // Set flight speed multiplier (1-50x)
+    manager.config.speedMultiplier = speed;
+    setFlightControls(prev => ({ ...prev, speed }));
+    console.log(`🛩️ Flight speed set to ${speed}x`);
+  };
+  
+  // Update flight controls state from auto flight manager
+  React.useEffect(() => {
+    const updateFlightState = () => {
+      const manager = window.autoFlightManager;
+      if (manager && layers.autoFlight) {
+        setFlightControls(prev => ({
+          ...prev,
+          isPlaying: manager.isFlying && !manager.isPaused,
+          phase: manager.state?.phase || 'PREFLIGHT',
+          currentWaypoint: manager.currentWaypointIndex < manager.route?.waypoints?.length ? 
+            `${manager.currentWaypointIndex + 1}/${manager.route.waypoints.length} - ${manager.route.waypoints[manager.currentWaypointIndex]?.name}` :
+            'No route',
+          estimatedTime: manager.route?.estimatedTime || 0,
+          progress: manager.route?.waypoints?.length > 1 ? 
+            Math.round(((manager.currentWaypointIndex + (manager.flightProgress || 0)) / (manager.route.waypoints.length - 1)) * 100) : 0
+        }));
+      }
+    };
+    
+    // Update every second when auto flight is active
+    let interval;
+    if (layers.autoFlight) {
+      interval = setInterval(updateFlightState, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [layers.autoFlight]);
+  
   // Master toggle function for all platform layers
   const toggleAllPlatformLayers = () => {
     // Determine if we should turn all on or all off
@@ -1501,54 +1631,96 @@ const MapLayersCard = ({
         </div>
         
         <div className="layer-section">
-          <h4>🌩️ 3D Flight Simulation</h4>
-          <div className="button-row">
-            {renderLayerToggle('cloud3DEffects', '☁️ Altitude-Based Clouds', true)}
-            {renderLayerToggle('enhanced3DControls', '🎮 Flight Controls', true)}
-          </div>
+          <h4>🛩️ Auto Flight</h4>
           <div className="button-row">
             {renderLayerToggle('autoFlight', '🛩️ Auto Flight', true)}
           </div>
           
-          {/* Enhanced controls descriptions */}
-          {(layers.cloud3DEffects || layers.enhanced3DControls || layers.autoFlight) && (
-            <div className="weather-layer-descriptions">
-              {layers.cloud3DEffects && (
-                <div className="layer-description">
-                  <strong>☁️ 3D CLOUDS:</strong> Low clouds (0-3,000ft), Mid clouds (6-15,000ft), High clouds (20-40,000ft)
+          {/* Auto Flight Control Panel - Slides down when enabled */}
+          {layers.autoFlight && (
+            <div className="auto-flight-panel">
+              <div className="flight-controls-row">
+                <button 
+                  className={`flight-control-btn ${flightControls.isPlaying ? 'active' : ''}`}
+                  onClick={() => handleFlightControl('play')}
+                  disabled={!window.autoFlightManager}
+                >
+                  {flightControls.isPlaying ? '⏸️' : '▶️'}
+                </button>
+                <button 
+                  className="flight-control-btn"
+                  onClick={() => handleFlightControl('stop')}
+                  disabled={!window.autoFlightManager}
+                >
+                  ⏹️
+                </button>
+                <div className="flight-phase">
+                  {flightControls.phase}
+                </div>
+              </div>
+              
+              <div className="flight-slider-row">
+                <label>Flight Progress:</label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={flightControls.progress}
+                  onChange={(e) => handleFlightProgress(parseInt(e.target.value))}
+                  className="flight-progress-slider"
+                  disabled={!window.autoFlightManager}
+                />
+                <span>{flightControls.progress}%</span>
+              </div>
+              
+              <div className="flight-slider-row">
+                <label>Speed:</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="50" 
+                  value={flightControls.speed}
+                  onChange={(e) => handleFlightSpeed(parseInt(e.target.value))}
+                  className="flight-speed-slider"
+                  disabled={!window.autoFlightManager}
+                />
+                <span>{flightControls.speed}x</span>
+              </div>
+              
+              <div className="flight-info">
+                <div className="flight-waypoint">
+                  {flightControls.currentWaypoint || 'No route loaded'}
+                </div>
+                {flightControls.estimatedTime > 0 && (
+                  <div className="flight-time">
+                    Est. {Math.round(flightControls.estimatedTime)} min
+                  </div>
+                )}
+              </div>
+              
+              {/* Waypoint Jump Buttons */}
+              {window.autoFlightManager?.route?.waypoints?.length > 0 && (
+                <div className="flight-waypoints-row">
+                  <label>View Approach:</label>
+                  <div className="waypoint-buttons">
+                    {window.autoFlightManager.route.waypoints.map((waypoint, index) => (
+                      <button
+                        key={index}
+                        className={`waypoint-jump-btn ${
+                          window.autoFlightManager.currentWaypointIndex === index ? 'current' : ''
+                        }`}
+                        onClick={() => handleWaypointJump(index)}
+                        title={index === 0 ? `Departure: ${waypoint.name}` : `Approach to ${waypoint.name}`}
+                      >
+                        {index === 0 ? '🛫' : 
+                         index === window.autoFlightManager.route.waypoints.length - 1 ? '🛬' : 
+                         waypoint.name?.includes('Platform') || waypoint.name?.includes('Rig') ? '🛢️' : '📍'}
+                        <span className="waypoint-name">{waypoint.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-              {layers.enhanced3DControls && (
-                <div className="layer-description">
-                  <strong>🎮 Flight Controls:</strong> Right-click drag, WASD keys, scroll wheel
-                </div>
-              )}
-              {layers.autoFlight && (
-                <div className="layer-description">
-                  <strong>🛩️ AUTO FLIGHT:</strong> Automatic route following with speed control (1x-50x)
-                </div>
-              )}
-              {(layers.cloud3DEffects && window.threeDCloudManager) && (
-                <div className="layer-description" style={{color: '#4CAF50', fontWeight: 'bold'}}>
-                  <strong>📊 Current Altitude:</strong> {Math.round(altitudeDisplay)}ft AGL
-                  <br />
-                  <span style={{fontSize: '10px', color: '#ccc'}}>
-                    Zoom: {mapManagerRef?.current?.map?.getZoom()?.toFixed(1) || 'N/A'} | 
-                    Pitch: {mapManagerRef?.current?.map?.getPitch()?.toFixed(1) || 'N/A'}°
-                  </span>
-                </div>
-              )}
-              {(layers.cloud3DEffects || layers.enhanced3DControls || layers.autoFlight) && (
-                <div className="layer-description">
-                  <strong>✈️ FLIGHT SIMULATION:</strong> Zoom in = Lower altitude, Zoom out = Higher altitude
-                </div>
-              )}
-            </div>
-          )}
-          
-          {(!layers.cloud3DEffects && !layers.enhanced3DControls && !layers.autoFlight) && (
-            <div className="layer-description" style={{marginTop: '8px', fontStyle: 'italic', color: 'rgba(255,255,255,0.6)'}}>
-              Enable for revolutionary 3D flight simulation with automatic route following
             </div>
           )}
         </div>

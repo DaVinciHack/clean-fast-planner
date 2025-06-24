@@ -244,3 +244,201 @@
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }
+
+/* Auto Flight Panel */
+.auto-flight-panel {
+  background: rgba(20, 20, 20, 0.8);
+  border: 1px solid rgba(106, 90, 205, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 10px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
+.flight-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.flight-control-btn {
+  background: linear-gradient(135deg, #6a5acd 0%, #00ced1 100%);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px 10px;
+  transition: all 0.2s ease;
+  min-width: 35px;
+}
+
+.flight-control-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(106, 90, 205, 0.3);
+}
+
+.flight-control-btn:disabled {
+  background: rgba(100, 100, 100, 0.3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.flight-control-btn.active {
+  background: linear-gradient(135deg, #00ced1 0%, #6a5acd 100%);
+  box-shadow: 0 0 8px rgba(0, 206, 209, 0.4);
+}
+
+.flight-phase {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+  color: #00ced1;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: bold;
+  margin-left: auto;
+  padding: 4px 8px;
+}
+
+.flight-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.flight-slider-row label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  min-width: 80px;
+}
+
+.flight-progress-slider,
+.flight-speed-slider {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.flight-progress-slider::-webkit-slider-thumb,
+.flight-speed-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6a5acd 0%, #00ced1 100%);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.flight-progress-slider::-moz-range-thumb,
+.flight-speed-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6a5acd 0%, #00ced1 100%);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.flight-slider-row span {
+  color: #00ced1;
+  font-family: monospace;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 35px;
+  text-align: right;
+}
+
+.flight-info {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.flight-waypoint {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: monospace;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.flight-time {
+  color: #6a5acd;
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.flight-waypoints-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.flight-waypoints-row label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.waypoint-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.waypoint-jump-btn {
+  background: rgba(40, 40, 40, 0.8);
+  border: 1px solid rgba(106, 90, 205, 0.3);
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 4px 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 80px;
+  overflow: hidden;
+}
+
+.waypoint-jump-btn:hover:not(:disabled) {
+  background: rgba(106, 90, 205, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(106, 90, 205, 0.3);
+}
+
+.waypoint-jump-btn.current {
+  background: linear-gradient(135deg, #6a5acd 0%, #00ced1 100%);
+  border-color: #00ced1;
+  box-shadow: 0 0 8px rgba(0, 206, 209, 0.4);
+}
+
+.waypoint-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  max-width: 50px;
+}

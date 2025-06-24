@@ -8,6 +8,16 @@
 
 class AutoFlightManager {
     constructor(mapInstance, enhanced3DControls) {
+        // Validate map instance
+        if (!mapInstance) {
+            throw new Error('❌ AutoFlightManager requires a valid map instance');
+        }
+        
+        // Validate map is loaded
+        if (!mapInstance.isStyleLoaded || !mapInstance.isStyleLoaded()) {
+            console.warn('⚠️ Map style not loaded yet - AutoFlight may not work correctly');
+        }
+        
         this.map = mapInstance;
         this.controls = enhanced3DControls;
         this.isFlying = false;
@@ -15,6 +25,7 @@ class AutoFlightManager {
         this.currentWaypointIndex = 0;
         this.flightProgress = 0; // 0-1 between current waypoints
         this.animationFrame = null;
+        this.hasError = false; // Track error state
         
         // Flight configuration
         this.config = {
@@ -53,18 +64,39 @@ class AutoFlightManager {
      * @param {Array} waypoints - Array of waypoint objects
      */
     loadRoute(waypoints) {
+        console.log('🛩️ Loading route with waypoints:', waypoints);
+        
         if (!waypoints || waypoints.length < 2) {
-            console.error('❌ Need at least 2 waypoints for flight route');
+            console.error('❌ Need at least 2 waypoints for flight route, got:', waypoints?.length || 0);
             return false;
         }
         
-        this.route.waypoints = waypoints.map((wp, index) => ({
+        // Validate waypoint data
+        const validWaypoints = waypoints.filter(wp => {
+            const hasLat = wp.lat !== undefined || wp.latitude !== undefined;
+            const hasLng = wp.lng !== undefined || wp.longitude !== undefined || wp.lon !== undefined;
+            
+            if (!hasLat || !hasLng) {
+                console.warn('⚠️ Invalid waypoint (missing coordinates):', wp);
+                return false;
+            }
+            return true;
+        });
+        
+        if (validWaypoints.length < 2) {
+            console.error('❌ Not enough valid waypoints after validation:', validWaypoints.length);
+            return false;
+        }
+        
+        this.route.waypoints = validWaypoints.map((wp, index) => ({
             lat: wp.lat || wp.latitude,
             lng: wp.lng || wp.longitude || wp.lon,
             name: wp.name || `WP${index + 1}`,
             altitude: wp.altitude || this.config.cruiseAltitude,
             index: index
         }));
+        
+        console.log('🛩️ Processed waypoints:', this.route.waypoints);
         
         // Calculate total distance and flight time
         this.calculateRouteMetrics();
@@ -75,9 +107,11 @@ class AutoFlightManager {
         this.currentWaypointIndex = 0;
         this.flightProgress = 0;
         
-        console.log(`🛩️ Route loaded: ${this.route.waypoints.length} waypoints, ${this.route.totalDistance.toFixed(1)}NM, ~${this.route.estimatedTime.toFixed(0)} minutes`);
+        console.log(`✅ Route loaded: ${this.route.waypoints.length} waypoints, ${this.route.totalDistance.toFixed(1)}NM, ~${this.route.estimatedTime.toFixed(0)} minutes`);
+        console.log(`🛩️ Route: ${this.route.waypoints.map(wp => wp.name).join(' → ')}`);
         
-        this.createFlightPanel();
+        // Don't create DOM panel - use React panel instead
+        console.log('🛩️ Route ready for flight simulation');
         return true;
     }
     
@@ -102,8 +136,12 @@ class AutoFlightManager {
      * Start automatic flight simulation
      */
     startFlight() {
+        console.log('🛩️ Starting auto flight...');
+        
+        // Validate prerequisites
         if (!this.route.waypoints.length) {
             console.error('❌ No route loaded for flight');
+            this.hasError = true;
             return false;
         }
         
@@ -112,31 +150,70 @@ class AutoFlightManager {
             return false;
         }
         
-        this.isFlying = true;
-        this.isPaused = false;
-        this.state.phase = 'TAKEOFF';
-        this.state.startTime = Date.now();
-        this.currentWaypointIndex = 0;
-        this.flightProgress = 0;
+        if (!this.map || !this.map.isStyleLoaded()) {
+            console.error('❌ Map not ready for flight simulation');
+            this.hasError = true;
+            return false;
+        }
         
-        // Move camera to departure position
-        this.map.easeTo({
-            center: [this.route.waypoints[0].lng, this.route.waypoints[0].lat],
-            zoom: 12,
-            pitch: 45,
-            bearing: this.calculateInitialHeading(),
-            duration: 2000
-        });
-        
-        // Start flight animation
-        setTimeout(() => {
-            this.startFlightAnimation();
-        }, 2500);
-        
-        console.log('🛫 Flight started! Automatic navigation engaged.');
-        this.updateFlightPanel();
-        
-        return true;
+        try {
+            this.isFlying = true;
+            this.isPaused = false;
+            this.hasError = false;
+            this.state.phase = 'TAKEOFF';
+            this.state.startTime = Date.now();
+            
+            // DON'T reset position if we already have one (preserve scrubbed position)
+            if (this.currentWaypointIndex === undefined || this.currentWaypointIndex === null) {
+                this.currentWaypointIndex = 0;
+                this.flightProgress = 0;
+            }
+            
+            console.log(`🛩️ Starting flight from waypoint ${this.currentWaypointIndex + 1}, progress: ${Math.round(this.flightProgress * 100)}%`);
+            
+            console.log(`🛫 Starting flight with ${this.route.waypoints.length} waypoints`);
+            console.log(`🛫 Route: ${this.route.waypoints.map(wp => wp.name).join(' → ')}`);
+            
+            // Move camera to current position (not always departure)
+            let currentPosition;
+            if (this.route.currentPosition) {
+                // Use existing current position (from scrubbing)
+                currentPosition = this.route.currentPosition;
+                console.log('🛫 Moving camera to current position:', currentPosition);
+            } else {
+                // Fall back to departure if no current position
+                currentPosition = { lat: this.route.waypoints[0].lat, lng: this.route.waypoints[0].lng };
+                this.route.currentPosition = currentPosition;
+                console.log('🛫 Moving camera to departure:', currentPosition);
+            }
+            
+            this.map.easeTo({
+                center: [currentPosition.lng, currentPosition.lat],
+                zoom: 12,
+                pitch: 45,
+                bearing: this.calculateInitialHeading(),
+                duration: 2000
+            });
+            
+            // Start flight animation after camera move
+            setTimeout(() => {
+                if (this.isFlying && !this.hasError) {
+                    console.log('🛫 Starting flight animation...');
+                    this.startFlightAnimation();
+                }
+            }, 2500);
+            
+            console.log('✅ Flight started! Automatic navigation engaged.');
+            this.updateFlightPanel();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Error starting flight:', error);
+            this.hasError = true;
+            this.isFlying = false;
+            return false;
+        }
     }
     
     /**
@@ -166,20 +243,74 @@ class AutoFlightManager {
     }
     
     /**
+     * Set flight progress to specific point (0-100%)
+     */
+    setFlightProgress(percent) {
+        if (!this.route.waypoints.length) return;
+        
+        console.log(`🛩️ Setting flight progress to ${percent}%`);
+        
+        // Convert percentage to waypoint index and progress
+        const totalProgress = (percent / 100) * (this.route.waypoints.length - 1);
+        this.currentWaypointIndex = Math.floor(totalProgress);
+        this.flightProgress = totalProgress - this.currentWaypointIndex;
+        
+        // Ensure we don't exceed bounds
+        if (this.currentWaypointIndex >= this.route.waypoints.length - 1) {
+            this.currentWaypointIndex = this.route.waypoints.length - 2;
+            this.flightProgress = 1;
+        }
+        
+        // Calculate new position
+        if (this.currentWaypointIndex < this.route.waypoints.length - 1) {
+            const currentWP = this.route.waypoints[this.currentWaypointIndex];
+            const nextWP = this.route.waypoints[this.currentWaypointIndex + 1];
+            
+            // Interpolate position
+            const lat = currentWP.lat + (nextWP.lat - currentWP.lat) * this.flightProgress;
+            const lng = currentWP.lng + (nextWP.lng - currentWP.lng) * this.flightProgress;
+            const altitude = currentWP.altitude + (nextWP.altitude - currentWP.altitude) * this.flightProgress;
+            
+            this.route.currentPosition = { lat, lng };
+            this.route.currentAltitude = altitude;
+            
+            // Update camera to new position
+            if (this.map && this.map.isStyleLoaded()) {
+                this.map.easeTo({
+                    center: [lng, lat],
+                    duration: 1000
+                });
+            }
+        }
+        
+        console.log(`🛩️ Jumped to waypoint ${this.currentWaypointIndex + 1}/${this.route.waypoints.length}, progress: ${Math.round(this.flightProgress * 100)}%`);
+    }
+    
+    /**
      * Main flight animation loop
      */
     startFlightAnimation() {
         const animate = () => {
-            if (!this.isFlying) return;
-            
-            if (!this.isPaused) {
-                this.updateFlightPosition();
-                this.updateCamera();
-                this.updateFlightState();
+            if (!this.isFlying || this.hasError) {
+                console.log('🛩️ Animation stopped - flying:', this.isFlying, 'error:', this.hasError);
+                return;
             }
             
-            this.updateFlightPanel();
-            this.animationFrame = requestAnimationFrame(animate);
+            try {
+                if (!this.isPaused) {
+                    this.updateFlightPosition();
+                    this.updateCamera();
+                    this.updateFlightState();
+                }
+                
+                this.updateFlightPanel();
+                this.animationFrame = requestAnimationFrame(animate);
+                
+            } catch (error) {
+                console.error('❌ Error in flight animation:', error);
+                this.hasError = true;
+                this.stopFlight();
+            }
         };
         
         animate();
@@ -245,25 +376,34 @@ class AutoFlightManager {
      * Update camera to follow aircraft
      */
     updateCamera() {
-        if (!this.route.currentPosition) return;
+        if (!this.route.currentPosition || !this.map) return;
         
-        // Calculate camera altitude based on flight altitude + offset
-        const cameraZoom = this.altitudeToZoom(this.route.currentAltitude + 2000);
-        
-        // Smooth camera following
-        this.map.easeTo({
-            center: [this.route.currentPosition.lng, this.route.currentPosition.lat],
-            zoom: cameraZoom,
-            bearing: this.route.currentHeading,
-            pitch: 60, // Good angle for following flight
-            duration: 100 // Smooth but responsive
-        });
-        
-        // Update 3D cloud effects if active
-        if (window.threeDCloudManager && window.threeDCloudManager.isActive) {
-            // Force cloud opacity update based on current altitude
-            window.threeDCloudManager.cameraAltitude = this.route.currentAltitude;
-            window.threeDCloudManager.updateCloudOpacity();
+        try {
+            // Calculate camera altitude based on flight altitude + offset
+            const cameraZoom = this.altitudeToZoom(this.route.currentAltitude + 2000);
+            
+            // Smooth camera following
+            this.map.easeTo({
+                center: [this.route.currentPosition.lng, this.route.currentPosition.lat],
+                zoom: cameraZoom,
+                bearing: this.route.currentHeading,
+                pitch: 60, // Good angle for following flight
+                duration: 100 // Smooth but responsive
+            });
+            
+            // Update 3D cloud effects if active
+            if (window.threeDCloudManager && window.threeDCloudManager.isActive) {
+                try {
+                    window.threeDCloudManager.cameraAltitude = this.route.currentAltitude;
+                    window.threeDCloudManager.updateCloudOpacity();
+                } catch (cloudError) {
+                    console.warn('⚠️ 3D cloud update error:', cloudError);
+                }
+            }
+            
+        } catch (error) {
+            console.error('❌ Camera update error:', error);
+            // Don't stop flight for camera errors, just log them
         }
     }
     
@@ -305,95 +445,22 @@ class AutoFlightManager {
     }
     
     /**
-     * Create flight control panel
+     * Flight control panel handled by React component
+     * This function is kept for compatibility but doesn't create DOM elements
      */
     createFlightPanel() {
-        if (document.getElementById('auto-flight-panel')) return;
-        
-        const panel = document.createElement('div');
-        panel.id = 'auto-flight-panel';
-        panel.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 1000;
-            border: 1px solid rgba(0, 150, 255, 0.5);
-            min-width: 280px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        `;
-        
-        panel.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 8px; color: #00aaff;">✈️ Auto Flight Control</div>
-            <div id="flight-info">
-                <div>Phase: <span id="flight-phase">PREFLIGHT</span></div>
-                <div>Waypoint: <span id="current-waypoint">-</span></div>
-                <div>Position: <span id="current-position">-</span></div>
-                <div>Altitude: <span id="current-altitude">0ft</span></div>
-                <div>Heading: <span id="current-heading">0°</span></div>
-                <div>Speed: <span id="flight-speed">${this.config.groundSpeed}kt</span></div>
-                <div>Fuel: <span id="fuel-remaining">100%</span></div>
-                <div>Time: <span id="flight-time">00:00</span></div>
-            </div>
-            <div style="margin-top: 10px;">
-                <button id="start-flight-btn" style="margin-right: 5px; padding: 4px 8px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">🛫 Start</button>
-                <button id="pause-flight-btn" style="margin-right: 5px; padding: 4px 8px; background: #FF9800; color: white; border: none; border-radius: 3px; cursor: pointer;">⏸️ Pause</button>
-                <button id="stop-flight-btn" style="margin-right: 5px; padding: 4px 8px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">🛑 Stop</button>
-            </div>
-            <div style="margin-top: 8px;">
-                <label>Speed: </label>
-                <input type="range" id="speed-slider" min="1" max="50" value="${this.config.speedMultiplier}" 
-                       style="width: 100px; margin: 0 5px;"> 
-                <span id="speed-value">${this.config.speedMultiplier}x</span>
-            </div>
-        `;
-        
-        document.body.appendChild(panel);
-        
-        // Add event listeners
-        document.getElementById('start-flight-btn').onclick = () => this.startFlight();
-        document.getElementById('pause-flight-btn').onclick = () => this.togglePause();
-        document.getElementById('stop-flight-btn').onclick = () => this.stopFlight();
-        
-        const speedSlider = document.getElementById('speed-slider');
-        speedSlider.oninput = (e) => {
-            this.config.speedMultiplier = parseInt(e.target.value);
-            document.getElementById('speed-value').textContent = `${this.config.speedMultiplier}x`;
-        };
+        console.log('🛩️ Flight panel creation handled by React component');
+        // Panel is now handled by the React MapLayersCard component
+        // No DOM manipulation needed
     }
     
     /**
-     * Update flight panel display
+     * Update flight panel display - now handled by React component
      */
     updateFlightPanel() {
-        const phaseEl = document.getElementById('flight-phase');
-        const waypointEl = document.getElementById('current-waypoint');
-        const positionEl = document.getElementById('current-position');
-        const altitudeEl = document.getElementById('current-altitude');
-        const headingEl = document.getElementById('current-heading');
-        const fuelEl = document.getElementById('fuel-remaining');
-        const timeEl = document.getElementById('flight-time');
-        
-        if (phaseEl) phaseEl.textContent = this.state.phase;
-        if (waypointEl && this.currentWaypointIndex < this.route.waypoints.length) {
-            waypointEl.textContent = `${this.currentWaypointIndex + 1}/${this.route.waypoints.length} - ${this.route.waypoints[this.currentWaypointIndex].name}`;
-        }
-        if (positionEl && this.route.currentPosition) {
-            positionEl.textContent = `${this.route.currentPosition.lat.toFixed(4)}, ${this.route.currentPosition.lng.toFixed(4)}`;
-        }
-        if (altitudeEl) altitudeEl.textContent = `${Math.round(this.route.currentAltitude)}ft`;
-        if (headingEl) headingEl.textContent = `${Math.round(this.route.currentHeading)}°`;
-        if (fuelEl) fuelEl.textContent = `${Math.round(this.state.fuelRemaining)}%`;
-        if (timeEl) {
-            const minutes = Math.floor(this.state.simulatedTime / 60);
-            const seconds = Math.floor(this.state.simulatedTime % 60);
-            timeEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
+        // Flight panel updates are now handled by React component
+        // The MapLayersCard component reads the flight state directly from this manager
+        console.log('🛩️ Flight panel update: React component handles display');
     }
     
     /**
@@ -437,11 +504,31 @@ class AutoFlightManager {
     }
     
     /**
-     * Remove flight panel
+     * Remove flight panel - now handled by React component
      */
     removeFlightPanel() {
-        const panel = document.getElementById('auto-flight-panel');
-        if (panel) panel.remove();
+        console.log('🛩️ Flight panel removal handled by React component');
+        // Panel cleanup is now handled by the React MapLayersCard component
+    }
+    
+    /**
+     * Debug method to check current state
+     */
+    debugStatus() {
+        console.log('🛩️ ===== AUTO FLIGHT DEBUG STATUS =====');
+        console.log('Map instance:', this.map);
+        console.log('Map style loaded:', this.map?.isStyleLoaded?.());
+        console.log('Is flying:', this.isFlying);
+        console.log('Is paused:', this.isPaused);
+        console.log('Has error:', this.hasError);
+        console.log('Route waypoints:', this.route.waypoints.length);
+        console.log('Current waypoint index:', this.currentWaypointIndex);
+        console.log('Flight progress:', this.flightProgress);
+        console.log('Current position:', this.route.currentPosition);
+        console.log('Flight state:', this.state);
+        console.log('Animation frame:', this.animationFrame);
+        console.log('Flight panel exists:', !!document.getElementById('auto-flight-panel'));
+        console.log('🛩️ ===== END DEBUG STATUS =====');
     }
     
     /**
@@ -459,4 +546,18 @@ export default AutoFlightManager;
 if (typeof window !== 'undefined') {
     window.AutoFlightManager = AutoFlightManager;
     console.log('🛩️ AutoFlight Manager available at: window.AutoFlightManager');
+    
+    // Add global debug function
+    window.debugAutoFlight = () => {
+        if (window.autoFlightManager) {
+            window.autoFlightManager.debugStatus();
+        } else {
+            console.log('🛩️ No active auto flight manager found');
+            console.log('🛩️ Available:', {
+                AutoFlightManager: !!window.AutoFlightManager,
+                mapManager: !!window.mapManager,
+                enhanced3DControls: !!window.enhanced3DControls
+            });
+        }
+    };
 }
