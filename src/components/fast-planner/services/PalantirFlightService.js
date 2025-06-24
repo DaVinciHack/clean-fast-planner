@@ -194,14 +194,20 @@ class PalantirFlightService {
         }
         
         // Prepare the parameters for createFlightWithWaypoints
+        // 🧙‍♂️ WIZARD FIX: Add ETD to createFlightWithWaypoints params
+        console.log('🧙‍♂️ CREATEFLIGHT DEBUG: flightData.etd =', flightData.etd);
+        
         const params = {
           "flightName": flightData.flightName || "Fast Planner Flight",
           "locations": cleanLocations,
           "displayWaypoints": displayWaypoints,  // Send structured waypoint information
           "useOnlyProvidedWaypoints": flightData.useOnlyProvidedWaypoints ?? false,  // 🔧 FIX: Respect Auto Plan setting for weather replanning
           "aircraftId": flightData.aircraftId || "190",
-          "region": flightData.region || "NORWAY"
+          "region": flightData.region || "NORWAY",
+          "etd": flightData.etd || new Date().toISOString() // 🧙‍♂️ WIZARD FIX: Include ETD in newer API
         };
+        
+        console.log('🧙‍♂️ CREATEFLIGHT DEBUG: params.etd =', params.etd);
         
         // Add crew members if provided
         if (flightData.captainId) params.captainId = flightData.captainId;
@@ -225,13 +231,27 @@ class PalantirFlightService {
         console.log('New createFlightWithWaypoints function not available, falling back to createNewFlightFp2');
         
         // Use a greatly simplified approach that matches the working ApiTester
+        // 🧙‍♂️ DEBUG: Log ETD before and after fallback
+        console.log('🧙‍♂️ PALANTIR DEBUG: flightData.etd =', flightData.etd);
+        console.log('🧙‍♂️ PALANTIR DEBUG: flightData.etd type =', typeof flightData.etd);
+        console.log('🧙‍♂️ PALANTIR DEBUG: flightData.etd truthy =', !!flightData.etd);
+        
+        const finalETD = flightData.etd || new Date().toISOString();
+        console.log('🧙‍♂️ PALANTIR DEBUG: Final ETD being used =', finalETD);
+        
+        // 🧙‍♂️ DEBUG: Check if we need to convert to extended offset format
+        const testDate = new Date(finalETD);
+        const extendedFormat = testDate.toISOString().replace('Z', '+00:00');
+        console.log('🧙‍♂️ PALANTIR DEBUG: Extended offset format =', extendedFormat);
+        console.log('🧙‍♂️ PALANTIR DEBUG: Original .toISOString() =', testDate.toISOString());
+        
         const cleanData = {
           flightName: flightData.flightName || "Test Flight",
           aircraftRegion: "NORWAY",
           new_parameter: "Norway",
           aircraftId: flightData.aircraftId || "190",
           region: "NORWAY",
-          etd: flightData.etd || new Date().toISOString(),
+          etd: finalETD,
           locations: cleanLocations,
           alternateLocation: flightData.alternateLocation || "",
           // Only include crew if provided
@@ -253,6 +273,8 @@ class PalantirFlightService {
         const params = this.formatFlightParams(cleanData);
         
         console.log('Calling createNewFlightFp2 with params:', params);
+        // 🧙‍♂️ DEBUG: Log final ETD in params object
+        console.log('🧙‍♂️ PALANTIR DEBUG: Final params.etd =', params.etd);
         
         // Make the API call with the exact format from the documentation
         const result = await client(sdk.createNewFlightFp2).applyAction(

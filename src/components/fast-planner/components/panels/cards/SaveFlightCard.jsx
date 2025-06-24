@@ -17,7 +17,8 @@ const SaveFlightCard = ({
   runAutomation = true, // Default to true to match current behavior
   selectedAircraft,
   alternateRouteData = null,    // ADD THIS
-  alternateRouteInput = ''      // ADD THIS
+  alternateRouteInput = '',      // ADD THIS
+  initialETD = null // 🧙‍♂️ WIZARD FIX: Accept initial ETD from wizard
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -42,14 +43,21 @@ const SaveFlightCard = ({
       setFlightName(initialFlightName);
     }
     
-    // Default ETD to current time
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+    // 🧙‍♂️ WIZARD FIX: Use wizard ETD if available, otherwise default to current time
+    let formattedDate;
+    if (initialETD && initialETD instanceof Date) {
+      console.log('🧙‍♂️ SaveFlightCard: Using wizard ETD:', initialETD);
+      formattedDate = initialETD.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+    } else {
+      console.log('🧙‍♂️ SaveFlightCard: No wizard ETD, using current time');
+      const now = new Date();
+      formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+    }
     setEtd(formattedDate);
     
     // Set initial automation state from props
     setEnableAutomation(runAutomation);
-  }, [initialFlightName, waypoints, runAutomation]);
+  }, [initialFlightName, waypoints, runAutomation, initialETD]); // 🧙‍♂️ Add initialETD to dependencies
   
   // Handle form submission
   const handleSubmit = () => {
