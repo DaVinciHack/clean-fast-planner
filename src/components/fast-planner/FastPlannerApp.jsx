@@ -546,11 +546,17 @@ const FastPlannerCore = ({
     // Clear alternate route state
     setAlternateRouteData(null);
     setAlternateRouteInput('');
+    setAlternateSplitPoint(null); // Clear split point state
+    
+    // Clear alternate mode memory
+    window.currentSplitPoint = null;
+    window.alternateModeClickHandler = null;
     
     // Clear current flight ID and weather segments
     setCurrentFlightId(null);
+    setLoadedFlightData(null); // Always clear loaded flight data when clearing route
     if (!preserveFlightData) {
-      setLoadedFlightData(null); // Clear loaded flight data for AppHeader
+      // Additional flight data clearing if needed
     }
     clearWeatherSegments();
     
@@ -953,6 +959,14 @@ const FastPlannerCore = ({
       // ✅ SOLUTION: Use window variable to avoid React closure issues
       window.currentSplitPoint = null;
       
+      // 🎯 LOADED FLIGHT FIX: Clear alternateRouteInput when entering alternate mode
+      // This makes loaded flights behave like new flights (click anywhere works)
+      if (alternateRouteInput && alternateRouteInput.includes(' ')) {
+        console.log('🎯 ALTERNATE MODE: Clearing loaded flight alternateRouteInput for click-anywhere behavior');
+        console.log('🎯 ALTERNATE MODE: Was:', alternateRouteInput);
+        setAlternateRouteInput('');
+      }
+      
       window.alternateModeClickHandler = (clickPoint, clickedFeature) => {
         console.log('🎯 Alternate mode click:', clickedFeature?.name || 'map location');
         
@@ -1030,12 +1044,15 @@ const FastPlannerCore = ({
               // Clear the split point state since we're using it
               setAlternateSplitPoint(null);
             } else {
-              // No split point, use default (single location alternate)
-              console.log('🎯 NO SPLIT POINT FOUND, using single location:', locationName);
-              console.log('🎯 alternateRouteInput:', alternateRouteInput);
-              console.log('🎯 alternateRouteInput.trim():', alternateRouteInput?.trim());
-              console.log('🎯 includes space:', alternateRouteInput?.includes(' '));
-              alternateString = locationName;
+              // 🎯 LOADED FLIGHT FIX: Use stops[1] (always the first landing stop)
+              const splitPoint = loadedFlightData?.stops?.[1];
+              if (splitPoint) {
+                alternateString = `${splitPoint} ${locationName}`;
+                console.log('🎯 MODE 1: Using stops[1] as split point:', alternateString);
+              } else {
+                console.log('🎯 MODE 1: No stops[1] found, using single location');
+                alternateString = locationName;
+              }
             }
             
             console.log('🎯 Final alternate input string:', alternateString);
@@ -1091,9 +1108,15 @@ const FastPlannerCore = ({
               // We have a single location in input (split point from route click), add destination to complete pair
               alternateString = `${alternateRouteInput.trim()} ${locationName}`;
             } else {
-              // No split point, use default (single location alternate)
-              console.log('🎯 Using default alternate:', locationName);
-              alternateString = locationName;
+              // 🎯 LOADED FLIGHT FIX: Use stops[1] (always the first landing stop)
+              const splitPoint = loadedFlightData?.stops?.[1];
+              if (splitPoint) {
+                alternateString = `${splitPoint} ${locationName}`;
+                console.log('🎯 MODE 1: Using stops[1] as split point:', alternateString);
+              } else {
+                console.log('🎯 MODE 1: No stops[1] found, using single location');
+                alternateString = locationName;
+              }
             }
             handleAlternateRouteInputChange(alternateString);
             // ✅ CRITICAL FIX: Pass the complete pair string to handleAlternateRouteSubmit
