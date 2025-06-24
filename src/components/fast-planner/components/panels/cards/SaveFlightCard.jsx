@@ -18,7 +18,8 @@ const SaveFlightCard = ({
   selectedAircraft,
   alternateRouteData = null,    // ADD THIS
   alternateRouteInput = '',      // ADD THIS
-  initialETD = null // 🧙‍♂️ WIZARD FIX: Accept initial ETD from wizard
+  initialETD = null, // 🧙‍♂️ WIZARD FIX: Accept initial ETD from wizard
+  loadedFlightData = null // 🧙‍♂️ SAVE CARD FIX: Accept loaded flight data for existing flight names
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -33,23 +34,67 @@ const SaveFlightCard = ({
   
   // Set up initial values when card is shown
   useEffect(() => {
-    // Generate a default flight name based on waypoints if not provided
-    if (!initialFlightName && waypoints && waypoints.length >= 2) {
+    // 🧙‍♂️ DEBUG: Log loadedFlightData structure to find the flight name property
+    console.log('🧙‍♂️ SaveCard DEBUG: loadedFlightData =', loadedFlightData);
+    console.log('🧙‍♂️ SaveCard DEBUG: loadedFlightData keys =', loadedFlightData ? Object.keys(loadedFlightData) : 'null');
+    
+    // 🧙‍♂️ DEBUG: Check all possible flight name properties
+    if (loadedFlightData) {
+      console.log('🧙‍♂️ SaveCard DEBUG: flightName =', loadedFlightData.flightName);
+      console.log('🧙‍♂️ SaveCard DEBUG: name =', loadedFlightData.name);
+      console.log('🧙‍♂️ SaveCard DEBUG: title =', loadedFlightData.title);
+      console.log('🧙‍♂️ SaveCard DEBUG: displayName =', loadedFlightData.displayName);
+    }
+    
+    // 🧙‍♂️ SAVE CARD FIX: Priority order for flight name:
+    // 1. Loaded flight name (for existing flights) - try multiple property names
+    // 2. Initial flight name (for new flights or wizard)
+    // 3. Auto-generated name (fallback)
+    
+    let foundFlightName = null;
+    if (loadedFlightData) {
+      // Try different possible property names for flight name
+      foundFlightName = loadedFlightData.flightNumber || // 🧙‍♂️ CORRECT PROPERTY!
+                       loadedFlightData.flightName || 
+                       loadedFlightData.name || 
+                       loadedFlightData.title || 
+                       loadedFlightData.displayName;
+    }
+    
+    if (foundFlightName) {
+      console.log('🧙‍♂️ SaveCard: Using loaded flight name:', foundFlightName);
+      setFlightName(foundFlightName);
+    } else if (initialFlightName) {
+      console.log('🧙‍♂️ SaveCard: Using initial flight name:', initialFlightName);
+      setFlightName(initialFlightName);
+    } else if (waypoints && waypoints.length >= 2) {
+      // Generate a default flight name based on waypoints
       const origin = waypoints[0].name || 'Origin';
       const destination = waypoints[waypoints.length - 1].name || 'Destination';
       const todayDate = new Date().toISOString().split('T')[0];
-      setFlightName(`${origin} to ${destination} - ${todayDate}`);
+      const generatedName = `${origin} to ${destination} - ${todayDate}`;
+      console.log('🧙‍♂️ SaveCard: Generated flight name:', generatedName);
+      setFlightName(generatedName);
     } else {
-      setFlightName(initialFlightName);
+      console.log('🧙‍♂️ SaveCard: No flight name available');
+      setFlightName('');
     }
     
-    // 🧙‍♂️ WIZARD FIX: Use wizard ETD if available, otherwise default to current time
+    // 🧙‍♂️ SAVE CARD FIX: Priority order for ETD:
+    // 1. Loaded flight departure time (for existing flights)
+    // 2. Wizard ETD (for new flights from wizard)
+    // 3. Current time (fallback)
+    
     let formattedDate;
-    if (initialETD && initialETD instanceof Date) {
-      console.log('🧙‍♂️ SaveFlightCard: Using wizard ETD:', initialETD);
+    if (loadedFlightData && loadedFlightData.etd) {
+      console.log('🧙‍♂️ SaveCard: Using loaded flight ETD:', loadedFlightData.etd);
+      const loadedDate = new Date(loadedFlightData.etd);
+      formattedDate = loadedDate.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
+    } else if (initialETD && initialETD instanceof Date) {
+      console.log('🧙‍♂️ SaveCard: Using wizard ETD:', initialETD);
       formattedDate = initialETD.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
     } else {
-      console.log('🧙‍♂️ SaveFlightCard: No wizard ETD, using current time');
+      console.log('🧙‍♂️ SaveCard: No loaded or wizard ETD, using current time');
       const now = new Date();
       formattedDate = now.toISOString().slice(0, 16); // Format: YYYY-MM-DDThh:mm
     }
@@ -57,7 +102,7 @@ const SaveFlightCard = ({
     
     // Set initial automation state from props
     setEnableAutomation(runAutomation);
-  }, [initialFlightName, waypoints, runAutomation, initialETD]); // 🧙‍♂️ Add initialETD to dependencies
+  }, [initialFlightName, waypoints, runAutomation, initialETD, loadedFlightData]); // 🧙‍♂️ Add loadedFlightData to dependencies
   
   // Handle form submission
   const handleSubmit = () => {

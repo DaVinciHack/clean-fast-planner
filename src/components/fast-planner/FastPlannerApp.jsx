@@ -2885,6 +2885,13 @@ const FastPlannerCore = ({
     // If auto-run is requested, trigger the MainCard AutoPlan button
     if (flightData.autoRun) {
       console.log('🧙‍♂️ Auto-planning flight...');
+      console.log('🧙‍♂️ Wizard flight name:', flightData.flightName);
+      
+      // 🧙‍♂️ WIZARD FIX: Store wizard flight name for Auto Plan to use
+      if (flightData.flightName) {
+        window.wizardCustomFlightName = flightData.flightName;
+        console.log('🧙‍♂️ Stored wizard flight name globally:', flightData.flightName);
+      }
       
       // Wait for React state updates to process before triggering automation
       setTimeout(() => {

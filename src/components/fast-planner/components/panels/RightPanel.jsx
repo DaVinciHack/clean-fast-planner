@@ -976,6 +976,14 @@ const RightPanel = React.forwardRef(({
     console.log('🎯 AUTO PLAN: Starting auto plan with data:', autoPlanData);
     console.log('🎯 AUTO PLAN: RightPanel waypoints prop:', waypoints);
     
+    // 🧙‍♂️ WIZARD FIX: Check for wizard custom flight name from global storage
+    const wizardFlightName = window.wizardCustomFlightName;
+    if (wizardFlightName) {
+      console.log('🧙‍♂️ Found wizard custom flight name:', wizardFlightName);
+      // Clear it after use to prevent it affecting future flights
+      delete window.wizardCustomFlightName;
+    }
+    
     const { isNewFlight, hasWaypoints, skipWaypointGeneration } = autoPlanData;
     
     if (isNewFlight) {
@@ -1030,10 +1038,18 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Built locations array:', locations);
       
-      // Generate flight name using departure + first location + short date format
-      const departure = locations[0] || 'Unknown';
-      const firstLocation = locations[1] || 'Direct';
-      const flightName = `${departure} ${firstLocation} ${shortDate}`;
+      // 🧙‍♂️ WIZARD FIX: Use wizard custom flight name if provided, otherwise generate default
+      let flightName;
+      if (wizardFlightName && wizardFlightName.trim()) {
+        console.log('🧙‍♂️ Using wizard custom flight name:', wizardFlightName);
+        flightName = wizardFlightName.trim();
+      } else {
+        // Generate flight name using departure + first location + short date format
+        const departure = locations[0] || 'Unknown';
+        const firstLocation = locations[1] || 'Direct';
+        flightName = `${departure} ${firstLocation} ${shortDate}`;
+        console.log('🧙‍♂️ Generated default flight name:', flightName);
+      }
       
       const flightData = {
         flightName: flightName, // Use departure + first location + short date format
@@ -1100,10 +1116,18 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Built locations array for existing flight:', locations);
       
-      // Generate flight name using departure + first location + short date format
-      const departure = locations[0] || 'Unknown';
-      const firstLocation = locations[1] || 'Direct';
-      const flightName = `${departure} ${firstLocation} ${shortDate}`;
+      // 🧙‍♂️ WIZARD FIX: Use wizard custom flight name if provided, otherwise generate default
+      let flightName;
+      if (wizardFlightName && wizardFlightName.trim()) {
+        console.log('🧙‍♂️ Using wizard custom flight name for existing flight:', wizardFlightName);
+        flightName = wizardFlightName.trim();
+      } else {
+        // Generate flight name using departure + first location + short date format
+        const departure = locations[0] || 'Unknown';
+        const firstLocation = locations[1] || 'Direct';
+        flightName = `${departure} ${firstLocation} ${shortDate}`;
+        console.log('🧙‍♂️ Generated default flight name for existing flight:', flightName);
+      }
       
       const flightData = {
         flightName: flightName, // Use departure + first location + short date format
@@ -1309,6 +1333,7 @@ const RightPanel = React.forwardRef(({
         alternateRouteData={alternateRouteData}
         alternateRouteInput={alternateRouteInput}
         initialETD={etd} // 🧙‍♂️ WIZARD FIX: Pass wizard ETD to save card
+        loadedFlightData={loadedFlightData} // 🧙‍♂️ SAVE CARD FIX: Pass loaded flight data for existing flight names
       />
       
       {/* Load Flights Card */}
