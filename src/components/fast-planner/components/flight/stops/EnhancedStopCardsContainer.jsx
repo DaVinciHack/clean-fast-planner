@@ -55,6 +55,9 @@ const EnhancedStopCardsContainer = ({
   // State for refuel stops (array of stop indices that are refuel stops)
   const [refuelStops, setRefuelStops] = useState([]);
   
+  // Force recalculation trigger when refuel stops change
+  const [forceRecalculation, setForceRecalculation] = useState(0);
+  
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
     if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy) {
@@ -100,7 +103,7 @@ const EnhancedStopCardsContainer = ({
       console.log('🎯 EnhancedStopCardsContainer: Missing required data for stop card calculation');
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation]);
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {
@@ -145,18 +148,27 @@ const EnhancedStopCardsContainer = ({
       try {
         // Prepare parameters for StopCardCalculator (same as StopCardsContainer)
         const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
+        // 🚨 AVIATION SAFETY: Ensure all required parameters are provided (no fallbacks)
+        if (!contingencyFuelPercent && contingencyFuelPercent !== 0) {
+          console.error('🚨 Missing contingencyFuelPercent for alternate calculation');
+          setAlternateStopCard(null);
+          return;
+        }
+        
         const numericParams = {
           passengerWeight: Number(passengerWeight) || 220,
-          cargoWeight: Number(cargoWeight) || 0, // 🟠 ADDED: Missing cargoWeight parameter
+          cargoWeight: Number(cargoWeight) || 0,
           reserveFuel: Number(reserveFuel) || 0,
-          contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
+          contingencyFuelPercent: Number(contingencyFuelPercent), // Required - no fallback
           deckTimePerStop: Number(deckTimePerStop) || 0,
           deckFuelFlow: Number(deckFuelFlow) || 0,
           taxiFuel: Number(taxiFuel) || 0,
-          extraFuel: Number(extraFuel) || 0,  // 🔧 ADDED: Missing extraFuel parameter
-          araFuel: Number(araFuel) || 0,      // 🔧 ADDED: ARA fuel from weather
-          approachFuel: Number(approachFuel) || 0,  // 🔧 ADDED: Approach fuel from weather
-          fuelPolicy: fuelPolicy?.currentPolicy  // 🔧 CRITICAL: Add fuel policy for reserve fuel conversion
+          extraFuel: Number(extraFuel) || 0,
+          araFuel: Number(araFuel) || 0,
+          approachFuel: Number(approachFuel) || 0,
+          fuelPolicy: fuelPolicy?.currentPolicy,
+          // 🛩️ REFUEL: Pass refuel stops for future segmented calculations
+          refuelStops: refuelStops
         };
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
@@ -195,7 +207,7 @@ const EnhancedStopCardsContainer = ({
       });
       setAlternateStopCard(null);
     }
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy]);
+  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation]);
   
   // Handle card click
   const handleCardClick = (index) => {
@@ -207,17 +219,17 @@ const EnhancedStopCardsContainer = ({
     console.log(`🛩️ Refuel checkbox changed: Stop ${stopIndex} = ${isRefuel}`);
     
     setRefuelStops(prev => {
-      if (isRefuel) {
-        // Add to refuel stops if not already there
-        return prev.includes(stopIndex) ? prev : [...prev, stopIndex];
-      } else {
-        // Remove from refuel stops
-        return prev.filter(index => index !== stopIndex);
-      }
+      const newRefuelStops = isRefuel 
+        ? (prev.includes(stopIndex) ? prev : [...prev, stopIndex])
+        : prev.filter(index => index !== stopIndex);
+      
+      console.log(`🛩️ Updated refuel stops:`, newRefuelStops);
+      return newRefuelStops;
     });
     
-    // TODO: Later we'll recalculate fuel here
-    // For now, just log the change
+    // 🛩️ PHASE 2: Trigger fuel recalculation
+    console.log(`🔄 Triggering fuel recalculation due to refuel change`);
+    setForceRecalculation(prev => prev + 1);
   };
   
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER
