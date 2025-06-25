@@ -192,29 +192,20 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     return [];
   }
   
-  // CRITICAL: Ensure aircraft has all required properties
-  if (!selectedAircraft.cruiseSpeed || !selectedAircraft.fuelBurn) {
-    console.error('StopCardCalculator: Aircraft missing critical cruiseSpeed or fuelBurn property');
-    return [];
+  // 🚨 AVIATION SAFETY: REQUIRE aircraft performance data
+  if (!selectedAircraft.cruiseSpeed || isNaN(Number(selectedAircraft.cruiseSpeed))) {
+    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing cruise speed. OSDK aircraft data required for safe fuel calculations.`);
+  }
+  if (!selectedAircraft.fuelBurn || isNaN(Number(selectedAircraft.fuelBurn))) {
+    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing fuel burn rate. OSDK aircraft data required for safe fuel calculations.`);
   }
   
-  // CRITICAL: Check for weight properties needed for passenger calculations
-  // Log a warning but continue with calculation
-  if (!selectedAircraft.emptyWeight || !selectedAircraft.maxTakeoffWeight) {
-    console.warn('StopCardCalculator: Aircraft missing weight properties (emptyWeight or maxTakeoffWeight)');
-    console.warn('Aircraft data:', selectedAircraft);
-    
-    // Add default values to allow calculation to proceed
-    // This is safer than returning nothing
-    if (!selectedAircraft.emptyWeight) {
-      console.warn('StopCardCalculator: Adding default emptyWeight of 12500 lbs');
-      selectedAircraft.emptyWeight = 12500;
-    }
-    
-    if (!selectedAircraft.maxTakeoffWeight) {
-      console.warn('StopCardCalculator: Adding default maxTakeoffWeight of 17500 lbs');
-      selectedAircraft.maxTakeoffWeight = 17500;
-    }
+  // 🚨 AVIATION SAFETY: REQUIRE weight data for passenger calculations  
+  if (!selectedAircraft.emptyWeight || isNaN(Number(selectedAircraft.emptyWeight))) {
+    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing empty weight. OSDK aircraft data required for safe passenger calculations.`);
+  }
+  if (!selectedAircraft.maxTakeoffWeight || isNaN(Number(selectedAircraft.maxTakeoffWeight))) {
+    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing max takeoff weight. OSDK aircraft data required for safe passenger calculations.`);
   }
   
   // Validate calculation parameters - Log warnings but don't fail
@@ -272,9 +263,16 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     console.log('⭐ StopCardCalculator: Using route stats legs data directly:', routeStats.legs.length);
     useRouteStatsDirectly = true;
     
-    // Use routeStats totalDistance and tripFuel directly
-    totalDistance = parseFloat(routeStats.totalDistance) || 0;
-    totalTripFuel = routeStats.tripFuel || 0;
+    // 🚨 AVIATION SAFETY: REQUIRE route calculation data
+    if (!routeStats.totalDistance || isNaN(parseFloat(routeStats.totalDistance))) {
+      throw new Error(`CRITICAL: Missing total route distance. Route calculation required for safe fuel planning.`);
+    }
+    if (!routeStats.tripFuel || isNaN(Number(routeStats.tripFuel))) {
+      throw new Error(`CRITICAL: Missing trip fuel calculation. Route calculation required for safe fuel planning.`);
+    }
+    
+    totalDistance = parseFloat(routeStats.totalDistance);
+    totalTripFuel = routeStats.tripFuel;
     
     console.log('⭐ StopCardCalculator: Using route stats values:', {
       totalDistance, 
@@ -510,8 +508,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // Calculate deck time and fuel
   const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours
   
-  // ✅ AVIATION SAFETY: Use aircraft OSDK data FIRST, fallback to options only if missing
-  const actualDeckFuelFlow = aircraft?.flatPitchFuelBurnDeckFuel || deckFuelFlowValue;
+  // 🚨 AVIATION SAFETY: REQUIRE OSDK aircraft data - NO FALLBACKS ALLOWED
+  if (!aircraft?.flatPitchFuelBurnDeckFuel) {
+    throw new Error(`CRITICAL: Missing deck fuel flow data for aircraft ${aircraft?.registration || 'unknown'}. OSDK aircraft data required for safe fuel calculations.`);
+  }
+  const actualDeckFuelFlow = aircraft.flatPitchFuelBurnDeckFuel;
   const deckFuelValue = Math.round(deckTimeHours * actualDeckFuelFlow);
   
   // 🔍 DEBUG: Show what deck fuel flow is actually being used
@@ -708,7 +709,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
 
     // Calculate remaining deck fuel - only for intermediate stops
     const remainingDeckTimeHours = (remainingIntermediateStops * deckTimePerStopValue) / 60;
-    const remainingDeckFuel = Math.round(remainingDeckTimeHours * deckFuelFlowValue);
+    const remainingDeckFuel = Math.round(remainingDeckTimeHours * actualDeckFuelFlow);
 
     // Calculate remaining contingency fuel (proportional to remaining trip fuel)
     let remainingContingencyFuel = 0;
@@ -1188,14 +1189,24 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     console.log(`🟠 AlternateStopCard: No fuel policy, using raw reserve fuel: ${calculatedReserveFuel}`);
   }
 
-  // Convert all calculation parameters to proper numeric values
-  const taxiFuelValue = Number(taxiFuel) || 0;
-  const passengerWeightValue = Number(passengerWeight) || 0;
-  const contingencyFuelPercentValue = Number(contingencyFuelPercent) || 0;
-  const reserveFuelValue = Number(calculatedReserveFuel) || 0;  // 🔧 Use converted reserve fuel
-  const deckTimePerStopValue = Number(deckTimePerStop) || 0;
-  const deckFuelFlowValue = Number(deckFuelFlow) || 0;
-  const extraFuelValue = Number(extraFuel) || 0;
+  // 🚨 AVIATION SAFETY: REQUIRE all fuel parameters - NO DEFAULTS
+  if (!taxiFuel || isNaN(Number(taxiFuel))) {
+    throw new Error(`CRITICAL: Missing taxi fuel value. Required for safe fuel calculations.`);
+  }
+  if (!contingencyFuelPercent || isNaN(Number(contingencyFuelPercent))) {
+    throw new Error(`CRITICAL: Missing contingency fuel percentage. Required for safe fuel calculations.`);
+  }
+  if (!calculatedReserveFuel || isNaN(Number(calculatedReserveFuel))) {
+    throw new Error(`CRITICAL: Missing reserve fuel value. Required for safe fuel calculations.`);
+  }
+  
+  const taxiFuelValue = Number(taxiFuel);
+  const passengerWeightValue = Number(passengerWeight) || 0; // Weight can be 0
+  const contingencyFuelPercentValue = Number(contingencyFuelPercent);
+  const reserveFuelValue = Number(calculatedReserveFuel);
+  const deckTimePerStopValue = Number(deckTimePerStop) || 0; // Can be 0 if no deck stops
+  const deckFuelFlowValue = Number(deckFuelFlow) || 0; // Can be 0 if no deck stops
+  const extraFuelValue = Number(extraFuel) || 0; // Extra fuel can be 0
   
   console.log('🟠 AlternateStopCard: Using same settings as normal stop cards:', {
     taxiFuelValue,
