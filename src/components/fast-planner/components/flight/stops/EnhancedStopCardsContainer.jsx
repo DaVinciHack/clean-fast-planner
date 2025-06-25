@@ -52,6 +52,9 @@ const EnhancedStopCardsContainer = ({
   const [alternateStopCard, setAlternateStopCard] = useState(null);
   const [activeCardIndex, setActiveCardIndex] = useState(null);
   
+  // State for refuel stops (array of stop indices that are refuel stops)
+  const [refuelStops, setRefuelStops] = useState([]);
+  
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
     if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy) {
@@ -199,6 +202,24 @@ const EnhancedStopCardsContainer = ({
     setActiveCardIndex(index === activeCardIndex ? null : index);
   };
   
+  // Handle refuel checkbox changes
+  const handleRefuelChange = (stopIndex, isRefuel) => {
+    console.log(`🛩️ Refuel checkbox changed: Stop ${stopIndex} = ${isRefuel}`);
+    
+    setRefuelStops(prev => {
+      if (isRefuel) {
+        // Add to refuel stops if not already there
+        return prev.includes(stopIndex) ? prev : [...prev, stopIndex];
+      } else {
+        // Remove from refuel stops
+        return prev.filter(index => index !== stopIndex);
+      }
+    });
+    
+    // TODO: Later we'll recalculate fuel here
+    // For now, just log the change
+  };
+  
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER
   // console.log('✈️ EnhancedStopCardsContainer: Updating aircraft in manager');
   // updateAircraft(selectedAircraft);
@@ -310,6 +331,9 @@ const EnhancedStopCardsContainer = ({
                 isActive={index === activeCardIndex}
                 onClick={() => handleCardClick(index)}
                 className="unified-fuel-card"
+                // Refuel props
+                isRefuelStop={refuelStops.includes(card.index)}
+                onRefuelChange={handleRefuelChange}
               />
             );
           })}
