@@ -115,7 +115,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuthState);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>(initialAuthState ? "Duncan Burbury" : null);
+  const [userName, setUserName] = useState<string | null>(null); // Removed hardcoded "Duncan Burbury" fallback
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   // Log initial state
@@ -559,7 +559,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (event && event.key === 'fastPlanner_isAuthenticated' && event.newValue === 'true') {
         console.log("%cAuthentication state changed in another tab/window", 
           "background: orange; color: black; font-weight: bold;");
-        updateAuthState(true, null, "Duncan Burbury");
+        // updateAuthState(true, null, "Duncan Burbury"); // Commented out hardcoded fallback
+        updateAuthState(true, null, null); // Let it get real user data
       }
     };
     

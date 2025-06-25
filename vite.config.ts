@@ -43,6 +43,23 @@ export default defineConfig({
             console.log('AWC proxy response:', proxyRes.statusCode, req.url);
           });
         }
+      },
+      // Proxy NOAA Buoy Data to avoid CORS issues
+      '/api/buoy': {
+        target: 'https://www.ndbc.noaa.gov',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/buoy/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('NOAA Buoy proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying NOAA Buoy request:', req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, _res) => {
+            console.log('NOAA Buoy proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
       }
     }
   },

@@ -94,6 +94,35 @@ const FastPlannerCore = () => {
   const [leftPanelVisible, setLeftPanelVisible] = useState(false);
   const [rightPanelVisible, setRightPanelVisible] = useState(true);
   
+  // Phone layout detection and responsive behavior
+  const [isPhoneLayout, setIsPhoneLayout] = useState(false);
+  
+  // Detect phone layout on mount and resize - PHONE ONLY (not iPad)
+  useEffect(() => {
+    const checkPhoneLayout = () => {
+      const isPhone = window.innerWidth <= 480; // Phone only, not iPad/tablet (≤480px)
+      setIsPhoneLayout(isPhone);
+      
+      if (isPhone) {
+        console.log('📱 Phone layout detected (≤480px) - right panel will be managed by glass dock');
+        // On phones, start with right panel hidden
+        setRightPanelVisible(false);
+      } else {
+        console.log('💻 Desktop/iPad layout (>480px) - normal panel behavior');
+        // On desktop/iPad, restore normal panel behavior
+        setRightPanelVisible(true);
+      }
+    };
+    
+    // Check on mount
+    checkPhoneLayout();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkPhoneLayout);
+    
+    return () => window.removeEventListener('resize', checkPhoneLayout);
+  }, []);
+  
   // Create favorite locations manager
   const favoriteLocationsManagerRef = useRef(new FavoriteLocationsManager());
   

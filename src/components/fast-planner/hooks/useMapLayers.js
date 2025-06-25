@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useRegion } from '../context/region';
 import GulfCoastHeliMap from '../modules/layers/GulfCoastHeliMap';
+import ObservedWeatherStationsLayer from '../modules/layers/ObservedWeatherStationsLayer';
 
 /**
  * Custom hook to manage map layers
@@ -12,12 +13,14 @@ const useMapLayers = ({ mapManagerRef }) => {
   const gulfCoastMapRef = useRef(null);
   const weatherLayerRef = useRef(null);
   const vfrChartsRef = useRef(null);
+  const observedWeatherStationsRef = useRef(null);  // NEW: Observed weather stations layer
   
   const [layersInitialized, setLayersInitialized] = useState(false);
   const [layerStates, setLayerStates] = useState({
     gulfCoastHeli: false,
     weather: false,
-    vfrCharts: false
+    vfrCharts: false,
+    observedWeatherStations: false  // NEW: Track observed weather stations visibility
   });
 
   // Initialize map layers
@@ -116,6 +119,21 @@ const useMapLayers = ({ mapManagerRef }) => {
         console.log("useMapLayers: Weather layer adapter created (always available)");
       }
       
+      // NEW: Initialize Observed Weather Stations layer
+      if (!observedWeatherStationsRef.current) {
+        console.log("useMapLayers: Creating Observed Weather Stations layer...");
+        observedWeatherStationsRef.current = new ObservedWeatherStationsLayer(mapManagerRef.current.map);
+        
+        // Initialize the layer
+        observedWeatherStationsRef.current.initialize().then(() => {
+          console.log("useMapLayers: ✅ Observed Weather Stations layer initialized successfully");
+          // Start hidden by default
+          observedWeatherStationsRef.current.setVisible(false);
+        }).catch(error => {
+          console.error("useMapLayers: ❌ Failed to initialize Observed Weather Stations layer:", error);
+        });
+      }
+      
       setLayersInitialized(true);
     }
     
@@ -133,6 +151,11 @@ const useMapLayers = ({ mapManagerRef }) => {
       
       if (vfrChartsRef.current && vfrChartsRef.current.remove) {
         vfrChartsRef.current.remove();
+      }
+      
+      // NEW: Clean up observed weather stations layer
+      if (observedWeatherStationsRef.current && observedWeatherStationsRef.current.destroy) {
+        observedWeatherStationsRef.current.destroy();
       }
     };
   }, [mapManagerRef, layersInitialized]);
@@ -181,6 +204,18 @@ const useMapLayers = ({ mapManagerRef }) => {
           }
           break;
           
+        // NEW: Handle observed weather stations layer toggle
+        case 'observedWeatherStations':
+          if (observedWeatherStationsRef.current) {
+            const currentVisible = observedWeatherStationsRef.current.isVisible;
+            const newVisible = !currentVisible;
+            observedWeatherStationsRef.current.setVisible(newVisible);
+            setLayerStates(prev => ({ ...prev, observedWeatherStations: newVisible }));
+            console.log(`🌡️ Observed Weather Stations layer ${newVisible ? 'shown' : 'hidden'}`);
+            return newVisible;
+          }
+          break;
+          
         default:
           console.warn(`Unknown layer: ${layerName}`);
       }
@@ -195,6 +230,7 @@ const useMapLayers = ({ mapManagerRef }) => {
     gulfCoastMapRef,
     weatherLayerRef,
     vfrChartsRef,
+    observedWeatherStationsRef,  // NEW: Export observed weather stations layer ref
     layerStates,
     toggleLayer
   };

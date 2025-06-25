@@ -168,6 +168,21 @@ const FastPlannerCore = ({
   // State for weather-based fuel calculations
   const [weatherFuel, setWeatherFuel] = useState({ araFuel: 0, approachFuel: 0 });
   
+  // Phone layout detection - PHONE ONLY (≤480px, not iPad)
+  const [isPhoneLayout, setIsPhoneLayout] = useState(false);
+  
+  // Detect phone layout on mount and resize
+  useEffect(() => {
+    const checkPhoneLayout = () => {
+      const isPhone = window.innerWidth <= 480; // Phone only, not iPad/tablet
+      setIsPhoneLayout(isPhone);
+    };
+    
+    checkPhoneLayout();
+    window.addEventListener('resize', checkPhoneLayout);
+    return () => window.removeEventListener('resize', checkPhoneLayout);
+  }, []);
+  
   // Check LoadingIndicator status periodically
   useEffect(() => {
     const checkLoadingStatus = () => {
@@ -349,6 +364,7 @@ const FastPlannerCore = ({
     gulfCoastMapRef,
     weatherLayerRef,
     vfrChartsRef,
+    observedWeatherStationsRef,  // NEW: Include observed weather stations ref
     layerStates,
     toggleLayer
   } = useMapLayers({ mapManagerRef });
@@ -2622,6 +2638,13 @@ const FastPlannerCore = ({
     }
   };
 
+  // Phone layout: Right panel toggle handler for glass dock
+  const handleToggleRightPanel = () => {
+    console.log('📱 Phone layout: Right panel toggle clicked - Current rightPanelVisible:', rightPanelVisible);
+    toggleRightPanel();
+    console.log('📱 toggleRightPanel called');
+  };
+
   const handleOpenRoute = () => {
     console.log('🗺️ Route button clicked - Current leftPanelVisible:', leftPanelVisible);
     toggleLeftPanel();
@@ -3359,6 +3382,7 @@ const FastPlannerCore = ({
           gulfCoastMapRef={gulfCoastMapRef}
           weatherLayerRef={weatherLayerRef}
           vfrChartsRef={vfrChartsRef}
+          observedWeatherStationsRef={observedWeatherStationsRef}  // NEW: Pass observed weather stations ref
           platformManagerRef={platformManagerRef}
           airfieldsVisible={airfieldsVisible}
           fixedPlatformsVisible={fixedPlatformsVisible} // Legacy
@@ -3393,6 +3417,9 @@ const FastPlannerCore = ({
         onOpenMenu={handleOpenMenu}
         leftPanelVisible={leftPanelVisible}
         rightPanelVisible={rightPanelVisible}
+        // Phone layout support - PHONE ONLY (not iPad)
+        isPhoneLayout={isPhoneLayout}
+        onToggleRightPanel={handleToggleRightPanel}
         // Smart toggle button props  
         showEditButton={showEditButton}
         currentMapMode={currentMapMode}

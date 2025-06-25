@@ -32,6 +32,7 @@ const RightPanel = React.forwardRef(({
   gulfCoastMapRef,
   weatherLayerRef,
   vfrChartsRef,
+  observedWeatherStationsRef,  // NEW: Add observed weather stations ref prop
   platformManagerRef,
   airfieldsVisible,
   fixedPlatformsVisible, // Legacy
@@ -1312,6 +1313,7 @@ const RightPanel = React.forwardRef(({
         gulfCoastMapRef={gulfCoastMapRef}
         weatherLayerRef={weatherLayerRef}
         vfrChartsRef={vfrChartsRef}
+        observedWeatherStationsRef={observedWeatherStationsRef}  // NEW: Pass observed weather stations ref
         platformManagerRef={platformManagerRef}
         platformsVisible={chartsVisible}
         airfieldsVisible={airfieldsVisible}

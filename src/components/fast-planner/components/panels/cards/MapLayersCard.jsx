@@ -13,6 +13,7 @@ const MapLayersCard = ({
   gulfCoastMapRef,
   weatherLayerRef,
   vfrChartsRef,
+  observedWeatherStationsRef, // NEW: Ref for observed weather stations layer
   // Props for platform toggles (enhanced categories)
   platformManagerRef,
   platformsVisible,
@@ -51,6 +52,7 @@ const MapLayersCard = ({
     gulfCoastHeli: false,
     weather: false,
     weatherCircles: false, // Default OFF - user can toggle on when needed
+    observedWeatherStations: false, // NEW: Real NOAA weather stations
     vfrCharts: false,
     grid: true,
     platforms: true, // Fixed platforms (enhanced category)
@@ -328,6 +330,46 @@ const MapLayersCard = ({
             } else {
               console.warn('No weather segments available for circles and PlatformManager not available');
             }
+          }
+          break;
+          
+        // NEW: Observed Weather Stations toggle
+        case 'observedWeatherStations':
+          console.log('🌡️ OBSERVED WEATHER STATIONS: Toggling real NOAA observation stations...');
+          console.log('🌡️ DEBUG: observedWeatherStationsRef exists:', !!observedWeatherStationsRef);
+          console.log('🌡️ DEBUG: observedWeatherStationsRef.current:', !!observedWeatherStationsRef?.current);
+          
+          try {
+            if (observedWeatherStationsRef?.current) {
+              const currentVisible = observedWeatherStationsRef.current.isVisible;
+              const newVisible = !currentVisible;
+              observedWeatherStationsRef.current.setVisible(newVisible);
+              setLayers(prev => ({ ...prev, observedWeatherStations: newVisible }));
+              console.log(`✅ Observed Weather Stations ${newVisible ? 'ENABLED' : 'DISABLED'}`);
+            } else {
+              console.warn('⚠️ Observed Weather Stations layer not available - attempting to initialize...');
+              
+              // Try to initialize the layer if it doesn't exist
+              if (mapManagerRef?.current?.map) {
+                console.log('🌡️ Attempting to create Observed Weather Stations layer...');
+                try {
+                  const ObservedWeatherStationsLayer = (await import('../../../modules/layers/ObservedWeatherStationsLayer')).default;
+                  const stationsLayer = new ObservedWeatherStationsLayer(mapManagerRef.current.map);
+                  
+                  await stationsLayer.initialize();
+                  observedWeatherStationsRef.current = stationsLayer;
+                  stationsLayer.setVisible(true);
+                  setLayers(prev => ({ ...prev, observedWeatherStations: true }));
+                  console.log('✅ Observed Weather Stations layer created and enabled!');
+                } catch (initError) {
+                  console.error('❌ Failed to initialize Observed Weather Stations layer:', initError);
+                }
+              } else {
+                console.error('❌ Map not available for Observed Weather Stations layer');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error toggling observed weather stations:', error);
           }
           break;
           
@@ -1211,6 +1253,9 @@ const MapLayersCard = ({
         <div className="layer-section">
           <h4>Aviation Layers</h4>
           {renderLayerToggle('weather', 'Weather Overlay', true)}
+          
+          {/* NEW: Real NOAA Weather Stations - Always available */}
+          {renderLayerToggle('observedWeatherStations', 'NOAA Weather Stations', true)}
           
           {/* Wind arrows are now automatic with weather circles - no separate toggle needed */}
           

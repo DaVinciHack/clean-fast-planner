@@ -1453,13 +1453,81 @@
   }
 }
 
-@media (max-width: 768px) {
+/* Keep existing tablet layout untouched */
+@media (max-width: 768px) and (min-width: 481px) {
   .route-editor-panel {
     width: 220px;
   }
   
   .info-panel {
     max-width: 220px;
+  }
+}
+
+/* Phone Layout ONLY - Move right panel off-screen, center cards */
+@media (max-width: 480px) {
+  .route-editor-panel {
+    width: 280px;
+    left: 10px;
+  }
+  
+  /* Hide the RIGHT PANEL TABS completely on phones */
+  .right-panel-tab,
+  .tab-selector.right-panel-tab {
+    display: none !important;
+  }
+  
+  /* Move the RIGHT PANEL CONTENT off-screen on phones */
+  .info-panel {
+    right: -380px !important; /* Move the entire panel off-screen */
+    max-width: 320px;
+    width: 320px;
+    transition: right 0.3s ease, transform 0.3s ease;
+  }
+  
+  /* When panel is shown, center the cards on screen */
+  .info-panel:not(.hidden) {
+    right: 50% !important;
+    transform: translateX(50%) !important;
+    left: auto !important;
+  }
+  
+  /* Ensure map has proper padding on phones */
+  .map-container {
+    padding: 10px 5px 15px 5px !important;
+  }
+  
+  /* Make route stats card responsive on phones */
+  .route-stats-card {
+    min-width: 90vw;
+    left: 50%;
+    padding: 6px 8px 8px 8px;
+    font-size: 12px;
+  }
+  
+  .route-stat-value {
+    font-size: 12px;
+  }
+  
+  .route-stat-label {
+    font-size: 9px;
+  }
+}
+
+/* Very small phones - extra compact layout */
+@media (max-width: 360px) {
+  .route-stats-card {
+    min-width: 95vw;
+    padding: 4px 6px 6px 6px;
+    font-size: 11px;
+  }
+  
+  .route-stat-value {
+    font-size: 11px;
+  }
+  
+  .route-stat-label {
+    font-size: 8px;
   }
 }
 
