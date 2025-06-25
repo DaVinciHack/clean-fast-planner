@@ -240,55 +240,92 @@ class ObservedWeatherStationsLayer {
             }
         });
         
-        // Wind direction arrows (positioned OUTSIDE the ring) - using text arrow symbol
-        this.map.addLayer({
-            id: `${this.layerName}-wind-arrows`,
-            type: 'symbol',
-            source: this.layerName,
-            layout: {
-                'text-field': '▲', // Triangle arrow symbol
-                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                'text-size': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    4, 10,
-                    8, 14,
-                    12, 16
-                ],
-                'text-rotate': [
-                    'case',
-                    ['has', 'windDirection'], ['get', 'windDirection'],
-                    0  // Default to 0 if no wind direction
-                ],
-                // Position the arrow OUTSIDE the ring
-                'text-offset': [
-                    0, 
-                    [
+        // Wind direction arrows - Create 36 layers for precise 10-degree positioning
+        // This gives us accurate positioning around the circle for each wind direction
+        for (let deg = 0; deg < 360; deg += 10) {
+            const radians = (deg * Math.PI) / 180;
+            const distance = 0.8; // Distance from circle center
+            
+            // Calculate exact position on circle for this direction
+            const offsetX = Math.sin(radians) * distance;
+            const offsetY = -Math.cos(radians) * distance; // Negative because Y increases downward
+            
+            // Define the range for this sector (±5 degrees)
+            let minDeg = deg - 5;
+            let maxDeg = deg + 5;
+            
+            let filter;
+            if (deg === 0) {
+                // Handle 360/0 wrap-around for north
+                filter = [
+                    'any',
+                    ['all', ['>=', ['get', 'windDirection'], 355], ['<=', ['get', 'windDirection'], 360]],
+                    ['all', ['>=', ['get', 'windDirection'], 0], ['<=', ['get', 'windDirection'], 5]]
+                ];
+            } else if (minDeg < 0) {
+                // Handle wrap-around for directions near 0
+                filter = [
+                    'any',
+                    ['all', ['>=', ['get', 'windDirection'], 360 + minDeg], ['<=', ['get', 'windDirection'], 360]],
+                    ['all', ['>=', ['get', 'windDirection'], 0], ['<=', ['get', 'windDirection'], maxDeg]]
+                ];
+            } else if (maxDeg >= 360) {
+                // Handle wrap-around for directions near 360
+                filter = [
+                    'any',
+                    ['all', ['>=', ['get', 'windDirection'], minDeg], ['<=', ['get', 'windDirection'], 360]],
+                    ['all', ['>=', ['get', 'windDirection'], 0], ['<=', ['get', 'windDirection'], maxDeg - 360]]
+                ];
+            } else {
+                // Normal range
+                filter = ['all', 
+                    ['>=', ['get', 'windDirection'], minDeg], 
+                    ['<=', ['get', 'windDirection'], maxDeg]
+                ];
+            }
+
+            this.map.addLayer({
+                id: `${this.layerName}-wind-arrows-${deg}`,
+                type: 'symbol',
+                source: this.layerName,
+                filter: ['all', ['has', 'windDirection'], filter],
+                layout: {
+                    'text-field': '▲',
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-size': [
                         'interpolate',
                         ['linear'],
                         ['zoom'],
-                        4, -1.5,   // Further outside at low zoom
-                        8, -2.0,   // Even further at medium zoom
-                        12, -2.5   // Furthest at high zoom
-                    ]
-                ],
-                'text-allow-overlap': true,
-                'text-ignore-placement': true,
-                'text-pitch-alignment': 'map',
-                'text-rotation-alignment': 'map'
-            },
-            paint: {
-                'text-color': '#ffffff',
-                'text-halo-color': '#000000',
-                'text-halo-width': 1,
-                'text-opacity': [
-                    'case',
-                    ['has', 'windDirection'], 0.9,  // Show arrow if wind data available
-                    0  // Hide if no wind data
-                ]
-            }
-        });
+                        4, 12,
+                        8, 18,
+                        12, 22
+                    ],
+                    'text-rotate': ['get', 'windDirection'],
+                    'text-offset': [offsetX, offsetY],
+                    'text-allow-overlap': true,
+                    'text-ignore-placement': true,
+                    'text-pitch-alignment': 'map',
+                    'text-rotation-alignment': 'map'
+                },
+                paint: {
+                    // Wind speed color coding: Green (0kt) to Red (60kt)
+                    'text-color': [
+                        'case',
+                        ['>=', ['get', 'windSpeed'], 60], '#ff0000',      // Red for 60+ kt
+                        ['>=', ['get', 'windSpeed'], 50], '#ff4500',      // Orange-red for 50+ kt
+                        ['>=', ['get', 'windSpeed'], 40], '#ff8c00',      // Orange for 40+ kt
+                        ['>=', ['get', 'windSpeed'], 30], '#ffa500',      // Light orange for 30+ kt
+                        ['>=', ['get', 'windSpeed'], 20], '#ffff00',      // Yellow for 20+ kt
+                        ['>=', ['get', 'windSpeed'], 10], '#9acd32',      // Yellow-green for 10+ kt
+                        ['>=', ['get', 'windSpeed'], 5], '#32cd32',       // Green for 5+ kt
+                        '#00ff00'  // Bright green for < 5 kt (light winds)
+                    ],
+                    'text-halo-color': '#000000',
+                    'text-halo-width': 1.5,
+                    'text-opacity': 0.95
+                }
+            });
+        }
         
         // Station labels
         this.map.addLayer({
@@ -342,7 +379,15 @@ class ObservedWeatherStationsLayer {
         });
         
         // Click handler for stations - handle clicks on any of the layer components
-        const clickableLayerIds = [`${this.layerName}-inner`, `${this.layerName}-ring`, `${this.layerName}-wind-arrows`];
+        const clickableLayerIds = [
+            `${this.layerName}-inner`, 
+            `${this.layerName}-ring`
+        ];
+        
+        // Add all wind arrow layers to clickable list
+        for (let deg = 0; deg < 360; deg += 10) {
+            clickableLayerIds.push(`${this.layerName}-wind-arrows-${deg}`);
+        }
         
         clickableLayerIds.forEach(layerId => {
             this.map.on('click', layerId, (e) => {
@@ -452,14 +497,69 @@ class ObservedWeatherStationsLayer {
         // Calculate flight category ourselves based on visibility and ceiling
         const flightCategory = this.calculateFlightCategory(metar, rawMetar);
         
+        // Extract wind direction and speed directly from METAR object
+        let windDirection = null;
+        let windSpeed = null;
+        
+        if (metar.wdir && metar.wdir !== 'VRB' && !isNaN(parseInt(metar.wdir))) {
+            windDirection = parseInt(metar.wdir);
+        }
+        
+        if (metar.wspd && !isNaN(parseFloat(metar.wspd))) {
+            windSpeed = Math.round(parseFloat(metar.wspd));
+        }
+        
+        // Extract timestamp from raw METAR - format is usually DDHHmmZ
+        let extractedTime = null;
+        if (rawMetar) {
+            // Look for METAR timestamp pattern like "252053Z" (day=25, time=20:53 UTC)
+            const timeMatch = rawMetar.match(/(\d{6}Z)/);
+            if (timeMatch) {
+                const timeStr = timeMatch[1];
+                const day = parseInt(timeStr.substring(0, 2));
+                const hour = parseInt(timeStr.substring(2, 4));
+                const minute = parseInt(timeStr.substring(4, 6));
+                
+                // Create timestamp for current month/year
+                const now = new Date();
+                const currentMonth = now.getUTCMonth();
+                const currentYear = now.getUTCFullYear();
+                
+                const metarTime = new Date(Date.UTC(currentYear, currentMonth, day, hour, minute));
+                
+                // If the METAR day is in the future (next month), adjust
+                if (metarTime > now) {
+                    metarTime.setUTCMonth(currentMonth - 1);
+                }
+                
+                extractedTime = metarTime.toISOString();
+                
+                console.log(`METAR ${metar.station || 'Unknown'} timestamp extracted:`, {
+                    timePattern: timeStr,
+                    day, hour, minute,
+                    calculatedTime: extractedTime,
+                    ageMinutes: Math.floor((now - metarTime) / (1000 * 60))
+                });
+            }
+        }
+        
+        // Debug the timestamp
+        console.log(`METAR ${metar.station || 'Unknown'} timestamp:`, {
+            obsTime: metar.obsTime,
+            extractedTime,
+            raw: rawMetar.substring(0, 80) + '...'
+        });
+        
         return {
             type: 'METAR',
             raw: rawMetar,
-            time: metar.obsTime || new Date().toISOString(),
+            time: extractedTime || metar.obsTime || null, // Use extracted time first
             conditions: this.extractMetarConditions(metar, rawMetar),
             weatherPhenomena: this.extractWeatherPhenomena(rawMetar),
             cloudLayers: this.extractCloudLayers(rawMetar),
             flightCategory: flightCategory, // Use our calculated category
+            windDirection: windDirection, // Add wind direction to the data object
+            windSpeed: windSpeed, // Add wind speed to the data object
             source: 'NOAA Aviation Weather Center'
         };
     }
@@ -661,10 +761,45 @@ class ObservedWeatherStationsLayer {
         // Parse the latest data line (usually line 2)
         const dataLine = lines[2].split(/\s+/);
         
+        // Extract actual timestamp from buoy data if available
+        // Buoy format: YY MM DD hh mm ...
+        let obsTime = null;
+        if (dataLine.length >= 5) {
+            try {
+                const year = 2000 + parseInt(dataLine[0]); // YY -> 20YY
+                const month = parseInt(dataLine[1]) - 1; // Month is 0-indexed in Date
+                const day = parseInt(dataLine[2]);
+                const hour = parseInt(dataLine[3]);
+                const minute = parseInt(dataLine[4]);
+                
+                console.log(`Buoy ${stationId} timestamp parsing:`, {
+                    raw: dataLine.slice(0, 5),
+                    year, month: month + 1, day, hour, minute
+                });
+                
+                const parsedDate = new Date(year, month, day, hour, minute);
+                console.log(`Buoy ${stationId} parsed date:`, parsedDate);
+                
+                // Validate the date makes sense (not too far in past/future)
+                const now = new Date();
+                const daysDiff = Math.abs(now - parsedDate) / (1000 * 60 * 60 * 24);
+                
+                if (daysDiff > 7) { // More than 7 days old/future
+                    console.warn(`Buoy ${stationId} timestamp seems invalid (${daysDiff.toFixed(1)} days from now)`);
+                    obsTime = null;
+                } else {
+                    obsTime = parsedDate.toISOString();
+                }
+            } catch (e) {
+                console.warn('Could not parse buoy timestamp:', dataLine.slice(0, 5), e);
+                obsTime = null;
+            }
+        }
+        
         return {
             type: 'BUOY',
             raw: lines[2],
-            time: new Date().toISOString(),
+            time: obsTime, // Use actual buoy timestamp if available
             conditions: this.extractBuoyConditions(dataLine),
             flightCategory: 'MARINE',
             source: 'NOAA National Data Buoy Center'
@@ -692,13 +827,48 @@ class ObservedWeatherStationsLayer {
      * Update popup with weather data
      */
     updateStationPopup(stationId, stationName, stationType, weatherData) {
-        const formatTime = (isoString) => {
-            const date = new Date(isoString);
-            return date.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
+        const formatAge = (isoString) => {
+            if (!isoString) {
+                return 'Time unknown';
+            }
+            
+            const obsTime = new Date(isoString);
+            if (isNaN(obsTime.getTime())) {
+                return 'Time invalid';
+            }
+            
+            const now = new Date();
+            const ageMinutes = Math.floor((now - obsTime) / (1000 * 60));
+            
+            console.log(`Age calculation for ${isoString}:`, {
+                obsTime: obsTime.toISOString(),
+                now: now.toISOString(),
+                ageMinutes,
+                ageDays: Math.floor(ageMinutes / 1440)
             });
+            
+            // Sanity check - if age is more than 30 days, something is wrong
+            if (Math.abs(ageMinutes) > 43200) { // 30 days
+                return 'Time error (check data)';
+            }
+            
+            if (ageMinutes < -60) { // More than 1 hour in future
+                return 'Future time (check clock)';
+            } else if (ageMinutes < 0) {
+                return 'Just now (future)';
+            } else if (ageMinutes < 1) {
+                return 'Just now';
+            } else if (ageMinutes < 60) {
+                return `${ageMinutes} min ago`;
+            } else if (ageMinutes < 120) {
+                return `1 hour ago`;
+            } else if (ageMinutes < 1440) {
+                return `${Math.floor(ageMinutes / 60)} hours ago`;
+            } else if (ageMinutes < 2880) {
+                return `1 day ago`;
+            } else {
+                return `${Math.floor(ageMinutes / 1440)} days ago`;
+            }
         };
         
         const categoryColor = {
@@ -763,7 +933,7 @@ class ObservedWeatherStationsLayer {
                     <div style="margin-bottom: 3px;"><strong>Temp:</strong> ${tempF || temp || 'N/A'}</div>
                     <div style="margin-bottom: 4px;"><strong>Conditions:</strong> ${conditionsText}</div>
                     
-                    <div style="font-size: 10px; color: #b8d4f0; opacity: 0.8;"><strong>Observed:</strong> ${formatTime(weatherData.time)}</div>
+                    <div style="font-size: 10px; color: #b8d4f0; opacity: 0.8;"><strong>Observed:</strong> ${formatAge(weatherData.time)}</div>
                 </div>
             </div>
         `);
@@ -800,6 +970,7 @@ class ObservedWeatherStationsLayer {
         console.log('✅ Started periodic weather updates (10 min intervals)');
     }
     
+    
     /**
      * Update all station colors based on conditions
      */
@@ -810,16 +981,20 @@ class ObservedWeatherStationsLayer {
             try {
                 const weatherData = await this.fetchStationWeather(station.id, station.type);
                 if (weatherData) {
-                    // Extract wind direction from conditions for arrow rotation
-                    let windDirection = null;
-                    if (weatherData.conditions) {
-                        const windMatch = weatherData.conditions.match(/Wind:\s*(\d+)°/);
+                    // Get wind direction and speed from weather data object (preferred) or extract from conditions string (fallback)
+                    let windDirection = weatherData.windDirection || null;
+                    let windSpeed = weatherData.windSpeed || null;
+                    
+                    // Fallback: Extract from conditions string if not directly available
+                    if (windDirection === null && weatherData.conditions) {
+                        const windMatch = weatherData.conditions.match(/Wind:\s*(\d+)°@(\d+)kt/);
                         if (windMatch) {
                             windDirection = parseInt(windMatch[1]);
+                            windSpeed = parseInt(windMatch[2]);
                         }
                     }
                     
-                    this.updateStationColor(station.id, weatherData.flightCategory, windDirection);
+                    this.updateStationColor(station.id, weatherData.flightCategory, windDirection, windSpeed);
                 }
             } catch (error) {
                 console.warn(`Failed to update station ${station.id}:`, error.message);
@@ -831,9 +1006,9 @@ class ObservedWeatherStationsLayer {
     }
     
     /**
-     * Update individual station color and wind direction
+     * Update individual station color, wind direction, and wind speed
      */
-    updateStationColor(stationId, flightCategory, windDirection = null) {
+    updateStationColor(stationId, flightCategory, windDirection = null, windSpeed = null) {
         // Update the source data
         const sourceData = this.source._data;
         const feature = sourceData.features.find(f => f.properties.id === stationId);
@@ -850,13 +1025,25 @@ class ObservedWeatherStationsLayer {
             feature.properties.status = statusMap[flightCategory] || 'unknown';
             feature.properties.lastUpdate = new Date().toISOString();
             
-            // Add wind direction for arrow rotation (convert to degrees for icon rotation)
+            // Add wind direction and speed for arrow rotation and coloring
             if (windDirection !== null && !isNaN(windDirection)) {
                 feature.properties.windDirection = windDirection;
+                console.log(`🌪️ SET: ${stationId} wind direction = ${windDirection}°`);
+            } else {
+                console.log(`❌ NO WIND DIR: ${stationId} - direction: ${windDirection}`);
+            }
+            
+            if (windSpeed !== null && !isNaN(windSpeed)) {
+                feature.properties.windSpeed = windSpeed;
+                console.log(`💨 SET: ${stationId} wind speed = ${windSpeed}kt`);
+            } else {
+                console.log(`❌ NO WIND SPEED: ${stationId} - speed: ${windSpeed}`);
+                // Set default wind speed for coloring if missing
+                feature.properties.windSpeed = 0;
             }
             
             this.source.setData(sourceData);
-            console.log(`Updated ${stationId}: ${flightCategory} (${statusMap[flightCategory]}), Wind: ${windDirection || 'N/A'}°`);
+            console.log(`Updated ${stationId}: ${flightCategory} (${statusMap[flightCategory]}), Wind: ${windDirection || 'N/A'}°@${windSpeed || 'N/A'}kt`);
         }
     }
     
@@ -871,10 +1058,14 @@ class ObservedWeatherStationsLayer {
         // Toggle visibility for all layer components
         const layerIds = [
             `${this.layerName}-inner`,
-            `${this.layerName}-ring`, 
-            `${this.layerName}-wind-arrows`,
+            `${this.layerName}-ring`,
             `${this.layerName}-labels`
         ];
+        
+        // Add all wind arrow layers to visibility list
+        for (let deg = 0; deg < 360; deg += 10) {
+            layerIds.push(`${this.layerName}-wind-arrows-${deg}`);
+        }
         
         layerIds.forEach(layerId => {
             if (this.map.getLayer(layerId)) {
@@ -900,11 +1091,15 @@ class ObservedWeatherStationsLayer {
         // Remove all layer components
         const layerIds = [
             `${this.layerName}-labels`,
-            `${this.layerName}-wind-arrows`,
             `${this.layerName}-ring`,
             `${this.layerName}-inner`,
             this.layerName
         ];
+        
+        // Add all wind arrow layers to removal list (reverse order for proper cleanup)
+        for (let deg = 350; deg >= 0; deg -= 10) {
+            layerIds.unshift(`${this.layerName}-wind-arrows-${deg}`);
+        }
         
         layerIds.forEach(layerId => {
             if (this.map.getLayer(layerId)) {
