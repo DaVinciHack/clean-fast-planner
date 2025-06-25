@@ -55,6 +55,9 @@ const EnhancedStopCardsContainer = ({
   // State for refuel stops (array of stop indices that are refuel stops)
   const [refuelStops, setRefuelStops] = useState([]);
   
+  // State for waiving alternates (VFR operations)
+  const [waiveAlternates, setWaiveAlternates] = useState(false);
+  
   // Force recalculation trigger when refuel stops change
   const [forceRecalculation, setForceRecalculation] = useState(0);
   
@@ -132,8 +135,16 @@ const EnhancedStopCardsContainer = ({
       hasSelectedAircraft: !!selectedAircraft,
       waypointCount: waypoints.length,
       hasWeather: !!weather,
-      hasFuelPolicy: !!fuelPolicy
+      hasFuelPolicy: !!fuelPolicy,
+      waiveAlternates: waiveAlternates
     });
+    
+    // 🛩️ WAIVE ALTERNATES: Skip calculation if alternates are waived (VFR operations)
+    if (waiveAlternates) {
+      console.log('🛩️ Waiving alternates for VFR operations - clearing alternate card');
+      setAlternateStopCard(null);
+      return;
+    }
     
     // Only calculate if we have the necessary data
     if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather) {
@@ -207,7 +218,7 @@ const EnhancedStopCardsContainer = ({
       });
       setAlternateStopCard(null);
     }
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation]);
+  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates]);
   
   // Handle card click
   const handleCardClick = (index) => {
@@ -230,6 +241,13 @@ const EnhancedStopCardsContainer = ({
     // 🛩️ PHASE 2: Trigger fuel recalculation
     console.log(`🔄 Triggering fuel recalculation due to refuel change`);
     setForceRecalculation(prev => prev + 1);
+  };
+  
+  // Handle waive alternates checkbox changes
+  const handleWaiveAlternatesChange = (event) => {
+    const isWaived = event.target.checked;
+    console.log(`🛩️ Waive alternates changed: ${isWaived}`);
+    setWaiveAlternates(isWaived);
   };
   
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER
@@ -307,6 +325,30 @@ const EnhancedStopCardsContainer = ({
       <h4 className="route-stops-title" style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}>
         ROUTE STOPS (UNIFIED FUEL)
       </h4>
+      
+      {/* 🛩️ VFR OPERATIONS: Waive Alternates Checkbox */}
+      <label className="waive-alternates-container" style={{
+        display: 'flex',
+        alignItems: 'center',
+        marginBottom: '8px',
+        fontSize: '11px',
+        color: 'rgba(255, 255, 255, 0.8)',
+        cursor: 'pointer',
+        padding: '4px 0'
+      }}>
+        <input
+          type="checkbox"
+          checked={waiveAlternates}
+          onChange={handleWaiveAlternatesChange}
+          style={{
+            width: '14px',
+            height: '14px',
+            marginRight: '6px',
+            cursor: 'pointer'
+          }}
+        />
+        ☑️ Waive Alternates (VFR Day Flying)
+      </label>
       
       {/* COMMENTED OUT DEBUG INFO TO FIX "isReady/isLoading is not defined" ERROR - WILL REVIEW LATER */}
       {/* Debug info in development */}
