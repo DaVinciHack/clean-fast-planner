@@ -17,6 +17,9 @@ const GlassMenuDock = ({
   // Panel states for visual feedback
   leftPanelVisible = false,
   rightPanelVisible = false,
+  // Phone layout support
+  isPhoneLayout = false,
+  onToggleRightPanel, // New callback for toggling right panel on phones
   // Smart toggle button props
   showEditButton = false, // Shows when flight is loaded
   currentMapMode = 'dark', // Current map style (dark/3d)
@@ -201,8 +204,27 @@ const GlassMenuDock = ({
           </button>
         </div>
 
-        {/* Smart Toggle Button - shows when flight is loaded */}
-        {showEditButton && (
+        {/* Phone Layout: Settings Panel Button - shows on phones to toggle right panel */}
+        {isPhoneLayout && (
+          <div className="glass-button-container">
+            <button 
+              className={`glass-button icon-above-text menu-button ${rightPanelVisible ? 'active' : ''}`}
+              onClick={onToggleRightPanel}
+              title={rightPanelVisible ? 'Hide settings panel' : 'Show settings panel'}
+            >
+              <div className="glass-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="m12 1 3 9 9 3-9 3-3 9-3-9-9-3 9-3 3-9z"/>
+                </svg>
+              </div>
+              <span className="button-label">Panel</span>
+            </button>
+          </div>
+        )}
+
+        {/* Smart Toggle Button - shows when flight is loaded (desktop) */}
+        {showEditButton && !isPhoneLayout && (
           <div className="glass-button-container edit-button-container">
             <button 
               className={`glass-button icon-above-text ${currentMapMode === '3d' ? 'edit-button' : 'satellite-button'}`}
