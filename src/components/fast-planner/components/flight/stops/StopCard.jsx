@@ -26,7 +26,10 @@ const StopCard = React.forwardRef(({
   fuelComponents,
   isActive,
   onClick,
-  className = ''
+  className = '',
+  // New refuel props
+  isRefuelStop = false,
+  onRefuelChange
 }, ref) => {
   // Function to format time as HH:MM
   const formatTime = (timeHours) => {
@@ -91,6 +94,30 @@ const StopCard = React.forwardRef(({
         <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
         <div className="stop-name">
           {stopName || `Stop ${index}`}
+          {/* Refuel checkbox - only show on intermediate stops */}
+          {!isDeparture && !isDestination && !isAlternate && onRefuelChange && (
+            <label className="refuel-checkbox-container" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              marginLeft: '8px',
+              fontSize: '10px',
+              color: 'rgba(255, 255, 255, 0.7)',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="checkbox"
+                checked={isRefuelStop}
+                onChange={(e) => onRefuelChange(index, e.target.checked)}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  marginRight: '4px',
+                  cursor: 'pointer'
+                }}
+              />
+              refuel
+            </label>
+          )}
           {isAlternate && routeDescription && (
             <div className="route-description" style={{ 
               fontSize: '0.65em', 
