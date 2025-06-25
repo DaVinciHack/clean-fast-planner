@@ -160,7 +160,7 @@ const EnhancedStopCardsContainer = ({
         // Prepare parameters for StopCardCalculator (same as StopCardsContainer)
         const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
         // 🚨 AVIATION SAFETY: Ensure all required parameters are provided (no fallbacks)
-        if (!contingencyFuelPercent && contingencyFuelPercent !== 0) {
+        if (contingencyFuelPercent === undefined || contingencyFuelPercent === null) {
           console.error('🚨 Missing contingencyFuelPercent for alternate calculation');
           setAlternateStopCard(null);
           return;
