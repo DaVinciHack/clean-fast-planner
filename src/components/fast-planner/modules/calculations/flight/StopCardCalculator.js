@@ -1190,10 +1190,10 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   }
 
   // 🚨 AVIATION SAFETY: REQUIRE all fuel parameters - NO DEFAULTS
-  if (!taxiFuel || isNaN(Number(taxiFuel))) {
+  if (taxiFuel === undefined || taxiFuel === null || isNaN(Number(taxiFuel))) {
     throw new Error(`CRITICAL: Missing taxi fuel value. Required for safe fuel calculations.`);
   }
-  if (!contingencyFuelPercent || isNaN(Number(contingencyFuelPercent))) {
+  if (contingencyFuelPercent === undefined || contingencyFuelPercent === null || isNaN(Number(contingencyFuelPercent))) {
     throw new Error(`CRITICAL: Missing contingency fuel percentage. Required for safe fuel calculations.`);
   }
   if (!calculatedReserveFuel || isNaN(Number(calculatedReserveFuel))) {
