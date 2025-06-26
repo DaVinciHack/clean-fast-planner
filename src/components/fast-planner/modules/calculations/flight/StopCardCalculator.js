@@ -226,11 +226,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   }
   
   // 🚨 AVIATION SAFETY: REQUIRE weight data for passenger calculations  
-  if (!selectedAircraft.emptyWeight || isNaN(Number(selectedAircraft.emptyWeight))) {
-    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing empty weight. OSDK aircraft data required for safe passenger calculations.`);
-  }
-  if (!selectedAircraft.maxTakeoffWeight || isNaN(Number(selectedAircraft.maxTakeoffWeight))) {
-    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing max takeoff weight. OSDK aircraft data required for safe passenger calculations.`);
+  if (!selectedAircraft.usefulLoad || isNaN(Number(selectedAircraft.usefulLoad))) {
+    throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing useful load. OSDK aircraft data required for safe passenger calculations.`);
   }
   
   // Validate calculation parameters - Log warnings but don't fail

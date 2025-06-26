@@ -30,7 +30,9 @@ const EnhancedStopCardsContainer = ({
   weatherSegments = null,
   stopCards = [], // Legacy prop - will be ignored
   // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
-  onWaiveAlternatesChange = null
+  onWaiveAlternatesChange = null,
+  // 🛩️ HEADER SYNC: Callback to update header totals
+  onStopCardsCalculated = null
 }) => {
   console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
   
@@ -63,11 +65,13 @@ const EnhancedStopCardsContainer = ({
   // Force recalculation trigger when refuel stops change
   const [forceRecalculation, setForceRecalculation] = useState(0);
   
+  // Track last notified cards to prevent infinite loop
+  const lastNotifiedCardsRef = useRef(null);
+  
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
     const hasRequiredAircraftData = selectedAircraft && 
-      selectedAircraft.dryWeight && 
       selectedAircraft.fuelBurn;
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy && hasRequiredAircraftData) {
@@ -107,6 +111,12 @@ const EnhancedStopCardsContainer = ({
         if (calculatedStopCards && calculatedStopCards.length > 0) {
           console.log(`🎯 EnhancedStopCardsContainer: Generated ${calculatedStopCards.length} stop cards with weather fuel`);
           setDisplayStopCards(calculatedStopCards);
+          
+          // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
+          if (onStopCardsCalculated && JSON.stringify(calculatedStopCards) !== lastNotifiedCardsRef.current) {
+            lastNotifiedCardsRef.current = JSON.stringify(calculatedStopCards);
+            onStopCardsCalculated(calculatedStopCards);
+          }
         }
       } catch (error) {
         console.error('🎯 EnhancedStopCardsContainer: Error calculating stop cards:', error);
@@ -169,7 +179,6 @@ const EnhancedStopCardsContainer = ({
     
     // 🚨 SAFETY: Check aircraft data completeness for alternate card too
     const hasRequiredAircraftData = selectedAircraft && 
-      selectedAircraft.dryWeight && 
       selectedAircraft.fuelBurn;
     
     // Only calculate if we have the necessary data AND complete aircraft data

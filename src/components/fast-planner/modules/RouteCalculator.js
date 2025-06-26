@@ -65,6 +65,7 @@ class RouteCalculator {
       payloadWeight = 0,
       reserveFuel = 0,
       weather = null,
+      passengerWeight = 220, // 🚨 MISSING PARAM: Add passengerWeight extraction
       // CRITICAL FIX: Add forceTimeCalculation flag
       forceTimeCalculation = false,
       // IMPROVED FIX: Add a flag to indicate if these are ALL waypoints (including navigation waypoints)
@@ -109,7 +110,8 @@ class RouteCalculator {
       selectedAircraft, // Pass the full aircraft object
       payloadWeight,
       reserveFuel,
-      weather
+      weather,
+      passengerWeight // 🚨 MISSING PARAM: Pass passengerWeight to fix max passengers calculation
     );
     
     // Validate time calculations before returning
@@ -224,7 +226,7 @@ class RouteCalculator {
    * @param {Object} weather - Weather data with windSpeed and windDirection
    * @returns {Object} - Route statistics
    */
-  calculateRouteStatsLocally(coordinates, aircraftTypes, aircraftObject, payloadWeight, reserveFuel, weather) {
+  calculateRouteStatsLocally(coordinates, aircraftTypes, aircraftObject, payloadWeight, reserveFuel, weather, passengerWeight = 220) {
     console.log("RouteCalculator: Starting calculation with:", { 
       coordinatesLength: coordinates?.length,
       aircraftObject: aircraftObject ? 
@@ -438,11 +440,11 @@ class RouteCalculator {
       // Calculate usable load from actual aircraft data
       usableLoad = Math.max(0, aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelRequired - (Number(payloadWeight) || 0));
       
-      // Only calculate passengers if we have passengerWeight
-      if (aircraft.passengerWeight) {
-        maxPassengers = Math.floor(usableLoad / aircraft.passengerWeight);
+      // Calculate passengers using passengerWeight parameter
+      if (passengerWeight && passengerWeight > 0) {
+        maxPassengers = Math.floor(usableLoad / passengerWeight);
       } else {
-        console.error('RouteCalculator: Missing passengerWeight data, cannot calculate max passengers');
+        console.error('RouteCalculator: Missing or invalid passengerWeight parameter, cannot calculate max passengers');
       }
     } else {
       console.error('RouteCalculator: Missing aircraft weight data, cannot calculate usable load');

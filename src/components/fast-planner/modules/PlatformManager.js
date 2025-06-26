@@ -1196,7 +1196,8 @@ class PlatformManager {
           }
 
           // Layer for Fixed Platforms (styled circle from backup)
-          map.addLayer({
+          if (!map.getLayer('platforms-fixed-layer')) {
+            map.addLayer({
             id: 'platforms-fixed-layer', // Keep current ID
             type: 'circle', // Changed from symbol
             source: sourceId,
@@ -1221,9 +1222,11 @@ class PlatformManager {
                 'visibility': this.fixedPlatformsVisible ? 'visible' : 'none'
             }
           });
+          }
 
           // Layer for Movable Platforms (styled circle from backup)
-          map.addLayer({
+          if (!map.getLayer('platforms-movable-layer')) {
+            map.addLayer({
             id: 'platforms-movable-layer',
             type: 'circle', // Changed from symbol
             source: sourceId,
@@ -1248,9 +1251,11 @@ class PlatformManager {
                 'visibility': this.movablePlatformsVisible ? 'visible' : 'none'
             }
           });
+          }
 
           // Layer for Airfields/Heliports (using custom/fallback icon from backup)
-          map.addLayer({
+          if (!map.getLayer('airfields-layer')) {
+            map.addLayer({
             id: 'airfields-layer',
             type: 'symbol',
             source: sourceId,
@@ -1270,9 +1275,11 @@ class PlatformManager {
               'visibility': this.airfieldsVisible ? 'visible' : 'none'
             }
           });
+          }
           
           // Labels for Fixed Platforms
-          map.addLayer({
+          if (!map.getLayer('platforms-fixed-labels')) {
+            map.addLayer({
             id: 'platforms-fixed-labels',
             type: 'symbol',
             source: sourceId,
@@ -1304,9 +1311,11 @@ class PlatformManager {
               ]
             }
           });
+          }
 
           // Labels for Movable Platforms
-          map.addLayer({
+          if (!map.getLayer('platforms-movable-labels')) {
+            map.addLayer({
             id: 'platforms-movable-labels',
             type: 'symbol',
             source: sourceId,
@@ -1337,9 +1346,11 @@ class PlatformManager {
               ]
             }
           });
+          }
 
           // Labels for Airfields
-          map.addLayer({
+          if (!map.getLayer('airfields-labels')) {
+            map.addLayer({
             id: 'airfields-labels',
             type: 'symbol',
             source: sourceId,
@@ -1363,9 +1374,11 @@ class PlatformManager {
               'text-halo-width': 0.5
             }
           });
+          }
 
           // Layer for Blocks (new category)
-          map.addLayer({
+          if (!map.getLayer('blocks-layer')) {
+            map.addLayer({
             id: 'blocks-layer',
             type: 'circle',
             source: sourceId,
@@ -1387,9 +1400,11 @@ class PlatformManager {
                 'visibility': this.blocksVisible ? 'visible' : 'none'
             }
           });
+          }
 
           // Labels for Blocks
-          map.addLayer({
+          if (!map.getLayer('blocks-labels')) {
+            map.addLayer({
             id: 'blocks-labels',
             type: 'symbol',
             source: sourceId,
@@ -1422,9 +1437,11 @@ class PlatformManager {
               ]
             }
           });
+          }
 
           // Layer for Bases (new category) - bright purple/magenta rings
-          map.addLayer({
+          if (!map.getLayer('bases-layer')) {
+            map.addLayer({
             id: 'bases-layer',
             type: 'circle',
             source: sourceId,
@@ -1446,9 +1463,11 @@ class PlatformManager {
                 'visibility': this.basesVisible ? 'visible' : 'none'
             }
           });
+          }
 
           // Labels for Bases
-          map.addLayer({
+          if (!map.getLayer('bases-labels')) {
+            map.addLayer({
             id: 'bases-labels',
             type: 'symbol',
             source: sourceId,
@@ -1474,9 +1493,11 @@ class PlatformManager {
               'text-halo-width': 1
             }
           });
+          }
 
           // Layer for Fuel Available Overlay (ring around platforms with fuel)
-          map.addLayer({
+          if (!map.getLayer('fuel-available-layer')) {
+            map.addLayer({
             id: 'fuel-available-layer',
             type: 'circle',
             source: sourceId,
@@ -1498,9 +1519,11 @@ class PlatformManager {
                 'visibility': this.fuelAvailableVisible ? 'visible' : 'none'
             }
           });
+          }
 
           // Labels for Fuel Available (show platform name)
-          map.addLayer({
+          if (!map.getLayer('fuel-available-labels')) {
+            map.addLayer({
             id: 'fuel-available-labels',
             type: 'symbol',
             source: sourceId,
@@ -1526,6 +1549,7 @@ class PlatformManager {
               'text-halo-width': 1
             }
           });
+          }
           
           console.log('PlatformManager: Platform layers added/updated.');
           
