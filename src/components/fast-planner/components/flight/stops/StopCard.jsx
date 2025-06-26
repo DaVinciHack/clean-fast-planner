@@ -29,7 +29,10 @@ const StopCard = React.forwardRef(({
   className = '',
   // New refuel props
   isRefuelStop = false,
-  onRefuelChange
+  onRefuelChange,
+  // Alternate fuel requirements for IFR operations
+  alternateRequirements = null,
+  shouldShowStrikethrough = false
 }, ref) => {
   // Function to format time as HH:MM
   const formatTime = (timeHours) => {
@@ -118,6 +121,18 @@ const StopCard = React.forwardRef(({
               refuel
             </label>
           )}
+          {/* Alternate fuel requirements display for departure card */}
+          {isDeparture && alternateRequirements && (
+            <div className="alternate-fuel-requirements" style={{ 
+              fontSize: '0.65em', 
+              color: '#f39c12', // Same yellow as alternate card
+              marginTop: '2px',
+              lineHeight: '1.2',
+              fontWeight: 'bold'
+            }}>
+              Min fuel amount is Alternate requirement
+            </div>
+          )}
           {isAlternate && routeDescription && (
             <div className="route-description" style={{ 
               fontSize: '0.65em', 
@@ -154,13 +169,17 @@ const StopCard = React.forwardRef(({
         {/* Total Fuel */}
         <div className="stop-metric">
           <span className="icon"><FuelIcon /></span>
-          <div className="metric-value">{totalFuel || '0'} lbs</div>
+          <div className="metric-value" style={alternateRequirements ? { color: '#f39c12' } : {}}>
+            {totalFuel || '0'} lbs
+          </div>
         </div>
         
         {/* Passenger information */}
         <div className="stop-metric">
           <span className="icon"><PassengerIcon /></span>
-          <div className="metric-value">{passengersDisplay}</div>
+          <div className="metric-value" style={alternateRequirements ? { color: '#f39c12' } : {}}>
+            {passengersDisplay}
+          </div>
         </div>
         
         {/* Wind information moved to header */}

@@ -26,7 +26,7 @@ import PassengerCalculator from '../passengers/PassengerCalculator';
  * @param {boolean} waiveAlternates - Whether alternates are waived for VFR operations
  * @returns {Array} Array of stop card objects
  */
-const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false) => {
+const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false, alternateStopCard = null) => {
   console.log('⭐ StopCardCalculator: Starting with routeStats?', !!routeStats);
   console.log('🛩️ StopCardCalculator: Refuel stops:', refuelStops, 'Waive alternates:', waiveAlternates);
   
@@ -657,6 +657,49 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       console.log(`🛩️ DEPARTURE CALC: Standard mode - ${departureFuelNeeded} lbs for full route`);
     }
     
+    // Calculate max passengers for departure using PassengerCalculator
+    let departureMaxPassengers = 0;
+    if (selectedAircraft) {
+      // Use our dedicated PassengerCalculator module
+      departureMaxPassengers = PassengerCalculator.calculateMaxPassengers(
+        selectedAircraft, 
+        departureFuelNeeded, 
+        passengerWeightValue,
+        cargoWeight
+      );
+    }
+    
+    // 🛩️ ALTERNATE FUEL LOGIC: Calculate alternate requirements when not waived
+    let alternateRequirements = null;
+    let shouldShowStrikethrough = false;
+    
+    if (hasRefuelStops && !waiveAlternates && alternateStopCard) {
+      // 🛩️ Use the exact values from the already-calculated alternate card
+      const alternateFuel = alternateStopCard.totalFuel;
+      const alternatePassengers = alternateStopCard.maxPassengers;
+      
+      console.log(`🛩️ USING ALTERNATE CARD VALUES: ${alternateFuel} lbs, ${alternatePassengers} pax`);
+      
+      // 🚨 REGULATORY REQUIREMENT: Always use alternate fuel when alternates are required
+      // This overrides any refuel optimization because alternates are mandatory for IFR
+      const originalDepartureFuel = departureFuelNeeded;
+      departureFuelNeeded = alternateFuel;
+      departureMaxPassengers = alternatePassengers;
+      
+      // Determine if we're overriding an optimization (for UI indication)
+      shouldShowStrikethrough = alternateFuel > originalDepartureFuel;
+      
+      console.log(`🛩️ ALTERNATE OVERRIDE: Using alternate fuel ${alternateFuel} lbs (was ${originalDepartureFuel} lbs) - REGULATORY REQUIREMENT`);
+      
+      alternateRequirements = {
+        fuel: alternateFuel,
+        passengers: alternatePassengers,
+        isRequired: true // Always required when alternates are not waived
+      };
+      
+      console.log(`🛩️ ALTERNATE REQUIREMENTS FINAL:`, alternateRequirements);
+    }
+    
     // Create fuel components text for departure using calculated values
     let fuelComponentsParts = [
       `Taxi:${departureComponentsCalculation.taxi}`,
@@ -694,19 +737,26 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       componentText: departureFuelComponentsText
     });
     
-    // Calculate max passengers for departure using PassengerCalculator
-    let departureMaxPassengers = 0;
-    if (selectedAircraft) {
-      // Use our dedicated PassengerCalculator module
-      departureMaxPassengers = PassengerCalculator.calculateMaxPassengers(
-        selectedAircraft, 
-        departureFuelNeeded, 
-        passengerWeightValue,
-        cargoWeight
-      );
+    // Create departure card with detailed console logging
+    // 🚨 FINAL ALTERNATE OVERRIDE: Apply alternate requirements just before creating departure card
+    console.log(`🔍 FINAL OVERRIDE CHECK:`, {
+      hasRefuelStops,
+      waiveAlternates,
+      alternateStopCard: !!alternateStopCard,
+      alternateStopCardFuel: alternateStopCard?.totalFuel,
+      currentDepartureFuel: departureFuelNeeded
+    });
+    
+    if (hasRefuelStops && !waiveAlternates && alternateStopCard) {
+      const originalFuel = departureFuelNeeded;
+      departureFuelNeeded = alternateStopCard.totalFuel;
+      departureMaxPassengers = alternateStopCard.maxPassengers;
+      
+      console.log(`🚨 FINAL ALTERNATE OVERRIDE: Changed departure fuel from ${originalFuel} lbs to ${departureFuelNeeded} lbs (alternate requirement)`);
+    } else {
+      console.log(`🚨 FINAL OVERRIDE SKIPPED - Condition not met`);
     }
     
-    // Create departure card with detailed console logging
     console.log('🔎 Creating departure card with components:', {
       tripFuel: departureComponentsCalculation.trip,
       contingencyFuel: departureComponentsCalculation.contingency,
@@ -754,6 +804,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         windDirection: weather?.windDirection || 0,
         source: weather?.source || 'manual'
       },
+      // Add alternate fuel requirements for UI display
+      alternateRequirements: alternateRequirements,
+      shouldShowStrikethrough: shouldShowStrikethrough,
       isDeparture: true,
       isDestination: false
     };
@@ -1193,9 +1246,14 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
             components: { ...card.fuelComponentsObject }
           });
           
-          // Correct the total fuel to match components
-          card.totalFuel = componentSum;
-          console.log(`✅ Card ${i} totalFuel corrected to ${componentSum}`);
+          // 🚨 SKIP CORRECTION for departure cards with alternate requirements
+          if (card.isDeparture && card.alternateRequirements) {
+            console.log(`🛩️ PRESERVING ALTERNATE FUEL: Skipping correction for departure card with alternate requirements (${card.totalFuel} lbs)`);
+          } else {
+            // Correct the total fuel to match components
+            card.totalFuel = componentSum;
+            console.log(`✅ Card ${i} totalFuel corrected to ${componentSum}`);
+          }
         }
       }
     }
@@ -1502,6 +1560,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
               {
                 selectedAircraft,
                 weather,
+                passengerWeight: passengerWeightValue,
                 forceTimeCalculation: true
               }
             );
@@ -1592,6 +1651,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
         {
           selectedAircraft,
           weather,
+          passengerWeight: passengerWeightValue,
           forceTimeCalculation: true
         }
       );
