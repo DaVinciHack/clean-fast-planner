@@ -22,10 +22,13 @@ import PassengerCalculator from '../passengers/PassengerCalculator';
  * @param {Object} weather - Weather data (windSpeed, windDirection)
  * @param {Object} options - Optional calculation parameters
  * @param {Array} weatherSegments - Weather segments data for rig detection
+ * @param {Array} refuelStops - Array of refuel stop indices (e.g., [1, 3])
+ * @param {boolean} waiveAlternates - Whether alternates are waived for VFR operations
  * @returns {Array} Array of stop card objects
  */
-const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null) => {
+const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false) => {
   console.log('⭐ StopCardCalculator: Starting with routeStats?', !!routeStats);
+  console.log('🛩️ StopCardCalculator: Refuel stops:', refuelStops, 'Waive alternates:', waiveAlternates);
   
   // First, verify we have the necessary input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
@@ -68,6 +71,28 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       windAdjusted: routeStats.windAdjusted || false
     });
   }
+  
+  // 🛩️ REFUEL SEGMENTATION: Check if we need to segment the route at refuel stops
+  const hasRefuelStops = refuelStops && refuelStops.length > 0;
+  
+  if (hasRefuelStops) {
+    console.log(`🛩️ StopCardCalculator: Refuel stops detected:`, refuelStops);
+    console.log(`🛩️ StopCardCalculator: TEMPORARILY using standard calculation with refuel display logic`);
+    console.log(`🛩️ TODO: Fix segmentation to preserve refuel display and implement proper fuel recalculation`);
+    // TODO: Fix segmentation to pass refuel context to individual segments
+    // return calculateSegmentedStopCards(
+    //   landingStopsOnly, 
+    //   routeStats, 
+    //   selectedAircraft, 
+    //   weather, 
+    //   options, 
+    //   weatherSegments, 
+    //   refuelStops, 
+    //   waiveAlternates
+    // );
+  }
+  
+  console.log('🛩️ StopCardCalculator: Standard calculation (segmentation disabled for debugging)');
   
   // IMPORTANT: Use only landing stops for stop cards, but keep route stats using all waypoints
   const stopsToProcess = landingStopsOnly;
@@ -570,27 +595,86 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   if (waypoints.length >= 2) {
     const departureWaypoint = waypoints[0];
     
-    // Total fuel needed for entire journey at departure
-    const departureFuelNeeded = taxiFuelValue + totalTripFuel + contingencyFuelValue + araFuel + deckFuelValue + approachFuel + reserveFuelValue + (extraFuel || 0);
+    // 🛩️ REFUEL LOGIC: Calculate departure fuel based on refuel stops
+    let departureFuelNeeded;
+    let departureComponentsCalculation;
     
-    // Create fuel components text for departure - only show non-zero weather fuel
+    if (hasRefuelStops && refuelStops.length > 0) {
+      // Find the first refuel stop index (1-based)
+      const firstRefuelStopIndex = Math.min(...refuelStops);
+      console.log(`🛩️ DEPARTURE CALC: First refuel stop at index ${firstRefuelStopIndex}`);
+      
+      // Calculate fuel only to first refuel stop
+      let tripFuelToFirstRefuel = 0;
+      let deckFuelToFirstRefuel = 0;
+      
+      // Sum fuel for legs up to first refuel stop
+      for (let i = 0; i < legDetails.length && i < firstRefuelStopIndex; i++) {
+        tripFuelToFirstRefuel += legDetails[i].fuel;
+      }
+      
+      // Calculate deck fuel for stops before first refuel (intermediate stops only)
+      const stopsBeforeFirstRefuel = firstRefuelStopIndex - 1; // -1 because we don't count departure
+      deckFuelToFirstRefuel = Math.round((stopsBeforeFirstRefuel * deckTimePerStopValue / 60) * actualDeckFuelFlow);
+      
+      // Calculate contingency based on trip fuel to first refuel
+      const contingencyToFirstRefuel = Math.round((tripFuelToFirstRefuel * contingencyFuelPercentValue) / 100);
+      
+      // For departure to first refuel: Taxi + Trip(to refuel) + Contingency(for refuel segment) + Reserve + ARA/Approach(if needed) + Deck(for intermediate stops)
+      departureFuelNeeded = taxiFuelValue + tripFuelToFirstRefuel + contingencyToFirstRefuel + deckFuelToFirstRefuel + reserveFuelValue + (extraFuel || 0);
+      
+      // Add ARA/approach fuel if needed for the first segment
+      if (araFuel > 0) departureFuelNeeded += araFuel;
+      if (approachFuel > 0) departureFuelNeeded += approachFuel;
+      
+      departureComponentsCalculation = {
+        taxi: taxiFuelValue,
+        trip: tripFuelToFirstRefuel,
+        contingency: contingencyToFirstRefuel,
+        deck: deckFuelToFirstRefuel,
+        reserve: reserveFuelValue,
+        ara: araFuel,
+        approach: approachFuel,
+        extra: extraFuel || 0
+      };
+      
+      console.log(`🛩️ DEPARTURE CALC: Refuel mode - ${departureFuelNeeded} lbs to first refuel stop`, departureComponentsCalculation);
+    } else {
+      // Standard calculation for entire journey at departure
+      departureFuelNeeded = taxiFuelValue + totalTripFuel + contingencyFuelValue + araFuel + deckFuelValue + approachFuel + reserveFuelValue + (extraFuel || 0);
+      
+      departureComponentsCalculation = {
+        taxi: taxiFuelValue,
+        trip: totalTripFuel,
+        contingency: contingencyFuelValue,
+        deck: deckFuelValue,
+        reserve: reserveFuelValue,
+        ara: araFuel,
+        approach: approachFuel,
+        extra: extraFuel || 0
+      };
+      
+      console.log(`🛩️ DEPARTURE CALC: Standard mode - ${departureFuelNeeded} lbs for full route`);
+    }
+    
+    // Create fuel components text for departure using calculated values
     let fuelComponentsParts = [
-      `Taxi:${taxiFuelValue}`,
-      `Trip:${totalTripFuel}`,
-      `Cont:${contingencyFuelValue}`
+      `Taxi:${departureComponentsCalculation.taxi}`,
+      `Trip:${departureComponentsCalculation.trip}`,
+      `Cont:${departureComponentsCalculation.contingency}`
     ];
     
-    if (araFuel > 0) {
-      fuelComponentsParts.push(`ARA:${araFuel}`);
+    if (departureComponentsCalculation.ara > 0) {
+      fuelComponentsParts.push(`ARA:${departureComponentsCalculation.ara}`);
     }
     
-    fuelComponentsParts.push(`Deck:${deckFuelValue}`);
+    fuelComponentsParts.push(`Deck:${departureComponentsCalculation.deck}`);
     
-    if (approachFuel > 0) {
-      fuelComponentsParts.push(`Approach:${approachFuel}`);
+    if (departureComponentsCalculation.approach > 0) {
+      fuelComponentsParts.push(`Approach:${departureComponentsCalculation.approach}`);
     }
     
-    fuelComponentsParts.push(`Res:${reserveFuelValue}`);
+    fuelComponentsParts.push(`Res:${departureComponentsCalculation.reserve}`);
     
     if (extraFuel > 0) {
       fuelComponentsParts.push(`Extra:${extraFuel}`);
@@ -624,15 +708,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     
     // Create departure card with detailed console logging
     console.log('🔎 Creating departure card with components:', {
-      tripFuel: totalTripFuel,
-      contingencyFuel: contingencyFuelValue,
+      tripFuel: departureComponentsCalculation.trip,
+      contingencyFuel: departureComponentsCalculation.contingency,
       contingencyRate: `${contingencyFuelPercentValue}%`,
-      taxiFuel: taxiFuelValue,
-      deckFuel: deckFuelValue,
-      reserveFuel: reserveFuelValue,
+      taxiFuel: departureComponentsCalculation.taxi,
+      deckFuel: departureComponentsCalculation.deck,
+      reserveFuel: departureComponentsCalculation.reserve,
       totalFuel: departureFuelNeeded,
       componentText: departureFuelComponentsText,
-      sum: totalTripFuel + contingencyFuelValue + taxiFuelValue + deckFuelValue + reserveFuelValue
+      refuelMode: hasRefuelStops
     });
     
     const departureCard = {
@@ -654,14 +738,14 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       deckFuel: deckFuelValue,
       fuelComponents: departureFuelComponentsText,
       fuelComponentsObject: {
-        tripFuel: totalTripFuel,
-        contingencyFuel: contingencyFuelValue,
-        taxiFuel: taxiFuelValue,
-        araFuel: araFuel,
-        deckFuel: deckFuelValue,
-        approachFuel: approachFuel,
-        reserveFuel: reserveFuelValue,
-        extraFuel: extraFuel || 0
+        tripFuel: departureComponentsCalculation.trip,
+        contingencyFuel: departureComponentsCalculation.contingency,
+        taxiFuel: departureComponentsCalculation.taxi,
+        araFuel: departureComponentsCalculation.ara,
+        deckFuel: departureComponentsCalculation.deck,
+        approachFuel: departureComponentsCalculation.approach,
+        reserveFuel: departureComponentsCalculation.reserve,
+        extraFuel: departureComponentsCalculation.extra
       },
       // Add wind information to all cards
       windInfo: weather ? `${weather.windDirection}°/${weather.windSpeed}kt` : 'No wind data',
@@ -693,19 +777,34 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     cumulativeDistance += legDetail.distance;
     cumulativeTime += legDetail.timeHours;
 
-    // Calculate remaining trip fuel - sum of all legs after this one
+    // 🛩️ REFUEL LOGIC: Calculate remaining fuel to next refuel stop or destination
     let remainingTripFuel = 0;
-    for (let j = i + 1; j < legDetails.length; j++) {
+    let remainingIntermediateStops = 0;
+    let calculationEndPoint = legDetails.length; // Default to end of route
+    
+    // Check if there are refuel stops ahead of current position
+    if (hasRefuelStops && refuelStops.length > 0) {
+      // Find the next refuel stop after current position
+      const currentCardIndex = i + 1; // Convert to card index
+      const nextRefuelStops = refuelStops.filter(refuelIndex => refuelIndex > currentCardIndex).sort((a, b) => a - b);
+      
+      if (nextRefuelStops.length > 0) {
+        const nextRefuelStopIndex = nextRefuelStops[0];
+        calculationEndPoint = nextRefuelStopIndex; // Calculate only to next refuel stop
+        console.log(`🛩️ INTERMEDIATE CALC: Stop ${currentCardIndex} calculating to next refuel stop ${nextRefuelStopIndex}`);
+      } else {
+        console.log(`🛩️ INTERMEDIATE CALC: Stop ${currentCardIndex} calculating to destination (no more refuel stops)`);
+      }
+    }
+    
+    // Calculate remaining trip fuel - sum of legs to calculation end point
+    for (let j = i + 1; j < legDetails.length && j < calculationEndPoint; j++) {
       remainingTripFuel += legDetails[j].fuel;
     }
 
-    // Calculate remaining number of deck stops
-    // This is critical - only count intermediate stops after this point
-    // For a route like: A → B → C → D
-    // At point A: B and C are intermediate (2 deck stops)
-    // At point B: Only C is intermediate (1 deck stop)
-    // At point C: No more intermediate stops (0 deck stops)
-    const remainingIntermediateStops = Math.max(0, legDetails.length - i - 1 - 1); // -1 for current leg, -1 for final leg
+    // Calculate remaining number of deck stops to calculation end point
+    // Count intermediate stops between current position and calculation end point
+    remainingIntermediateStops = Math.max(0, calculationEndPoint - (i + 1) - 1); // -1 because end point doesn't count as intermediate
 
     // Calculate remaining deck fuel - only for intermediate stops
     const remainingDeckTimeHours = (remainingIntermediateStops * deckTimePerStopValue) / 60;
@@ -716,56 +815,30 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     if (totalTripFuel > 0) {
       remainingContingencyFuel = Math.round((remainingTripFuel / totalTripFuel) * contingencyFuelValue);
     }
+    
+    console.log(`🛩️ SEGMENT CALC: Stop ${i + 1} - Trip:${remainingTripFuel}, Deck:${remainingDeckFuel}, Cont:${remainingContingencyFuel} (to point ${calculationEndPoint})`);
 
     // At the final destination, we only have reserve and unused contingency
     const isFinalDestination = i === legDetails.length - 1;
+    
+    // 🛩️ REFUEL LOGIC: Check if this stop is marked for refuel
+    // The refuel stops array contains card indices, which for intermediate stops is (i + 1)
+    const cardIndex = i + 1; 
+    const isRefuelStop = refuelStops && refuelStops.includes(cardIndex);
+    
+    // 🛩️ REFUEL LOGIC: If this is a refuel stop, treat it differently from final destination
+    const shouldTreatAsFinal = isFinalDestination && !isRefuelStop;
 
     // Calculate the fuel needed at this stop to continue the journey
     let fuelNeeded;
     let fuelComponents;
     let fuelComponentsText;
 
-    if (isFinalDestination) {
+    if (shouldTreatAsFinal) {
       // At the final destination, you have reserve fuel and unused contingency
       // For potential landing fuel, we should show the total contingency (from departure)
       // not just the remaining contingency for this leg
       fuelNeeded = reserveFuelValue + remainingContingencyFuel + (extraFuel || 0);
-      fuelComponents = {
-        reserveFuel: reserveFuelValue,
-        contingencyFuel: remainingContingencyFuel,
-        extraFuel: extraFuel || 0, // Use actual extraFuel from settings
-        // Add remaining fuel components with zero values for consistency
-        tripFuel: 0,
-        taxiFuel: 0,
-        araFuel: 0,  // 🎯 SMART: No ARA fuel at destination (all consumed)
-        deckFuel: 0,
-        approachFuel: 0  // 🎯 SMART: No approach fuel at destination (consumed during approach)
-      };
-
-      // Get the original full contingency amount (from departure)
-      const fullContingencyFuel = contingencyFuelValue;
-
-      if (routeStats?.enhancedResults?.auxiliaryFuel?.contingencyFuel) {
-        // If we have enhanced results, use the exact contingency fuel
-        fuelComponents.contingencyFuel = routeStats.enhancedResults.auxiliaryFuel.contingencyFuel;
-      }
-
-      // Calculate potential landing fuel (reserve + full unused contingency + extra fuel)
-      const potentialLandingFuel = reserveFuelValue + fullContingencyFuel + (extraFuel || 0);
-      fuelComponentsText = `Reserve:${reserveFuelValue}${extraFuel > 0 ? ` Extra:${extraFuel}` : ' Extra:0'} FullCont:${remainingContingencyFuel} (${reserveFuelValue}+${fullContingencyFuel}${extraFuel > 0 ? `+${extraFuel}` : ''}=${potentialLandingFuel})`;
-      
-      // Recalculate fuelNeeded as the sum of all components to ensure consistency
-      fuelNeeded = Object.values(fuelComponents).reduce((sum, value) => sum + value, 0);
-      
-      // Log the destination fuel components
-      console.log('🔚 DESTINATION CARD FUEL COMPONENTS:', {
-        reserveFuel: reserveFuelValue,
-        fullContingencyFuel,
-        remainingContingencyFuel,
-        potentialLandingFuel,
-        componentText: fuelComponentsText,
-        finalFuelNeeded: fuelNeeded
-      });
     } else {
       // 🎯 SMART CONSUMPTION LOGIC: Calculate remaining weather fuel needed
       
@@ -801,67 +874,103 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         console.log(`🎯 CONSUMPTION: ${toWaypoint.name} consumes approach fuel, remaining: ${remainingApproachFuel}`);
       }
       
-      // At intermediate stops, you need fuel for remaining legs, plus reserve
-      fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingAraFuel + remainingDeckFuel + remainingApproachFuel + reserveFuelValue + (extraFuel || 0);
-      fuelComponents = {
-        remainingTripFuel: remainingTripFuel,
-        contingencyFuel: remainingContingencyFuel,
-        araFuel: remainingAraFuel,  // 🎯 SMART: Reduced after consumption
-        deckFuel: remainingDeckFuel,
-        approachFuel: remainingApproachFuel,  // 🎯 SMART: Reduced after consumption
-        reserveFuel: reserveFuelValue,
-        extraFuel: extraFuel || 0
-      };
-      
-      // Create fuel components text - only show non-zero weather fuel (using remaining amounts)
-      let intermediateParts = [`Trip:${remainingTripFuel}`, `Cont:${remainingContingencyFuel}`];
-      
-      if (remainingAraFuel > 0) {
-        intermediateParts.push(`ARA:${remainingAraFuel}`);
-      }
-      
-      intermediateParts.push(`Deck:${remainingDeckFuel}`);
-      
-      if (remainingApproachFuel > 0) {
-        intermediateParts.push(`Approach:${remainingApproachFuel}`);
-      }
-      
-      intermediateParts.push(`Res:${reserveFuelValue}`);
-      
-      fuelComponentsText = intermediateParts.join(' ');
-
-      // 🔧 DEBUG: Log extraFuel logic
-      console.log('🔧 ExtraFuel Debug - Intermediate stop:', {
-        extraFuel,
-        extraFuelType: typeof extraFuel,
-        extraFuelGreaterThanZero: extraFuel > 0,
-        extraFuelAsNumber: Number(extraFuel),
-        numberCheck: Number(extraFuel) > 0
-      });
-
-      // Add extra fuel text if present
-      if (Number(extraFuel) > 0) {
-        fuelComponentsText += ` Extra:${extraFuel}`;
-        console.log('🔧 ExtraFuel: Added to fuel components text');
+      // 🛩️ REFUEL LOGIC: Check if this is a refuel stop and calculate differently
+      if (isRefuelStop) {
+        // 🛩️ REFUEL STOP: Calculate fuel needed for NEXT segment only (not remaining route)
+        console.log(`🛩️ REFUEL CALC: Calculating fuel for next segment from ${toWaypoint.name}`);
+        
+        // For refuel stops, we need minimal fuel to continue:
+        // Reserve fuel + any ARA/approach fuel needed for next segment
+        fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingAraFuel + remainingDeckFuel + remainingApproachFuel + reserveFuelValue + (extraFuel || 0);
+        
+        fuelComponents = {
+          tripFuel: remainingTripFuel,
+          contingencyFuel: remainingContingencyFuel,
+          taxiFuel: 0, // No taxi fuel for intermediate stops
+          araFuel: remainingAraFuel,
+          deckFuel: remainingDeckFuel,
+          approachFuel: remainingApproachFuel,
+          reserveFuel: reserveFuelValue,
+          extraFuel: extraFuel || 0
+        };
+        
+        // Create fuel components text for refuel stops
+        let refuelFuelComponentsParts = [];
+        if (remainingTripFuel > 0) refuelFuelComponentsParts.push(`Trip:${remainingTripFuel}`);
+        if (remainingContingencyFuel > 0) refuelFuelComponentsParts.push(`Cont:${remainingContingencyFuel}`);
+        if (remainingAraFuel > 0) refuelFuelComponentsParts.push(`ARA:${remainingAraFuel}`);
+        if (remainingDeckFuel > 0) refuelFuelComponentsParts.push(`Deck:${remainingDeckFuel}`);
+        if (remainingApproachFuel > 0) refuelFuelComponentsParts.push(`Approach:${remainingApproachFuel}`);
+        refuelFuelComponentsParts.push(`Res:${reserveFuelValue}`);
+        if (extraFuel > 0) refuelFuelComponentsParts.push(`Extra:${extraFuel}`);
+        
+        fuelComponentsText = refuelFuelComponentsParts.join(' ') + ' (refuel)';
+        
+        console.log(`🛩️ REFUEL CALC: ${toWaypoint.name} needs ${fuelNeeded} lbs for next segment`);
       } else {
-        console.log('🔧 ExtraFuel: NOT added - value is 0 or invalid');
-      }
+        // At intermediate stops, you need fuel for remaining legs, plus reserve
+        fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingAraFuel + remainingDeckFuel + remainingApproachFuel + reserveFuelValue + (extraFuel || 0);
+        
+        fuelComponents = {
+          remainingTripFuel: remainingTripFuel,
+          contingencyFuel: remainingContingencyFuel,
+          araFuel: remainingAraFuel,  // 🎯 SMART: Reduced after consumption
+          deckFuel: remainingDeckFuel,
+          approachFuel: remainingApproachFuel,  // 🎯 SMART: Reduced after consumption
+          reserveFuel: reserveFuelValue,
+          extraFuel: extraFuel || 0
+        };
+        
+        // Create fuel components text - only show non-zero weather fuel (using remaining amounts)
+        let intermediateParts = [`Trip:${remainingTripFuel}`, `Cont:${remainingContingencyFuel}`];
+        
+        if (remainingAraFuel > 0) {
+          intermediateParts.push(`ARA:${remainingAraFuel}`);
+        }
+        
+        intermediateParts.push(`Deck:${remainingDeckFuel}`);
+        
+        if (remainingApproachFuel > 0) {
+          intermediateParts.push(`Approach:${remainingApproachFuel}`);
+        }
+        
+        intermediateParts.push(`Res:${reserveFuelValue}`);
+        
+        fuelComponentsText = intermediateParts.join(' ');
 
-      // Add deck fuel text only if there are remaining intermediate stops
-      if (remainingDeckFuel > 0) {
-        fuelComponentsText += ` Deck:${remainingDeckFuel}`;
-      }
-      
-      // Log the intermediate stop fuel components
-      console.log('🛑 INTERMEDIATE STOP FUEL COMPONENTS:', {
-        remainingTripFuel,
-        remainingContingencyFuel,
-        remainingDeckFuel,
-        reserveFuel: reserveFuelValue,
-        fuelNeeded,
-        componentText: fuelComponentsText,
-        sum: remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue
-      });
+        // 🔧 DEBUG: Log extraFuel logic
+        console.log('🔧 ExtraFuel Debug - Intermediate stop:', {
+          extraFuel,
+          extraFuelType: typeof extraFuel,
+          extraFuelGreaterThanZero: extraFuel > 0,
+          extraFuelAsNumber: Number(extraFuel),
+          numberCheck: Number(extraFuel) > 0
+        });
+
+        // Add extra fuel text if present
+        if (Number(extraFuel) > 0) {
+          fuelComponentsText += ` Extra:${extraFuel}`;
+          console.log('🔧 ExtraFuel: Added to fuel components text');
+        } else {
+          console.log('🔧 ExtraFuel: NOT added - value is 0 or invalid');
+        }
+
+        // Add deck fuel text only if there are remaining intermediate stops
+        if (remainingDeckFuel > 0) {
+          fuelComponentsText += ` Deck:${remainingDeckFuel}`;
+        }
+        
+        // Log the intermediate stop fuel components
+        console.log('🛑 INTERMEDIATE STOP FUEL COMPONENTS:', {
+          remainingTripFuel,
+          remainingContingencyFuel,
+          remainingDeckFuel,
+          reserveFuel: reserveFuelValue,
+          fuelNeeded,
+          componentText: fuelComponentsText,
+          sum: remainingTripFuel + remainingContingencyFuel + remainingDeckFuel + reserveFuelValue
+        });
+      } // 🛩️ REFUEL: Close the main else block for weather/refuel logic
     }
 
     // Calculate max passengers using our PassengerCalculator module
@@ -876,23 +985,31 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       );
     }
 
-    // For final destination, show "Final Stop" instead of passenger count
-    const displayMaxPassengers = isFinalDestination ? "Final Stop" : maxPassengers;
-    const maxPassengersValue = isFinalDestination ? null : maxPassengers;
-    const maxPassengersWeight = isFinalDestination ? null : (maxPassengers * passengerWeightValue);
+    // 🛩️ REFUEL LOGIC: Display logic for different stop types
+    let displayMaxPassengers;
+    if (shouldTreatAsFinal) {
+      displayMaxPassengers = "Final Stop";
+    } else if (isRefuelStop) {
+      displayMaxPassengers = `${maxPassengers} (refuel)`;
+    } else {
+      displayMaxPassengers = maxPassengers;
+    }
+    
+    const maxPassengersValue = shouldTreatAsFinal ? null : maxPassengers;
+    const maxPassengersWeight = shouldTreatAsFinal ? null : (maxPassengers * passengerWeightValue);
 
     // Only the final waypoint is a destination
     const isDeparture = false; // We already added the departure card
-    const isDestination = isFinalDestination;
+    const isDestination = shouldTreatAsFinal; // 🛩️ REFUEL: Only true final destinations, not refuel stops
 
     // Initialize cardData before conditional assignment
     let cardData;
     
-    if (isFinalDestination) {
+    if (shouldTreatAsFinal) {
       // CRITICAL FIX: Special handling for destination cards
       // Always include all fuel component fields, even if they're zero
       cardData = {
-        index: isFinalDestination ? 'F' : (i + 1),
+        index: shouldTreatAsFinal ? 'F' : (i + 1),
         id: stopId,
         stopName: toWaypoint.name,
         legDistance: legDetail.distance.toFixed(1),
@@ -935,9 +1052,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         isDestination: isDestination
       };
     } else {
-      // Normal case for all non-destination cards
+      // Normal case for all non-destination cards (including refuel stops)
       cardData = {
-        index: isFinalDestination ? 'F' : (i + 1),
+        index: shouldTreatAsFinal ? 'F' : (i + 1),
         id: stopId,
         stopName: toWaypoint.name,
         legDistance: legDetail.distance.toFixed(1),
@@ -1691,6 +1808,193 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   console.log('🟠 AlternateStopCard: Created alternate card:', alternateCard);
   
   return alternateCard;
+};
+
+/**
+ * 🛩️ REFUEL SEGMENTATION: Calculate stop cards for routes with refuel stops
+ * Each segment is treated as an independent flight for fuel calculations
+ * 
+ * @param {Array} waypoints - Landing stops waypoints array
+ * @param {Object} routeStats - Route statistics from RouteCalculator
+ * @param {Object} selectedAircraft - Selected aircraft with performance data
+ * @param {Object} weather - Weather data (windSpeed, windDirection)
+ * @param {Object} options - Optional calculation parameters
+ * @param {Array} weatherSegments - Weather segments data for rig detection
+ * @param {Array} refuelStops - Array of refuel stop indices (e.g., [1, 3])
+ * @param {boolean} waiveAlternates - Whether alternates are waived for VFR operations
+ * @returns {Array} Array of stop card objects
+ */
+const calculateSegmentedStopCards = (waypoints, routeStats, selectedAircraft, weather, options, weatherSegments, refuelStops, waiveAlternates) => {
+  console.log('🛩️ SEGMENTED CALCULATION: Starting segmented fuel calculation');
+  
+  // Split waypoints into segments at refuel points
+  const segments = splitWaypointsIntoSegments(waypoints, refuelStops);
+  console.log(`🛩️ Split route into ${segments.length} segments:`, segments.map(seg => `${seg.start.name} → ${seg.end.name}`));
+  
+  const allStopCards = [];
+  
+  // Calculate each segment independently
+  for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+    const segment = segments[segmentIndex];
+    console.log(`🛩️ Calculating segment ${segmentIndex + 1}: ${segment.start.name} → ${segment.end.name}`);
+    
+    // For each segment, calculate as if it's an independent flight
+    const segmentWaypoints = segment.waypoints;
+    const isFirstSegment = segmentIndex === 0;
+    const isLastSegment = segmentIndex === segments.length - 1;
+    
+    // Calculate segment fuel requirements
+    const segmentCards = calculateSingleSegment(
+      segmentWaypoints,
+      routeStats, 
+      selectedAircraft,
+      weather,
+      options,
+      weatherSegments,
+      isFirstSegment,
+      isLastSegment,
+      waiveAlternates
+    );
+    
+    // Add cards to our results, but handle special cases
+    if (isFirstSegment) {
+      // For first segment, handle departure fuel logic (MAX of segment vs alternate)
+      allStopCards.push(...segmentCards);
+    } else {
+      // For subsequent segments, skip the departure card (it's a refuel stop)
+      allStopCards.push(...segmentCards.slice(1));
+    }
+  }
+  
+  console.log(`🛩️ SEGMENTED CALCULATION: Generated ${allStopCards.length} total stop cards`);
+  return allStopCards;
+};
+
+/**
+ * 🛩️ Split waypoints into segments at refuel stops
+ */
+const splitWaypointsIntoSegments = (waypoints, refuelStops) => {
+  const segments = [];
+  let currentStartIndex = 0;
+  
+  // Sort refuel stops to ensure proper order
+  const sortedRefuelStops = [...refuelStops].sort((a, b) => a - b);
+  
+  for (const refuelStopIndex of sortedRefuelStops) {
+    if (refuelStopIndex > currentStartIndex && refuelStopIndex < waypoints.length - 1) {
+      // Create segment from current start to refuel stop
+      const segmentWaypoints = waypoints.slice(currentStartIndex, refuelStopIndex + 1);
+      segments.push({
+        start: waypoints[currentStartIndex],
+        end: waypoints[refuelStopIndex],
+        waypoints: segmentWaypoints,
+        startIndex: currentStartIndex,
+        endIndex: refuelStopIndex,
+        isRefuelEnd: true
+      });
+      currentStartIndex = refuelStopIndex;
+    }
+  }
+  
+  // Add final segment from last refuel stop to destination
+  if (currentStartIndex < waypoints.length - 1) {
+    const segmentWaypoints = waypoints.slice(currentStartIndex);
+    segments.push({
+      start: waypoints[currentStartIndex],
+      end: waypoints[waypoints.length - 1],
+      waypoints: segmentWaypoints,
+      startIndex: currentStartIndex,
+      endIndex: waypoints.length - 1,
+      isRefuelEnd: false
+    });
+  }
+  
+  return segments;
+};
+
+/**
+ * 🛩️ Calculate fuel requirements for a single segment
+ */
+const calculateSingleSegment = (segmentWaypoints, routeStats, selectedAircraft, weather, options, weatherSegments, isFirstSegment, isLastSegment, waiveAlternates) => {
+  console.log(`🛩️ SEGMENT CALC: Processing ${segmentWaypoints.length} waypoints for segment`);
+  console.log(`🛩️ SEGMENT CALC: Segment waypoints:`, segmentWaypoints.map(wp => wp.name));
+  
+  // Create segment-specific routeStats by extracting relevant legs
+  let segmentRouteStats = null;
+  if (routeStats && routeStats.legs) {
+    // Calculate which legs belong to this segment
+    const segmentLegs = extractSegmentLegs(segmentWaypoints, routeStats.legs);
+    
+    if (segmentLegs.length > 0) {
+      // Calculate segment totals
+      const segmentTotalDistance = segmentLegs.reduce((sum, leg) => sum + parseFloat(leg.distance), 0);
+      const segmentTotalTime = segmentLegs.reduce((sum, leg) => sum + parseFloat(leg.time || 0), 0);
+      const segmentTripFuel = segmentLegs.reduce((sum, leg) => sum + parseInt(leg.fuel || 0), 0);
+      
+      segmentRouteStats = {
+        ...routeStats,
+        totalDistance: segmentTotalDistance,
+        timeHours: segmentTotalTime,
+        tripFuel: segmentTripFuel,
+        legs: segmentLegs,
+        windAdjusted: routeStats.windAdjusted || false
+      };
+      
+      console.log(`🛩️ SEGMENT CALC: Segment stats calculated:`, {
+        distance: segmentTotalDistance,
+        time: segmentTotalTime,
+        tripFuel: segmentTripFuel,
+        legs: segmentLegs.length
+      });
+    }
+  }
+  
+  // Call the main calculation function with no refuel stops (to avoid recursion)
+  // This calculates the segment as if it's a complete independent flight
+  const segmentCards = calculateStopCards(
+    segmentWaypoints,
+    segmentRouteStats,
+    selectedAircraft,
+    weather,
+    options,
+    weatherSegments,
+    [], // No refuel stops for individual segments
+    false // waiveAlternates handled at segment level
+  );
+  
+  // Handle special logic for first segment departure fuel
+  if (isFirstSegment && !waiveAlternates) {
+    console.log('🛩️ FIRST SEGMENT: Checking departure fuel (segment vs alternate)');
+    
+    // TODO: Calculate what the fuel would be for full alternate route
+    // and use MAX(segment_fuel, alternate_fuel) for departure
+    
+    console.log('🛩️ TODO: Implement departure fuel MAX logic (segment vs alternate)');
+  }
+  
+  console.log(`🛩️ SEGMENT CALC: Generated ${segmentCards.length} cards for segment`);
+  return segmentCards;
+};
+
+/**
+ * 🛩️ Extract legs that belong to a specific segment based on waypoints
+ */
+const extractSegmentLegs = (segmentWaypoints, allLegs) => {
+  if (!segmentWaypoints || segmentWaypoints.length < 2 || !allLegs) {
+    return [];
+  }
+  
+  // For now, return a proportional subset of legs
+  // TODO: Implement proper waypoint-to-leg matching
+  const segmentLength = segmentWaypoints.length - 1; // Number of legs in segment
+  const totalLegs = allLegs.length;
+  
+  // Simple approach: take proportional legs from the start
+  // This is a simplified implementation - we'll improve this
+  const startIndex = 0; // TODO: Calculate proper start index based on segment position
+  const endIndex = Math.min(segmentLength, totalLegs);
+  
+  return allLegs.slice(startIndex, endIndex);
 };
 
 
