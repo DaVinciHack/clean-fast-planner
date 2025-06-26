@@ -551,6 +551,12 @@ class RigWeatherGraphics {
         
         // Mouse enter - show unified popup
         this.map.on('mouseenter', this.layerIds.hover, (e) => {
+            // 🎯 ALTERNATE MODE: Skip weather interactions when alternate mode is active
+            if (window.isAlternateModeActive === true) {
+                console.log('🎯 RigWeatherGraphics: Skipping weather popup - alternate mode is active');
+                return;
+            }
+            
             this.map.getCanvas().style.cursor = 'pointer';
             
             try {
@@ -601,7 +607,14 @@ class RigWeatherGraphics {
         
         // Mouse leave
         this.map.on('mouseleave', this.layerIds.hover, () => {
+            // 🎯 ALTERNATE MODE: Always reset cursor, but skip popup handling if alternate mode is active
             this.map.getCanvas().style.cursor = '';
+            
+            if (window.isAlternateModeActive === true) {
+                console.log('🎯 RigWeatherGraphics: Skipping weather popup cleanup - alternate mode is active');
+                return;
+            }
+            
             if (this.popup) {
                 this.popup.remove();
             }
