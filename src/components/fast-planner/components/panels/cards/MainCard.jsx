@@ -42,10 +42,10 @@ const MainCard = ({
   extraFuel = 0, // 🔧 ADDED: Missing extraFuel prop
   araFuel = 0, // 🔧 ADDED: ARA fuel from weather analysis
   approachFuel = 0, // 🔧 ADDED: Approach fuel from weather analysis
-  deckTimePerStop = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
-  deckFuelFlow = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK  
-  contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
-  taxiFuel = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
+  deckTimePerStop, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy
+  deckFuelFlow, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy
+  contingencyFuelPercent, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy  
+  taxiFuel, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy
   // Weather props
   weather, // No default - weather must be provided from parent
   onWeatherUpdate = () => {},

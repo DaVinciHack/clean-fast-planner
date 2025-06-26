@@ -10,11 +10,8 @@
 
 class WeatherFuelAnalyzer {
   constructor() {
-    // Default fuel amounts (should match Palantir policy settings)
-    this.defaults = {
-      araFuelDefault: 200,     // lbs - ARA fuel per rig requiring it
-      approachFuelDefault: 200, // lbs - Approach fuel per airport requiring it
-    };
+    // 🚨 AVIATION SAFETY: NO HARDCODED DEFAULTS - All values must come from OSDK fuel policy
+    // Any missing fuel policy values should cause explicit failure, not fallbacks
   }
 
   /**
@@ -25,9 +22,17 @@ class WeatherFuelAnalyzer {
    * @returns {Object} Analysis results with fuel requirements
    */
   analyzeWeatherForFuel(weatherSegments, waypoints, settings = {}) {
-    // Get fuel amounts directly from settings (matching fuel policy field names)
-    const araFuelAmount = settings.araFuelDefault || this.defaults.araFuelDefault;
-    const approachFuelAmount = settings.approachFuelDefault || this.defaults.approachFuelDefault;
+    // 🚨 AVIATION SAFETY: Get fuel amounts from OSDK fuel policy - NO FALLBACKS
+    const araFuelAmount = settings.araFuelDefault;
+    const approachFuelAmount = settings.approachFuelDefault;
+    
+    // Explicit validation - fail if fuel policy values are missing
+    if (araFuelAmount === undefined || araFuelAmount === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: ARA fuel amount missing from fuel policy - cannot proceed with flight calculations');
+    }
+    if (approachFuelAmount === undefined || approachFuelAmount === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: Approach fuel amount missing from fuel policy - cannot proceed with flight calculations');
+    }
     
     console.log(`🟠 WeatherFuelAnalyzer: Analyzing weather for ${weatherSegments.length} segments and ${waypoints.length} waypoints`);
     
