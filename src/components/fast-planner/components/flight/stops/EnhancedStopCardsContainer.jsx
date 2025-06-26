@@ -278,6 +278,39 @@ const EnhancedStopCardsContainer = ({
       return;
     }
     
+    // 🚨 AVIATION SAFETY: Check if trying to set refuel after alternate split point
+    if (isRefuel && alternateRouteData && alternateRouteData.splitPoint) {
+      // Find the splitPoint waypoint index in the route
+      const splitPointIndex = waypoints.findIndex(wp => 
+        wp.name === alternateRouteData.splitPoint || 
+        wp.id === alternateRouteData.splitPoint ||
+        wp === alternateRouteData.splitPoint
+      );
+      
+      console.log(`🚨 SAFETY CHECK: Split point "${alternateRouteData.splitPoint}" is at waypoint index ${splitPointIndex}, refuel attempt at card index ${cardIndex}`);
+      
+      if (splitPointIndex !== -1 && cardIndex > splitPointIndex) {
+        // Show critical safety warning
+        const isConfirmed = window.confirm(
+          `🚨 AVIATION SAFETY WARNING 🚨\n\n` +
+          `You are trying to set a refuel stop AFTER the alternate split point (${alternateRouteData.splitPoint}).\n\n` +
+          `DANGER: If you cannot land at this refuel stop, you will not have enough fuel to reach either:\n` +
+          `• Your original destination\n` +
+          `• Your alternate destination\n\n` +
+          `This could result in a FUEL EMERGENCY.\n\n` +
+          `RECOMMENDATION: Only set refuel stops BEFORE or AT the split point.\n\n` +
+          `Do you want to proceed anyway? (NOT RECOMMENDED)`
+        );
+        
+        if (!isConfirmed) {
+          console.log(`🚨 SAFETY: User cancelled refuel after split point - GOOD DECISION`);
+          return; // Cancel the refuel change
+        } else {
+          console.warn(`🚨 SAFETY WARNING: User proceeded with refuel after split point - DANGEROUS`);
+        }
+      }
+    }
+    
     setRefuelStops(prev => {
       const newRefuelStops = isRefuel 
         ? (prev.includes(cardIndex) ? prev : [...prev, cardIndex])
@@ -423,9 +456,20 @@ const EnhancedStopCardsContainer = ({
           {displayStopCards.map((card, index) => {
             const cardId = `stop-${card.id}`;
             
+            // 🚨 AVIATION SAFETY: Calculate if this card is after the alternate split point
+            let isAfterSplitPoint = false;
+            if (alternateRouteData && alternateRouteData.splitPoint) {
+              const splitPointIndex = waypoints.findIndex(wp => 
+                wp.name === alternateRouteData.splitPoint || 
+                wp.id === alternateRouteData.splitPoint ||
+                wp === alternateRouteData.splitPoint
+              );
+              isAfterSplitPoint = splitPointIndex !== -1 && card.index > splitPointIndex;
+            }
+            
             // 🛩️ DEBUG: Log card and index info for refuel debugging
             if (index < 5) { // Only log first few to avoid spam
-              console.log(`🛩️ CARD DEBUG: index=${index}, card.index=${card.index}, isDeparture=${card.isDeparture}, isDestination=${card.isDestination}, refuelStops=${JSON.stringify(refuelStops)}`);
+              console.log(`🛩️ CARD DEBUG: index=${index}, card.index=${card.index}, isDeparture=${card.isDeparture}, isDestination=${card.isDestination}, refuelStops=${JSON.stringify(refuelStops)}, isAfterSplitPoint=${isAfterSplitPoint}`);
             }
             
             return (
@@ -451,6 +495,8 @@ const EnhancedStopCardsContainer = ({
                 // Refuel props - use card.index not array index
                 isRefuelStop={refuelStops.includes(card.index)}
                 onRefuelChange={(cardIndex, isRefuel) => handleRefuelChange(card.index, isRefuel)}
+                // 🚨 AVIATION SAFETY: Pass split point information for visual warning
+                isAfterSplitPoint={isAfterSplitPoint}
                 // Alternate fuel requirements for IFR display
                 alternateRequirements={card.alternateRequirements}
                 shouldShowStrikethrough={card.shouldShowStrikethrough}
