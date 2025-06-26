@@ -82,6 +82,9 @@ const RouteStatsCard = ({
     // Extract passenger data
     const passengers = departureCard.maxPassengers || 0;
     
+    // 🛩️ DETECT ALTERNATE REQUIREMENTS: Check if departure card has alternate fuel restrictions
+    const hasAlternateRequirements = departureCard.alternateRequirements && departureCard.alternateRequirements.isRequired;
+    
     // Extract wind information
     let windDisplay = 'No wind';
     if (departureCard.windInfo) {
@@ -98,7 +101,8 @@ const RouteStatsCard = ({
       tripFuel,
       deckFuel,
       passengers,
-      windDisplay
+      windDisplay,
+      hasAlternateRequirements
     });
     
     return {
@@ -109,7 +113,8 @@ const RouteStatsCard = ({
       tripFuel,
       deckFuel,
       passengers: passengers.toString(),
-      windDisplay
+      windDisplay,
+      hasAlternateRequirements
     };
   };
   
@@ -170,12 +175,14 @@ const RouteStatsCard = ({
           
           <div className="stat-item">
             <div className="stat-label">TOTAL FUEL</div>
-            <div className="stat-value">{displayData.totalFuel} lbs</div>
+            <div className="stat-value" style={displayData.hasAlternateRequirements ? { color: '#f39c12' } : {}}>
+              {displayData.totalFuel} lbs
+            </div>
           </div>
           
           <div className="stat-item">
             <div className="stat-label">PASSENGERS</div>
-            <div className="stat-value">
+            <div className="stat-value" style={displayData.hasAlternateRequirements ? { color: '#f39c12' } : {}}>
               <span className="passenger-icon">👥</span> {displayData.passengers}
             </div>
           </div>
@@ -185,7 +192,9 @@ const RouteStatsCard = ({
         <div className="stats-row fuel-details">
           <div className="stat-item">
             <div className="stat-label">TRIP FUEL</div>
-            <div className="stat-value">{displayData.tripFuel} lbs</div>
+            <div className="stat-value" style={displayData.hasAlternateRequirements ? { color: '#f39c12' } : {}}>
+              {displayData.tripFuel} lbs
+            </div>
           </div>
           
           <div className="stat-item">
