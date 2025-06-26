@@ -1557,11 +1557,28 @@ const FastPlannerCore = ({
                     if (rigSegments.length > 0) {
                       console.log('🚁 HYBRID: Auto-enabling rig weather graphics with real API data');
                       
-                      // Enable rig weather graphics
-                      if (window.rigWeatherIntegration) {
-                        window.rigWeatherIntegration.toggleVisibility(true);
-                        console.log('🚁 HYBRID: ✅ Rig weather graphics enabled');
-                      }
+                      // 🚨 RACE CONDITION FIX: Wait for rig weather integration to be available
+                      const waitForRigWeatherIntegration = () => {
+                        return new Promise((resolve) => {
+                          const checkIntegration = () => {
+                            if (window.rigWeatherIntegration) {
+                              resolve();
+                            } else {
+                              console.log('🚁 RACE FIX: Waiting for rig weather integration...');
+                              setTimeout(checkIntegration, 100);
+                            }
+                          };
+                          checkIntegration();
+                        });
+                      };
+                      
+                      // Enable rig weather graphics after integration is ready
+                      waitForRigWeatherIntegration().then(() => {
+                        if (window.rigWeatherIntegration) {
+                          window.rigWeatherIntegration.toggleVisibility(true);
+                          console.log('🚁 HYBRID: ✅ Rig weather graphics enabled (after race condition fix)');
+                        }
+                      });
                       
                       // DISABLED: Competing rig-only system - WeatherCirclesLayer now handles ALL arrows  
                       console.log(`🌬️ UNIFIED: Weather data loaded for ${rigSegments.length} rigs - WeatherCirclesLayer handles all arrows automatically`);
