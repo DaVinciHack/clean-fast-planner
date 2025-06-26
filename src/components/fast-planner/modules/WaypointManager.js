@@ -19,6 +19,7 @@ class WaypointManager {
     this._routeDragHandlers = null; // To store references to drag handlers
     this.storedAlternateRouteData = null; // Store alternate route data for persistence
     this.isWaypointDraggingDisabled = false; // Lock state for waypoint dragging
+    this.waiveAlternates = false; // Track whether alternates are waived for VFR operations
   }
 
   /**
@@ -40,6 +41,14 @@ class WaypointManager {
   enableWaypointDragging() {
     this.isWaypointDraggingDisabled = false;
     console.log('✅ WaypointManager: Waypoint dragging enabled');
+  }
+
+  /**
+   * 🛩️ VFR OPERATIONS: Set waive alternates state
+   */
+  setWaiveAlternates(shouldWaive) {
+    this.waiveAlternates = shouldWaive;
+    console.log(`🛩️ WaypointManager: Waive alternates set to ${shouldWaive}`);
   }
 
 
@@ -1703,13 +1712,17 @@ class WaypointManager {
         }
       }
 
-      // Render alternate route if available
-      if (activeAlternateRouteData && activeAlternateRouteData.coordinates) {
+      // 🛩️ VFR OPERATIONS: Render alternate route if available and not waived
+      if (activeAlternateRouteData && activeAlternateRouteData.coordinates && !this.waiveAlternates) {
         console.log('⭐ Using alternate route data:', activeAlternateRouteData.name || 'No name');
         this.renderAlternateRoute(activeAlternateRouteData, map);
       } else {
-        console.log('⭐ No alternate route data available or clearing alternate route');
-        console.log('⭐ activeAlternateRouteData:', activeAlternateRouteData);
+        if (this.waiveAlternates) {
+          console.log('🛩️ Alternates waived - not rendering alternate route');
+        } else {
+          console.log('⭐ No alternate route data available or clearing alternate route');
+          console.log('⭐ activeAlternateRouteData:', activeAlternateRouteData);
+        }
         this.clearAlternateRoute(map);
       }
 
