@@ -30,8 +30,6 @@ const StopCard = React.forwardRef(({
   // New refuel props
   isRefuelStop = false,
   onRefuelChange,
-  // 🚨 AVIATION SAFETY: Split point safety indicator
-  isAfterSplitPoint = false,
   // Alternate fuel requirements for IFR operations
   alternateRequirements = null,
   shouldShowStrikethrough = false
@@ -99,6 +97,20 @@ const StopCard = React.forwardRef(({
         <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
         <div className="stop-name">
           {stopName || `Stop ${index}`}
+          
+          {/* Alternate fuel requirements display beside name */}
+          {isDeparture && alternateRequirements && (
+            <span style={{ 
+              fontSize: '0.6em', 
+              color: '#f39c12', 
+              marginLeft: '8px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap'
+            }}>
+              ALT FUEL REQUIRED
+            </span>
+          )}
+          
           {/* Refuel checkbox - only show on intermediate stops */}
           {!isDeparture && !isDestination && !isAlternate && onRefuelChange && (
             <label className="refuel-checkbox-container" style={{
@@ -106,12 +118,8 @@ const StopCard = React.forwardRef(({
               alignItems: 'center',
               marginLeft: '8px',
               fontSize: '10px',
-              color: isAfterSplitPoint ? '#ff6b6b' : 'rgba(255, 255, 255, 0.7)', // Red warning if after split point
-              cursor: 'pointer',
-              backgroundColor: isAfterSplitPoint ? 'rgba(255, 107, 107, 0.1)' : 'transparent', // Subtle red background
-              padding: isAfterSplitPoint ? '2px 4px' : '0',
-              borderRadius: isAfterSplitPoint ? '3px' : '0',
-              border: isAfterSplitPoint ? '1px solid #ff6b6b' : 'none'
+              color: 'rgba(255, 255, 255, 0.7)',
+              cursor: 'pointer'
             }}>
               <input
                 type="checkbox"
@@ -124,21 +132,12 @@ const StopCard = React.forwardRef(({
                   cursor: 'pointer'
                 }}
               />
-              {isAfterSplitPoint ? '⚠️ refuel' : 'refuel'}
+              refuel
             </label>
           )}
-          {/* Alternate fuel requirements display for departure card */}
-          {isDeparture && alternateRequirements && (
-            <div className="alternate-fuel-requirements" style={{ 
-              fontSize: '0.65em', 
-              color: '#f39c12', // Same yellow as alternate card
-              marginTop: '2px',
-              lineHeight: '1.2',
-              fontWeight: 'bold'
-            }}>
-              Min fuel amount is Alternate requirement
-            </div>
-          )}
+        </div>
+        
+        <div className="stop-content">
           {isAlternate && routeDescription && (
             <div className="route-description" style={{ 
               fontSize: '0.65em', 
