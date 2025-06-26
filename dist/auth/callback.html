@@ -92,8 +92,13 @@
           document.cookie = `PALANTIR_TOKEN=${params.access_token}; expires=${expiry.toUTCString()}; path=/`;
           
           // Update status
-          statusElement.textContent = 'Authentication successful!';
+          statusElement.textContent = 'Authentication successful! Redirecting...';
           statusElement.className = 'status success';
+          
+          // Auto-redirect to app after 1.5 seconds
+          setTimeout(() => {
+            window.location.href = '/plan/';
+          }, 1500);
           
           // Try to extract user info from token
           const tokenParts = params.access_token.split('.');

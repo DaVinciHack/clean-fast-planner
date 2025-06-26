@@ -93,7 +93,10 @@ const EnhancedStopCardsContainer = ({
           selectedAircraft,
           weather,
           stopCardOptions,
-          weatherSegments
+          weatherSegments,
+          refuelStops,     // 🛩️ REFUEL: Pass refuel stops array
+          waiveAlternates, // 🛩️ VFR: Pass waive alternates flag
+          alternateStopCard // 🛩️ IFR: Pass alternate card data for fuel requirements
         );
         
         if (calculatedStopCards && calculatedStopCards.length > 0) {
@@ -108,7 +111,7 @@ const EnhancedStopCardsContainer = ({
       console.log('🎯 EnhancedStopCardsContainer: Missing required data for stop card calculation');
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard]);
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {
@@ -228,13 +231,21 @@ const EnhancedStopCardsContainer = ({
   };
   
   // Handle refuel checkbox changes
-  const handleRefuelChange = (stopIndex, isRefuel) => {
-    console.log(`🛩️ Refuel checkbox changed: Stop ${stopIndex} = ${isRefuel}`);
+  const handleRefuelChange = (cardIndex, isRefuel) => {
+    console.log(`🛩️ Refuel checkbox changed: Card ${cardIndex} = ${isRefuel}`);
+    console.log(`🛩️ Current refuel stops before change:`, refuelStops);
+    console.log(`🛩️ Card index type:`, typeof cardIndex, `value:`, cardIndex);
+    
+    // Only allow refuel on intermediate stops (not D=departure, F=final)
+    if (cardIndex === 'D' || cardIndex === 'F') {
+      console.log(`🛩️ Ignoring refuel change on departure/destination card: ${cardIndex}`);
+      return;
+    }
     
     setRefuelStops(prev => {
       const newRefuelStops = isRefuel 
-        ? (prev.includes(stopIndex) ? prev : [...prev, stopIndex])
-        : prev.filter(index => index !== stopIndex);
+        ? (prev.includes(cardIndex) ? prev : [...prev, cardIndex])
+        : prev.filter(index => index !== cardIndex);
       
       console.log(`🛩️ Updated refuel stops:`, newRefuelStops);
       return newRefuelStops;
@@ -376,6 +387,11 @@ const EnhancedStopCardsContainer = ({
           {displayStopCards.map((card, index) => {
             const cardId = `stop-${card.id}`;
             
+            // 🛩️ DEBUG: Log card and index info for refuel debugging
+            if (index < 5) { // Only log first few to avoid spam
+              console.log(`🛩️ CARD DEBUG: index=${index}, card.index=${card.index}, isDeparture=${card.isDeparture}, isDestination=${card.isDestination}, refuelStops=${JSON.stringify(refuelStops)}`);
+            }
+            
             return (
               <StopCard
                 key={`main-stop-${index}`}
@@ -396,9 +412,12 @@ const EnhancedStopCardsContainer = ({
                 isActive={index === activeCardIndex}
                 onClick={() => handleCardClick(index)}
                 className="unified-fuel-card"
-                // Refuel props
+                // Refuel props - use card.index not array index
                 isRefuelStop={refuelStops.includes(card.index)}
-                onRefuelChange={handleRefuelChange}
+                onRefuelChange={(cardIndex, isRefuel) => handleRefuelChange(card.index, isRefuel)}
+                // Alternate fuel requirements for IFR display
+                alternateRequirements={card.alternateRequirements}
+                shouldShowStrikethrough={card.shouldShowStrikethrough}
               />
             );
           })}
