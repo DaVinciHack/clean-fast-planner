@@ -404,7 +404,29 @@ const FastPlannerCore = ({
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
-    if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+    // 🔍 DEBUG: Always log aircraft data to see what's available
+    if (selectedAircraft) {
+      console.log('🔍 AIRCRAFT DEBUG - All properties:', Object.keys(selectedAircraft));
+      console.log('🔍 AIRCRAFT DEBUG - Data dump:', {
+        emptyWeight: selectedAircraft.emptyWeight,
+        empty_weight: selectedAircraft.empty_weight,
+        emptyWeightLbs: selectedAircraft.emptyWeightLbs,
+        fuelBurnRate: selectedAircraft.fuelBurnRate,
+        fuel_burn_rate: selectedAircraft.fuel_burn_rate,
+        fuelBurnPerHour: selectedAircraft.fuelBurnPerHour,
+        burnRate: selectedAircraft.burnRate,
+        weight: selectedAircraft.weight,
+        maxGrossWeight: selectedAircraft.maxGrossWeight,
+        maxTakeoffWeight: selectedAircraft.maxTakeoffWeight
+      });
+    }
+    
+    // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
+    const hasRequiredAircraftData = selectedAircraft && 
+      selectedAircraft.dryWeight && 
+      selectedAircraft.fuelBurn;
+      
+    if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
       console.log('🔄 Auto-triggering calculations due to route/aircraft/settings change');
       console.log('🔧 EFFECT TRIGGERED - Current extraFuel:', flightSettings.extraFuel);
       
@@ -432,6 +454,19 @@ const FastPlannerCore = ({
         setStopCards(newStopCards);
         console.log('✅ Auto-calculation complete - header should update');
       }
+    } else {
+      console.log('🔄 FastPlannerApp: Waiting for complete data:', {
+        hasWaypoints: waypoints && waypoints.length >= 2,
+        hasAircraft: !!selectedAircraft,
+        hasAircraftData: hasRequiredAircraftData,
+        aircraftInfo: selectedAircraft ? {
+          registration: selectedAircraft.registration,
+          hasDryWeight: !!selectedAircraft.dryWeight,
+          hasFuelBurn: !!selectedAircraft.fuelBurn,
+          dryWeight: selectedAircraft.dryWeight,
+          fuelBurn: selectedAircraft.fuelBurn
+        } : 'No aircraft'
+      });
     }
   }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
 
@@ -2097,7 +2132,12 @@ const FastPlannerCore = ({
           }
           
           // CRITICAL FIX: Force stop cards regeneration with new wind data
-          if (waypoints && waypoints.length >= 2 && selectedAircraft) {
+          // 🚨 SAFETY: Check aircraft data before calculating
+          const hasRequiredAircraftData = selectedAircraft && 
+            selectedAircraft.dryWeight && 
+            selectedAircraft.fuelBurn;
+            
+          if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
             console.log('🔄 Regenerating stop cards with loaded flight wind data');
             const currentRouteStats = routeStats || window.currentRouteStats;
             
@@ -2124,6 +2164,12 @@ const FastPlannerCore = ({
               console.log('🔄 Updated stop cards with new wind data:', newStopCards.length, 'cards');
               setStopCards(newStopCards);
             }
+          } else {
+            console.log('🔄 Skipping stop cards regeneration - waiting for complete aircraft data:', {
+              hasWaypoints: waypoints && waypoints.length >= 2,
+              hasAircraft: !!selectedAircraft,
+              hasAircraftData: hasRequiredAircraftData
+            });
           }
         }, 100);
       }

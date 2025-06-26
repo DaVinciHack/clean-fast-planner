@@ -30,9 +30,7 @@ const EnhancedStopCardsContainer = ({
   weatherSegments = null,
   stopCards = [], // Legacy prop - will be ignored
   // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
-  onWaiveAlternatesChange = null,
-  // 🛩️ HEADER SYNC: Callback to update parent's stopCards for AppHeader
-  onStopCardsCalculated = null
+  onWaiveAlternatesChange = null
 }) => {
   console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
   
@@ -67,7 +65,12 @@ const EnhancedStopCardsContainer = ({
   
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
-    if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy) {
+    // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
+    const hasRequiredAircraftData = selectedAircraft && 
+      selectedAircraft.dryWeight && 
+      selectedAircraft.fuelBurn;
+      
+    if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy && hasRequiredAircraftData) {
       console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator (ONE SOURCE OF TRUTH)');
       console.log('🎯 EnhancedStopCardsContainer: Using weather fuel values:', { araFuel, approachFuel });
       console.log('🎯 EnhancedStopCardsContainer: Fuel policy structure:', fuelPolicy);
@@ -110,18 +113,21 @@ const EnhancedStopCardsContainer = ({
         setDisplayStopCards([]);
       }
     } else {
-      console.log('🎯 EnhancedStopCardsContainer: Missing required data for stop card calculation');
+      console.log('🎯 EnhancedStopCardsContainer: Waiting for complete data:', {
+        hasWaypoints: waypoints && waypoints.length >= 2,
+        hasAircraft: !!selectedAircraft,
+        hasFuelPolicy: !!fuelPolicy,
+        hasAircraftData: hasRequiredAircraftData,
+        aircraftInfo: selectedAircraft ? {
+          registration: selectedAircraft.registration,
+          hasEmptyWeight: !!selectedAircraft.emptyWeight,
+          hasFuelBurnRate: !!selectedAircraft.fuelBurnRate
+        } : 'No aircraft'
+      });
       setDisplayStopCards([]);
     }
   }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard]);
   
-  // 🛩️ HEADER SYNC: Notify parent when stop cards are calculated to prevent race conditions
-  useEffect(() => {
-    if (displayStopCards.length > 0 && onStopCardsCalculated) {
-      console.log('🛩️ EnhancedStopCardsContainer: Notifying parent of calculated stop cards:', displayStopCards.length);
-      onStopCardsCalculated(displayStopCards);
-    }
-  }, [displayStopCards, onStopCardsCalculated]);
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {
@@ -161,8 +167,13 @@ const EnhancedStopCardsContainer = ({
       return;
     }
     
-    // Only calculate if we have the necessary data
-    if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather) {
+    // 🚨 SAFETY: Check aircraft data completeness for alternate card too
+    const hasRequiredAircraftData = selectedAircraft && 
+      selectedAircraft.dryWeight && 
+      selectedAircraft.fuelBurn;
+    
+    // Only calculate if we have the necessary data AND complete aircraft data
+    if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
       console.log('🟠 EnhancedStopCardsContainer: Calculating alternate stop card with data:', {
         splitPoint: alternateRouteData.splitPoint,
         name: alternateRouteData.name,
@@ -225,11 +236,17 @@ const EnhancedStopCardsContainer = ({
       
     } else {
       // Clear alternate card if conditions not met
-      console.log('🟠 EnhancedStopCardsContainer: Clearing alternate card - missing required data:', {
+      console.log('🟠 EnhancedStopCardsContainer: Waiting for alternate card data:', {
         hasAlternateRouteData: !!alternateRouteData,
         hasSelectedAircraft: !!selectedAircraft,
         waypointCount: waypoints.length,
-        hasWeather: !!weather
+        hasWeather: !!weather,
+        hasAircraftData: hasRequiredAircraftData,
+        aircraftInfo: selectedAircraft ? {
+          registration: selectedAircraft.registration,
+          hasEmptyWeight: !!selectedAircraft.emptyWeight,
+          hasFuelBurnRate: !!selectedAircraft.fuelBurnRate
+        } : 'No aircraft'
       });
       setAlternateStopCard(null);
     }
