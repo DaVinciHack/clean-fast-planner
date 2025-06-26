@@ -114,7 +114,9 @@ const RightPanel = React.forwardRef(({
   // SAR calculation data
   sarData = null,
   // ETD from flight settings (wizard departure time)
-  etd = null
+  etd = null,
+  // 🛩️ HEADER SYNC: Callback for stop cards synchronization
+  onStopCardsCalculated = null
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -1245,6 +1247,7 @@ const RightPanel = React.forwardRef(({
         waypointModeActive={waypointModeActive}
         weatherSegments={weatherSegments}
         currentFlightId={currentFlightId} // 🔧 FIX: Pass flight ID for Auto Plan detection
+        onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to MainCard
       />
       
       {/* Settings Card */}

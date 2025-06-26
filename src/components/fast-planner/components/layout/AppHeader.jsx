@@ -319,7 +319,8 @@ const AppHeader = ({
       .map(card => ({
         id: card.id,
         isDeparture: card.isDeparture,
-        maxPassengers: safeNumber(card.maxPassengers)
+        maxPassengers: safeNumber(card.maxPassengers),
+        hasAlternateRequirements: card.alternateRequirements && card.alternateRequirements.isRequired // 🛩️ Track per-card alternate requirements
       }));
   }
   
@@ -400,8 +401,8 @@ const AppHeader = ({
                     return (
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {passengers.map((passenger, idx) => {
-                          // 🛩️ Use yellow color when alternates are required, otherwise normal colors
-                          const iconColor = hasAlternateRequirements ? '#f39c12' : 
+                          // 🛩️ Use yellow color only for passengers on cards with alternate requirements (before split point)
+                          const iconColor = passenger.hasAlternateRequirements ? '#f39c12' : 
                                            (passenger.isDeparture ? '#3498db' : 
                                            colors[Math.min(idx, colors.length - 1)]);
                           
@@ -415,7 +416,7 @@ const AppHeader = ({
                               </div>
                               <span style={{ 
                                 fontSize: '10px',
-                                color: hasAlternateRequirements ? '#f39c12' : 'inherit'
+                                color: passenger.hasAlternateRequirements ? '#f39c12' : 'inherit'
                               }}>
                                 {passenger.maxPassengers}
                               </span>
