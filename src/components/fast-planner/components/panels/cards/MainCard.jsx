@@ -19,6 +19,7 @@ const MainCard = ({
   onLoadRigData,
   onToggleChart,
   onAutoPlan, // Add onAutoPlan prop
+  onWaiveAlternatesChange, // 🛩️ VFR OPERATIONS: Callback for alternate route visibility
   chartsVisible,
   aircraftType,
   onAircraftTypeChange,
@@ -811,6 +812,7 @@ const MainCard = ({
             fuelPolicy={fuelPolicy}
             weatherSegments={weatherSegments}
             stopCards={stopCards}
+            onWaiveAlternatesChange={onWaiveAlternatesChange} // 🛩️ Pass callback up
           />
         )}
       </div>

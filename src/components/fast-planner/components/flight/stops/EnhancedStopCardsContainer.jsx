@@ -28,7 +28,9 @@ const EnhancedStopCardsContainer = ({
   alternateRouteData = null,
   fuelPolicy = null, // Fuel policy for reserve fuel conversion
   weatherSegments = null,
-  stopCards = [] // Legacy prop - will be ignored
+  stopCards = [], // Legacy prop - will be ignored
+  // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
+  onWaiveAlternatesChange = null
 }) => {
   console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
   
@@ -246,8 +248,17 @@ const EnhancedStopCardsContainer = ({
   // Handle waive alternates checkbox changes
   const handleWaiveAlternatesChange = (event) => {
     const isWaived = event.target.checked;
-    console.log(`🛩️ Waive alternates changed: ${isWaived}`);
+    console.log(`🛩️ ENHANCED CONTAINER: Waive alternates changed: ${isWaived}`);
     setWaiveAlternates(isWaived);
+    
+    // 🛩️ NOTIFY PARENT: Call parent callback to hide/show alternate route line on map
+    if (onWaiveAlternatesChange) {
+      console.log(`🗺️ ENHANCED CONTAINER: Calling parent callback with: ${isWaived}`);
+      onWaiveAlternatesChange(isWaived);
+      console.log(`🗺️ ENHANCED CONTAINER: Parent callback completed`);
+    } else {
+      console.error(`🚨 ENHANCED CONTAINER: No callback provided! Cannot notify parent.`);
+    }
   };
   
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER

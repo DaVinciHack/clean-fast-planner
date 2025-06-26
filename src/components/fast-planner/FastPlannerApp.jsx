@@ -949,6 +949,62 @@ const FastPlannerCore = ({
     }
   };
 
+  // 🛩️ VFR OPERATIONS: Handle waive alternates checkbox changes
+  const handleWaiveAlternatesChange = useCallback((isWaived) => {
+    console.log(`🛩️ FASTPLANNER APP: Waive alternates changed: ${isWaived}`);
+    console.log(`🛩️ FASTPLANNER APP: Managers available:`, {
+      waypointManager: !!waypointManagerRef.current,
+      mapManager: !!mapManagerRef.current,
+      map: !!mapManagerRef.current?.map,
+      weatherCirclesLayer: !!window.currentWeatherCirclesLayer
+    });
+    
+    // Control alternate route line visibility on map via WaypointManager
+    if (waypointManagerRef.current && mapManagerRef.current) {
+      // 🛩️ Update WaypointManager's waive alternates state first
+      waypointManagerRef.current.setWaiveAlternates(isWaived);
+      
+      if (isWaived) {
+        console.log('🗺️ FASTPLANNER APP: Clearing alternate route line from map (alternates waived)');
+        // 1. Clear traditional alternate route from WaypointManager
+        waypointManagerRef.current.clearAlternateRoute(mapManagerRef.current.map);
+        
+        // 2. Clear weather-based alternate lines from WeatherCirclesLayer
+        if (window.currentWeatherCirclesLayer) {
+          console.log('🌦️ FASTPLANNER APP: Also clearing weather-based alternate lines');
+          try {
+            window.currentWeatherCirclesLayer.removeWeatherCircles();
+            console.log('🌦️ FASTPLANNER APP: ✅ Weather circles layer cleared successfully');
+          } catch (error) {
+            console.warn('🌦️ FASTPLANNER APP: Warning clearing weather circles:', error.message);
+          }
+        } else {
+          console.log('🌦️ FASTPLANNER APP: No weather circles layer to clear');
+        }
+      } else {
+        console.log('🗺️ FASTPLANNER APP: Restoring alternate route line on map (alternates not waived)');
+        // Check if we have stored alternate route data to restore
+        if (waypointManagerRef.current.storedAlternateRouteData) {
+          console.log('🗺️ FASTPLANNER APP: Found stored alternate data, rendering...');
+          waypointManagerRef.current.renderAlternateRoute(
+            waypointManagerRef.current.storedAlternateRouteData, 
+            mapManagerRef.current.map
+          );
+        } else {
+          console.log('🗺️ FASTPLANNER APP: No stored alternate data to restore');
+        }
+        
+        // Note: Weather circles layer restoration is handled automatically by the weather system
+        console.log('🌦️ FASTPLANNER APP: Weather circles will be restored automatically by the weather system');
+      }
+    } else {
+      console.error('🚨 FASTPLANNER APP: Managers not available for alternate route line control:', {
+        waypointManagerRef: waypointManagerRef.current,
+        mapManagerRef: mapManagerRef.current
+      });
+    }
+  }, [waypointManagerRef, mapManagerRef]);
+
   // Handle alternate route input changes
   const handleAlternateRouteInputChange = (value) => {
     setAlternateRouteInput(value);
@@ -3346,7 +3402,8 @@ const FastPlannerCore = ({
         <RightPanel
           visible={rightPanelVisible} onToggleVisibility={toggleRightPanel} onClearRoute={clearRoute}
           onLoadRigData={reloadPlatformData} onToggleChart={togglePlatformsVisibility}
-          onLoadCustomChart={loadCustomChart} chartsVisible={platformsVisible} aircraftType={aircraftType}
+          onLoadCustomChart={loadCustomChart} onWaiveAlternatesChange={handleWaiveAlternatesChange} 
+          chartsVisible={platformsVisible} aircraftType={aircraftType}
           onAircraftTypeChange={changeAircraftType} aircraftRegistration={aircraftRegistration}
           onAircraftRegistrationChange={changeAircraftRegistration} selectedAircraft={selectedAircraft}
           aircraftsByType={aircraftsByType} aircraftLoading={aircraftLoading} routeStats={routeStats}
