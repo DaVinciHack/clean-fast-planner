@@ -88,8 +88,8 @@ const RightPanel = React.forwardRef(({
   extraFuel = 0,
   araFuel = 0, // 🔧 ADDED: ARA fuel from weather analysis
   approachFuel = 0, // 🔧 ADDED: Approach fuel from weather analysis
-  taxiFuel = 9999, // ⚠️ SAFETY: Obvious error value - real values must come from OSDK
-  contingencyFuelPercent = 9999, // ⚠️ CRITICAL SAFETY: No defaults! Real policy values or obvious error
+  taxiFuel, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy  
+  contingencyFuelPercent, // 🚨 AVIATION SAFETY: NO DEFAULT - Must come from OSDK fuel policy
   reserveMethod = 'fixed',
   onDeckTimeChange = () => {},
   onDeckFuelChange = () => {},
