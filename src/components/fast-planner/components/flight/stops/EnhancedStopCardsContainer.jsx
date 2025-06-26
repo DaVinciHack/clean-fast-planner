@@ -30,7 +30,9 @@ const EnhancedStopCardsContainer = ({
   weatherSegments = null,
   stopCards = [], // Legacy prop - will be ignored
   // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
-  onWaiveAlternatesChange = null
+  onWaiveAlternatesChange = null,
+  // 🛩️ HEADER SYNC: Callback to update parent's stopCards for AppHeader
+  onStopCardsCalculated = null
 }) => {
   console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
   
@@ -112,6 +114,14 @@ const EnhancedStopCardsContainer = ({
       setDisplayStopCards([]);
     }
   }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard]);
+  
+  // 🛩️ HEADER SYNC: Notify parent when stop cards are calculated to prevent race conditions
+  useEffect(() => {
+    if (displayStopCards.length > 0 && onStopCardsCalculated) {
+      console.log('🛩️ EnhancedStopCardsContainer: Notifying parent of calculated stop cards:', displayStopCards.length);
+      onStopCardsCalculated(displayStopCards);
+    }
+  }, [displayStopCards, onStopCardsCalculated]);
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {

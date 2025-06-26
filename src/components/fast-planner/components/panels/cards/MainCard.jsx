@@ -66,6 +66,8 @@ const MainCard = ({
   weatherSegments = null,
   // Current flight ID for Auto Plan detection
   currentFlightId = null,
+  // 🛩️ HEADER SYNC: Callback for stop cards synchronization
+  onStopCardsCalculated = null,
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
@@ -813,6 +815,7 @@ const MainCard = ({
             weatherSegments={weatherSegments}
             stopCards={stopCards}
             onWaiveAlternatesChange={onWaiveAlternatesChange} // 🛩️ Pass callback up
+            onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to container
           />
         )}
       </div>

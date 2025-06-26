@@ -3095,6 +3095,12 @@ const FastPlannerCore = ({
     }
   }, [handleFlightLoad]);
   
+  // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
+  const handleStopCardsCalculated = useCallback((calculatedStopCards) => {
+    console.log('🛩️ FastPlannerApp: Received calculated stop cards from EnhancedStopCardsContainer:', calculatedStopCards.length);
+    setStopCards(calculatedStopCards);
+  }, []);
+  
   // Real search function for wizard using existing platform data
   const handleWizardSearch = useCallback(async (searchTerm) => {
     console.log('🧙‍♂️ Wizard: Searching for:', searchTerm);
@@ -3430,6 +3436,7 @@ const FastPlannerCore = ({
           onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
           onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
           forceUpdate={forceUpdate} weather={weather} onWeatherUpdate={updateWeatherSettings}
+          onStopCardsCalculated={handleStopCardsCalculated} // 🛩️ HEADER SYNC: Callback for stop cards synchronization
           
           // Fuel policy props
           fuelPolicy={fuelPolicy}
