@@ -30,6 +30,8 @@ const StopCard = React.forwardRef(({
   // New refuel props
   isRefuelStop = false,
   onRefuelChange,
+  // 🚨 AVIATION SAFETY: Split point safety indicator
+  isAfterSplitPoint = false,
   // Alternate fuel requirements for IFR operations
   alternateRequirements = null,
   shouldShowStrikethrough = false
@@ -104,8 +106,12 @@ const StopCard = React.forwardRef(({
               alignItems: 'center',
               marginLeft: '8px',
               fontSize: '10px',
-              color: 'rgba(255, 255, 255, 0.7)',
-              cursor: 'pointer'
+              color: isAfterSplitPoint ? '#ff6b6b' : 'rgba(255, 255, 255, 0.7)', // Red warning if after split point
+              cursor: 'pointer',
+              backgroundColor: isAfterSplitPoint ? 'rgba(255, 107, 107, 0.1)' : 'transparent', // Subtle red background
+              padding: isAfterSplitPoint ? '2px 4px' : '0',
+              borderRadius: isAfterSplitPoint ? '3px' : '0',
+              border: isAfterSplitPoint ? '1px solid #ff6b6b' : 'none'
             }}>
               <input
                 type="checkbox"
@@ -118,7 +124,7 @@ const StopCard = React.forwardRef(({
                   cursor: 'pointer'
                 }}
               />
-              refuel
+              {isAfterSplitPoint ? '⚠️ refuel' : 'refuel'}
             </label>
           )}
           {/* Alternate fuel requirements display for departure card */}
