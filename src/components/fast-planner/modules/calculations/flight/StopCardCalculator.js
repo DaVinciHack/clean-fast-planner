@@ -1026,6 +1026,75 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       } // 🛩️ REFUEL: Close the main else block for weather/refuel logic
     }
 
+    // 🚨 EDGE CASE: Alternate fuel for intermediate stops before split point
+    let intermediateAlternateRequirements = null;
+    if (hasRefuelStops && !waiveAlternates && alternateStopCard) {
+      const currentStopIndex = i + 1; // Convert to stop index (1-based)
+      
+      // Find the split point (where alternate route starts)
+      // This should match the logic used in alternate card calculation
+      let splitPointIndex = null;
+      
+      // TODO: Need to determine split point - for now assume it's where the refuel is
+      const refuelStopIndices = refuelStops;
+      if (refuelStopIndices.length > 0) {
+        splitPointIndex = Math.min(...refuelStopIndices); // First refuel stop is split point
+      }
+      
+      console.log(`🔍 EDGE CASE CHECK: Stop ${currentStopIndex}, Split at ${splitPointIndex}, Refuel stops:`, refuelStops);
+      
+      // If this stop is BEFORE the split point, it needs alternate fuel
+      if (splitPointIndex && currentStopIndex < splitPointIndex) {
+        console.log(`🚨 INTERMEDIATE ALTERNATE: Stop ${currentStopIndex} is before split point ${splitPointIndex}`);
+        
+        // Calculate fuel needed: Trip (to split) + Alternate leg + Contingency + Deck + Reserve
+        const tripFuelToSplit = remainingTripFuel; // This should be trip fuel to the split point
+        const alternateLegFuel = alternateStopCard.fuelComponentsObject?.altFuel || 0;
+        const alternateContingency = Math.round((tripFuelToSplit + alternateLegFuel) * contingencyFuelPercentValue / 100);
+        
+        const intermediateAlternateFuel = tripFuelToSplit + alternateLegFuel + alternateContingency + remainingDeckFuel + reserveFuelValue + (extraFuel || 0);
+        
+        console.log(`🛩️ INTERMEDIATE ALTERNATE CALC:`, {
+          stop: currentStopIndex,
+          tripToSplit: tripFuelToSplit,
+          alternateLeg: alternateLegFuel,
+          contingency: alternateContingency,
+          deck: remainingDeckFuel,
+          reserve: reserveFuelValue,
+          total: intermediateAlternateFuel,
+          originalFuel: fuelNeeded
+        });
+        
+        // Override the fuel amount
+        fuelNeeded = intermediateAlternateFuel;
+        
+        // Update fuel components to reflect alternate calculation
+        fuelComponents = {
+          tripFuel: tripFuelToSplit,
+          alternateFuel: alternateLegFuel,
+          contingencyFuel: alternateContingency,
+          deckFuel: remainingDeckFuel,
+          reserveFuel: reserveFuelValue,
+          extraFuel: extraFuel || 0
+        };
+        
+        // Update fuel components text
+        let alternateParts = [`Trip:${tripFuelToSplit}`, `Alt:${alternateLegFuel}`, `Cont:${alternateContingency}`];
+        if (remainingDeckFuel > 0) alternateParts.push(`Deck:${remainingDeckFuel}`);
+        alternateParts.push(`Res:${reserveFuelValue}`);
+        if (extraFuel > 0) alternateParts.push(`Extra:${extraFuel}`);
+        fuelComponentsText = alternateParts.join(' ') + ' (alternate)';
+        
+        intermediateAlternateRequirements = {
+          fuel: intermediateAlternateFuel,
+          passengers: null, // Will be calculated below
+          isRequired: true
+        };
+        
+        console.log(`🚨 INTERMEDIATE OVERRIDE: Stop ${currentStopIndex} fuel changed to ${intermediateAlternateFuel} lbs (alternate requirement)`);
+      }
+    }
+
     // Calculate max passengers using our PassengerCalculator module
     let maxPassengers = 0;
     if (selectedAircraft) {
@@ -1036,6 +1105,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         passengerWeightValue,
         cargoWeight
       );
+    }
+    
+    // Update intermediate alternate requirements with calculated passengers
+    if (intermediateAlternateRequirements) {
+      intermediateAlternateRequirements.passengers = maxPassengers;
     }
 
     // 🛩️ REFUEL LOGIC: Display logic for different stop types
@@ -1135,6 +1209,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           windDirection: weather?.windDirection || 0,
           source: weather?.source || 'manual'
         },
+        // Add alternate fuel requirements for intermediate stops  
+        alternateRequirements: intermediateAlternateRequirements,
+        shouldShowStrikethrough: false, // No strikethrough for intermediate stops
         isDeparture: isDeparture,
         isDestination: isDestination
       };
@@ -1246,9 +1323,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
             components: { ...card.fuelComponentsObject }
           });
           
-          // 🚨 SKIP CORRECTION for departure cards with alternate requirements
-          if (card.isDeparture && card.alternateRequirements) {
-            console.log(`🛩️ PRESERVING ALTERNATE FUEL: Skipping correction for departure card with alternate requirements (${card.totalFuel} lbs)`);
+          // 🚨 SKIP CORRECTION for cards with alternate requirements (departure or intermediate)
+          if ((card.isDeparture || !card.isDestination) && card.alternateRequirements) {
+            console.log(`🛩️ PRESERVING ALTERNATE FUEL: Skipping correction for ${card.isDeparture ? 'departure' : 'intermediate'} card with alternate requirements (${card.totalFuel} lbs)`);
           } else {
             // Correct the total fuel to match components
             card.totalFuel = componentSum;
