@@ -210,6 +210,7 @@ const AppHeader = ({
   let tripFuel = 0;
   let deckFuel = 0;
   let passengers = [];
+  let hasAlternateRequirements = false; // 🛩️ Track if alternate fuel requirements are active
   
   // CRITICAL DEBUG: Log what data AppHeader is actually using
   console.log('🔍 AppHeader render - stopCards received:', stopCards?.length || 0, 'cards');
@@ -253,6 +254,15 @@ const AppHeader = ({
     if (departureCard) {
       totalFuel = safeNumber(departureCard.totalFuel);
       deckFuel = safeNumber(departureCard.deckFuel);
+      
+      // 🛩️ DETECT ALTERNATE REQUIREMENTS: Check if departure card has alternate fuel restrictions
+      hasAlternateRequirements = departureCard.alternateRequirements && departureCard.alternateRequirements.isRequired;
+      
+      console.log('🛩️ AppHeader: Alternate requirements check:', {
+        hasAlternateRequirements,
+        alternateRequirements: departureCard.alternateRequirements,
+        departureCardKeys: Object.keys(departureCard)
+      });
       
       // 🔍 DETAILED HEADER FUEL LOGGING from Stop Cards
       console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from Stop Cards:');
@@ -373,7 +383,9 @@ const AppHeader = ({
           </span>
           <span className="flight-detail">
             <span className="detail-label">Total Fuel:</span>
-            <span className="detail-value">{totalFuel.toFixed(0)} lbs</span>
+            <span className="detail-value" style={hasAlternateRequirements ? { color: '#f39c12' } : {}}>
+              {totalFuel.toFixed(0)} lbs
+            </span>
           </span>
           <span className="flight-detail">
             <span className="detail-label">Passengers:</span>
@@ -388,9 +400,10 @@ const AppHeader = ({
                     return (
                       <div style={{ display: 'flex', gap: '4px' }}>
                         {passengers.map((passenger, idx) => {
-                          // Get appropriate color based on index 
-                          const iconColor = passenger.isDeparture ? '#3498db' : 
-                                         colors[Math.min(idx, colors.length - 1)];
+                          // 🛩️ Use yellow color when alternates are required, otherwise normal colors
+                          const iconColor = hasAlternateRequirements ? '#f39c12' : 
+                                           (passenger.isDeparture ? '#3498db' : 
+                                           colors[Math.min(idx, colors.length - 1)]);
                           
                           return (
                             <div key={idx} style={{ display: 'flex', alignItems: 'center' }}>
@@ -400,7 +413,12 @@ const AppHeader = ({
                                     fill={iconColor} />
                                 </svg>
                               </div>
-                              <span style={{ fontSize: '10px' }}>{passenger.maxPassengers}</span>
+                              <span style={{ 
+                                fontSize: '10px',
+                                color: hasAlternateRequirements ? '#f39c12' : 'inherit'
+                              }}>
+                                {passenger.maxPassengers}
+                              </span>
                             </div>
                           );
                         })}
