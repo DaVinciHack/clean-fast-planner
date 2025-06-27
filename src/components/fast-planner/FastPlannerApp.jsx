@@ -404,6 +404,19 @@ const FastPlannerCore = ({
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: useEffect triggered');
+    console.log('🚀 TIMESTAMP:', new Date().toISOString());
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: waypoints length:', waypoints?.length);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: waypoints actual:', waypoints?.map(wp => wp.name));
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has selectedAircraft:', !!selectedAircraft);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has appManagers.routeCalculator:', !!appManagers?.routeCalculator);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: appManagers keys:', appManagers ? Object.keys(appManagers) : 'NO APPMANAGERS');
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: routeCalculator type:', typeof appManagers?.routeCalculator);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has fuelPolicy:', !!fuelPolicy);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: flightSettings:', Object.keys(flightSettings || {}));
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: weather:', weather);
+    console.log('🚀 LIVE UPDATE BROKEN DEBUG: weatherFuel:', weatherFuel);
+    
     // 🔍 DEBUG: Always log aircraft data to see what's available
     if (selectedAircraft) {
       console.log('🔍 AIRCRAFT DEBUG - All properties:', Object.keys(selectedAircraft));
@@ -423,11 +436,19 @@ const FastPlannerCore = ({
     
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
     const hasRequiredAircraftData = selectedAircraft && 
-      selectedAircraft.dryWeight && 
-      selectedAircraft.fuelBurn;
+      selectedAircraft.fuelBurn &&
+      selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
+    
+    console.log('🔧 CONDITION CHECK:', {
+      hasWaypoints: waypoints && waypoints.length >= 2,
+      hasSelectedAircraft: !!selectedAircraft,
+      hasRequiredAircraftData: hasRequiredAircraftData,
+      usefulLoad: selectedAircraft?.usefulLoad,
+      fuelBurn: selectedAircraft?.fuelBurn
+    });
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
-      console.log('🔄 Auto-triggering calculations due to route/aircraft/settings change');
+      console.log('🔄 CONDITION PASSED: Starting calculations');
       console.log('🔧 EFFECT TRIGGERED - Current extraFuel:', flightSettings.extraFuel);
       
       // 🔧 DEBUG: Log flightSettings to see what we're passing
@@ -437,7 +458,37 @@ const FastPlannerCore = ({
         cargoWeight: flightSettings.cargoWeight
       });
       
-      // Generate stop cards and update header
+      // 🔧 FINANCE CALCULATOR FIX: Also calculate routeStats for live updates
+      console.log('🔧 BYPASS FIX: Attempting routeStats calculation without appManagers dependency');
+      
+      if (appManagers?.routeCalculatorRef?.current && waypoints.length >= 2) {
+        console.log('🔧 FINANCE FIX: Calculating routeStats for live updates');
+        const coordinates = waypoints.map(wp => wp.coords).filter(Boolean);
+        
+        if (coordinates.length >= 2) {
+          const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinates, {
+            selectedAircraft,
+            weather,
+            payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
+            reserveFuel: flightSettings.reserveFuel || 0
+          });
+          
+          if (newRouteStats) {
+            setRouteStats(newRouteStats);
+            console.log('🔧 FINANCE FIX: RouteStats updated for finance calculator');
+          }
+        }
+      } else {
+        console.log('🔧 BYPASS FIX: No routeCalculatorRef.current, but continuing with stopCards calculation');
+      }
+
+      // Generate stop cards and update header - KEEP EXISTING FUEL FLOW
+      console.log('🔧 STOP CARDS DEBUG: About to call generateStopCardsData');
+      console.log('🔧 STOP CARDS DEBUG: waypoints:', waypoints?.length);
+      console.log('🔧 STOP CARDS DEBUG: routeStats:', routeStats);
+      console.log('🔧 STOP CARDS DEBUG: selectedAircraft:', !!selectedAircraft);
+      console.log('🔧 STOP CARDS DEBUG: weather:', weather);
+      
       const newStopCards = generateStopCardsData(
         waypoints,
         routeStats, 
@@ -450,9 +501,13 @@ const FastPlannerCore = ({
         }
       );
       
+      console.log('🔧 STOP CARDS DEBUG: generateStopCardsData returned:', newStopCards?.length || 'null/undefined');
+      
       if (newStopCards && newStopCards.length > 0) {
         setStopCards(newStopCards);
-        console.log('✅ Auto-calculation complete - header should update');
+        console.log('✅ STOP CARDS SUCCESS: Updated stopCards state - header and finance calculator should update');
+      } else {
+        console.log('🚨 STOP CARDS FAILED: No cards generated');
       }
     } else {
       console.log('🔄 FastPlannerApp: Waiting for complete data:', {

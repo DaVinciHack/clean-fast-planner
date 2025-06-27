@@ -169,6 +169,7 @@ const FinanceCard = ({
   // CLEAN: Use proper React props with enhanced stopCards fallback
   const readRouteData = () => {
     try {
+      console.log('🏦 FinanceCard: readRouteData called');
       let dataSource = null;
       let sourceDescription = '';
       
@@ -176,6 +177,7 @@ const FinanceCard = ({
       if (routeStats && (routeStats.totalDistance > 0 || routeStats.timeHours > 0)) {
         dataSource = routeStats;
         sourceDescription = 'routeStats prop (primary)';
+        console.log('🏦 FinanceCard: Using routeStats data:', dataSource);
       }
       // Fallback: Extract directly from stopCards (this will be the main path now)
       else if (stopCards && stopCards.length > 0) {
@@ -249,6 +251,11 @@ const FinanceCard = ({
   
   // CRITICAL FIX: Proper React updates only - NO global events or polling
   useEffect(() => {
+    console.log('🏦 FinanceCard: Props changed - updating route data');
+    console.log('🏦 FinanceCard: routeStats:', routeStats);
+    console.log('🏦 FinanceCard: stopCards length:', stopCards?.length || 0);
+    console.log('🏦 FinanceCard: selectedAircraft:', !!selectedAircraft);
+    console.log('🏦 FinanceCard: waypoints length:', waypoints?.length || 0);
     readRouteData();
   }, [routeStats, stopCards, selectedAircraft, waypoints]); // React to prop changes only
   
