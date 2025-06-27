@@ -214,7 +214,9 @@ const AppHeader = ({
   
   // CRITICAL DEBUG: Log what data AppHeader is actually using
   console.log('🔍 AppHeader render - stopCards received:', stopCards?.length || 0, 'cards');
+  console.log('🔍 AppHeader render - loadedFlightData received:', !!loadedFlightData);
   console.log('🔍 AppHeader render - weather received:', weather);
+  console.log('🔍 AppHeader render - DETAILED stopCards:', stopCards);
   
   // CRITICAL: Handle case where weather is undefined
   const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
