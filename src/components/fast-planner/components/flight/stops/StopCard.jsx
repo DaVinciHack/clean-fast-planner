@@ -93,49 +93,59 @@ const StopCard = React.forwardRef(({
       data-index={index}
       style={cardStyle}
     >
-      <div className="stop-header">
-        <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
-        <div className="stop-name">
-          {stopName || `Stop ${index}`}
-          
-          {/* Alternate fuel requirements display beside name */}
-          {isDeparture && alternateRequirements && (
-            <span style={{ 
-              fontSize: '0.6em', 
-              color: '#f39c12', 
-              marginLeft: '8px',
-              fontWeight: 'bold',
-              whiteSpace: 'nowrap'
-            }}>
-              ALT FUEL REQUIRED
+      <div className="stop-header" style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <div className="stop-number" style={stopNumberStyle}>{stopNumberDisplay}</div>
+          <div className="stop-name">
+            <span>
+              {(() => {
+                const name = stopName || `Stop ${index}`;
+                return name.length > 12 ? name.substring(0, 12) + '...' : name;
+              })()}
             </span>
-          )}
-          
-          {/* Refuel checkbox - only show on intermediate stops */}
-          {!isDeparture && !isDestination && !isAlternate && onRefuelChange && (
-            <label className="refuel-checkbox-container" style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              marginLeft: '8px',
-              fontSize: '10px',
-              color: 'rgba(255, 255, 255, 0.7)',
-              cursor: 'pointer'
-            }}>
-              <input
-                type="checkbox"
-                checked={isRefuelStop}
-                onChange={(e) => onRefuelChange(index, e.target.checked)}
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  marginRight: '4px',
-                  cursor: 'pointer'
-                }}
-              />
-              refuel
-            </label>
-          )}
+            
+            {/* Alternate fuel requirements display beside name */}
+            {isDeparture && alternateRequirements && (
+              <span style={{ 
+                fontSize: '0.6em', 
+                color: '#f39c12', 
+                marginLeft: '8px',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap'
+              }}>
+                ALT FUEL REQUIRED
+              </span>
+            )}
+          </div>
         </div>
+        
+        {/* Refuel checkbox - positioned absolutely to the right with gap before wind */}
+        {!isDeparture && !isDestination && !isAlternate && onRefuelChange && (
+          <label className="refuel-checkbox-container" style={{
+            position: 'absolute',
+            right: '60px', // Gap before wind
+            top: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: '10px',
+            color: 'rgba(255, 255, 255, 0.7)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}>
+            <input
+              type="checkbox"
+              checked={isRefuelStop}
+              onChange={(e) => onRefuelChange(index, e.target.checked)}
+              style={{
+                width: '12px',
+                height: '12px',
+                marginRight: '4px',
+                cursor: 'pointer'
+              }}
+            />
+            refuel
+          </label>
+        )}
         
         <div className="stop-content">
           {isAlternate && routeDescription && (
@@ -193,7 +203,15 @@ const StopCard = React.forwardRef(({
       {/* Fuel Components - shown for all stops */}
       {fuelComponents && (
         <div className="fuel-components">
-          <div className="fuel-components-text">{fuelComponents}</div>
+          <div className="fuel-components-text" style={{ 
+            fontSize: '0.6em',
+            lineHeight: '1.3',
+            wordWrap: 'break-word',
+            whiteSpace: 'normal',
+            overflow: 'visible'
+          }}>
+            {fuelComponents}
+          </div>
         </div>
       )}
     </div>

@@ -889,6 +889,28 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // For potential landing fuel, we should show the total contingency (from departure)
       // not just the remaining contingency for this leg
       fuelNeeded = reserveFuelValue + remainingContingencyFuel + (extraFuel || 0);
+      
+      // 🛩️ FINAL DESTINATION: Create fuel components for landing fuel display
+      fuelComponents = {
+        tripFuel: 0, // No trip fuel needed at final destination
+        contingencyFuel: remainingContingencyFuel,
+        taxiFuel: 0, // No taxi fuel at destination
+        araFuel: 0, // No ARA fuel needed at destination
+        deckFuel: 0, // No deck fuel at destination
+        approachFuel: 0, // No approach fuel needed at destination
+        reserveFuel: reserveFuelValue,
+        extraFuel: extraFuel || 0
+      };
+      
+      // Create landing fuel components text with bracketed display
+      let landingFuelParts = [];
+      if (remainingContingencyFuel > 0) landingFuelParts.push(`Contingency:${remainingContingencyFuel}`);
+      landingFuelParts.push(`Reserve:${reserveFuelValue}`);
+      if (extraFuel > 0) landingFuelParts.push(`Extra:${extraFuel}`);
+      
+      fuelComponentsText = `Expected Landing Fuel (${landingFuelParts.join(' + ')})`;
+      
+      console.log(`🛩️ FINAL DESTINATION: ${toWaypoint.name} landing fuel: ${fuelNeeded} lbs - ${fuelComponentsText}`);
     } else {
       // 🎯 SMART CONSUMPTION LOGIC: Calculate remaining weather fuel needed
       
