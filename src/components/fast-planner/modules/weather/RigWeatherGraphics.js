@@ -49,6 +49,10 @@ class RigWeatherGraphics {
             if (windArrow && !this.map.hasImage('compass-rose')) {
                 this.map.addImage('compass-rose', windArrow);
                 console.log('🚁 Simple wind arrow graphic added');
+            } else if (!windArrow) {
+                console.error('🚁 ❌ createCompassRose() returned null/undefined - cannot create wind arrows');
+            } else {
+                console.log('🚁 Wind arrow image already exists');
             }
             
         } catch (error) {

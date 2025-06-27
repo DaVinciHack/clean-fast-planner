@@ -23,16 +23,18 @@ class PassengerCalculator {
       return 0;
     }
 
-    // CRITICAL: Add default values for aircraft properties if they're missing
-    // This ensures calculations proceed even with incomplete data
-    if (!aircraft.emptyWeight) {
-      console.warn('PassengerCalculator: Aircraft missing emptyWeight, using default 12500 lbs');
-      aircraft.emptyWeight = 12500;
-    }
-    
-    if (!aircraft.maxTakeoffWeight) {
-      console.warn('PassengerCalculator: Aircraft missing maxTakeoffWeight, using default 17500 lbs');
-      aircraft.maxTakeoffWeight = 17500;
+    // 🚨 AVIATION SAFETY: NO FALLBACKS FOR CRITICAL AIRCRAFT DATA
+    // Missing usefulLoad data could result in aircraft overloading and fatal accidents
+    if (!aircraft.usefulLoad && (!aircraft.emptyWeight || !aircraft.maxTakeoffWeight)) {
+      console.error('🚨 SAFETY CRITICAL: Aircraft missing usefulLoad or weight data - cannot calculate passengers safely');
+      console.error('🚨 Missing data:', {
+        usefulLoad: aircraft.usefulLoad,
+        emptyWeight: aircraft.emptyWeight,
+        maxTakeoffWeight: aircraft.maxTakeoffWeight,
+        aircraftId: aircraft.aircraftId || aircraft.registration
+      });
+      console.error('🚨 RETURNING 0 PASSENGERS - System must obtain correct aircraft load data before calculations can proceed');
+      return 0;
     }
 
     // Ensure numeric inputs

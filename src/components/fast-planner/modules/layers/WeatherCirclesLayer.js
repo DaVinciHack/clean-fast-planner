@@ -1016,10 +1016,16 @@ class WeatherCirclesLayer {
       window.weatherCirclesLockTime = null;
     }
     
+    // 🚨 SAFETY CHECK: Ensure map exists before attempting removal
+    if (!this.map) {
+      console.warn('🧹 WeatherCirclesLayer: Cannot remove weather circles - map reference is null/undefined');
+      return;
+    }
+    
     try {
       // Remove event listeners BEFORE removing layers
       const hoverLayer = this.layerId + '-hover-areas';
-      if (this.map.getLayer(hoverLayer)) {
+      if (this.map.getLayer && this.map.getLayer(hoverLayer)) {
         this.map.off('mouseenter', hoverLayer);
         this.map.off('mouseleave', hoverLayer);
         console.log('🧹 Removed weather hover event listeners');
@@ -1153,6 +1159,12 @@ class WeatherCirclesLayer {
   addAlternateLines(validSegments) {
     console.log('🔗 Adding curved dotted lines for weather alternate routes');
     
+    // 🚨 SAFETY CHECK: Ensure map exists before attempting to add lines
+    if (!this.map) {
+      console.warn('🔗 WeatherCirclesLayer: Cannot add alternate lines - map reference is null/undefined');
+      return;
+    }
+    
     // CRITICAL FIX: Get correct split point from flight data, not weather segments
     const flightAlternateData = window.flightAlternateData;
     let correctSplitPoint = null;
@@ -1221,10 +1233,10 @@ class WeatherCirclesLayer {
       
       try {
         // Remove existing lines
-        if (this.map.getLayer(linesLayerId)) {
+        if (this.map.getLayer && this.map.getLayer(linesLayerId)) {
           this.map.removeLayer(linesLayerId);
         }
-        if (this.map.getSource(linesSourceId)) {
+        if (this.map.getSource && this.map.getSource(linesSourceId)) {
           this.map.removeSource(linesSourceId);
         }
         
