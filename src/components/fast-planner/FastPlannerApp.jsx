@@ -2722,6 +2722,13 @@ const FastPlannerCore = ({
         setIsEditLocked(false);
         window.isEditLocked = false;
         console.log('🎯 SMART TOGGLE: Unlocked editing (2D mode)');
+        
+        // 🔧 FIX: Reset any flight sequence flags when entering edit mode
+        // This prevents tilt flags from persisting when loading new flights
+        if (window.flightSequenceController) {
+          window.flightSequenceController.reset();
+          console.log('🎯 SMART TOGGLE: Reset FlightSequenceController flags for edit mode');
+        }
       } else {
         setIsEditLocked(true);
         window.isEditLocked = true;
