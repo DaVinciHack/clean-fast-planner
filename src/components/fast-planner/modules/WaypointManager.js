@@ -1815,7 +1815,7 @@ class WaypointManager {
             'symbol-placement': 'point',
             'text-field': ['get', 'text'],
             'text-size': 10, // Smaller text for cleaner look
-            'text-font': ['Arial Unicode MS Regular'], // Regular font, not italic
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'], // Fallback fonts
             'text-rotate': ['-', ['get', 'bearing'], 90],
             'text-rotation-alignment': 'map',
             'text-allow-overlap': true,

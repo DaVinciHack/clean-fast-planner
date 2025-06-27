@@ -432,12 +432,22 @@ class RouteCalculator {
     const reserveFuelValue = Number(reserveFuel) || 0;
     const fuelRequired = Math.round(totalFuel + reserveFuelValue);
     
-    // Calculate usable load - only if we have all required aircraft properties
+    // Calculate usable load - use OSDK usefulLoad if available, otherwise calculate from weights
     let usableLoad = 0;
     let maxPassengers = 0;
     
-    if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
-      // Calculate usable load from actual aircraft data
+    if (aircraft.usefulLoad) {
+      // Use OSDK usefulLoad directly, subtract fuel and payload
+      usableLoad = Math.max(0, aircraft.usefulLoad - fuelRequired - (Number(payloadWeight) || 0));
+      
+      // Calculate passengers using passengerWeight parameter
+      if (passengerWeight && passengerWeight > 0) {
+        maxPassengers = Math.floor(usableLoad / passengerWeight);
+      } else {
+        console.error('RouteCalculator: Missing or invalid passengerWeight parameter, cannot calculate max passengers');
+      }
+    } else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
+      // Fallback: Calculate usable load from weight data
       usableLoad = Math.max(0, aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelRequired - (Number(payloadWeight) || 0));
       
       // Calculate passengers using passengerWeight parameter
@@ -447,7 +457,7 @@ class RouteCalculator {
         console.error('RouteCalculator: Missing or invalid passengerWeight parameter, cannot calculate max passengers');
       }
     } else {
-      console.error('RouteCalculator: Missing aircraft weight data, cannot calculate usable load');
+      console.error('RouteCalculator: Missing aircraft usefulLoad or weight data, cannot calculate usable load');
     }
     
     // Compile results with clean, consistent property names
@@ -548,9 +558,9 @@ class RouteCalculator {
         estimatedTime: estimatedTime,
         timeHours: timeHours,
         legs: legs,
-        // Add minimal properties to make it compatible with UI expectations
-        fuelRequired: Math.round(timeHours * 1100), // Use a default fuel burn of 1100 lbs/hr
-        tripFuel: Math.round(timeHours * 1100),
+        // 🚨 AVIATION SAFETY: NO FUEL BURN FALLBACKS
+        fuelRequired: 0, // Cannot calculate without real aircraft data
+        tripFuel: 0, // Cannot calculate without real aircraft data
         usableLoad: 0,
         maxPassengers: 0
       };

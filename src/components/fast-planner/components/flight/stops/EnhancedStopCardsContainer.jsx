@@ -72,7 +72,8 @@ const EnhancedStopCardsContainer = ({
   useEffect(() => {
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
     const hasRequiredAircraftData = selectedAircraft && 
-      selectedAircraft.fuelBurn;
+      selectedAircraft.fuelBurn &&
+      selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy && hasRequiredAircraftData) {
       console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator (ONE SOURCE OF TRUTH)');
@@ -130,8 +131,10 @@ const EnhancedStopCardsContainer = ({
         hasAircraftData: hasRequiredAircraftData,
         aircraftInfo: selectedAircraft ? {
           registration: selectedAircraft.registration,
-          hasEmptyWeight: !!selectedAircraft.emptyWeight,
-          hasFuelBurnRate: !!selectedAircraft.fuelBurnRate
+          hasUsefulLoad: !!selectedAircraft.usefulLoad,
+          usefulLoadValue: selectedAircraft.usefulLoad,
+          hasFuelBurn: !!selectedAircraft.fuelBurn,
+          fuelBurnValue: selectedAircraft.fuelBurn
         } : 'No aircraft'
       });
       setDisplayStopCards([]);
@@ -179,7 +182,8 @@ const EnhancedStopCardsContainer = ({
     
     // 🚨 SAFETY: Check aircraft data completeness for alternate card too
     const hasRequiredAircraftData = selectedAircraft && 
-      selectedAircraft.fuelBurn;
+      selectedAircraft.fuelBurn &&
+      selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
     // Only calculate if we have the necessary data AND complete aircraft data
     if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
@@ -253,8 +257,10 @@ const EnhancedStopCardsContainer = ({
         hasAircraftData: hasRequiredAircraftData,
         aircraftInfo: selectedAircraft ? {
           registration: selectedAircraft.registration,
-          hasEmptyWeight: !!selectedAircraft.emptyWeight,
-          hasFuelBurnRate: !!selectedAircraft.fuelBurnRate
+          hasUsefulLoad: !!selectedAircraft.usefulLoad,
+          usefulLoadValue: selectedAircraft.usefulLoad,
+          hasFuelBurn: !!selectedAircraft.fuelBurn,
+          fuelBurnValue: selectedAircraft.fuelBurn
         } : 'No aircraft'
       });
       setAlternateStopCard(null);
