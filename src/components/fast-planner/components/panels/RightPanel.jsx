@@ -755,21 +755,26 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
-      // 🛰️ STEP 1: Change map style to satellite first (before flight loading)
-      console.log('🛰️ STEP 1: Changing to satellite map style first');
+      // 🛰️ STEP 1: MAP STATE AWARE flight loading
+      console.log('🛰️ STEP 1: Map state aware flight loading');
       
       try {
         if (window.mapManager?.map) {
           const map = window.mapManager.map;
+          const mapState = window.mapManager.getMapState();
           
-          // Check current style to avoid unnecessary switches
-          const currentStyleUrl = map.getStyle()?.sources ? 
-            (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
+          console.log('🛰️ STEP 1: Current map state:', mapState);
           
-          console.log('🛰️ STEP 1: Current style type:', currentStyleUrl);
+          // If NOT at 60°: Go starlight + pan to 60°
+          // If ALREADY at 60°: Go starlight + do 360° fly-around
+          if (mapState.tilt < 55) {
+            console.log('🛰️ STEP 1: Not at starlight angle, switching to satellite + will pan to 60°');
+          } else {
+            console.log('🛰️ STEP 1: Already at starlight angle, switching to satellite + will do fly-around');
+          }
           
           // Only switch to satellite if we're not already on satellite
-          if (currentStyleUrl !== 'satellite') {
+          if (!mapState.isStarlightMode) {
             console.log('🛰️ STEP 1: Switching to satellite background');
             
             // IMMEDIATE switch to satellite for clean look
