@@ -43,7 +43,7 @@ class FlightDataProcessor {
     const legs = this.processLegData(stopCards, waypoints);
     
     // Process totals
-    const totals = this.processTotals(routeStats, legs, costData);
+    const totals = this.processTotals(routeStats, legs, costData, stopCards);
     
     // Process costs
     const costs = this.processCosts(costData, totals);
@@ -86,10 +86,19 @@ class FlightDataProcessor {
 
     // Debug aircraft data structure
     console.log('📄 Processing aircraft data:', selectedAircraft);
+    console.log('📄 Aircraft keys:', Object.keys(selectedAircraft));
+    console.log('📄 defaultModel:', selectedAircraft.defaultModel);
+    console.log('📄 aircraftType:', selectedAircraft.aircraftType);
+    console.log('📄 type:', selectedAircraft.type);
+    console.log('📄 model:', selectedAircraft.model);
+
+    // Clean registration - remove anything in brackets
+    const rawRegistration = selectedAircraft.registration || selectedAircraft.aircraftRegistration || selectedAircraft.tailNumber || 'TBD';
+    const cleanRegistration = rawRegistration.replace(/\s*\([^)]*\)\s*$/, '').trim();
 
     return {
-      type: selectedAircraft.type || selectedAircraft.aircraftType || selectedAircraft.model || 'TBD',
-      registration: selectedAircraft.registration || selectedAircraft.aircraftRegistration || selectedAircraft.tailNumber || 'TBD',
+      type: selectedAircraft.modelNmae || selectedAircraft.modelName || selectedAircraft.modelType || selectedAircraft.aircraftType || selectedAircraft.type || 'TBD',
+      registration: cleanRegistration,
       capacity: selectedAircraft.maxPassengers || selectedAircraft.capacity || selectedAircraft.passengerCapacity || 0,
       fuelCapacity: selectedAircraft.fuelCapacity || selectedAircraft.maxFuel || 0,
       range: selectedAircraft.range || selectedAircraft.maxRange || 0,
@@ -133,29 +142,70 @@ class FlightDataProcessor {
     console.log('📄 Processing leg data - stopCards:', stopCards?.length, 'waypoints:', waypoints?.length);
     
     if (stopCards && stopCards.length > 0) {
-      stopCards.forEach((card, index) => {
-        console.log('📄 Processing stop card', index, ':', card);
-        
-        if (card.legInfo || card.leg || card) {
-          // Handle different data structures
-          const legInfo = card.legInfo || card.leg || card;
-          
-          legs.push({
-            legNumber: index + 1,
-            from: legInfo.departure || legInfo.from || waypoints?.[index]?.name || 'Unknown',
-            to: legInfo.destination || legInfo.to || waypoints?.[index + 1]?.name || 'Unknown',
-            distance: this.formatDistance(legInfo.distance || legInfo.totalDistance),
-            time: this.formatTime(legInfo.flightTime || legInfo.time || legInfo.totalTime),
-            fuel: this.formatFuel(legInfo.fuel || legInfo.totalFuel),
-            passengers: legInfo.passengers || legInfo.pax || legInfo.maxPassengers || 0,
-            deckTime: this.formatTime(legInfo.deckTime || legInfo.stopTime),
-            coordinates: {
-              from: legInfo.departureCoords || legInfo.fromCoords,
-              to: legInfo.destinationCoords || legInfo.toCoords
-            }
-          });
+      // Filter out waypoints and navigation points - only include actual stops
+      const actualStops = stopCards.filter(card => {
+        // Skip if it's a waypoint or navigation point
+        if (card.isWaypoint || card.type === 'waypoint' || card.pointType === 'NAVIGATION_WAYPOINT') {
+          return false;
         }
+        // Include departure, destination, and intermediate stops
+        return card.isDeparture || card.isDestination || (!card.isAlternate && card.stopName);
       });
+      
+      console.log('📄 Filtered actual stops:', actualStops.length, 'from', stopCards.length, 'total cards');
+      
+      // Create legs between actual stops
+      for (let i = 0; i < actualStops.length - 1; i++) {
+        const fromCard = actualStops[i];
+        const toCard = actualStops[i + 1];
+        
+        console.log('📄 Creating leg from', fromCard.stopName, 'to', toCard.stopName);
+        
+        // Calculate leg distance (difference between cumulative distances)
+        const legDistance = (toCard.totalDistance || 0) - (fromCard.totalDistance || 0);
+        
+        // Get leg time from the destination card
+        const legTime = toCard.flightTime || toCard.time || toCard.totalTime || 0;
+        
+        // Get passengers for this leg - use fromCard passengers since they're traveling on this leg
+        const legPassengers = fromCard.maxPassengers || fromCard.passengers || fromCard.pax || 0;
+        
+        legs.push({
+          legNumber: i + 1,
+          from: fromCard.stopName || fromCard.name || 'Unknown',
+          to: toCard.stopName || toCard.name || 'Unknown',
+          distance: this.formatDistance(legDistance),
+          time: this.formatTime(legTime),
+          fuel: this.formatFuel(toCard.totalFuel || toCard.fuel || 0),
+          passengers: legPassengers,
+          deckTime: this.formatTime(toCard.deckTime || 0),
+          coordinates: {
+            from: fromCard.coordinates || fromCard.coords,
+            to: toCard.coordinates || toCard.coords
+          }
+        });
+      }
+      
+      // Add alternate route if present
+      const alternateCard = stopCards.find(card => card.isAlternate);
+      if (alternateCard) {
+        legs.push({
+          legNumber: legs.length + 1,
+          from: alternateCard.stopName || alternateCard.name || 'Alternate Route',
+          to: alternateCard.alternateName || alternateCard.destination || 'Unknown',
+          distance: this.formatDistance(alternateCard.totalDistance || alternateCard.distance || 0),
+          time: this.formatTime(alternateCard.flightTime || alternateCard.time || alternateCard.totalTime || 0),
+          fuel: this.formatFuel(alternateCard.totalFuel || alternateCard.fuel || 0),
+          passengers: alternateCard.maxPassengers || alternateCard.passengers || alternateCard.pax || 0,
+          deckTime: '00:00',
+          isAlternate: true,
+          coordinates: {
+            from: alternateCard.coordinates || alternateCard.coords,
+            to: alternateCard.alternateCoords
+          }
+        });
+      }
+      
     } else if (waypoints && waypoints.length > 1) {
       // Fallback: create legs from waypoints if stop cards not available
       for (let i = 0; i < waypoints.length - 1; i++) {
@@ -181,32 +231,58 @@ class FlightDataProcessor {
   }
 
   /**
-   * Process total values
+   * Process total values - extract from stop cards for accuracy
    * @param {Object} routeStats - Route statistics
    * @param {Array} legs - Processed leg data
    * @param {Object} costData - Cost data
+   * @param {Array} stopCards - Original stop cards for accurate totals
    * @returns {Object} - Total values
    */
-  processTotals(routeStats, legs, costData) {
-    // Calculate totals from route stats if available
+  processTotals(routeStats, legs, costData, stopCards) {
     let totalDistance = 0;
     let totalFlightTime = 0;
     let totalFuel = 0;
     let maxPassengers = 0;
 
-    if (routeStats) {
+    // Extract totals from stop cards for accuracy (best source)
+    if (stopCards && stopCards.length > 0) {
+      // Get departure card for fuel
+      const departureCard = stopCards.find(card => card.isDeparture);
+      if (departureCard) {
+        totalFuel = departureCard.totalFuel || departureCard.fuel || 0;
+      }
+      
+      // Get final destination card for distance and flight time
+      const destinationCard = stopCards.find(card => card.isDestination);
+      if (destinationCard) {
+        totalDistance = destinationCard.totalDistance || destinationCard.distance || 0;
+        totalFlightTime = destinationCard.totalTime || destinationCard.flightTime || destinationCard.time || 0;
+      }
+      
+      // Get max passengers from any card
+      stopCards.forEach(card => {
+        if (!card.isAlternate) { // Exclude alternate route from passenger calc
+          const passengers = card.maxPassengers || card.passengers || card.pax || 0;
+          maxPassengers = Math.max(maxPassengers, passengers);
+        }
+      });
+      
+    } else if (routeStats) {
+      // Fallback to route stats
       totalDistance = routeStats.totalDistance || 0;
       totalFlightTime = routeStats.totalTime || 0;
       totalFuel = routeStats.totalFuel || 0;
       maxPassengers = routeStats.maxPassengers || 0;
     } else if (legs && legs.length > 0) {
-      // Fallback: calculate from legs
+      // Final fallback: calculate from legs
       legs.forEach(leg => {
-        const distance = parseFloat(leg.distance) || 0;
-        const fuel = parseFloat(leg.fuel) || 0;
-        totalDistance += distance;
-        totalFuel += fuel;
-        maxPassengers = Math.max(maxPassengers, leg.passengers || 0);
+        if (!leg.isAlternate) { // Exclude alternate from main totals
+          const distance = parseFloat(leg.distance) || 0;
+          const fuel = parseFloat(leg.fuel) || 0;
+          totalDistance += distance;
+          totalFuel += fuel;
+          maxPassengers = Math.max(maxPassengers, leg.passengers || 0);
+        }
       });
     }
 
@@ -248,19 +324,28 @@ class FlightDataProcessor {
 
   /**
    * Format time value
-   * @param {number|string} time - Time in minutes or HH:MM format
+   * @param {number|string} time - Time in hours (decimal), minutes, or HH:MM format
    * @returns {string} - Formatted time as HH:MM
    */
   formatTime(time) {
     if (!time) return '00:00';
     
+    // If already formatted as HH:MM, return as-is
     if (typeof time === 'string' && time.includes(':')) {
-      return time; // Already formatted
+      return time;
     }
     
-    const minutes = parseInt(time) || 0;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    // Handle decimal hours (like 1.75 for 1 hour 45 minutes)
+    if (typeof time === 'number' && time < 24) {
+      const hours = Math.floor(time);
+      const minutes = Math.round((time - hours) * 60);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    
+    // Handle time in minutes
+    const totalMinutes = parseInt(time) || 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   }
 
