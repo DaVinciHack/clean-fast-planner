@@ -177,18 +177,18 @@ const FlightWizard = ({
     console.log('🧙‍♂️ Wizard: Selected flight:', flight.flightNumber || flight.name);
     console.log('🧙‍♂️ Wizard: Using EXACT LoadFlightsCard workflow');
     
-    // 🛰️ SIMPLE FIX: Switch to satellite BEHIND wizard, then delay before closing
+    // 🛰️ MAP STATE AWARE: Check current state before transitioning
     if (window.mapManager?.map) {
-      const map = window.mapManager.map;
+      const mapState = window.mapManager.getMapState();
+      console.log('🧙‍♂️ Wizard: Current map state:', mapState);
       
-      // Check if we're already on satellite
-      const currentStyleUrl = map.getStyle()?.sources ? 
-        (Object.keys(map.getStyle().sources).some(key => key.includes('satellite')) ? 'satellite' : 'other') : 'unknown';
-      
-      if (currentStyleUrl !== 'satellite') {
-        console.log('🛰️ Wizard: Quick switch to satellite behind wizard to prevent flash');
-        map.setStyle('mapbox://styles/mapbox/satellite-v9');
-        // Don't wait for style load - let the existing RightPanel logic handle terrain and angles
+      // If NOT at 60°: Go starlight + pan to 60°
+      // If ALREADY at 60°: Go starlight + do 360° fly-around
+      if (mapState.tilt < 55) {
+        console.log('🛰️ Wizard: Not at starlight angle, switching to satellite behind wizard');
+        window.mapManager.map.setStyle('mapbox://styles/mapbox/satellite-v9');
+      } else {
+        console.log('🛰️ Wizard: Already at starlight angle, no style change needed');
       }
     }
     

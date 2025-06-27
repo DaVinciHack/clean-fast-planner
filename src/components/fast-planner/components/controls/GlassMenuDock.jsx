@@ -227,22 +227,22 @@ const GlassMenuDock = ({
         {showEditButton && !isPhoneLayout && (
           <div className="glass-button-container edit-button-container">
             <button 
-              className={`glass-button icon-above-text ${currentMapMode === '3d' ? 'edit-button' : 'satellite-button'}`}
+              className={`glass-button icon-above-text ${window.mapManager?.isStarlightMode() ? 'edit-button' : 'satellite-button'}`}
               onClick={onEditMode}
-              title={currentMapMode === '3d' ? 
+              title={window.mapManager?.isStarlightMode() ? 
                 'Switch to editing mode - 2D view with all layers' : 
                 'Switch to satellite mode - 3D view for presentation'
               }
             >
               <div className="glass-icon">
-                {currentMapMode === '3d' ? (
-                  // Edit icon when in 3D satellite mode
+                {window.mapManager?.isStarlightMode() ? (
+                  // Edit icon when in starlight mode (60° tilt + satellite)
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
                 ) : (
-                  // Satellite icon when in dark edit mode
+                  // Satellite icon when in edit mode (vertical tilt)
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
                     <path d="M8 12h8"/>
@@ -253,7 +253,7 @@ const GlassMenuDock = ({
                 )}
               </div>
               <span className="button-label">
-                {currentMapMode === '3d' ? 'Edit' : 'Satellite'}
+                {window.mapManager?.isStarlightMode() ? 'Edit Mode' : 'Starlight Mode'}
               </span>
             </button>
           </div>

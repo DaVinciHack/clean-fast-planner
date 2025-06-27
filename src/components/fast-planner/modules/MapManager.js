@@ -1344,6 +1344,51 @@ class MapManager {
     
     return 'dark'; // Default fallback
   }
+
+  /**
+   * Get current map state for starlight/edit mode transitions
+   * @returns {Object} - Map state with tilt, style, and mode information
+   */
+  getMapState() {
+    if (!this.map) {
+      return {
+        tilt: 0,
+        style: 'dark',
+        mode: 'edit',
+        isStarlightMode: false
+      };
+    }
+
+    try {
+      const pitch = this.map.getPitch();
+      const currentStyle = this.getCurrentStyle();
+      const isStarlightMode = pitch >= 55 && (currentStyle === 'satellite' || currentStyle === 'satellite-streets');
+      
+      return {
+        tilt: pitch,
+        style: currentStyle,
+        mode: isStarlightMode ? 'starlight' : 'edit',
+        isStarlightMode: isStarlightMode
+      };
+    } catch (error) {
+      console.warn('Error getting map state:', error);
+      return {
+        tilt: 0,
+        style: 'dark',
+        mode: 'edit',
+        isStarlightMode: false
+      };
+    }
+  }
+
+  /**
+   * Check if map is currently in starlight mode (60° tilt + satellite view)
+   * @returns {boolean} - True if in starlight mode
+   */
+  isStarlightMode() {
+    const state = this.getMapState();
+    return state.isStarlightMode;
+  }
 }
 
 export default MapManager;
