@@ -33,19 +33,9 @@ const useWeatherSegments = ({
         console.log('🌤️ useWeatherSegments: Weather segments loaded but NOT updating global wind settings');
         console.log('🌤️ useWeatherSegments: Flight-level wind should come from Palantir automation, not segment averages');
         
-        // RACE CONDITION FIX: Wait for map and segments to be ready, then add to map
-        if (mapManagerRef?.current?.map && result.segments?.length > 0) {
-          console.log('🌤️ useWeatherSegments: Map and segments ready, adding to map...');
-          // Add a small delay to ensure everything is ready
-          setTimeout(() => {
-            addWeatherSegmentsToMap(result);
-          }, 100);
-        } else {
-          console.log('🌤️ useWeatherSegments: Map or segments not ready:', {
-            hasMap: !!mapManagerRef?.current?.map,
-            segmentsLength: result.segments?.length
-          });
-        }
+        // DISABLED: Auto-adding weather to map - FlightSequenceController now controls this
+        console.log('🌤️ useWeatherSegments: Weather segments loaded but NOT auto-adding to map');
+        console.log('🌤️ useWeatherSegments: FlightSequenceController will handle weather rendering timing');
         
         return result;
       } else {

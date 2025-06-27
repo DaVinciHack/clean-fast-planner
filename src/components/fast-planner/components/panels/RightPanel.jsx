@@ -755,121 +755,13 @@ const RightPanel = React.forwardRef(({
         onFlightLoad(flightData);
       }
       
-      // 🛰️ STEP 1: MAP STATE AWARE flight loading
-      console.log('🛰️ STEP 1: Map state aware flight loading');
+      // 🎯 CENTRALIZED: Use AppStateManager for coordinated camera control
+      console.log('🎯 RightPanel: Using centralized camera control');
       
-      try {
-        if (window.mapManager?.map) {
-          const map = window.mapManager.map;
-          const mapState = window.mapManager.getMapState();
-          
-          console.log('🛰️ STEP 1: Current map state:', mapState);
-          
-          // If NOT at 60°: Go starlight + pan to 60°
-          // If ALREADY at 60°: Go starlight + do 360° fly-around
-          if (mapState.tilt < 55) {
-            console.log('🛰️ STEP 1: Not at starlight angle, switching to satellite + will pan to 60°');
-          } else {
-            console.log('🛰️ STEP 1: Already at starlight angle, switching to satellite + will do fly-around');
-          }
-          
-          // Only switch to satellite if we're not already on satellite
-          if (!mapState.isStarlightMode) {
-            console.log('🛰️ STEP 1: Switching to satellite background');
-            
-            // IMMEDIATE switch to satellite for clean look
-            map.setStyle('mapbox://styles/mapbox/satellite-v9');
-            
-            // Handle style load for 3D terrain (but no angle change yet)
-            map.once('style.load', () => {
-              console.log('🛰️ STEP 1: Satellite loaded, adding 3D terrain (no angle change yet)');
-              
-              try {
-                // Add terrain source
-                if (!map.getSource('mapbox-dem')) {
-                  map.addSource('mapbox-dem', {
-                    'type': 'raster-dem',
-                    'url': 'mapbox://mapbox.terrain-rgb',
-                    'tileSize': 512,
-                    'maxzoom': 14
-                  });
-                }
-                
-                // Enable 3D terrain
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                console.log('🛰️ STEP 1: ✅ 3D terrain enabled (angle change deferred)');
-                
-                // STEP 3: Apply 3D angle AFTER flight loading is complete
-                setTimeout(() => {
-                  console.log('🛰️ STEP 3: Now applying FULL 3D angle after flight loading completed');
-                  map.easeTo({
-                    pitch: 60, // Full 3D angle to complete the transition
-                    bearing: map.getBearing(),
-                    duration: 2000
-                  });
-                  console.log('🛰️ STEP 3: ✅ FULL 60° angle applied - no camera jumping!');
-                  
-                  // 🎯 SMART TOGGLE: Notify that we're now in 3D mode
-                  setTimeout(() => {
-                    window.dispatchEvent(new CustomEvent('map-mode-changed', {
-                      detail: { mode: '3d', source: 'flight-loading' }
-                    }));
-                    console.log('🎯 SMART TOGGLE: Notified button that we are now in 3D mode - should show "Edit"');
-                  }, 2200); // Wait for camera transition to complete
-                }, 4000); // Wait longer for flight loading to completely finish
-                
-              } catch (terrainError) {
-                console.warn('🛰️ STEP 1: Error adding terrain:', terrainError.message);
-              }
-            });
-            
-          } else {
-            console.log('🛰️ STEP 1: Already on satellite, just ensuring 3D terrain and deferred angle');
-            
-            // Already on satellite, just ensure 3D terrain is enabled
-            try {
-              if (!map.getTerrain()) {
-                if (!map.getSource('mapbox-dem')) {
-                  map.addSource('mapbox-dem', {
-                    'type': 'raster-dem',
-                    'url': 'mapbox://mapbox.terrain-rgb',
-                    'tileSize': 512,
-                    'maxzoom': 14
-                  });
-                }
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-                console.log('🛰️ STEP 1: ✅ Added 3D terrain to existing satellite');
-              }
-              
-              // STEP 3: Apply 3D angle AFTER flight loading (even if already on satellite)
-              setTimeout(() => {
-                console.log('🛰️ STEP 3: Applying deferred FULL 3D angle to existing satellite');
-                map.easeTo({
-                  pitch: 60, // Full 3D angle to complete the transition
-                  bearing: map.getBearing(),
-                  duration: 2000
-                });
-                console.log('🛰️ STEP 3: ✅ FULL 60° angle applied to existing satellite - complete transition!');
-                
-                // 🎯 SMART TOGGLE: Notify that we're now in 3D mode
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('map-mode-changed', {
-                    detail: { mode: '3d', source: 'flight-loading' }
-                  }));
-                  console.log('🎯 SMART TOGGLE: Notified button that we are now in 3D mode - should show "Edit"');
-                }, 2200); // Wait for camera transition to complete
-              }, 4000); // Wait longer for flight loading to completely finish
-              
-            } catch (terrainError) {
-              console.warn('🛰️ STEP 1: Error adding terrain to existing satellite:', terrainError.message);
-            }
-          }
-          
-        }
-        
-      } catch (error) {
-        console.warn('🛰️ STEP 1: Error in satellite mode setup:', error.message);
-      }
+      // 🎬 NEW: RightPanel no longer controls map transitions
+      // All map state changes now handled by AppStateManager in FastPlannerApp.handleFlightLoad()
+      console.log('🎬 RightPanel: Flight loading delegated to FastPlannerApp AppStateManager integration');
+      console.log('🎬 RightPanel: No manual map control - state synchronization handled centrally');
       
       // STEP 2: Flight loading happens here (in the main flow) between style change and angle application
       

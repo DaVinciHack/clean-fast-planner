@@ -346,28 +346,32 @@ const AppHeader = ({
           {console.log('🔍 AppHeader ALWAYS: loadedFlightData is null?', loadedFlightData === null)}
           {console.log('🔍 AppHeader ALWAYS: loadedFlightData is undefined?', loadedFlightData === undefined)}
           
-          {loadedFlightData ? (
-            <>
-              {console.log('🔍 AppHeader DEBUG: INSIDE loadedFlightData block')}
-              {console.log('🔍 AppHeader DEBUG: Available fields =', Object.keys(loadedFlightData))}
-              <span className="AppHeader-flight-name" style={{ color: '#FFFFFF' }}>
-                {loadedFlightData.flightNumber || loadedFlightData.name || 'Unknown Flight'}
-              </span>
-              <span 
-                className="AppHeader-flight-departure" 
-                style={{ color: getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).color }}
-              >
-                {getTimeToDepature(loadedFlightData.etd || loadedFlightData.estimatedTimeOfDeparture).text}
-              </span>
-            </>
-          ) : (
-            <>
-              {console.log('🔍 AppHeader DEBUG: INSIDE No Flight Loaded block')}
+          {(() => {
+            // Use centralized state for immediate header updates
+            const appState = window.appStateManager?.getState();
+            const centralizedFlightData = appState?.loadedFlightData;
+            const flightData = centralizedFlightData || loadedFlightData;
+            
+            console.log('🎯 AppHeader CENTRALIZED: Using flight data from:', centralizedFlightData ? 'AppStateManager' : 'props');
+            
+            return flightData ? (
+              <>
+                <span className="AppHeader-flight-name" style={{ color: '#FFFFFF' }}>
+                  {flightData.flightNumber || flightData.name || 'Unknown Flight'}
+                </span>
+                <span 
+                  className="AppHeader-flight-departure" 
+                  style={{ color: getTimeToDepature(flightData.etd || flightData.estimatedTimeOfDeparture).color }}
+                >
+                  {getTimeToDepature(flightData.etd || flightData.estimatedTimeOfDeparture).text}
+                </span>
+              </>
+            ) : (
               <span className="AppHeader-no-flight" style={{ color: '#888888' }}>
                 No Flight Loaded
               </span>
-            </>
-          )}
+            );
+          })()}
         </div>
       </div>
       

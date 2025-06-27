@@ -177,18 +177,18 @@ const FlightWizard = ({
     console.log('🧙‍♂️ Wizard: Selected flight:', flight.flightNumber || flight.name);
     console.log('🧙‍♂️ Wizard: Using EXACT LoadFlightsCard workflow');
     
-    // 🛰️ MAP STATE AWARE: Check current state before transitioning
+    // 🎯 WIZARD MAP STATE AWARE: Check current state before transitioning
     if (window.mapManager?.map) {
       const mapState = window.mapManager.getMapState();
       console.log('🧙‍♂️ Wizard: Current map state:', mapState);
       
-      // If NOT at 60°: Go starlight + pan to 60°
-      // If ALREADY at 60°: Go starlight + do 360° fly-around
-      if (mapState.tilt < 55) {
-        console.log('🛰️ Wizard: Not at starlight angle, switching to satellite behind wizard');
-        window.mapManager.map.setStyle('mapbox://styles/mapbox/satellite-v9');
+      if (mapState.isStarlightMode) {
+        // Already in starlight mode - wizard will trigger 360° spin via RightPanel
+        console.log('🌪️ Wizard: Already in starlight mode - RightPanel will handle 360° spin');
       } else {
-        console.log('🛰️ Wizard: Already at starlight angle, no style change needed');
+        // Not in starlight mode - switch to satellite behind wizard
+        console.log('🛰️ Wizard: Not in starlight mode, switching to satellite behind wizard');
+        window.mapManager.map.setStyle('mapbox://styles/mapbox/satellite-v9');
       }
     }
     

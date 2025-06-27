@@ -347,13 +347,17 @@ export const RegionProvider = ({
         return false;
       }
       
-      // Force map to fly to the region bounds with no conditions
+      // Force map to fly to the region bounds with map state awareness
+      const currentMapState = window.mapManager?.getMapState();
+      const targetPitch = currentMapState?.isStarlightMode ? 60 : 0;
+      
       map.fitBounds(region.bounds, {
         padding: 50,
         maxZoom: region.zoom || 6,
         animate: true,
         duration: 3000,
-        essential: true
+        essential: true,
+        pitch: targetPitch  // Preserve current map mode
       });
       
       console.log(`RegionContext [EMERGENCY FLY]: Forced flight to ${region.name}`);
@@ -424,14 +428,18 @@ export const RegionProvider = ({
           return false;
         }
         
-        // Force a direct flyTo with no conditions
+        // Force a direct flyTo with map state awareness
+        const currentMapState = window.mapManager?.getMapState();
+        const targetPitch = currentMapState?.isStarlightMode ? 60 : 0;
+        
         map.fitBounds(currentRegion.bounds, { 
           padding: 50, 
           maxZoom: currentRegion.zoom || 6,
           animate: true,
           duration: 3000,  // 3 seconds for smooth animation
           essential: true,
-          linear: false    // Use default ease-out effect
+          linear: false,   // Use default ease-out effect
+          pitch: targetPitch  // Preserve current map mode
         });
         
         console.log(`RegionContext [DIRECT FLY]: Forced flight to ${currentRegion.name} bounds`);
@@ -683,13 +691,18 @@ export const RegionProvider = ({
         const map = mapManagerRef?.current?.getMap();
         if (map && typeof map.fitBounds === 'function' && initialCenter) {
           console.log(`%c REGION DIAGNOSTIC: Flying directly to ${regionObject.name} bounds`, 'background: #ffcc00; color: black;');
-          // Skip any intermediate positions and go directly to target
+          
+          // Skip any intermediate positions and go directly to target with map state awareness
+          const currentMapState = window.mapManager?.getMapState();
+          const targetPitch = currentMapState?.isStarlightMode ? 60 : 0;
+          
           map.fitBounds(regionObject.bounds, { 
             padding: 50, 
             maxZoom: regionObject.zoom || 6,
             animate: true,
             duration: 3000,
-            essential: true
+            essential: true,
+            pitch: targetPitch  // Preserve current map mode
           });
         } else {
           // Fall back to directFlyToRegion

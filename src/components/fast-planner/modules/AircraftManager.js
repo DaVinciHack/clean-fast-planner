@@ -1177,12 +1177,19 @@ class AircraftManager {
     if (registration) {
       const aircraft = this.getAircraftByRegistration(registration);
       if (aircraft) {
+        // 🚨 AVIATION SAFETY: Only return data if we have real aircraft specs
+        const hasRequiredData = aircraft.cruiseSpeed && aircraft.fuelBurn && aircraft.maxFuel;
+        if (!hasRequiredData) {
+          console.error('🚨 SAFETY CRITICAL: Aircraft missing performance data:', registration);
+          return null; // Fail safely - no calculations with incomplete data
+        }
+        
         return {
-          cruiseSpeed: aircraft.cruiseSpeed || this.defaultPerformanceData[type]?.cruiseSpeed || 145,
-          fuelBurn: aircraft.fuelBurn || this.defaultPerformanceData[type]?.fuelBurn || 1100,
-          maxFuel: aircraft.maxFuel || this.defaultPerformanceData[type]?.maxFuel || 5000,
-          maxPassengers: aircraft.maxPassengers || this.defaultPerformanceData[type]?.maxPassengers || 19,
-          usefulLoad: aircraft.usefulLoad || this.defaultPerformanceData[type]?.usefulLoad || 7000
+          cruiseSpeed: aircraft.cruiseSpeed,
+          fuelBurn: aircraft.fuelBurn,
+          maxFuel: aircraft.maxFuel,
+          maxPassengers: aircraft.maxPassengers || 0,
+          usefulLoad: aircraft.usefulLoad || 0
         };
       }
     }

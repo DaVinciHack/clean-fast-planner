@@ -1441,9 +1441,16 @@ const FastPlannerCore = ({
     }
   };
 
+
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
-    console.log('🚨 FLIGHT LOAD STARTED - handleFlightLoad function called');
+    console.log('🚨 FLIGHT LOAD STARTED - FlightSequenceController will handle the sequence');
+    
+    // 🎬 CRITICAL: Store flight data globally for FlightSequenceController
+    window.currentFlightData = flightData;
+    window.appManagers = appManagers;
+    window.currentRouteStats = routeStats;
+    console.log('🎬 STORED: Flight data stored globally for FlightSequenceController access');
     
     // 🔍 DEBUG: Log the complete flightData structure to find flight ID
     console.log('🔍 COMPLETE FLIGHT DATA STRUCTURE:', JSON.stringify(flightData, null, 2));
@@ -1680,6 +1687,24 @@ const FastPlannerCore = ({
       // Wait for clear to complete
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      // 🎬 BEFORE FLIGHT LOADS: Switch to satellite if in edit mode
+      if (currentMapMode !== '3d' && mapManagerRef?.current?.map) {
+        console.log('🌟 BEFORE LOADING: Switching to satellite mode first');
+        const map = mapManagerRef.current.map;
+        map.setStyle('mapbox://styles/mapbox/satellite-v9');
+        setCurrentMapMode('3d');
+        
+        // Wait for style to load before continuing
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      console.log('🎬 Flight loading - proceeding in mode:', currentMapMode);
+      
+      // Remove this - check mode later at actual animation time
+      
+      // SIMPLE: Let the normal flight loading work like the wizard does
+      console.log('🚁 SIMPLE: Proceeding with normal flight loading (like wizard)');
+      
       // 🚨 CRITICAL FIX: Always check for displayWaypoints in raw flight data first
       // The issue was that extracted waypoints were incomplete, causing fallback to route string
       const hasRawDisplayWaypoints = flightData._rawFlight?.displayWaypoints;
@@ -1799,211 +1824,8 @@ const FastPlannerCore = ({
             }
           );
           
-          // 🌤️ CRITICAL: Auto-load weather segments for loaded flight using OSDK directly
-          // MOVED OUTSIDE stop cards condition to ensure it always runs
-          console.log('🌤️ Auto-loading weather segments for flight:', flightData.flightId);
-          if (flightData.flightId) {
-            try {
-              console.log('🌤️ Loading OSDK weather data for flight:', flightData.flightId);
-              
-              // Use the EXACT WeatherCard method to fetch weather segments
-              const sdk = await import('@flight-app/sdk');
-              
-              if (!sdk.NorwayWeatherSegments) {
-                throw new Error('NorwayWeatherSegments not found in SDK');
-              }
-              
-              console.log('🌤️ Fetching NorwayWeatherSegments directly like WeatherCard...');
-              
-              // Import client from correct path (src/client.ts)
-              const { default: client } = await import('../../client');
-              
-              // Fetch exactly like WeatherCard does
-              const weatherResult = await client(sdk.NorwayWeatherSegments)
-                .where({ flightUuid: flightData.flightId })
-                .fetchPage({ $pageSize: 1000 });
-                
-              const loadedWeatherSegments = weatherResult.data || [];
-              console.log(`🌤️ Fetched ${loadedWeatherSegments.length} NorwayWeatherSegments directly`);
-              
-              if (loadedWeatherSegments.length > 0) {
-                console.log("🌤️ First weather segment structure:", JSON.stringify(loadedWeatherSegments[0], null, 2));
-                
-                // Set weather segments globally and trigger auto-loading
-                window.loadedWeatherSegments = loadedWeatherSegments;
-                console.log('🌤️ STORED: Weather segments stored in window.loadedWeatherSegments for auto-loading');
-                
-                // CRITICAL FIX: Store alternate route data for correct split point coordinates
-                if (alternateRouteData && alternateRouteData.splitPoint) {
-                  window.flightAlternateData = alternateRouteData;
-                  console.log('🎯 STORED: Flight alternate data with correct split point:', {
-                    splitPoint: alternateRouteData.splitPoint,
-                    name: alternateRouteData.name,
-                    coordinateCount: alternateRouteData.coordinates?.length || 0
-                  });
-                } else {
-                  console.warn('🎯 WARNING: No alternate route data available for correct split point');
-                }
-                
-                // PROFESSIONAL SOLUTION: Dispatch proper data-ready event instead of timeouts
-                console.log('🎯 PROFESSIONAL: Dispatching weather-data-ready event for proper event-driven triggers');
-                window.dispatchEvent(new CustomEvent('weather-data-ready', {
-                  detail: {
-                    weatherSegments: loadedWeatherSegments,
-                    flightAlternateData: alternateRouteData,
-                    timestamp: Date.now(),
-                    source: 'flight-load-complete'
-                  }
-                }));
-                
-                // COMPREHENSIVE DEBUG: Let's see what's actually happening
-                console.log('🚨 DEBUG: Flight load complete - starting comprehensive debug');
-                console.log('🚨 DEBUG: loadedWeatherSegments:', loadedWeatherSegments?.length || 0);
-                console.log('🚨 DEBUG: alternateRouteData:', !!alternateRouteData);
-                console.log('🚨 DEBUG: window.mapManager:', !!window.mapManager);
-                console.log('🚨 DEBUG: window.mapManagerRef:', !!window.mapManagerRef);
-                console.log('🚨 DEBUG: Map available:', !!(window.mapManager?.map || window.mapManagerRef?.current?.map));
-                
-                // Store debug data globally for inspection
-                window.debugWeatherData = {
-                  loadedWeatherSegments,
-                  alternateRouteData,
-                  mapManager: window.mapManager,
-                  mapManagerRef: window.mapManagerRef,
-                  timestamp: Date.now()
-                };
-                
-                // DIRECT FIX: Force create weather circles immediately after data is available
-                setTimeout(() => {
-                  console.log('🚨 DEBUG TIMEOUT: Starting 1-second delayed creation');
-                  const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
-                  console.log('🚨 DEBUG TIMEOUT: Map check:', !!hasMap);
-                  console.log('🚨 DEBUG TIMEOUT: Weather segments check:', loadedWeatherSegments?.length || 0);
-                  
-                  if (loadedWeatherSegments && loadedWeatherSegments.length > 0 && hasMap) {
-                    console.log('🎯 DIRECT: Creating weather circles immediately with loaded data');
-                    console.log('🎯 DIRECT: First few weather segments:', loadedWeatherSegments.slice(0, 3));
-                    
-                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                      console.log('🎯 DIRECT: WeatherCirclesLayer imported successfully');
-                      
-                      // Clean up existing layer
-                      if (window.currentWeatherCirclesLayer) {
-                        try {
-                          window.currentWeatherCirclesLayer.removeWeatherCircles();
-                          console.log('🎯 DIRECT: Cleaned up existing layer');
-                        } catch (e) { 
-                          console.warn('🎯 DIRECT: Cleanup warning:', e.message); 
-                        }
-                      }
-                      
-                      // Create new layer
-                      console.log('🎯 DIRECT: Creating new WeatherCirclesLayer with map:', !!hasMap);
-                      const weatherCirclesLayer = new WeatherCirclesLayer(hasMap);
-                      console.log('🎯 DIRECT: WeatherCirclesLayer instance created');
-                      
-                      weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
-                      window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                      console.log('🎯 DIRECT: Weather circles created immediately after flight load - SUCCESS');
-                      
-                      // Extra verification
-                      setTimeout(() => {
-                        console.log('🎯 VERIFY: Checking if weather circles are visible on map');
-                        console.log('🎯 VERIFY: currentWeatherCirclesLayer exists:', !!window.currentWeatherCirclesLayer);
-                        console.log('🎯 VERIFY: Layer visible state:', window.currentWeatherCirclesLayer?.isVisible);
-                      }, 500);
-                      
-                    }).catch(error => {
-                      console.error('🎯 DIRECT: Error importing/creating weather circles:', error);
-                    });
-                  } else {
-                    console.log('🚨 DEBUG TIMEOUT: Failed checks:');
-                    console.log('🚨 DEBUG TIMEOUT: - Has weather segments:', !!(loadedWeatherSegments && loadedWeatherSegments.length > 0));
-                    console.log('🚨 DEBUG TIMEOUT: - Has map:', !!hasMap);
-                    console.log('🚨 DEBUG TIMEOUT: - Weather segments value:', loadedWeatherSegments);
-                  }
-                }, 1000); // 1 second after flight data is loaded
-                
-                // ADDITIONAL DEBUG: Multiple timing attempts
-                setTimeout(() => {
-                  console.log('🚨 DEBUG 3s: Checking data availability at 3 seconds');
-                  console.log('🚨 DEBUG 3s: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
-                  console.log('🚨 DEBUG 3s: window.flightAlternateData:', !!window.flightAlternateData);
-                }, 3000);
-                
-                setTimeout(() => {
-                  console.log('🚨 DEBUG 5s: Checking data availability at 5 seconds');
-                  console.log('🚨 DEBUG 5s: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
-                  console.log('🚨 DEBUG 5s: window.flightAlternateData:', !!window.flightAlternateData);
-                }, 5000);
-                
-                // GLOBAL DEBUG FUNCTION: Make manual testing available
-                window.debugWeatherCircles = () => {
-                  console.log('🔧 MANUAL DEBUG: Running manual weather circles creation');
-                  console.log('🔧 MANUAL DEBUG: window.loadedWeatherSegments:', window.loadedWeatherSegments?.length || 0);
-                  console.log('🔧 MANUAL DEBUG: window.flightAlternateData:', !!window.flightAlternateData);
-                  console.log('🔧 MANUAL DEBUG: window.mapManager:', !!window.mapManager);
-                  
-                  const hasMap = window.mapManager?.map || window.mapManagerRef?.current?.map;
-                  const weatherData = window.loadedWeatherSegments;
-                  
-                  if (weatherData && weatherData.length > 0 && hasMap) {
-                    import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                      if (window.currentWeatherCirclesLayer) {
-                        window.currentWeatherCirclesLayer.removeWeatherCircles();
-                      }
-                      const layer = new WeatherCirclesLayer(hasMap);
-                      layer.addWeatherCircles(weatherData);
-                      window.currentWeatherCirclesLayer = layer;
-                      console.log('🔧 MANUAL DEBUG: Weather circles created manually - SUCCESS');
-                    });
-                  } else {
-                    console.log('🔧 MANUAL DEBUG: FAILED - missing data or map');
-                  }
-                };
-                
-                // DISABLED: Auto-creation of weather circles on flight load - let user control
-                console.log('🚫 DISABLED: Auto-creation of weather circles on flight load');
-                console.log('🚫 Available weather data:', {
-                  segmentCount: loadedWeatherSegments.length,
-                  message: 'User can manually enable weather circles in Map Layers panel'
-                });
-                // setTimeout(() => {
-                //   console.log('🌤️ FORCE: Attempting to auto-create weather circles after data load');
-                //   if (mapManagerRef?.current?.map && loadedWeatherSegments.length > 0) {
-                //     import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
-                //       // Clean up any existing layer first
-                //       if (window.currentWeatherCirclesLayer) {
-                //         try {
-                //           window.currentWeatherCirclesLayer.removeWeatherCircles();
-                //         } catch (cleanupError) {
-                //           console.warn('🌤️ FORCE: Cleanup error:', cleanupError);
-                //         }
-                //       }
-                //       
-                //       console.log('🌤️ FORCE: Creating WeatherCirclesLayer with loaded flight data');
-                //       const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
-                //       weatherCirclesLayer.addWeatherCircles(loadedWeatherSegments);
-                //       window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                //       console.log('🌤️ FORCE: Weather circles force-created for loaded flight');
-                //       
-                //       // Also dispatch an event to update MapLayersCard state
-                //       window.dispatchEvent(new CustomEvent('weather-circles-force-enabled'));
-                //     }).catch(error => {
-                //       console.error('🌤️ FORCE: Error force-creating weather circles:', error);
-                //     });
-                //   }
-                // }, 2000); // Wait 2 seconds for map to be ready
-              }
-              
-              console.log('🌤️ Weather segments loaded successfully for flight');
-            } catch (weatherError) {
-              console.error('🌤️ Failed to load weather segments:', weatherError);
-              console.error('🌤️ Weather error details:', weatherError.message);
-            }
-          } else {
-            console.warn('🌤️ Cannot load weather segments - missing flightId');
-          }
+          // 🌤️ DEFERRED: Weather segments and circles moved to AFTER flight sequence completion
+          console.log('🌤️ DEFERRED: Weather processing deferred until after flight sequence complete');
           
           if (newStopCards && newStopCards.length > 0) {
             console.log(`Generated ${newStopCards.length} stop cards for loaded flight`);
@@ -2012,51 +1834,6 @@ const FastPlannerCore = ({
             // Make stop cards globally available for debugging
             window.debugStopCards = newStopCards;
             console.log('Stop cards available at window.debugStopCards');
-            
-            // 🛢️ RIG WEATHER: Make current waypoints globally available for weather circle coordinate lookup
-            window.currentWaypoints = processedWaypoints;
-            console.log('🛢️ RIG WEATHER: Current waypoints made globally available for weather circles:', processedWaypoints.length);
-            console.log('🌤️ Auto-loading weather segments for flight:', flightData.flightId);
-            if (flightData.flightId) {
-              try {
-                console.log('🌤️ Loading OSDK weather data for flight:', flightData.flightId);
-                
-                // Use the EXACT WeatherCard method to fetch weather segments
-                const sdk = await import('@flight-app/sdk');
-                
-                if (!sdk.NorwayWeatherSegments) {
-                  throw new Error('NorwayWeatherSegments not found in SDK');
-                }
-                
-                console.log('🌤️ Fetching NorwayWeatherSegments directly like WeatherCard...');
-                
-                // Import client from correct path (src/client.ts)
-                const { default: client } = await import('../../client');
-                
-                // Fetch exactly like WeatherCard does
-                const weatherResult = await client(sdk.NorwayWeatherSegments)
-                  .where({ flightUuid: flightData.flightId })
-                  .fetchPage({ $pageSize: 1000 });
-                  
-                const loadedWeatherSegments = weatherResult.data || [];
-                console.log(`🌤️ Fetched ${loadedWeatherSegments.length} NorwayWeatherSegments directly`);
-                
-                if (loadedWeatherSegments.length > 0) {
-                  console.log("🌤️ First weather segment structure:", JSON.stringify(loadedWeatherSegments[0], null, 2));
-                  
-                  // TODO: Set weather segments state for fuel calculations
-                  // This needs to integrate with the useWeatherSegments hook
-                  window.loadedWeatherSegments = loadedWeatherSegments; // Temporary for debugging
-                }
-                
-                console.log('🌤️ Weather segments loaded successfully for flight');
-              } catch (weatherError) {
-                console.error('🌤️ Failed to load weather segments:', weatherError);
-                console.error('🌤️ Weather error details:', weatherError.message);
-              }
-            } else {
-              console.warn('🌤️ Cannot load weather segments - missing flightId');
-            }
             
             // 🚫 REMOVED: Second auto-zoom was happening too late and zooming too close without alternates
             // The first auto-zoom (after direct coordinate loading) is perfect - keep only that one
@@ -2314,73 +2091,8 @@ const FastPlannerCore = ({
             console.warn('DEBUG: No fullRouteGeoShape found in raw flight');
           }
           
-          // Extract alternate route data if available
-          // First check if alternate data was passed directly from RightPanel
-          if (flightData.alternateRouteData) {
-            console.log('🟠 FASTPLANNER LOAD: Using alternate data passed from RightPanel:', flightData.alternateRouteData);
-            alternateRouteData = flightData.alternateRouteData;
-          }
-          // Otherwise extract from raw flight (for auto-reload cases)
-          else if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
-            console.log('🟠 FLIGHT LOAD DEBUG: Found alternateFullRouteGeoShape, extracting alternate route data...');
-            console.log('🟠 FLIGHT LOAD DEBUG: Current waypoint count:', waypoints?.length || 0);
-            
-            // Extract alternate route coordinates
-            const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
-              rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
-              
-            console.log('🟠 FLIGHT LOAD DEBUG: Alternate GeoShape:', alternateGeoShape);
-            
-            if (alternateGeoShape && alternateGeoShape.coordinates) {
-              alternateRouteData = {
-                coordinates: alternateGeoShape.coordinates,
-                splitPoint: rawFlight.alternateSplitPoint || null,
-                name: rawFlight.alternateName || 'Alternate Route',
-                geoPoint: rawFlight.alternateGeoPoint || null,
-                legIds: rawFlight.alternateLegIds || []
-              };
-              
-              console.log('🟠 FLIGHT LOAD DEBUG: Successfully created alternateRouteData:', {
-                coordinateCount: alternateRouteData.coordinates.length,
-                splitPoint: alternateRouteData.splitPoint,
-                name: alternateRouteData.name
-              });
-            } else {
-              console.warn('🟠 FLIGHT LOAD DEBUG: No coordinates found in alternate geoShape');
-            }
-          } else {
-            console.log('🟠 FLIGHT LOAD DEBUG: No alternate route data found');
-            console.log('🟠 FLIGHT LOAD DEBUG: flightData.alternateRouteData:', !!flightData.alternateRouteData);
-            console.log('🟠 FLIGHT LOAD DEBUG: rawFlight.alternateFullRouteGeoShape:', !!rawFlight?.alternateFullRouteGeoShape);
-          }
-          
-          // Store alternate route data in state for rendering
-          if (alternateRouteData) {
-            console.log('🟠 STATE DEBUG: Storing alternate route data in component state');
-            console.log('🟠 STATE DEBUG: About to store alternateRouteData:', {
-              hasCoordinates: !!alternateRouteData.coordinates,
-              coordinateCount: alternateRouteData.coordinates?.length,
-              name: alternateRouteData.name,
-              splitPoint: alternateRouteData.splitPoint
-            });
-            setAlternateRouteData(alternateRouteData);
-            
-            // 🚁 CRITICAL FIX: Trigger map update to render alternate route after flight loading
-            console.log('🟠 FLIGHT LOAD: Triggering map update to render loaded alternate route');
-            if (appManagers.waypointManagerRef?.current) {
-              // Use current routeStats (will be calculated) and the loaded alternateRouteData
-              appManagers.waypointManagerRef.current.updateRoute(routeStats, alternateRouteData);
-            }
-            
-            // Also populate the alternate route input field with the current alternate name
-            console.log('🟠 STATE DEBUG: Setting alternate route input to:', alternateRouteData.name);
-            console.log('ALTERNATE LOAD: Restored alternateRouteInput =', alternateRouteData.name);
-            setAlternateRouteInput(alternateRouteData.name);
-          } else {
-            console.log('🟠 STATE DEBUG: Clearing alternate route data (no alternate route in flight)');
-            setAlternateRouteData(null);
-            setAlternateRouteInput(''); // Clear input field too
-          }
+          // MOVED: Alternate route processing will happen AFTER main route loads
+          console.log('🟠 DEFERRED: Alternate route processing deferred until after main route');
           
           // Get the waypoint names with labels
           const displayWaypoints = waypointsToProcess;
@@ -2443,6 +2155,56 @@ const FastPlannerCore = ({
             
             console.log('All flight waypoints and stops loaded successfully');
             
+            // EXTRACT AND RENDER: Process alternate route AFTER main route is complete
+            console.log('🟠 EXTRACTING: Processing alternate route data after main route completion');
+            
+            let alternateRouteData = null;
+            
+            // Extract alternate route data (moved from earlier)
+            const rawFlight = flightData._rawFlight;
+            if (flightData.alternateRouteData) {
+              console.log('🟠 EXTRACT: Using alternate data passed from RightPanel');
+              alternateRouteData = flightData.alternateRouteData;
+            } else if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
+              console.log('🟠 EXTRACT: Found alternateFullRouteGeoShape, extracting...');
+              
+              const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
+                rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
+                
+              if (alternateGeoShape && alternateGeoShape.coordinates) {
+                alternateRouteData = {
+                  coordinates: alternateGeoShape.coordinates,
+                  splitPoint: rawFlight.alternateSplitPoint || null,
+                  name: rawFlight.alternateName || 'Alternate Route',
+                  geoPoint: rawFlight.alternateGeoPoint || null,
+                  legIds: rawFlight.alternateLegIds || []
+                };
+                console.log('🟠 EXTRACT: Created alternateRouteData:', {
+                  coordinateCount: alternateRouteData.coordinates.length,
+                  name: alternateRouteData.name
+                });
+              }
+            }
+            
+            // Store and render alternate route AFTER main route
+            if (alternateRouteData) {
+              setAlternateRouteData(alternateRouteData);
+              setAlternateRouteInput(alternateRouteData.name);
+              window.pendingAlternateRouteData = alternateRouteData;
+              
+              // Render alternate route
+              setTimeout(() => {
+                if (appManagers.waypointManagerRef?.current && alternateRouteData) {
+                  appManagers.waypointManagerRef.current.updateRoute(routeStats, alternateRouteData);
+                  console.log('🟠 RENDERED: Alternate route rendered after main route');
+                }
+              }, 300); // Small delay after main route completion
+            } else {
+              setAlternateRouteData(null);
+              setAlternateRouteInput('');
+              window.pendingAlternateRouteData = null;
+            }
+            
             // 🛢️ RIG WEATHER: Make waypoints globally available for weather circle coordinate lookup
             const waypointObjects = routeCoordinates.map((coords, index) => ({
               name: displayWaypoints[index]?.replace(/\s*\([^)]*\)\s*$/, '').trim() || `Point ${index + 1}`,
@@ -2453,25 +2215,60 @@ const FastPlannerCore = ({
             window.currentWaypoints = waypointObjects;
             console.log('🛢️ RIG WEATHER: Direct coordinate waypoints made globally available:', waypointObjects.length);
             
-            // 🎯 AUTO-ZOOM: Immediately trigger auto-zoom after direct coordinate loading
+            // 🎯 ZOOM: Always zoom to flight after it loads
             setTimeout(() => {
-              if (mapManagerRef?.current && routeCoordinates && routeCoordinates.length > 0) {
-                console.log('🎯 AUTO-ZOOM: Triggering auto-zoom after direct coordinate loading');
+              if (routeCoordinates && routeCoordinates.length > 0 && mapManagerRef?.current) {
+                console.log('🎯 ZOOM: Zooming to flight including alternates');
                 
-                const zoomSuccess = mapManagerRef.current.autoZoomToFlight(waypointObjects, {
-                  padding: 150,          // More generous padding around flight
-                  maxZoom: 8,            // Much less close zoom
-                  duration: 2000,        // Fast 2 second animation
-                  animate: true
+                // Combine main route with alternates for bounding box
+                let allCoordinates = [...waypointObjects];
+                
+                // Add alternate route coordinates if available
+                if (alternateRouteData?.coordinates) {
+                  console.log('🎯 Including alternate coordinates in zoom bounds');
+                  const alternateWaypoints = alternateRouteData.coordinates.map(coord => ({
+                    lat: coord[1],
+                    lng: coord[0],
+                    name: 'Alternate'
+                  }));
+                  allCoordinates = [...allCoordinates, ...alternateWaypoints];
+                  console.log(`🎯 Zoom bounds: ${waypointObjects.length} main + ${alternateWaypoints.length} alternate waypoints`);
+                }
+                
+                // Zoom to include both main route and alternates
+                const zoomSuccess = mapManagerRef.current.autoZoomToFlight(allCoordinates, {
+                  padding: 120,     // Less padding 
+                  maxZoom: 8,       // Closer zoom (back to 8)
+                  duration: 2000,   
+                  animate: true,
+                  pitch: 60         
                 });
                 
                 if (zoomSuccess) {
-                  console.log('🎯 AUTO-ZOOM: Successfully auto-zoomed to loaded flight coordinates');
+                  console.log('🎯 ZOOM: Successfully zoomed to flight');
                 } else {
-                  console.warn('🎯 AUTO-ZOOM: Failed to auto-zoom to loaded flight coordinates');
+                  console.warn('🎯 ZOOM: Failed to zoom to flight');
                 }
               }
             }, 500); // Small delay to allow waypoint rendering
+            
+            // 🎯 SMOOTH TILT: Just smooth tilt, accept current map style
+            setTimeout(() => {
+              if (mapManagerRef?.current?.map) {
+                console.log('🌟 SMOOTH TILT: Applying smooth tilt only');
+                const map = mapManagerRef.current.map;
+                
+                // Smooth tilt without changing anything else
+                map.flyTo({
+                  pitch: 60,
+                  duration: 1500,
+                  easing: (t) => 1 - Math.pow(1 - t, 3)
+                });
+                
+                // Update state so glass button works correctly
+                setCurrentMapMode('3d');
+              }
+            }, 2500); // After zoom completes
             
             // Update loading indicator
             if (window.LoadingIndicator) {
@@ -2807,15 +2604,9 @@ const FastPlannerCore = ({
         console.log('🎯 SMART TOGGLE: ✅ Flight loaded - showing toggle button');
         setShowEditButton(true);
         
-        // Detect the final mode after 3D transition completes
-        setTimeout(() => {
-          const mapManager = mapManagerRef?.current;
-          if (mapManager && mapManager.getCurrentStyle) {
-            const currentStyle = mapManager.getCurrentStyle();
-            console.log('🎯 SMART TOGGLE: Detected final mode after flight load:', currentStyle);
-            setCurrentMapMode(currentStyle);
-          }
-        }, 3000); // Wait for 3D transition to complete
+        // DISABLED: This was overriding FlightSequenceController's state setting
+        // FlightSequenceController now properly manages currentMapMode
+        console.log('🎯 SMART TOGGLE: Using FlightSequenceController for state management');
       }, 1000);
     };
     

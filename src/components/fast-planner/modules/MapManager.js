@@ -559,8 +559,15 @@ class MapManager {
         essential: options.hasOwnProperty('essential') ? options.essential : true
       };
       
-      console.log(`MapManager: Fitting map to bounds with options:`, fitOptions);
-      this.map.fitBounds(bounds, fitOptions);
+      // 🎯 MAP STATE AWARE: Explicitly set pitch based on current mode
+      const currentMapState = this.getMapState();
+      const targetPitch = currentMapState.isStarlightMode ? 60 : 0;
+      
+      console.log(`MapManager: Fitting map to bounds with pitch: ${targetPitch}°`, fitOptions);
+      this.map.fitBounds(bounds, {
+        ...fitOptions,
+        pitch: targetPitch  // Explicitly set pitch instead of preserving random values
+      });
       return true;
     } catch (error) {
       console.error('MapManager: Error fitting map to bounds:', error);
@@ -1063,12 +1070,16 @@ class MapManager {
       const onStyleLoad = () => {
         console.log(`🗺️ Style ${styleId} loaded successfully`);
 
-        // Restore map position
+        // Restore map position - MAP STATE AWARE pitch handling
+        const targetPitch = styleId === '3d' ? 
+          (this.isStarlightMode() ? this.map.getPitch() : 60) : // Preserve current pitch if already in starlight
+          currentPitch;
+        
         this.map.jumpTo({
           center: currentCenter,
           zoom: currentZoom,
           bearing: currentBearing,
-          pitch: styleId === '3d' ? 60 : currentPitch // Set 3D pitch for 3D style
+          pitch: targetPitch
         });
 
         // For 3D style, enable terrain if available
@@ -1129,12 +1140,16 @@ class MapManager {
         }
       }
 
-      // Adjust pitch for better 3D viewing
-      this.map.easeTo({
-        pitch: 60,
-        duration: 2000
-      });
-      console.log('📐 Camera pitch adjusted for 3D viewing');
+      // MAP STATE AWARE pitch adjustment - only if not already in starlight mode
+      if (!this.isStarlightMode()) {
+        this.map.easeTo({
+          pitch: 60,
+          duration: 2000
+        });
+        console.log('📐 Camera pitch adjusted for 3D viewing');
+      } else {
+        console.log('📐 Already in starlight mode - preserving current pitch');
+      }
 
       // Try to add terrain if available (may not be supported in all styles)
       try {
@@ -1249,9 +1264,16 @@ class MapManager {
         essential: options.hasOwnProperty('essential') ? options.essential : true
       };
       
-      console.log(`🎯 MapManager: Fitting to bounds with options:`, fitOptions);
+      // 🎯 MAP STATE AWARE: Explicitly set pitch based on current mode
+      const currentMapState = this.getMapState();
+      const targetPitch = currentMapState.isStarlightMode ? 60 : 0;
       
-      this.map.fitBounds(bounds, fitOptions);
+      console.log(`🎯 MapManager: Auto-zoom with map state awareness - pitch: ${targetPitch}°`, fitOptions);
+      
+      this.map.fitBounds(bounds, {
+        ...fitOptions,
+        pitch: targetPitch  // Explicitly set pitch instead of preserving random values
+      });
       
       // Auto-load weather circles if flight has weather data
       setTimeout(() => {
@@ -1388,6 +1410,40 @@ class MapManager {
   isStarlightMode() {
     const state = this.getMapState();
     return state.isStarlightMode;
+  }
+
+  /**
+   * Perform 360° fly-around spin for flight loading when already in starlight mode
+   * @param {Object} options - Spin options
+   * @param {number} options.duration - Duration of the spin in milliseconds (default: 3000)
+   * @param {string} options.easing - Easing function (default: ease-in-out)
+   */
+  do360Spin(options = {}) {
+    if (!this.map) {
+      console.warn('MapManager: Cannot perform 360° spin - map not initialized');
+      return Promise.reject(new Error('Map not initialized'));
+    }
+
+    return new Promise((resolve) => {
+      const { duration = 3000, easing = 'ease-in-out' } = options;
+      const currentBearing = this.map.getBearing();
+      
+      console.log('🌪️ MapManager: Starting 360° fly-around spin');
+      
+      this.map.easeTo({
+        bearing: currentBearing + 360,
+        duration: duration,
+        easing: easing === 'ease-in-out' ? 
+          (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t : 
+          easing
+      });
+      
+      // Resolve after spin completes
+      setTimeout(() => {
+        console.log('🌪️ MapManager: 360° fly-around spin completed');
+        resolve();
+      }, duration + 100);
+    });
   }
 }
 
