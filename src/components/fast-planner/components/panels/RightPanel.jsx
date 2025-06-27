@@ -797,11 +797,10 @@ const RightPanel = React.forwardRef(({
       }
     }
     
-    // 🚫 DISABLED: Don't automatically return to main card after loading
-    // The user has chosen to close all panels when loading a flight
-    // setTimeout(() => {
-    //   handleCardChange('main');
-    // }, 500);
+    // ✅ RE-ENABLED: Return to main card after loading flight to show stop cards
+    setTimeout(() => {
+      handleCardChange('main');
+    }, 500);
   };
   
   /**
