@@ -458,12 +458,26 @@ const FastPlannerCore = ({
         cargoWeight: flightSettings.cargoWeight
       });
       
-      // 🔧 FINANCE CALCULATOR FIX: Also calculate routeStats for live updates
-      console.log('🔧 BYPASS FIX: Attempting routeStats calculation without appManagers dependency');
-      
+      // 🔧 PROPER FIX: Calculate routeStats with FILTERED landing stops only (matches StopCardCalculator)
       if (appManagers?.routeCalculatorRef?.current && waypoints.length >= 2) {
-        console.log('🔧 FINANCE FIX: Calculating routeStats for live updates');
-        const coordinates = waypoints.map(wp => wp.coords).filter(Boolean);
+        console.log('🔧 PROPER FIX: Calculating routeStats with filtered landing stops for Finance Calculator');
+        
+        // Filter out navigation waypoints (same logic as StopCardCalculator)
+        const landingStopsOnly = waypoints.filter(wp => {
+          const isWaypoint = 
+            wp.pointType === 'NAVIGATION_WAYPOINT' || 
+            wp.isWaypoint === true || 
+            wp.type === 'WAYPOINT';
+          return !isWaypoint;
+        });
+        
+        console.log('🔧 FILTERED WAYPOINTS:', {
+          originalCount: waypoints.length,
+          filteredCount: landingStopsOnly.length,
+          removed: waypoints.length - landingStopsOnly.length
+        });
+        
+        const coordinates = landingStopsOnly.map(wp => wp.coords).filter(Boolean);
         
         if (coordinates.length >= 2) {
           const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinates, {
@@ -475,11 +489,11 @@ const FastPlannerCore = ({
           
           if (newRouteStats) {
             setRouteStats(newRouteStats);
-            console.log('🔧 FINANCE FIX: RouteStats updated for finance calculator');
+            console.log('🔧 PROPER FIX: RouteStats updated with correct filtered waypoints');
           }
         }
       } else {
-        console.log('🔧 BYPASS FIX: No routeCalculatorRef.current, but continuing with stopCards calculation');
+        console.log('🔧 PROPER FIX: No routeCalculatorRef.current available');
       }
 
       // Generate stop cards and update header - KEEP EXISTING FUEL FLOW
@@ -488,6 +502,7 @@ const FastPlannerCore = ({
       console.log('🔧 STOP CARDS DEBUG: routeStats:', routeStats);
       console.log('🔧 STOP CARDS DEBUG: selectedAircraft:', !!selectedAircraft);
       console.log('🔧 STOP CARDS DEBUG: weather:', weather);
+      console.log('🔧 SAR DEBUG: alternateRouteData:', alternateRouteData);
       
       const newStopCards = generateStopCardsData(
         waypoints,
@@ -497,7 +512,8 @@ const FastPlannerCore = ({
         {
           ...flightSettings,
           araFuel: weatherFuel.araFuel,
-          approachFuel: weatherFuel.approachFuel
+          approachFuel: weatherFuel.approachFuel,
+          alternateRouteData: alternateRouteData  // 🔧 SAR FIX: Add alternate route data for SAR alternate card
         }
       );
       

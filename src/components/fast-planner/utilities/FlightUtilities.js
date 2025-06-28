@@ -12,7 +12,29 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
   // Get fuel policy for reserve fuel conversion
   const currentPolicy = fuelPolicy?.currentPolicy;
   
-  // Call StopCardCalculator directly with fuel policy
+  // 🔧 SAR FIX: Calculate alternate card first if alternate route data exists
+  let alternateStopCard = null;
+  if (options.alternateRouteData && selectedAircraft) {
+    console.log('🟠 generateStopCardsData: Calculating alternate stop card for SAR');
+    try {
+      alternateStopCard = StopCardCalculator.calculateAlternateStopCard(
+        waypoints,
+        options.alternateRouteData,
+        routeStats,
+        selectedAircraft,
+        weather,
+        {
+          ...options,
+          fuelPolicy: currentPolicy
+        }
+      );
+      console.log('🟠 generateStopCardsData: Alternate card calculated:', !!alternateStopCard);
+    } catch (error) {
+      console.error('🟠 generateStopCardsData: Error calculating alternate card:', error);
+    }
+  }
+  
+  // Call StopCardCalculator directly with fuel policy AND alternate card
   const stopCards = StopCardCalculator.calculateStopCards(
     waypoints,
     routeStats, 
@@ -22,7 +44,10 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
       ...options,
       fuelPolicy: currentPolicy
     },
-    weatherSegments
+    weatherSegments,
+    options.refuelStops || [],
+    options.waiveAlternates || false,
+    alternateStopCard  // 🔧 SAR FIX: Pass alternate card to main calculation
   );
   
   console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');
