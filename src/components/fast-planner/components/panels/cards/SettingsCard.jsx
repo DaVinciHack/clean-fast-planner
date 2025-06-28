@@ -33,7 +33,13 @@ const SettingsCard = ({
   aircraftType,
   // Fuel policy props
   fuelPolicy = null,
-  currentRegion = null
+  currentRegion = null,
+  // Fuel save-back props
+  currentFlightId = null,
+  stopCards = [],
+  routeStats = {},
+  araFuel = 0,
+  approachFuel = 0
 }) => {
   
   // REMOVED: localStorage loading - all values now come from fuel policy
@@ -118,18 +124,6 @@ const SettingsCard = ({
           currentRegion={currentRegion}
           selectedAircraft={selectedAircraft}
         />
-        
-        <div style={{ marginTop: '15px', padding: '1rem', backgroundColor: '#2a2a2a', borderRadius: '6px' }}>
-          <h5 style={{ color: '#4FC3F7', margin: '0 0 0.5rem 0', fontSize: '0.7rem' }}>
-            FUEL POLICY INTEGRATION
-          </h5>
-          <div style={{ fontSize: '0.7rem', color: '#9ca3af', lineHeight: '1.4' }}>
-            ✅ All fuel values now come from OSDK fuel policies<br/>
-            ✅ Settings automatically load by region and aircraft<br/>
-            ✅ No browser storage conflicts - aviation standard data flow<br/>
-            💡 Flight-specific overrides are saved with the flight plan
-          </div>
-        </div>
       </div>
     </div>
   );

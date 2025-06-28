@@ -704,4 +704,145 @@ const SaveFlightButton = ({
   );
 };
 
+/**
+ * Exported function for saving flight data without UI
+ * This can be imported by other components that need to save flights
+ */
+export const saveFlightData = async (
+  flightData,
+  selectedAircraft,
+  waypoints,
+  routeStats,
+  runAutomation = false,
+  onSuccess = () => {},
+  onError = () => {}
+) => {
+  if (!selectedAircraft || !waypoints || waypoints.length < 2) {
+    const error = 'Cannot save flight: Missing aircraft or waypoints';
+    onError(error);
+    throw new Error(error);
+  }
+  
+  try {
+    // Import required services
+    const PalantirFlightService = (await import('../../services/PalantirFlightService')).default;
+    
+    // Update loading indicator if available
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator('Saving flight...');
+    }
+    
+    // Get waypoint locations for the API - ONLY include landing stops (rigs/airports), NOT navigation waypoints
+    const locations = waypoints
+      .filter(wp => {
+        // Use the SAME logic as the left panel to determine waypoint type
+        const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+        // Only include in locations if it's NOT a waypoint (i.e., it's a landing stop)
+        return !isWaypointType;
+      })
+      .map(wp => {
+        // Clean up location names - trim whitespace to avoid issues
+        const locationName = wp.name ? wp.name.trim() : `${wp.coords[1].toFixed(6)},${wp.coords[0].toFixed(6)}`;
+        return locationName;
+      });
+    
+    // Format the ETD for Palantir
+    const etdTimestamp = new Date(flightData.etd).toISOString();
+    
+    // Use the aircraft tail number (rawRegistration) first, then assetId as fallback
+    const finalAircraftId = selectedAircraft.rawRegistration || selectedAircraft.assetId || "190";
+    
+    // Filter navigation waypoints
+    const navigationWaypoints = waypoints.filter(wp => {
+      const isWaypointType = wp.isWaypoint === true || wp.type === 'WAYPOINT';
+      return isWaypointType;
+    });
+    
+    // Group waypoints by leg if available, otherwise put all in leg 0
+    const waypointsWithLegs = navigationWaypoints.map((wp, index) => {
+      return {
+        legIndex: wp.legIndex || 0,
+        name: wp.name || `Waypoint ${index + 1}`,
+        coords: wp.coords,
+        id: wp.id,
+        type: wp.type,
+        pointType: wp.pointType,
+        isWaypoint: wp.isWaypoint
+      };
+    });
+    
+    // Prepare parameters for the API
+    const apiParams = {
+      // Basic parameters
+      flightName: flightData.flightName,
+      aircraftRegion: "NORWAY", // Default region
+      aircraftId: finalAircraftId,
+      region: "NORWAY", // Default region
+      etd: etdTimestamp,
+      locations: locations,
+      alternateLocation: flightData.alternateLocation || "",
+      
+      // Add flight ID if this is an update (flight already exists)
+      ...(flightData.flightId ? { flightId: flightData.flightId } : {}),
+      
+      // Structured waypoints for the API
+      waypoints: waypointsWithLegs,
+      
+      // Waypoint handling preference
+      useOnlyProvidedWaypoints: flightData.useOnlyFastPlannerWaypoints || false,
+      
+      // Crew member IDs
+      captainId: flightData.captainId || null,
+      copilotId: flightData.copilotId || null,
+      medicId: flightData.medicId || null,
+      soId: flightData.soId || null,
+      rswId: flightData.rswId || null
+    };
+    
+    console.log('Sending flight data to Palantir:', apiParams);
+    
+    // Call the service to create the flight
+    const result = await PalantirFlightService.createFlight(apiParams);
+    console.log('Flight creation result:', result);
+    
+    // Check if the result is successful
+    if (PalantirFlightService.isSuccessfulResult(result)) {
+      // Extract the flight ID
+      const flightId = PalantirFlightService.extractFlightId(result);
+      
+      console.log(`Flight created successfully with ID: ${flightId}`);
+      
+      // Show success message
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(`Flight "${flightData.flightName}" saved successfully!`, 'success');
+      }
+      
+      // Call success callback
+      onSuccess(`Flight "${flightData.flightName}" saved successfully`);
+      
+      return {
+        success: true,
+        flightId: flightId,
+        message: `Flight "${flightData.flightName}" saved successfully`
+      };
+    } else {
+      console.error('Invalid response from server:', result);
+      throw new Error('Flight creation failed: Invalid response from server');
+    }
+  } catch (error) {
+    console.error('Error creating flight:', error);
+    
+    // Format the error message
+    const errorMessage = `Failed to save flight: ${error.message}`;
+    
+    // Update loading indicator with error
+    if (window.LoadingIndicator) {
+      window.LoadingIndicator.updateStatusIndicator(errorMessage, 'error');
+    }
+    
+    onError(errorMessage);
+    throw error;
+  }
+};
+
 export default SaveFlightButton;

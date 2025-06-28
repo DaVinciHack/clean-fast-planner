@@ -27,7 +27,8 @@ const LeftPanel = ({
   onToggleWaypointMode, // Handler for the "Add Insert Waypoints" button
   waypointModeActive, // State to track if waypoint insertion mode is active
   onToggleAlternateMode, // Handler for the "Alternate Mode" button
-  alternateModeActive // State to track if alternate mode is active
+  alternateModeActive, // State to track if alternate mode is active
+  onClearAlternate // Handler for clearing alternate route
 }) => {
   // Initialize with safe, sanitized defaults
   const safeWaypoints = Array.isArray(waypoints) ? waypoints : [];
@@ -240,7 +241,9 @@ const LeftPanel = ({
       <div 
         className={`route-editor-panel ${!visible ? "hidden" : ""}`}
       >
-        <h3>Flight Stops</h3>
+        <h3 style={{ color: alternateModeActive ? "#ffcc00" : "inherit" }}>
+          {alternateModeActive ? "ALTERNATE MODE" : "Flight Routing"}
+        </h3>
         
         {/* ROUTE BUILDING SECTION */}
         <div style={{ 
@@ -495,12 +498,12 @@ const LeftPanel = ({
 
         {/* ALTERNATES SECTION */}
         <div style={{ 
-          border: "1px solid #9C27B0", 
+          border: alternateModeActive ? "2px solid #ffcc00" : "1px solid #cfaaf7", 
           borderRadius: "6px", 
           padding: "12px", 
           marginTop: "15px"
         }}>
-          <h4 style={{ margin: "0 0 10px 0", color: "#7B1FA2", fontSize: "14px", fontWeight: "600" }}>Alternate Routes</h4>
+          <h4 style={{ margin: "0 0 10px 0", color: "#cfaaf7", fontSize: "14px", fontWeight: "600" }}>Alternate Routes</h4>
           
           {/* Alternate Route Input */}
           <div style={{ marginBottom: "10px" }}>
@@ -575,36 +578,67 @@ const LeftPanel = ({
             </div>
           </div>
 
-          {/* Add Alternate Button */}
-          <button 
-            className="control-button"
-            style={{ 
-              width: "100%",
-              padding: "6px 4px", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              fontSize: "12px",
-              height: "32px",
-              backgroundColor: alternateModeActive ? "#00cc66" : "#9C27B0",
-              color: "white",
-              fontWeight: alternateModeActive ? "bold" : "normal",
-              border: alternateModeActive ? "2px solid #ffcc00" : "none"
-            }}
-            onClick={() => {
-              if (onToggleAlternateMode) {
-                // If waypoint mode is active, turn it off first
-                if (waypointModeActive && onToggleWaypointMode) {
-                  onToggleWaypointMode(false);
+          {/* Alternate Action Buttons */}
+          <div style={{ display: "flex", gap: "8px" }}>
+            {/* Clear Alternate Button */}
+            <button 
+              className="control-button"
+              style={{ 
+                flex: 1,
+                padding: "6px 4px", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                fontSize: "12px",
+                height: "32px",
+                backgroundColor: "#ff6b6b",
+                color: "white",
+                fontWeight: "normal",
+                border: "none"
+              }}
+              onClick={() => {
+                console.log('Clear Alternate clicked');
+                if (onClearAlternate) {
+                  onClearAlternate();
+                } else {
+                  console.warn('onClearAlternate function not provided');
                 }
-                onToggleAlternateMode(!alternateModeActive);
-              }
-            }}
-          >
-            {alternateModeActive ? 
-              "✅ Alternate Mode Active" : 
-              "Click Map to Set Alternates"}
-          </button>
+              }}
+            >
+              Clear Alternate
+            </button>
+            
+            {/* Add Alternate Button */}
+            <button 
+              className="control-button"
+              style={{ 
+                flex: 1,
+                padding: "6px 4px", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                fontSize: "12px",
+                height: "32px",
+                backgroundColor: alternateModeActive ? "#00cc66" : "#cfaaf7",
+                color: alternateModeActive ? "white" : "white",
+                fontWeight: alternateModeActive ? "bold" : "normal",
+                border: alternateModeActive ? "2px solid #ffcc00" : "1px solid #cfaaf7"
+              }}
+              onClick={() => {
+                if (onToggleAlternateMode) {
+                  // If waypoint mode is active, turn it off first
+                  if (waypointModeActive && onToggleWaypointMode) {
+                    onToggleWaypointMode(false);
+                  }
+                  onToggleAlternateMode(!alternateModeActive);
+                }
+              }}
+            >
+              {alternateModeActive ? 
+                "Alternate Mode" : 
+                "Add Alternate"}
+            </button>
+          </div>
         </div>
         
         {/* FAVORITES SECTION */}

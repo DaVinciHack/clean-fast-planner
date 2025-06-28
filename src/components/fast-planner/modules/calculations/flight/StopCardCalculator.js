@@ -763,7 +763,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       reserveFuel: departureComponentsCalculation.reserve,
       totalFuel: departureFuelNeeded,
       componentText: departureFuelComponentsText,
-      refuelMode: hasRefuelStops
+      refuelMode: false // Departure card is never a refuel stop
     });
     
     const departureCard = {
@@ -1153,6 +1153,51 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     
     if (shouldTreatAsFinal) {
       // CRITICAL FIX: Special handling for destination cards
+      // Calculate expected landing fuel: Reserve + Unburnt contingency + Extra fuel
+      let unburntContingencyFuel = 0;
+      
+      // 🚨 RACE CONDITION FIX: Guard against undefined values during loading
+      if (refuelStops && Array.isArray(refuelStops) && refuelStops.length > 0 && legDetails && contingencyFuelPercentValue !== undefined) {
+        // With refuels: only contingency from the last refuel stop to destination remains unburnt
+        const lastRefuelStopIndex = Math.max(...refuelStops);
+        console.log(`🏁 CONTINGENCY CALC: Last refuel stop at index ${lastRefuelStopIndex}, current stop ${i + 1}`);
+        
+        // Calculate trip fuel from last refuel stop to destination
+        let tripFuelFromLastRefuel = 0;
+        for (let legIndex = lastRefuelStopIndex; legIndex < legDetails.length; legIndex++) {
+          tripFuelFromLastRefuel += (legDetails[legIndex]?.fuel || 0);
+        }
+        
+        // Contingency is only on the final segment (after last refuel)
+        unburntContingencyFuel = Math.round((tripFuelFromLastRefuel * contingencyFuelPercentValue) / 100);
+        console.log(`🏁 CONTINGENCY CALC: Trip fuel from last refuel: ${tripFuelFromLastRefuel} lbs, contingency: ${unburntContingencyFuel} lbs`);
+      } else if (totalTripFuel !== undefined && contingencyFuelPercentValue !== undefined) {
+        // Without refuels: all contingency fuel remains unburnt at destination
+        unburntContingencyFuel = Math.round((totalTripFuel * contingencyFuelPercentValue) / 100);
+        console.log(`🏁 CONTINGENCY CALC: No refuels - full contingency: ${unburntContingencyFuel} lbs`);
+      } else {
+        console.log(`🏁 CONTINGENCY CALC: Skipping calculation - missing data during loading`);
+      }
+      const expectedLandingFuel = reserveFuelValue + unburntContingencyFuel + (extraFuel || 0);
+      
+      // Update fuel components text for destination to show expected landing fuel breakdown
+      const landingFuelParts = [`Reserve:${reserveFuelValue}`];
+      if (unburntContingencyFuel > 0) {
+        landingFuelParts.push(`UnburntCont:${unburntContingencyFuel}`);
+      }
+      if (extraFuel > 0) {
+        landingFuelParts.push(`Extra:${extraFuel}`);
+      }
+      const destinationFuelComponentsText = `Expected Landing Fuel (${landingFuelParts.join(', ')}) [${expectedLandingFuel} lbs]`;
+      
+      console.log('🏁 DESTINATION FUEL CALC:', {
+        reserveFuel: reserveFuelValue,
+        unburntContingency: unburntContingencyFuel,
+        extraFuel: extraFuel || 0,
+        expectedLandingFuel: expectedLandingFuel,
+        componentText: destinationFuelComponentsText
+      });
+      
       // Always include all fuel component fields, even if they're zero
       cardData = {
         index: shouldTreatAsFinal ? 'F' : (i + 1),
@@ -1165,8 +1210,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         // Add flight time separately for clarity
         flightTime: Number(cumulativeTime), // Flight time only
         legFuel: Number(legDetail.fuel),
-        // The fuel shown is what's needed to continue from this point
-        totalFuel: Number(fuelNeeded),
+        // The fuel shown is expected landing fuel (reserve + unburnt contingency + extra)
+        totalFuel: Number(expectedLandingFuel),
         maxPassengers: maxPassengersValue,
         maxPassengersDisplay: displayMaxPassengers,
         maxPassengersWeight: maxPassengersWeight,
@@ -1174,12 +1219,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         headwind: Number(legDetail.headwind),
         deckTime: Number(remainingDeckTimeHours * 60), // Convert back to minutes for display
         deckFuel: Number(remainingDeckFuel),
-        fuelComponents: fuelComponentsText,
+        fuelComponents: destinationFuelComponentsText,
         // For destination cards, ensure all component fields exist
         fuelComponentsObject: {
           reserveFuel: reserveFuelValue,
-          contingencyFuel: remainingContingencyFuel,
-          extraFuel: 0,
+          contingencyFuel: unburntContingencyFuel,
+          extraFuel: extraFuel || 0,
           // Always include these with zero values for consistency
           tripFuel: 0,
           taxiFuel: 0,
@@ -1195,7 +1240,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           source: weather?.source || 'manual'
         },
         isDeparture: isDeparture,
-        isDestination: isDestination
+        isDestination: isDestination,
+        refuelMode: false // Final destinations are never refuel stops
       };
     } else {
       // Normal case for all non-destination cards (including refuel stops)
@@ -1232,7 +1278,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         alternateRequirements: intermediateAlternateRequirements,
         shouldShowStrikethrough: false, // No strikethrough for intermediate stops
         isDeparture: isDeparture,
-        isDestination: isDestination
+        isDestination: isDestination,
+        refuelMode: isRefuelStop // Only true if this stop is actually marked for refuel
       };
     }
 
@@ -1376,11 +1423,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       console.log('🎯 StopCardCalculator: Stored real calculated leg times for WaypointManager');
     }
 
-    // 🔧 SAR FIX: Add alternate stop card to results if provided
-    if (alternateStopCard) {
-      console.log('🟠 StopCardCalculator: Adding alternate stop card to results');
-      finalCards.push(alternateStopCard);
-    }
+    // 🔧 SAR FIX: Don't add alternate card here - it's handled by FlightUtilities
+    // The alternateStopCard is passed in and used for calculations but added separately
+    console.log('🟠 StopCardCalculator: Alternate card handled by FlightUtilities, not adding duplicate');
 
     return finalCards;
 };

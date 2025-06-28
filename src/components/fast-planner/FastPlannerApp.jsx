@@ -33,6 +33,9 @@ import GlassMenuDock from './components/controls/GlassMenuDock';
 // Import FlightWizard for guided flight planning
 import FlightWizard from './components/wizard/FlightWizard';
 
+// Import DetailedFuelBreakdown for fuel analysis popup
+import DetailedFuelBreakdown from './components/fuel/DetailedFuelBreakdown';
+
 // Import MapZoomHandler for waypoint display
 import MapZoomHandler from './components/map/MapZoomHandler';
 
@@ -101,6 +104,12 @@ const FastPlannerCore = ({
   
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
+  
+  // 📊 FUEL BREAKDOWN STATE: Detailed fuel analysis modal
+  const [showFuelBreakdown, setShowFuelBreakdown] = useState(false);
+  
+  // 🔧 NEW: State to store alternate card data
+  const [alternateStopCard, setAlternateStopCard] = useState(null);
   
   // Simple loading overlay to prevent flash before wizard
   const [showInitialOverlay, setShowInitialOverlay] = useState(true);
@@ -1317,6 +1326,41 @@ const FastPlannerCore = ({
     }
   }, [platformManagerRef, handleAlternateRouteInputChange, waypoints]);
 
+  // Clear alternate route function
+  const clearAlternate = useCallback(() => {
+    console.log('🧹 CLEAR ALTERNATE: Clearing all alternate route data');
+    
+    // Clear alternate route data and input
+    setAlternateRouteData(null);
+    setAlternateRouteInput('');
+    setAlternateSplitPoint(null);
+    
+    // Clear window variables
+    window.currentSplitPoint = null;
+    window.alternateModeClickHandler = null;
+    
+    // Turn off alternate mode
+    setAlternateModeActive(false);
+    window.isAlternateModeActive = false;
+    
+    // Clear alternate route from map using WaypointManager
+    if (waypointManagerRef.current && typeof waypointManagerRef.current.clearAlternateRoute === 'function') {
+      console.log('🧹 CLEAR ALTERNATE: Calling WaypointManager.clearAlternateRoute');
+      const map = mapManagerRef.current?.getMap();
+      if (map) {
+        waypointManagerRef.current.clearAlternateRoute(map);
+      }
+      waypointManagerRef.current.clearAlternateRouteData();
+    }
+    
+    // Clear alternate from PlatformManager
+    if (platformManagerRef.current && typeof platformManagerRef.current.toggleAlternateMode === 'function') {
+      console.log('🧹 CLEAR ALTERNATE: Turning off PlatformManager alternate mode');
+      platformManagerRef.current.toggleAlternateMode(false);
+    }
+    
+    console.log('✅ CLEAR ALTERNATE: All alternate data cleared');
+  }, [waypointManagerRef, mapManagerRef, platformManagerRef]);
 
   // Helper function to determine split point for new flights
   const determineNewFlightSplitPoint = useCallback((currentWaypoints) => {
@@ -3254,6 +3298,23 @@ const FastPlannerCore = ({
         onAircraftSelect={setSelectedAircraft}
       />
       
+      {/* Detailed Fuel Breakdown Modal - Rendered at App Level for True Popup */}
+      <DetailedFuelBreakdown
+        visible={showFuelBreakdown}
+        onClose={() => setShowFuelBreakdown(false)}
+        stopCards={stopCards}
+        flightSettings={flightSettings}
+        weatherFuel={weatherFuel}
+        fuelPolicy={fuelPolicy}
+        routeStats={routeStats}
+        selectedAircraft={selectedAircraft}
+        currentFlightId={currentFlightId}
+        alternateRouteData={alternateRouteData}
+        alternateStopCard={alternateStopCard}
+        waypoints={waypoints}
+        weather={weather}
+      />
+      
       {/* RegionAircraftConnector removed - using only event-based region sync */}
       <div className="fast-planner-container">
         
@@ -3335,6 +3396,7 @@ const FastPlannerCore = ({
           onClearRoute={clearRoute} onToggleChart={togglePlatformsVisibility} chartsVisible={platformsVisible}
           onToggleWaypointMode={toggleWaypointMode} waypointModeActive={waypointModeActive}
           onToggleAlternateMode={toggleAlternateMode} alternateModeActive={alternateModeActive}
+          onClearAlternate={clearAlternate}
         />
         
         <RightPanel
@@ -3369,6 +3431,8 @@ const FastPlannerCore = ({
           onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
           forceUpdate={forceUpdate} weather={weather} onWeatherUpdate={updateWeatherSettings}
           onStopCardsCalculated={handleStopCardsCalculated} // 🛩️ HEADER SYNC: Callback for stop cards synchronization
+          onShowFuelBreakdown={() => setShowFuelBreakdown(true)} // 📊 FUEL BREAKDOWN: Callback to show modal
+          onAlternateCardCalculated={setAlternateStopCard} // 🔧 NEW: Callback to receive alternate card data
           
           // Fuel policy props
           fuelPolicy={fuelPolicy}

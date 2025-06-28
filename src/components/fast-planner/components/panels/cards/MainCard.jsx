@@ -68,6 +68,10 @@ const MainCard = ({
   currentFlightId = null,
   // 🛩️ HEADER SYNC: Callback for stop cards synchronization
   onStopCardsCalculated = null,
+  // 📊 FUEL BREAKDOWN: Callback to show fuel breakdown modal
+  onShowFuelBreakdown = null,
+  // 🔧 NEW: Callback to receive alternate card data
+  onAlternateCardCalculated = null,
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
@@ -816,6 +820,9 @@ const MainCard = ({
             stopCards={stopCards}
             onWaiveAlternatesChange={onWaiveAlternatesChange} // 🛩️ Pass callback up
             onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to container
+            onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to show modal at app level
+            onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback
+            currentFlightId={currentFlightId} // 🔧 NEW: Pass current flight ID for fuel save functionality
           />
         )}
       </div>
