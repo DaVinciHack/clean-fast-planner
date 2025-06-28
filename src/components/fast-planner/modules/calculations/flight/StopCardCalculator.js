@@ -1376,6 +1376,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       console.log('🎯 StopCardCalculator: Stored real calculated leg times for WaypointManager');
     }
 
+    // 🔧 SAR FIX: Add alternate stop card to results if provided
+    if (alternateStopCard) {
+      console.log('🟠 StopCardCalculator: Adding alternate stop card to results');
+      finalCards.push(alternateStopCard);
+    }
+
     return finalCards;
 };
 
