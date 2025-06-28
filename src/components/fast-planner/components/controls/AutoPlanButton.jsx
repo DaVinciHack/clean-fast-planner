@@ -126,7 +126,7 @@ const AutoPlanButton = ({
   const isNewFlight = !flightId;
   const hasWaypoints = waypoints && waypoints.length > 0;
 
-  // Button style to match other buttons - minimal overrides to preserve CSS class gradient
+  // Button style to match Submit Flight Plan style - dark grey with blue border
   const buttonStyle = {
     padding: '5px 10px',
     fontSize: '14px',
@@ -135,8 +135,11 @@ const AutoPlanButton = ({
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 'normal',
-    height: '32px'
-    // Don't override backgroundColor - let the CSS class handle the gradient
+    height: '32px',
+    // Override the bright blue with dark grey + blue border
+    background: 'linear-gradient(to bottom, #1f2937, #111827) !important',
+    border: '1px solid #4FC3F7 !important',
+    color: '#ffffff !important'
   };
 
   return (

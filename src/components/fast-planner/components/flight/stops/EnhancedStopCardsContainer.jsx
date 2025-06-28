@@ -32,7 +32,13 @@ const EnhancedStopCardsContainer = ({
   // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
   onWaiveAlternatesChange = null,
   // 🛩️ HEADER SYNC: Callback to update header totals
-  onStopCardsCalculated = null
+  onStopCardsCalculated = null,
+  // 🔧 NEW: Callback to show fuel breakdown modal at MainCard level
+  onShowFuelBreakdown = null,
+  // 🔧 NEW: Callback to pass alternate card data up to parent
+  onAlternateCardCalculated = null,
+  // 🔧 NEW: Current flight ID for fuel save functionality
+  currentFlightId = null
 }) => {
   console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
   
@@ -74,8 +80,11 @@ const EnhancedStopCardsContainer = ({
     const hasRequiredAircraftData = selectedAircraft && 
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
+    
+    // 🚨 RACE CONDITION FIX: Ensure fuel policy has actual current policy data
+    const hasValidFuelPolicy = fuelPolicy && fuelPolicy.currentPolicy && fuelPolicy.currentPolicy.uuid;
       
-    if (waypoints && waypoints.length >= 2 && selectedAircraft && fuelPolicy && hasRequiredAircraftData) {
+    if (waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData) {
       console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator (ONE SOURCE OF TRUTH)');
       console.log('🎯 EnhancedStopCardsContainer: Using weather fuel values:', { araFuel, approachFuel });
       console.log('🎯 EnhancedStopCardsContainer: Fuel policy structure:', fuelPolicy);
@@ -111,12 +120,22 @@ const EnhancedStopCardsContainer = ({
         
         if (calculatedStopCards && calculatedStopCards.length > 0) {
           console.log(`🎯 EnhancedStopCardsContainer: Generated ${calculatedStopCards.length} stop cards with weather fuel`);
-          setDisplayStopCards(calculatedStopCards);
           
-          // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
-          if (onStopCardsCalculated && JSON.stringify(calculatedStopCards) !== lastNotifiedCardsRef.current) {
-            lastNotifiedCardsRef.current = JSON.stringify(calculatedStopCards);
-            onStopCardsCalculated(calculatedStopCards);
+          // 🚨 RACE CONDITION FIX: Only update if cards have actually changed
+          const newCardsString = JSON.stringify(calculatedStopCards);
+          const currentCardsString = JSON.stringify(displayStopCards);
+          
+          if (newCardsString !== currentCardsString) {
+            console.log('🔄 EnhancedStopCardsContainer: Stop cards changed, updating display');
+            setDisplayStopCards(calculatedStopCards);
+            
+            // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
+            if (onStopCardsCalculated && newCardsString !== lastNotifiedCardsRef.current) {
+              lastNotifiedCardsRef.current = newCardsString;
+              onStopCardsCalculated(calculatedStopCards);
+            }
+          } else {
+            console.log('🔄 EnhancedStopCardsContainer: Stop cards unchanged, skipping update');
           }
         }
       } catch (error) {
@@ -236,15 +255,51 @@ const EnhancedStopCardsContainer = ({
             maxPassengers: alternateCard.maxPassengers,
             routeDescription: alternateCard.routeDescription
           });
-          setAlternateStopCard(alternateCard);
+          
+          // 🚨 RACE CONDITION FIX: Only update if alternate card has actually changed
+          const newAlternateString = JSON.stringify(alternateCard);
+          const currentAlternateString = JSON.stringify(alternateStopCard);
+          
+          if (newAlternateString !== currentAlternateString) {
+            console.log('🔄 EnhancedStopCardsContainer: Alternate card changed, updating');
+            setAlternateStopCard(alternateCard);
+            
+            // 🔧 NEW: Pass alternate card data up to parent
+            if (onAlternateCardCalculated) {
+              onAlternateCardCalculated(alternateCard);
+            }
+          } else {
+            console.log('🔄 EnhancedStopCardsContainer: Alternate card unchanged, skipping update');
+          }
         } else {
           console.log('🟠 EnhancedStopCardsContainer: No alternate stop card generated (calculation returned null)');
-          setAlternateStopCard(null);
+          
+          // 🚨 RACE CONDITION FIX: Only update if currently not null
+          if (alternateStopCard !== null) {
+            console.log('🔄 EnhancedStopCardsContainer: Clearing alternate card');
+            setAlternateStopCard(null);
+            
+            // 🔧 NEW: Clear alternate card data in parent
+            if (onAlternateCardCalculated) {
+              onAlternateCardCalculated(null);
+            }
+          } else {
+            console.log('🔄 EnhancedStopCardsContainer: Alternate card already null, skipping update');
+          }
         }
         
       } catch (error) {
         console.error('🟠 EnhancedStopCardsContainer: Error calculating alternate stop card:', error);
-        setAlternateStopCard(null);
+        
+        // 🚨 RACE CONDITION FIX: Only update if currently not null
+        if (alternateStopCard !== null) {
+          setAlternateStopCard(null);
+          
+          // 🔧 NEW: Clear alternate card data in parent on error
+          if (onAlternateCardCalculated) {
+            onAlternateCardCalculated(null);
+          }
+        }
       }
       
     } else {
@@ -263,7 +318,16 @@ const EnhancedStopCardsContainer = ({
           fuelBurnValue: selectedAircraft.fuelBurn
         } : 'No aircraft'
       });
-      setAlternateStopCard(null);
+      
+      // 🚨 RACE CONDITION FIX: Only update if currently not null
+      if (alternateStopCard !== null) {
+        setAlternateStopCard(null);
+        
+        // 🔧 NEW: Clear alternate card data in parent when conditions not met
+        if (onAlternateCardCalculated) {
+          onAlternateCardCalculated(null);
+        }
+      }
     }
   }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates]);
   
@@ -348,6 +412,64 @@ const EnhancedStopCardsContainer = ({
       console.error(`🚨 ENHANCED CONTAINER: No callback provided! Cannot notify parent.`);
     }
   };
+
+  // Save flight function - saves complete flight without automation
+  const handleSaveFlightSettings = async () => {
+    if (!selectedAircraft || !waypoints || waypoints.length < 2) {
+      alert('Please select an aircraft and add waypoints before saving.');
+      return;
+    }
+    
+    try {
+      // Import SaveFlightButton functionality
+      const { saveFlightData } = await import('../../controls/SaveFlightButton');
+      
+      // Create flight data object with current settings
+      const flightData = {
+        // Use existing flight name/time or generate defaults
+        flightName: currentFlightId ? `Flight ${currentFlightId}` : `Fast Planner Flight ${new Date().toLocaleDateString()}`,
+        etd: new Date().toISOString(), // Current time as departure
+        
+        // Flight settings
+        passengerWeight: passengerWeight || 220,
+        cargoWeight: cargoWeight || 0,
+        extraFuel: extraFuel || 0,
+        
+        // Pilot settings (defaults for Fast Planner)
+        captainId: "1", // Default Fast Planner pilot
+        copilotId: "1", // Default Fast Planner pilot
+        
+        // Automation settings - DISABLED for manual save
+        enableAutomation: false, // Don't run automation
+        useOnlyFastPlannerWaypoints: true // Use only our waypoints
+      };
+      
+      // Save the complete flight
+      const result = await saveFlightData(
+        flightData,
+        selectedAircraft,
+        waypoints,
+        routeStats,
+        false, // Don't run automation
+        () => {}, // Success callback
+        () => {} // Error callback
+      );
+      
+      // Show success message
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Flight saved successfully', 'success');
+      } else {
+        alert('Flight saved successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to save flight:', error);
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(`Failed to save flight: ${error.message}`, 'error');
+      } else {
+        alert(`Failed to save flight: ${error.message}`);
+      }
+    }
+  };
   
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER
   // console.log('✈️ EnhancedStopCardsContainer: Updating aircraft in manager');
@@ -420,10 +542,38 @@ const EnhancedStopCardsContainer = ({
   }
   
   return (
-    <div className="route-stops" style={{ margin: '0', padding: '4px 10px' }}>
-      <h4 className="route-stops-title" style={{ margin: '0 0 4px 0', fontSize: '0.9em' }}>
-        ROUTE STOPS (UNIFIED FUEL)
-      </h4>
+    <>
+      <div className="route-stops" style={{ margin: '0', padding: '4px 10px' }}>
+        {/* Detailed Fuel Breakdown Button */}
+        <button
+          onClick={() => onShowFuelBreakdown && onShowFuelBreakdown()}
+          style={{
+            width: '100%',
+            padding: '6px 12px',
+            background: 'linear-gradient(to bottom, #1f2937, #111827)',
+            color: '#ffffff',
+            border: '1px solid #4FC3F7',
+            borderRadius: '4px',
+            fontSize: '0.85em',
+            fontWeight: 'normal',
+            cursor: 'pointer',
+            marginBottom: '8px',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onMouseOver={(e) => {
+            e.target.style.background = 'linear-gradient(to bottom, #2a3a47, #1a2a37)';
+            e.target.style.borderColor = '#4FC3F7';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.background = 'linear-gradient(to bottom, #1f2937, #111827)';
+            e.target.style.borderColor = '#4FC3F7';
+          }}
+        >
+          View Detailed Fuel Breakdown
+        </button>
       
       {/* 🛩️ VFR OPERATIONS: Waive Alternates Checkbox */}
       <label className="waive-alternates-container" style={{
@@ -526,8 +676,51 @@ const EnhancedStopCardsContainer = ({
             />
           )}
         </div>
+        
+        {/* Save Flight Button - Only show if aircraft and waypoints are available */}
+        {selectedAircraft && waypoints && waypoints.length >= 2 && (
+          <div style={{ marginTop: '12px', padding: '0 10px' }}>
+            <button 
+              onClick={handleSaveFlightSettings}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'linear-gradient(to bottom, #1f2937, #111827)',
+                color: 'white',
+                border: '1px solid #4FC3F7',
+                borderRadius: '4px',
+                fontSize: '0.85em',
+                fontWeight: 'normal',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = 'linear-gradient(to bottom, #2a3a47, #1a2a37)';
+                e.target.style.borderColor = '#4FC3F7';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = 'linear-gradient(to bottom, #1f2937, #111827)';
+                e.target.style.borderColor = '#4FC3F7';
+              }}
+            >
+              💾 Save Flight
+            </button>
+            <div style={{ 
+              fontSize: '11px', 
+              color: '#9ca3af', 
+              marginTop: '5px',
+              textAlign: 'center'
+            }}>
+              Save complete flight with current fuel stops and settings
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -10,6 +10,7 @@ import SaveFlightCard from './SaveFlightCard';
 import LoadFlightsCard from './LoadFlightsCard';
 import AutoPlanCard from './AutoPlanCard';
 import MapLayersCard from './MapLayersCard';
+import FuelSummaryCard from './FuelSummaryCard';
 
 export {
   MainCard,
@@ -22,5 +23,6 @@ export {
   SaveFlightCard,
   LoadFlightsCard,
   AutoPlanCard,
-  MapLayersCard
+  MapLayersCard,
+  FuelSummaryCard
 };

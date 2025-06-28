@@ -29,7 +29,9 @@ const SARCard = ({
   selectedAircraft, 
   routeStats, 
   alternateStats, 
+  alternateRouteData,
   fuelPolicy,
+  reserveFuel: preCalculatedReserveFuel,
   waypoints,
   stopCards,
   onSARUpdate 
@@ -41,6 +43,9 @@ const SARCard = ({
     hasSelectedAircraft: !!selectedAircraft,
     hasRouteStats: !!routeStats,
     hasAlternateStats: !!alternateStats,
+    alternateStats: alternateStats,
+    hasAlternateRouteData: !!alternateRouteData,
+    alternateRouteData: alternateRouteData,
     hasFuelPolicy: !!fuelPolicy,
     waypointsCount: waypoints?.length || 0,
     stopCardsCount: stopCards?.length || 0,
@@ -91,7 +96,9 @@ const SARCard = ({
     selectedAircraft,
     routeStats,
     alternateStats,
+    alternateRouteData,
     fuelPolicy,
+    reserveFuel: preCalculatedReserveFuel,
     waypoints,
     stopCards,
     onSARUpdate
@@ -104,16 +111,22 @@ const SARCard = ({
   
   // Handle SAR updates to parent component (done here to avoid race conditions in hook)
   useEffect(() => {
+    console.log('🚁 SARCard: ===== USEEFFECT TRIGGERED =====');
     console.log('🚁 SARCard useEffect triggered:', {
       sarEnabled,
       waypointCount: waypoints?.length || 0,
       waypoints: waypoints?.map(wp => ({ name: wp.name, coords: wp.coords, id: wp.id })),
+      stopCardsCount: stopCards?.length || 0,
+      hasAlternateCard: !!stopCards?.find(card => card.isAlternate),
+      alternateCardFuel: stopCards?.find(card => card.isAlternate)?.fuelComponentsObject?.altFuel,
       hasSarCalculation: !!sarCalculation,
       sarCalculationRadius: sarCalculation?.operationalRadiusNM,
+      alternateFuel,
       hasOnSARUpdate: !!onSARUpdate,
       hasSelectedAircraft: !!selectedAircraft,
       hasRouteStats: !!routeStats,
-      hasFuelPolicy: !!fuelPolicy
+      hasFuelPolicy: !!fuelPolicy,
+      timestamp: new Date().toISOString()
     });
     
     if (onSARUpdate && sarEnabled) {
@@ -144,6 +157,9 @@ const SARCard = ({
           };
         })() : null;
       
+      console.log('🚁 SARCard: Final waypoint result:', finalWaypoint);
+      console.log('🚁 SARCard: Waypoints array:', waypoints?.map(wp => ({ name: wp.name, coords: wp.coords })));
+      
       console.log('🚁 SARCard sending update:', {
         hasCalculation: !!sarCalculation,
         finalWaypoint,
@@ -160,9 +176,9 @@ const SARCard = ({
           timeOnTask
         }
       });
-    } else if (onSARUpdate && !sarEnabled) {
-      // Send disabled state
-      console.log('🚁 SARCard sending disabled state');
+    } else if (onSARUpdate) {
+      // Send disabled state (SAR disabled OR no waypoints)
+      console.log('🚁 SARCard sending disabled state - sarEnabled:', sarEnabled, 'waypoints:', waypoints?.length);
       onSARUpdate({
         calculation: null,
         finalWaypoint: null,
@@ -175,10 +191,15 @@ const SARCard = ({
     waypoints?.length, 
     waypoints?.[waypoints?.length - 1]?.coords?.[0], // Only track final waypoint lng
     waypoints?.[waypoints?.length - 1]?.coords?.[1], // Only track final waypoint lat
+    waypoints?.[waypoints?.length - 1]?.name, // Track final waypoint name changes
     sarCalculation?.operationalRadiusNM, // Only track the radius result
     takeoffFuel,
     sarWeight,
-    timeOnTask
+    timeOnTask,
+    stopCards?.length, // Track stop cards changes (for alternate route addition/removal)
+    stopCards?.find(card => card.isAlternate)?.fuelComponentsObject?.altFuel, // Track alternate fuel changes
+    // Add a stringified version of the final waypoint to catch all changes
+    JSON.stringify(waypoints?.[waypoints?.length - 1] || null)
   ]);
   
   return (
@@ -581,12 +602,13 @@ const SARCard = ({
                 )}
                 
                 {/* Weight and Balance */}
-                {sarCalculation.totalPayload && (
+                {sarCalculation.totalWeight && (
                   <details style={{ marginTop: '8px' }}>
                     <summary style={{ fontSize: '12px', cursor: 'pointer', color: 'var(--text-color)' }}>Weight & Balance</summary>
                     <div style={{ fontSize: '11px', marginTop: '4px', paddingLeft: '15px', color: 'var(--label-color)' }}>
-                      <div>Total Payload: {sarCalculation.totalPayload} lbs</div>
+                      <div>Total Weight: {sarCalculation.totalWeight} lbs</div>
                       <div>Useful Load: {sarCalculation.usefulLoad} lbs</div>
+                      <div>Available Payload: {sarCalculation.availablePayload} lbs</div>
                       <div>Remaining Capacity: {sarCalculation.remainingPayloadCapacity} lbs</div>
                     </div>
                   </details>

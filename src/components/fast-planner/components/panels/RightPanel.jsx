@@ -116,7 +116,11 @@ const RightPanel = React.forwardRef(({
   // ETD from flight settings (wizard departure time)
   etd = null,
   // 🛩️ HEADER SYNC: Callback for stop cards synchronization
-  onStopCardsCalculated = null
+  onStopCardsCalculated = null,
+  // 📊 FUEL BREAKDOWN: Callback to show fuel breakdown modal
+  onShowFuelBreakdown = null,
+  // 🔧 NEW: Callback to receive alternate card data
+  onAlternateCardCalculated = null
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -318,6 +322,57 @@ const RightPanel = React.forwardRef(({
         // Show success message
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator(`Flight "${flightData.flightName}" created successfully!`, 'success');
+        }
+        
+        // 💾 FUEL SAVE-BACK: Save fuel data to Palantir after successful flight save
+        try {
+          console.log('💾 FUEL SAVE-BACK: Starting fuel save for flight ID:', flightId);
+          
+          // Import FuelSaveBackService
+          const FuelSaveBackService = (await import('../../services/FuelSaveBackService')).default;
+          
+          // Gather current fuel data from props and context
+          const currentFlightSettings = {
+            extraFuel: extraFuel || 0,
+            extraFuelReason: '', // Could be extracted from UI if available
+            araFuel: araFuel || 0,
+            approachFuel: approachFuel || 0,
+            taxiFuel: taxiFuel || 0,
+            deckFuelPerStop: deckFuelPerStop || 0,
+            contingencyFuelPercent: contingencyFuelPercent || 0,
+            passengerWeight: passengerWeight || 0,
+            cargoWeight: cargoWeight || 0,
+            reserveFuel: reserveFuel || 0
+          };
+          
+          const currentWeatherFuel = {
+            araFuel: araFuel || 0,
+            approachFuel: approachFuel || 0
+          };
+          
+          // Save fuel data using the service
+          await FuelSaveBackService.autoSaveFuelData(
+            flightId,
+            stopCards,
+            currentFlightSettings,
+            currentWeatherFuel,
+            fuelPolicy?.currentPolicy || null,
+            routeStats,
+            selectedAircraft
+          );
+          
+          console.log('✅ FUEL SAVE-BACK: Fuel data saved successfully');
+          
+        } catch (fuelSaveError) {
+          console.error('❌ FUEL SAVE-BACK: Failed to save fuel data:', fuelSaveError);
+          // Don't block the main flow if fuel save fails
+          if (window.LoadingIndicator) {
+            window.LoadingIndicator.updateStatusIndicator(
+              'Flight saved, but fuel data save failed. Check console for details.',
+              'warning',
+              4000
+            );
+          }
         }
         
         // Run automation if enabled
@@ -1144,6 +1199,8 @@ const RightPanel = React.forwardRef(({
         weatherSegments={weatherSegments}
         currentFlightId={currentFlightId} // 🔧 FIX: Pass flight ID for Auto Plan detection
         onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to MainCard
+        onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to MainCard
+        onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback to MainCard
       />
       
       {/* Settings Card */}
@@ -1173,6 +1230,11 @@ const RightPanel = React.forwardRef(({
         aircraftType={aircraftType}
         fuelPolicy={fuelPolicy}
         currentRegion={currentRegion}
+        currentFlightId={currentFlightId}
+        stopCards={stopCards}
+        routeStats={routeStats}
+        araFuel={araFuel}
+        approachFuel={approachFuel}
       />
       
       {/* Performance Card */}
