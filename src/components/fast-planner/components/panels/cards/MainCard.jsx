@@ -20,6 +20,7 @@ const MainCard = ({
   onToggleChart,
   onAutoPlan, // Add onAutoPlan prop
   onWaiveAlternatesChange, // 🛩️ VFR OPERATIONS: Callback for alternate route visibility
+  waiveAlternates = false, // 🛩️ VFR OPERATIONS: Current waive alternates state
   chartsVisible,
   aircraftType,
   onAircraftTypeChange,
@@ -827,6 +828,7 @@ const MainCard = ({
             weatherSegments={weatherSegments}
             stopCards={stopCards}
             onWaiveAlternatesChange={onWaiveAlternatesChange} // 🛩️ Pass callback up
+            waiveAlternates={waiveAlternates} // 🛩️ VFR OPERATIONS: Pass waive alternates state
             onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to container
             onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to show modal at app level
             onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback
