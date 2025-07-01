@@ -17,6 +17,9 @@ import FuelSaveBackService from '../../services/FuelSaveBackService';
 import StopCardCalculator from '../../modules/calculations/flight/StopCardCalculator';
 import { DistanceIcon, TimeIcon } from '../flight/stops/StopIcons';
 
+// Import segment-aware utilities
+import { detectLocationSegment, createSegmentFuelKey, getSegmentBoundaries, parseSegmentFuelKey } from '../../utilities/SegmentUtils';
+
 // Time formatting function - same as StopCard component
 const formatTime = (timeHours) => {
   if (!timeHours && timeHours !== 0) return '00:00';
@@ -56,7 +59,10 @@ const DetailedFuelBreakdown = ({
   onReserveMethodChange = () => {},
   onReserveFuelChange = () => {},
   // NEW: Location-specific fuel callback
-  onLocationFuelChange = () => {}  // Callback for ARA/approach fuel changes
+  onLocationFuelChange = () => {},  // Callback for ARA/approach fuel changes
+  // ✅ SEGMENT-AWARE: Segment-specific fuel callbacks
+  onSegmentExtraFuelChange = () => {},  // Callback for segment extra fuel changes
+  getCurrentSegmentInfo = () => []      // Function to get current segment information
 }) => {
   console.log('🚨🚨🚨 DetailedFuelBreakdown RENDERING! visible=', visible);
   
@@ -66,7 +72,76 @@ const DetailedFuelBreakdown = ({
   const [isEditing, setIsEditing] = useState(null);
   const [localStopCards, setLocalStopCards] = useState(stopCards);
   
-  // Update local state when props change and clear user overrides for new flights
+  // ✅ REFUEL PERSISTENCE: Local refuel stops state to prevent clearing
+  const [localRefuelStops, setLocalRefuelStops] = useState([]);
+  
+  // ✅ REFUEL PERSISTENCE: Detect refuel stops from both local state and stop cards
+  const refuelStops = useMemo(() => {
+    if (!localStopCards || localStopCards.length === 0) return localRefuelStops;
+    
+    // Merge detected stops from cards with local state (prioritize local state)
+    const detectedStops = [];
+    localStopCards.forEach((card, index) => {
+      if (card.refuelMode === true || card.isRefuelStop === true) {
+        detectedStops.push(card.index); // Use actual card index directly
+      }
+    });
+    
+    // Use local state if it has values, otherwise use detected stops
+    const finalStops = localRefuelStops.length > 0 ? localRefuelStops : detectedStops;
+    
+    console.log('🛩️ REFUEL PERSISTENCE: Refuel stops detection:', {
+      detectedFromCards: detectedStops,
+      localState: localRefuelStops,
+      finalStops: finalStops
+    });
+    
+    return finalStops;
+  }, [localStopCards, localRefuelStops]);
+  
+  // ✅ SEGMENT-AWARE: Get current segment boundaries
+  const segmentInfo = useMemo(() => {
+    const segments = getSegmentBoundaries(waypoints, refuelStops);
+    console.log('🛩️ SEGMENT-AWARE: Current segments:', segments);
+    return segments;
+  }, [waypoints, refuelStops]);
+  
+  // ✅ SYNC FIX: Always sync local refuel stops from updated stop cards
+  useEffect(() => {
+    if (localStopCards && localStopCards.length > 0) {
+      const detectedStops = [];
+      localStopCards.forEach((card, index) => {
+        if (card.refuelMode === true || card.isRefuelStop === true) {
+          detectedStops.push(card.index); // Use actual card index directly
+        }
+      });
+      
+      // Update local refuel stops to match what's in the stop cards
+      const currentStopsString = JSON.stringify(localRefuelStops.sort());
+      const detectedStopsString = JSON.stringify(detectedStops.sort());
+      
+      if (currentStopsString !== detectedStopsString) {
+        console.log('✅ SYNC FIX: Syncing local refuel stops with stop cards:', detectedStops);
+        setLocalRefuelStops(detectedStops);
+      }
+    }
+  }, [localStopCards]);
+  
+  // ✅ CLEAN: Simple refuel checkbox changes - no complex parent communication
+  const handleRefuelChange = useCallback((cardIndex, isRefuel) => {
+    console.log(`🛩️ CLEAN: Checkbox change - Card ${cardIndex} = ${isRefuel}`);
+    
+    setLocalRefuelStops(prev => {
+      const newRefuelStops = isRefuel 
+        ? (prev.includes(cardIndex) ? prev : [...prev, cardIndex])
+        : prev.filter(index => index !== cardIndex);
+      
+      console.log(`🛩️ CLEAN: Updated local refuel stops:`, newRefuelStops);
+      return newRefuelStops;
+    });
+  }, []);
+  
+  // ✅ COMPREHENSIVE SYNC: "Let it think and then refresh" - Full UI sync after calculation cycle
   React.useEffect(() => {
     console.log('🔄 DetailedFuelBreakdown: stopCards prop changed:', {
       stopCardsLength: stopCards?.length,
@@ -75,118 +150,70 @@ const DetailedFuelBreakdown = ({
       hasApproachFuel: stopCards?.[0]?.approachFuel
     });
     
-    // 🚨 CRITICAL FIX: Clear user overrides when flight changes
-    console.log('🧹 DetailedFuelBreakdown: Clearing userOverrides for new flight/route');
-    setUserOverrides({});
-    setFieldStates({});
-    setIsEditing(null);
+    // 🚫 SMART FILTER: Protect refuel stops but allow final correct updates
+    console.log('🔄 DetailedFuelBreakdown: Received new stopCards, checking refuel integrity');
     
-    setLocalStopCards(stopCards);
+    const expectedRefuelStops = localRefuelStops;
+    let shouldUpdate = true;
     
-    // DEBUG: Expose test function
-    window.testFuelBreakdownUpdate = () => {
-      console.log('🧪 TEST: Manual test of fuel breakdown update');
-      console.log('🧪 TEST: Current userOverrides:', userOverrides);
-      console.log('🧪 TEST: Current localStopCards length:', localStopCards?.length);
-      console.log('🧪 TEST: onStopCardsCalculated type:', typeof onStopCardsCalculated);
-      
-      // Try to trigger manually
-      setUserOverrides(prev => ({
-        ...prev,
-        '1_extraFuel': 999 // Test value
-      }));
-    };
-  }, [stopCards]);
-
-  // 🚨 CRITICAL: Clear all user state when flight/route changes (separate effect)
-  React.useEffect(() => {
-    console.log('🧹 DetailedFuelBreakdown: clearKey changed:', clearKey);
-    console.log('🧹 DetailedFuelBreakdown: Clearing ALL user state due to clearKey change');
-    setUserOverrides({});
-    setFieldStates({});
-    setIsEditing(null);
-  }, [clearKey]);
-
-  // Trigger recalculation only when user actually changes something  
-  const triggerRecalculation = useCallback((forceOverrides = null) => {
-    const currentOverrides = forceOverrides || userOverrides;
-    console.log('🔄 DetailedFuelBreakdown: triggerRecalculation called');
-    console.log('🔄 DetailedFuelBreakdown: forceOverrides:', forceOverrides);
-    console.log('🔄 DetailedFuelBreakdown: userOverrides:', userOverrides);
-    console.log('🔄 DetailedFuelBreakdown: currentOverrides:', currentOverrides);
-    console.log('🔄 DetailedFuelBreakdown: currentOverrides length:', Object.keys(currentOverrides).length);
-    console.log('🔄 DetailedFuelBreakdown: onStopCardsCalculated type:', typeof onStopCardsCalculated);
-    
-    if (Object.keys(currentOverrides).length > 0) {
-      console.log('🔄 DetailedFuelBreakdown: Triggering recalculation with overrides:', currentOverrides);
-      
-      // Apply user overrides to stop cards before triggering recalculation
-      const updatedStopCards = localStopCards.map((card, idx) => {
-        const updatedCard = { ...card };
-        
-        // Apply any user overrides for this stop
-        Object.keys(currentOverrides).forEach(key => {
-          const [stopIdx, fieldType] = key.split('_');
-          if (parseInt(stopIdx) === idx) {
-            const value = currentOverrides[key];
-            switch (fieldType) {
-              case 'extraFuel':
-                updatedCard.extraFuel = value;
-                // Also update fuelComponentsObject if it exists
-                if (updatedCard.fuelComponentsObject) {
-                  updatedCard.fuelComponentsObject.extraFuel = value;
-                }
-                break;
-              case 'araFuel':
-                // Smart logic: Apply to ARA for rigs, Approach for airports
-                const isRig = updatedCard.isRig || updatedCard.type === 'rig' || updatedCard.stopType === 'rig';
-                if (isRig) {
-                  updatedCard.araFuel = value;
-                  // Also update fuelComponentsObject if it exists
-                  if (updatedCard.fuelComponentsObject) {
-                    updatedCard.fuelComponentsObject.araFuel = value;
-                  }
-                } else {
-                  updatedCard.approachFuel = value;
-                  // Also update fuelComponentsObject if it exists
-                  if (updatedCard.fuelComponentsObject) {
-                    updatedCard.fuelComponentsObject.approachFuel = value;
-                  }
-                }
-                break;
-              case 'deckTime':
-                updatedCard.deckTime = value;
-                break;
-              case 'passengers':
-                updatedCard.maxPassengers = value;
-                break;
-              case 'weight':
-                updatedCard.maxWeight = value;
-                break;
-            }
-          }
-        });
-        
-        return updatedCard;
+    if (expectedRefuelStops.length > 0) {
+      // Check if the stop cards have the expected refuel information
+      const actualRefuelInCards = [];
+      stopCards.forEach(card => {
+        if (card.refuelMode === true || card.isRefuelStop === true) {
+          actualRefuelInCards.push(card.index);
+        }
       });
       
-      setLocalStopCards(updatedStopCards);
+      console.log('🚫 SMART FILTER: Expected refuel stops:', expectedRefuelStops);
+      console.log('🚫 SMART FILTER: Actual refuel in cards:', actualRefuelInCards);
       
-      // Trigger main app recalculation with updated stop cards
-      setTimeout(() => {
-        console.log('🚀 DetailedFuelBreakdown: Sending updated stop cards to main app:', updatedStopCards?.length, 'cards');
-        console.log('🚀 DetailedFuelBreakdown: First card extraFuel:', updatedStopCards?.[0]?.extraFuel);
-        console.log('🚀 DetailedFuelBreakdown: Calling onStopCardsCalculated...');
-        onStopCardsCalculated(updatedStopCards);
-        console.log('🚀 DetailedFuelBreakdown: onStopCardsCalculated called successfully');
-      }, 50);
+      // Only reject if we expect refuel stops but the cards have NONE
+      const hasAnyRefuelStops = actualRefuelInCards.length > 0;
+      shouldUpdate = hasAnyRefuelStops; // Accept if there are ANY refuel stops
     }
-  }, [localStopCards, onStopCardsCalculated]);
+    
+    if (shouldUpdate) {
+      console.log('✅ SMART FILTER: Accepting stop cards update');
+      setLocalStopCards(stopCards);
+    } else {
+      console.log('❌ SMART FILTER: Rejecting update - missing ALL refuel stops');
+    }
+    
+    // 🎯 FORCE REFRESH: When stop cards update, force UI to re-render with new summaries
+    console.log('✅ SIMPLE SYNC: Stop cards updated, forcing UI refresh for corrected summaries');
+    
+    // Force re-render by updating a dummy state to trigger summary recalculation
+    setFieldStates(prev => ({ ...prev, _forceRefresh: Date.now() }));
+    
+  }, [stopCards]);
+  
+  // Separate effect for clearing user state (only on new flights)
+  React.useEffect(() => {
+    console.log('🧹 DetailedFuelBreakdown: Clearing user state for new flight');
+    setUserOverrides({});
+    setFieldStates({});
+    setIsEditing(null);
+  }, [clearKey]); // Only clear when clearKey changes (new flight)
+
+  // ❌ REMOVED: Duplicate clearKey effect
+
+  // 🚫 REMOVED CALCULATION: Only update settings, let EnhancedStopCardsContainer handle calculations
+  const triggerRecalculation = useCallback((forceOverrides = null) => {
+    console.log('🚫 DetailedFuelBreakdown: NO LONGER DOING CALCULATIONS - delegating to EnhancedStopCardsContainer');
+    console.log('🔄 DetailedFuelBreakdown: Will only update location fuel overrides, not trigger calculations');
+    
+    // DO NOT do any calculations - only update settings and let EnhancedStopCardsContainer recalculate
+    console.log('🚫 DetailedFuelBreakdown: Not doing any calculations - settings updates will trigger natural recalculation');
+    
+    // The function now only exists for handleFieldChange to call, but doesn't do calculations
+  }, [localStopCards]);
   
   // Handle field changes - proper async updates to avoid render warnings
   const handleFieldChange = useCallback((stopIndex, fieldType, value) => {
     const key = `${stopIndex}_${fieldType}`;
     
+    console.log(`🚨🚨🚨 FIELD CHANGE DETECTED! Field change ${fieldType} for stop ${stopIndex}:`, value);
     console.log(`🛩️ Fuel Breakdown: *** FIELD CHANGE CALLED ***`);
     console.log(`🛩️ Fuel Breakdown: Field change ${fieldType} for stop ${stopIndex}:`, value);
     console.log(`🛩️ Fuel Breakdown: Key: ${key}`);
@@ -219,10 +246,13 @@ const DetailedFuelBreakdown = ({
       // Call settings update DIRECTLY (no timeout)
       console.log(`🔄 DIRECT settings update for ${fieldType}:`, value);
       
+      console.log(`🔍 SWITCH DEBUG: About to enter switch for fieldType: "${fieldType}"`);
+      
       try {
         switch (fieldType) {
           case 'extraFuel':
-            console.log(`✅ Calling onExtraFuelChange with:`, value);
+            // 🚨 SIMPLIFIED: Just use global extra fuel for now - segment-aware was too complex
+            console.log(`✅ SIMPLIFIED: Global extra fuel change:`, value);
             onExtraFuelChange(value);
             break;
           case 'deckTime':
@@ -230,26 +260,27 @@ const DetailedFuelBreakdown = ({
             onDeckTimeChange(value);
             break;
           case 'araFuel':
-            // Location-specific ARA/approach fuel
-            console.log(`🌦️ Location-specific fuel change for stop ${stopIndex}:`, value);
-            const stopCard = localStopCards[stopIndex];
-            const stopName = stopCard?.name || stopCard?.stopName || `stop_${stopIndex}`;
+            console.log(`🎯 SWITCH DEBUG: Entered araFuel case for value:`, value);
+            // ✅ SEGMENT-AWARE: Location-specific ARA/approach fuel
+            console.log(`🛩️ SEGMENT-AWARE: Location-specific fuel change for stop ${stopIndex}:`, value);
+            const araStopCard = localStopCards[stopIndex];
+            const araStopName = araStopCard?.name || araStopCard?.stopName || `stop_${stopIndex}`;
             
             // 🚨 FIX: Get isRig from weather segments, not from stop card
             let isRig = false;
             if (weatherSegments && weatherSegments.length > 0) {
               const weatherSegment = weatherSegments.find(segment => 
-                segment.airportIcao === stopName ||
-                segment.locationName === stopName ||
-                segment.location === stopName ||
-                segment.uniqueId === stopName
+                segment.airportIcao === araStopName ||
+                segment.locationName === araStopName ||
+                segment.location === araStopName ||
+                segment.uniqueId === araStopName
               );
               isRig = weatherSegment?.isRig || false;
-              console.log(`🌦️ Found weather segment for ${stopName}:`, { isRig: isRig, segment: weatherSegment });
+              console.log(`🌦️ Found weather segment for ${araStopName}:`, { isRig: isRig, segment: weatherSegment });
             }
             
-            console.log(`✅ About to call onLocationFuelChange with:`, {
-              stopName: stopName,
+            console.log(`✅ SIMPLIFIED: About to call onLocationFuelChange:`, {
+              stopName: araStopName,
               stopIndex: stopIndex,
               fuelType: isRig ? 'araFuel' : 'approachFuel',
               value: value,
@@ -257,28 +288,51 @@ const DetailedFuelBreakdown = ({
             });
             
             onLocationFuelChange({
-              stopName: stopName,
+              stopName: araStopName,
               stopIndex: stopIndex,
               fuelType: isRig ? 'araFuel' : 'approachFuel',
               value: value,
-              isRig: isRig
+              isRig: isRig,
+              refuelStops: localRefuelStops  // 🚨 CRITICAL: Pass current refuel stops so calculation is correct
             });
             
-            console.log(`✅ onLocationFuelChange called successfully`);
-            
-            // 🚨 DEBUG: Log current locationFuelOverrides after change
-            setTimeout(() => {
-              console.log(`🔍 Current locationFuelOverrides after change:`, locationFuelOverrides);
-              console.log(`🔍 Triggering manual recalculation to update summaries...`);
-              
-              // 🚨 FORCE: Trigger recalculation manually
-              if (typeof triggerRecalculation === 'function') {
-                triggerRecalculation();
-              }
-            }, 100);
+            console.log(`✅ onLocationFuelChange called successfully - letting normal flow handle recalculation`);
             break;
           default:
             console.log(`⚠️ Unknown field type: ${fieldType}`);
+        }
+        
+        // 🎯 DELAYED TRIGGER: For ALL fuel types that might affect calculations
+        if (fieldType === 'araFuel' || fieldType === 'extraFuel') {
+          console.log('🕐 SETTING UP DELAYED TRIGGER for fieldType:', fieldType);
+          
+          // Capture current context for later trigger
+          const currentStopCard = localStopCards[stopIndex];
+          const currentStopName = currentStopCard?.name || currentStopCard?.stopName || `stop_${stopIndex}`;
+          
+          setTimeout(() => {
+            console.log('🕐 DELAYED TRIGGER: Executing now for fieldType:', fieldType);
+            
+            if (fieldType === 'araFuel') {
+              console.log('🔄 DELAYED TRIGGER: Forcing GLOBAL recalculation by toggling extra fuel');
+              
+              // Get current extra fuel value
+              const currentExtraFuel = flightSettings?.extraFuel || 0;
+              
+              // Force global recalculation by slightly changing extra fuel then changing it back
+              onExtraFuelChange(currentExtraFuel + 0.1); // Tiny change
+              
+              setTimeout(() => {
+                onExtraFuelChange(currentExtraFuel); // Change back to original
+                console.log('🔄 DELAYED TRIGGER: Restored original extra fuel, recalculation should be complete');
+              }, 100);
+              
+            } else if (fieldType === 'extraFuel') {
+              // Re-trigger extra fuel change
+              onExtraFuelChange(value);
+            }
+            
+          }, 500);
         }
         console.log(`✅ Settings update completed for ${fieldType}`);
       } catch (error) {
@@ -325,8 +379,63 @@ const DetailedFuelBreakdown = ({
       return newOverrides;
     });
     
-    // Note: Recalculation is now triggered immediately above with fresh overrides
-  }, [localStopCards, flightSettings.passengerWeight, selectedAircraft?.maxPayload, triggerRecalculation]);
+    // 🚫 DIRECT SETTINGS CALL: Call settings callbacks directly, don't wait for recalculation
+    console.log(`🔄 DIRECT settings update for ${fieldType}:`, value);
+    
+    try {
+      switch (fieldType) {
+        case 'extraFuel':
+          console.log(`✅ Calling onExtraFuelChange with:`, value);
+          onExtraFuelChange(value);
+          break;
+        case 'deckTime':
+          console.log(`✅ Calling onDeckTimeChange with:`, value);
+          onDeckTimeChange(value);
+          break;
+        case 'araFuel':
+          // Location-specific ARA/approach fuel
+          console.log(`🛩️ Location-specific fuel change for stop ${stopIndex}:`, value);
+          const araStopCard = localStopCards[stopIndex];
+          const araStopName = araStopCard?.name || araStopCard?.stopName || `stop_${stopIndex}`;
+          
+          // Determine if it's a rig from weather segments
+          let isRig = false;
+          if (weatherSegments && weatherSegments.length > 0) {
+            const weatherSegment = weatherSegments.find(segment => 
+              segment.airportIcao === araStopName ||
+              segment.locationName === araStopName ||
+              segment.location === araStopName ||
+              segment.uniqueId === araStopName
+            );
+            isRig = weatherSegment?.isRig || false;
+          }
+          
+          console.log(`✅ Calling onLocationFuelChange:`, {
+            stopName: araStopName,
+            stopIndex: stopIndex,
+            fuelType: isRig ? 'araFuel' : 'approachFuel',
+            value: value,
+            isRig: isRig,
+            refuelStops: localRefuelStops
+          });
+          
+          onLocationFuelChange({
+            stopName: araStopName,
+            stopIndex: stopIndex,
+            fuelType: isRig ? 'araFuel' : 'approachFuel',
+            value: value,
+            isRig: isRig,
+            refuelStops: localRefuelStops
+          });
+          break;
+        default:
+          console.log(`⚠️ Unknown field type: ${fieldType}`);
+      }
+    } catch (error) {
+      console.error(`😨 Error calling settings callback for ${fieldType}:`, error);
+    }
+    
+  }, [localStopCards, flightSettings.passengerWeight, selectedAircraft?.maxPayload, localRefuelStops, onExtraFuelChange, onDeckTimeChange, onLocationFuelChange, weatherSegments]);
   
   // Get field border color based on state
   const getFieldBorderColor = (stopIndex, fieldType) => {
@@ -384,11 +493,28 @@ const DetailedFuelBreakdown = ({
         const stopCard = localStopCards[stopIndex] || {};
         const stopName = stopCard.name || stopCard.stopName;
         if (stopName) {
-          // Check both araFuel and approachFuel location overrides
+          // 🚨 FIX: Check both old format and new segment-aware format
           const araKey = `${stopName}_araFuel`;
           const approachKey = `${stopName}_approachFuel`;
           
-          return locationFuelOverrides[araKey]?.value || locationFuelOverrides[approachKey]?.value;
+          // First check old format keys
+          let value = locationFuelOverrides[araKey]?.value || locationFuelOverrides[approachKey]?.value;
+          
+          // If not found, check all segment-aware keys for this stop
+          if (value === undefined) {
+            const segmentKeys = Object.keys(locationFuelOverrides).filter(key => 
+              key.includes(stopName) && (key.includes('araFuel') || key.includes('approachFuel'))
+            );
+            
+            for (const key of segmentKeys) {
+              if (locationFuelOverrides[key]?.value !== undefined) {
+                value = locationFuelOverrides[key].value;
+                break;
+              }
+            }
+          }
+          
+          return value;
         }
       } else if (fieldType === 'extraFuel') {
         // Extra fuel comes from flightSettings, not userOverrides
@@ -789,9 +915,30 @@ const DetailedFuelBreakdown = ({
                               </div>
                             )}
                           </div>
-                          {isRefuelStop && (
-                            <div style={{ color: '#FF6B35', fontSize: '11px', fontWeight: '600', marginTop: '2px' }}>
-                              REFUEL STOP
+                          
+                          {/* ✅ REFUEL PERSISTENCE: Refuel Checkbox */}
+                          {!stopCard.isDeparture && !stopCard.isDestination && originalIndex > 0 && originalIndex < localStopCards.length - 1 && (
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: '6px', 
+                              marginTop: '4px',
+                              fontSize: '11px',
+                              color: isRefuelStop ? '#FF6B35' : '#ccc'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={localRefuelStops.includes(stopCard.index)}
+                                onChange={(e) => handleRefuelChange(stopCard.index, e.target.checked)}
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                              <span style={{ fontWeight: '600' }}>
+                                {isRefuelStop ? '⛽ REFUEL STOP' : 'Mark as Refuel Stop'}
+                              </span>
                             </div>
                           )}
                         </div>

@@ -121,7 +121,15 @@ const RightPanel = React.forwardRef(({
   // 📊 FUEL BREAKDOWN: Callback to show fuel breakdown modal
   onShowFuelBreakdown = null,
   // 🔧 NEW: Callback to receive alternate card data
-  onAlternateCardCalculated = null
+  onAlternateCardCalculated = null,
+  // ✅ SYNC FIX: Location-specific fuel overrides for stop card synchronization
+  locationFuelOverrides = {},
+  // 🚫 REFUEL SYNC: Current refuel stops from DetailedFuelBreakdown
+  currentRefuelStops = [],
+  // ✅ SEGMENT-AWARE: Segment-specific extra fuel handler
+  onSegmentExtraFuelChange = () => {},
+  // ✅ SEGMENT-AWARE: Function to get current segment information
+  getCurrentSegmentInfo = () => []
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -1204,6 +1212,10 @@ const RightPanel = React.forwardRef(({
         onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to MainCard
         onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to MainCard
         onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback to MainCard
+        locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to MainCard
+        currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to MainCard
+        onSegmentExtraFuelChange={onSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler to MainCard
+        getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter to MainCard
       />
       
       {/* Settings Card */}
