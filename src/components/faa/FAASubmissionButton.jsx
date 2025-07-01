@@ -19,6 +19,33 @@ const FAASubmissionButton = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate required flight data before submission
+    const requiredFields = [];
+    if (!flightPlanData?.tailNumber || flightPlanData.tailNumber.includes('REQUIRED')) {
+      requiredFields.push('Aircraft Registration');
+    }
+    if (!flightPlanData?.aircraftType || flightPlanData.aircraftType.includes('REQUIRED')) {
+      requiredFields.push('Aircraft Type');
+    }
+    if (!flightPlanData?.departure?.airport || flightPlanData.departure.airport.includes('REQUIRED')) {
+      requiredFields.push('Departure Airport');
+    }
+    if (!flightPlanData?.destination?.airport || flightPlanData.destination.airport.includes('REQUIRED')) {
+      requiredFields.push('Destination Airport');
+    }
+    if (!flightPlanData?.pilotName || flightPlanData.pilotName.includes('REQUIRED')) {
+      requiredFields.push('Pilot Name');
+    }
+    if (!flightPlanData?.fuelOnBoard || flightPlanData.fuelOnBoard.includes('REQUIRED')) {
+      requiredFields.push('Fuel Calculation');
+    }
+    
+    if (requiredFields.length > 0) {
+      alert(`❌ Cannot Submit Flight Plan\n\nMissing required information:\n• ${requiredFields.join('\n• ')}\n\nPlease complete your flight plan before submission.`);
+      return;
+    }
+    
     // For now, just simulate success
     const mockFlightPlanId = 'FP' + Date.now().toString().slice(-6);
     alert(`✈️ Flight Plan Submitted Successfully!\n\nFlight Plan ID: ${mockFlightPlanId}\n\n(This is a demo - backend integration needed for actual FAA submission)`);
@@ -93,14 +120,22 @@ const FAASubmissionButton = ({
             <div style={{
               padding: '1.5rem 2rem 1rem 2rem',
               borderBottom: '1px solid #404040',
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              background: '#2d2d2d',
               color: 'white',
               borderRadius: '16px 16px 0 0',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>Submit Flight Plan to FAA</h2>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600', color: '#64b5f6' }}>Submit Flight Plan to FAA</h2>
+                {flightPlanData?.departure?.airport && flightPlanData?.destination?.airport && (
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: '#9ca3af', fontWeight: '400' }}>
+                    {flightPlanData.departure.airport} → {flightPlanData.destination.airport} 
+                    {flightPlanData?.tailNumber && !flightPlanData.tailNumber.includes('REQUIRED') && ` • ${flightPlanData.tailNumber}`}
+                  </p>
+                )}
+              </div>
               <button 
                 onClick={handleClose}
                 style={{
@@ -136,10 +171,25 @@ const FAASubmissionButton = ({
                 <div style={{ color: '#64b5f6', fontWeight: '600', marginBottom: '0.6rem', fontSize: '0.8rem' }}>Aircraft & Flight Details</div>
                 <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
                   {/* Single column for long registration */}
-                  <div style={{ marginBottom: '0.4rem' }}><span style={{ color: '#8e8e93' }}>Registration:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.tailNumber}</span></div>
+                  <div style={{ marginBottom: '0.4rem' }}>
+                    <span style={{ color: '#8e8e93' }}>Registration:</span> 
+                    <span style={{ 
+                      color: flightPlanData?.tailNumber?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                      fontWeight: flightPlanData?.tailNumber?.includes('REQUIRED') ? '600' : '400'
+                    }}>
+                      {flightPlanData?.tailNumber}
+                    </span>
+                  </div>
                   {/* Two columns for shorter fields */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    <div><span style={{ color: '#8e8e93' }}>Aircraft Type:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.aircraftType}</span></div>
+                    <div><span style={{ color: '#8e8e93' }}>Aircraft Type:</span> 
+                      <span style={{ 
+                        color: flightPlanData?.aircraftType?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                        fontWeight: flightPlanData?.aircraftType?.includes('REQUIRED') ? '600' : '400'
+                      }}>
+                        {flightPlanData?.aircraftType}
+                      </span>
+                    </div>
                     <div><span style={{ color: '#8e8e93' }}>Flight Rules:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.flightRules}</span></div>
                     <div><span style={{ color: '#8e8e93' }}>Equipment:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.equipment || 'SG'}</span></div>
                     <div><span style={{ color: '#8e8e93' }}>Wake Category:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.wakeCategory || 'L'}</span></div>
@@ -159,8 +209,22 @@ const FAASubmissionButton = ({
                 <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
                   {/* Two columns for departure/destination */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                    <div><span style={{ color: '#8e8e93' }}>Departure:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.departure?.airport} at {flightPlanData?.departure?.time}Z</span></div>
-                    <div><span style={{ color: '#8e8e93' }}>Destination:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.destination?.airport}</span></div>
+                    <div><span style={{ color: '#8e8e93' }}>Departure:</span> 
+                      <span style={{ 
+                        color: flightPlanData?.departure?.airport?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                        fontWeight: flightPlanData?.departure?.airport?.includes('REQUIRED') ? '600' : '400'
+                      }}>
+                        {flightPlanData?.departure?.airport} at {flightPlanData?.departure?.time}Z
+                      </span>
+                    </div>
+                    <div><span style={{ color: '#8e8e93' }}>Destination:</span> 
+                      <span style={{ 
+                        color: flightPlanData?.destination?.airport?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                        fontWeight: flightPlanData?.destination?.airport?.includes('REQUIRED') ? '600' : '400'
+                      }}>
+                        {flightPlanData?.destination?.airport}
+                      </span>
+                    </div>
                   </div>
                   {/* Single column for long route */}
                   <div style={{ marginBottom: '0.4rem' }}><span style={{ color: '#8e8e93' }}>Route:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.route?.replace(/\s+/g, ', ')}</span></div>
@@ -187,14 +251,29 @@ const FAASubmissionButton = ({
                 <div style={{ color: '#fbbf24', fontWeight: '600', marginBottom: '0.6rem', fontSize: '0.8rem' }}>Pilot & Passenger Info</div>
                 <div style={{ fontSize: '0.75rem', lineHeight: '1.4' }}>
                   {/* Single column for pilot name */}
-                  <div style={{ marginBottom: '0.4rem' }}><span style={{ color: '#8e8e93' }}>Pilot in Command:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.pilotName}</span></div>
+                  <div style={{ marginBottom: '0.4rem' }}>
+                    <span style={{ color: '#8e8e93' }}>Pilot in Command:</span> 
+                    <span style={{ 
+                      color: flightPlanData?.pilotName?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                      fontWeight: flightPlanData?.pilotName?.includes('REQUIRED') ? '600' : '400'
+                    }}>
+                      {flightPlanData?.pilotName}
+                    </span>
+                  </div>
                   {/* Two columns for shorter fields */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                     {flightPlanData?.pilotPhone && (
                       <div><span style={{ color: '#8e8e93' }}>Contact:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData.pilotPhone}</span></div>
                     )}
                     <div><span style={{ color: '#8e8e93' }}>Persons on Board:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.personsOnBoard || 1}</span></div>
-                    <div><span style={{ color: '#8e8e93' }}>Fuel on Board:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData?.fuelOnBoard}</span></div>
+                    <div><span style={{ color: '#8e8e93' }}>Fuel on Board:</span> 
+                      <span style={{ 
+                        color: flightPlanData?.fuelOnBoard?.includes('REQUIRED') ? '#f87171' : '#e5e5e7',
+                        fontWeight: flightPlanData?.fuelOnBoard?.includes('REQUIRED') ? '600' : '400'
+                      }}>
+                        {flightPlanData?.fuelOnBoard}
+                      </span>
+                    </div>
                     {flightPlanData?.endurance && (
                       <div><span style={{ color: '#8e8e93' }}>Endurance:</span> <span style={{ color: '#e5e5e7' }}>{flightPlanData.endurance}</span></div>
                     )}

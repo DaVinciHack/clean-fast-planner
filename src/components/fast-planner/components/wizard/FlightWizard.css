@@ -870,3 +870,18 @@
   }
 }
 
+/* Passenger Step Styling */
+.wizard-step.passengers-step {
+  min-height: auto;
+}
+
+.passenger-input-wizard {
+  margin-bottom: 30px;
+}
+
+.wizard-step.passengers-step .wizard-buttons {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+

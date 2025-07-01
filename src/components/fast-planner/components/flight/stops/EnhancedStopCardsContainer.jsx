@@ -108,6 +108,7 @@ const EnhancedStopCardsContainer = ({
       console.log('🎯 EnhancedStopCardsContainer: Fuel policy structure:', fuelPolicy);
       console.log('🚫 REFUEL DEBUG: About to call StopCardCalculator with refuelStops:', refuelStops);
       console.log('🚫 REFUEL DEBUG: Calculation trigger - locationFuelOverrides:', Object.keys(locationFuelOverrides));
+      console.log('🛩️ VFR DEBUG: EnhancedStopCardsContainer calling with waiveAlternates:', waiveAlternates, 'alternateStopCard:', !!alternateStopCard);
       
       try {
         const stopCardOptions = {

@@ -357,33 +357,43 @@ const MainCard = ({
             <FAASubmissionButton
               flightPlanData={{
                 // Aircraft Information
-                tailNumber: aircraftRegistration || selectedAircraft?.registration || "N-UNKNOWN",
-                aircraftType: aircraftType || selectedAircraft?.type || "UNK",
-                wakeCategory: selectedAircraft?.wakeCategory || "L",
-                equipment: selectedAircraft?.equipment || "SG",
+                tailNumber: (selectedAircraft?.registration || aircraftRegistration || "REGISTRATION REQUIRED")
+                  .replace(/\s*\([^)]*\)/g, ''), // Remove anything in brackets
+                aircraftType: selectedAircraft?.acModelName || selectedAircraft?.modelName || selectedAircraft?.type || aircraftType || "AIRCRAFT TYPE REQUIRED",
+                wakeCategory: selectedAircraft?.wakeCategory || "L", // Helicopter wake category
+                equipment: selectedAircraft?.equipment || "SG", // Standard helicopter equipment
                 
                 // Route Information  
                 departure: {
-                  airport: waypoints.length > 0 ? (waypoints[0]?.name || waypoints[0]?.id || "UNKN") : "UNKN",
+                  airport: waypoints.length > 0 ? (waypoints[0]?.name || waypoints[0]?.id) : "DEPARTURE REQUIRED",
                   time: new Date().toISOString().substr(11, 5).replace(':', '') // Current time in HHMM
                 },
                 destination: {
-                  airport: waypoints.length > 1 ? (waypoints[waypoints.length - 1]?.name || waypoints[waypoints.length - 1]?.id || "UNKN") : "UNKN",
-                  estimatedTime: routeStats?.totalTime ? Math.floor(routeStats.totalTime / 60).toString().padStart(2, '0') + (routeStats.totalTime % 60).toString().padStart(2, '0') : "0100"
+                  airport: waypoints.length > 1 ? (waypoints[waypoints.length - 1]?.name || waypoints[waypoints.length - 1]?.id) : "DESTINATION REQUIRED",
+                  estimatedTime: routeStats?.totalTime ? 
+                    `${Math.floor(routeStats.totalTime / 60).toString().padStart(2, '0')}${(routeStats.totalTime % 60).toString().padStart(2, '0')}` : 
+                    "FLIGHT TIME REQUIRED"
                 },
                 route: waypoints.length > 2 ? waypoints.slice(1, -1).map(wp => wp.name || wp.id || 'WPT').join(' ') : "DCT",
-                altitude: "1000", // Default helicopter altitude
-                airspeed: selectedAircraft?.cruiseSpeed || "120", // Use aircraft cruise speed or default
+                altitude: selectedAircraft?.cruiseAltitude || selectedAircraft?.serviceAltitude || "1000", // Use real aircraft altitude
+                airspeed: selectedAircraft?.cruiseSpeed || selectedAircraft?.cruseSpeed || "AIRSPEED REQUIRED", // Real aircraft cruise speed (note: cruseSpeed is OSDK typo)
                 flightRules: "VFR", // Default for helicopter ops
                 
                 // Pilot Information
-                pilotName: authUserName || "Unknown Pilot",
+                pilotName: authUserName || "PILOT NAME REQUIRED",
                 pilotPhone: "",
                 
                 // Passengers & Fuel
                 personsOnBoard: Math.ceil(passengerWeight / 170) || 1, // Estimate from passenger weight
-                fuelOnBoard: routeStats?.fuelRequired ? Math.floor(routeStats.fuelRequired / 60).toString().padStart(2, '0') + Math.floor((routeStats.fuelRequired % 60) * 60 / 60).toString().padStart(2, '0') : "0400",
-                endurance: selectedAircraft?.endurance || "0600", // 6 hours default
+                fuelOnBoard: routeStats?.fuelRequired ? 
+                  `${Math.floor(routeStats.fuelRequired / 60).toString().padStart(2, '0')}${Math.floor((routeStats.fuelRequired % 60)).toString().padStart(2, '0')}` : 
+                  "FUEL CALCULATION REQUIRED",
+                endurance: selectedAircraft?.endurance || 
+                  (selectedAircraft?.maxFuelCapacity && selectedAircraft?.fuelBurn ? 
+                    `${Math.floor(selectedAircraft.maxFuelCapacity / selectedAircraft.fuelBurn).toString().padStart(2, '0')}00` : 
+                    (selectedAircraft?.fuelCapacity && selectedAircraft?.fuelConsumption ? 
+                      `${Math.floor(selectedAircraft.fuelCapacity / selectedAircraft.fuelConsumption).toString().padStart(2, '0')}00` : 
+                      "ENDURANCE DATA REQUIRED")),
                 
                 // Emergency Equipment (standard for commercial helicopters)
                 emergencyEquipment: "R/V/S/J", // Radio, VHF, Survival equipment, Jackets
@@ -391,7 +401,16 @@ const MainCard = ({
                 dinghies: "D/4/C", // Dinghies, 4 persons, Color
                 
                 // Operational Information
-                remarks: `BRISTOW HELICOPTER ${routeStats?.distance ? Math.round(routeStats.distance) + 'NM' : ''}`,
+                remarks: [
+                  routeStats?.distance ? `ROUTE DISTANCE: ${Math.round(routeStats.distance)}NM` : null,
+                  araFuel > 0 ? `ARA FUEL REQUIRED: ${araFuel}LBS` : null,
+                  approachFuel > 0 ? `APPROACH FUEL REQUIRED: ${approachFuel}LBS` : null,
+                  passengerWeight > 0 ? `PAX WEIGHT: ${passengerWeight}LBS` : null,
+                  selectedAircraft?.acModelName ? `AIRCRAFT: ${selectedAircraft.acModelName}` : 
+                    (selectedAircraft?.type ? `AIRCRAFT: ${selectedAircraft.type}` : null),
+                  selectedAircraft?.company ? `OPERATOR: ${selectedAircraft.company}` : null,
+                  selectedAircraft?.maxPassengers ? `MAX PAX: ${selectedAircraft.maxPassengers}` : null
+                ].filter(Boolean).join(' / ') || "OFFSHORE HELICOPTER OPERATIONS",
                 alternateAirport: waypoints.length > 2 ? (waypoints[1]?.name || waypoints[1]?.id) : undefined
               }}
               onSubmissionSuccess={(flightPlanId) => {

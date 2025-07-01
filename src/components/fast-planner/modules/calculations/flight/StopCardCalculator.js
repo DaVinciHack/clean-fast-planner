@@ -56,6 +56,7 @@ function getSegmentExtraFuel(segment, locationFuelOverrides, globalExtraFuel = 0
  * @returns {Array} Array of stop card objects
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false, alternateStopCard = null) => {
+  console.log('🛩️ VFR DEBUG: StopCardCalculator called with:', { waiveAlternates, hasRefuelStops: refuelStops.length > 0, alternateStopCard: !!alternateStopCard });
   console.log('⭐ StopCardCalculator: Starting with routeStats?', !!routeStats);
   console.log('🛩️ StopCardCalculator: Refuel stops:', refuelStops, 'Waive alternates:', waiveAlternates);
   
@@ -1279,6 +1280,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
 
     // 🚨 EDGE CASE: Alternate fuel for intermediate stops before split point
     let intermediateAlternateRequirements = null;
+    console.log('🛩️ VFR DEBUG: Checking intermediate alternate logic:', { hasRefuelStops, waiveAlternates, alternateStopCard: !!alternateStopCard, condition: hasRefuelStops && !waiveAlternates && alternateStopCard });
     if (hasRefuelStops && !waiveAlternates && alternateStopCard) {
       const currentStopIndex = i + 1; // Convert to stop index (1-based)
       
@@ -1300,7 +1302,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         
         // Calculate fuel needed: Trip (to split) + Alternate leg + Contingency + Deck + Reserve
         const tripFuelToSplit = remainingTripFuel; // This should be trip fuel to the split point
-        const alternateLegFuel = alternateStopCard.fuelComponentsObject?.altFuel || 0;
+        const alternateLegFuel = alternateStopCard?.fuelComponentsObject?.altFuel || 0;
         const alternateContingency = Math.round((tripFuelToSplit + alternateLegFuel) * contingencyFuelPercentValue / 100);
         
         const intermediateAlternateFuel = tripFuelToSplit + alternateLegFuel + alternateContingency + remainingDeckFuel + reserveFuelValue + (extraFuel || 0);
