@@ -53,6 +53,7 @@ const RightPanel = React.forwardRef(({
   onToggleChart,
   onLoadCustomChart,
   onWaiveAlternatesChange, // 🛩️ VFR OPERATIONS: Callback for alternate route visibility
+  waiveAlternates = false, // 🛩️ VFR OPERATIONS: Current waive alternates state
   chartsVisible,
   aircraftType,
   onAircraftTypeChange,
@@ -1174,6 +1175,7 @@ const RightPanel = React.forwardRef(({
         onToggleChart={onToggleChart}
         onAutoPlan={handleAutoPlan}
         onWaiveAlternatesChange={onWaiveAlternatesChange} // 🛩️ Pass callback through
+        waiveAlternates={waiveAlternates} // 🛩️ VFR OPERATIONS: Pass waive alternates state
         chartsVisible={chartsVisible}
         aircraftType={aircraftType}
         onAircraftTypeChange={onAircraftTypeChange}

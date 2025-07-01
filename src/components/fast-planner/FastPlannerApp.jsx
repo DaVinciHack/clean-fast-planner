@@ -399,6 +399,9 @@ const FastPlannerCore = ({
   // 🚫 REFUEL SYNC STATE: Store refuel stops from DetailedFuelBreakdown
   const [currentRefuelStops, setCurrentRefuelStops] = useState([]);
   
+  // 🛩️ VFR OPERATIONS: Waive alternates state for VFR day flying
+  const [waiveAlternates, setWaiveAlternates] = useState(false);
+  
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
     console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
@@ -1334,6 +1337,9 @@ const FastPlannerCore = ({
   // 🛩️ VFR OPERATIONS: Handle waive alternates checkbox changes
   const handleWaiveAlternatesChange = useCallback((isWaived) => {
     console.log(`🛩️ FASTPLANNER APP: Waive alternates changed: ${isWaived}`);
+    
+    // Update local state
+    setWaiveAlternates(isWaived);
     console.log(`🛩️ FASTPLANNER APP: Managers available:`, {
       waypointManager: !!waypointManagerRef.current,
       mapManager: !!mapManagerRef.current,
@@ -3797,7 +3803,8 @@ const FastPlannerCore = ({
         <RightPanel
           visible={rightPanelVisible} onToggleVisibility={toggleRightPanel} onClearRoute={clearRoute}
           onLoadRigData={reloadPlatformData} onToggleChart={togglePlatformsVisibility}
-          onLoadCustomChart={loadCustomChart} onWaiveAlternatesChange={handleWaiveAlternatesChange} 
+          onLoadCustomChart={loadCustomChart} onWaiveAlternatesChange={handleWaiveAlternatesChange}
+          waiveAlternates={waiveAlternates} // 🛩️ VFR OPERATIONS: Pass waive alternates state 
           chartsVisible={platformsVisible} aircraftType={aircraftType}
           onAircraftTypeChange={changeAircraftType} aircraftRegistration={aircraftRegistration}
           onAircraftRegistrationChange={changeAircraftRegistration} selectedAircraft={selectedAircraft}

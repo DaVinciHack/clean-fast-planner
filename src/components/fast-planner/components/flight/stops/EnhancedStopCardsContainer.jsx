@@ -31,6 +31,8 @@ const EnhancedStopCardsContainer = ({
   stopCards = [], // Legacy prop - will be ignored
   // 🛩️ VFR OPERATIONS: Callback for waive alternates state changes
   onWaiveAlternatesChange = null,
+  // 🛩️ VFR OPERATIONS: Current waive alternates state from parent
+  waiveAlternates = false,
   // 🛩️ HEADER SYNC: Callback to update header totals
   onStopCardsCalculated = null,
   // 🔧 NEW: Callback to show fuel breakdown modal at MainCard level
@@ -72,9 +74,6 @@ const EnhancedStopCardsContainer = ({
   
   // State for refuel stops (array of stop indices that are refuel stops)
   const [refuelStops, setRefuelStops] = useState([]);
-  
-  // State for waiving alternates (VFR operations)
-  const [waiveAlternates, setWaiveAlternates] = useState(false);
   
   // Force recalculation trigger when refuel stops change
   const [forceRecalculation, setForceRecalculation] = useState(0);
@@ -198,7 +197,7 @@ const EnhancedStopCardsContainer = ({
       });
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, locationFuelOverrides]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, locationFuelOverrides, waiveAlternates]);
   
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
@@ -443,9 +442,8 @@ const EnhancedStopCardsContainer = ({
   const handleWaiveAlternatesChange = (event) => {
     const isWaived = event.target.checked;
     console.log(`🛩️ ENHANCED CONTAINER: Waive alternates changed: ${isWaived}`);
-    setWaiveAlternates(isWaived);
     
-    // 🛩️ NOTIFY PARENT: Call parent callback to hide/show alternate route line on map
+    // 🛩️ NOTIFY PARENT: Call parent callback to update state and hide/show alternate route line on map
     if (onWaiveAlternatesChange) {
       console.log(`🗺️ ENHANCED CONTAINER: Calling parent callback with: ${isWaived}`);
       onWaiveAlternatesChange(isWaived);
