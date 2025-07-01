@@ -17,6 +17,7 @@ import '../../FastPlannerStyles.css';
 import { PanelProvider } from '../../context/PanelContext';
 import { useRegion } from '../../context/region'; // Import region context
 import FlightAutomationLoader from '../loaders/FlightAutomationLoader';
+import FuelSaveBackService from '../../services/FuelSaveBackService';
 
 /**
  * Right Panel Component
@@ -325,6 +326,8 @@ const RightPanel = React.forwardRef(({
         }
         
         // 💾 FUEL SAVE-BACK: Save fuel data to Palantir after successful flight save
+        console.log('🔍 DEBUG: Reached fuel save section. Flight ID:', flightId, 'Stop cards:', stopCards?.length);
+        
         try {
           console.log('💾 FUEL SAVE-BACK: Starting fuel save for flight ID:', flightId);
           

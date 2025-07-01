@@ -137,6 +137,7 @@ export function useFuelPolicy() {
       deckTime: currentPolicy.deckFuelTime,
       taxiFuel: currentPolicy.fuelTypes.taxiFuel.default,
       reserveFuel: currentPolicy.fuelTypes.reserveFuel.default,
+      extraFuel: currentPolicy.fuelTypes.extraFuel.default, // ✅ ADD: Include extraFuel from policy
       
       // Display-only settings (from policy)
       contingencyFlightLegs: currentPolicy.contingencyFuel.flightLegs.value,

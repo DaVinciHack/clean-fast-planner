@@ -677,8 +677,8 @@ const EnhancedStopCardsContainer = ({
           )}
         </div>
         
-        {/* Save Flight Button - Only show if aircraft and waypoints are available */}
-        {selectedAircraft && waypoints && waypoints.length >= 2 && (
+        {/* Save Flight Button - DISABLED: Use SaveFlightCard instead */}
+        {false && selectedAircraft && waypoints && waypoints.length >= 2 && (
           <div style={{ marginTop: '12px', padding: '0 10px' }}>
             <button 
               onClick={handleSaveFlightSettings}
