@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../../context/AuthContext';
+import PassengerInputStep from './PassengerInputStep';
 import './FlightWizard.css';
 
 /**
@@ -226,6 +227,7 @@ const FlightWizard = ({
     { id: 'departure', title: 'Where are you departing from?' },
     { id: 'landings', title: 'Add any rigs and final destination' },
     { id: 'aircraft', title: 'Which aircraft will you use?' },
+    { id: 'passengers', title: 'How many passengers and cargo?' },
     { id: 'time', title: 'When do you want to depart?' },
     { id: 'complete', title: 'Ready to plan your flight!' }
   ];
@@ -744,6 +746,25 @@ const FlightWizard = ({
                     Next
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+          
+          {currentStepData.id === 'passengers' && (
+            <div className="wizard-step passengers-step">
+              <PassengerInputStep
+                flightData={flightData}
+                onFlightDataUpdate={setFlightData}
+                className="passenger-input-wizard"
+              />
+              
+              <div className="wizard-buttons">
+                <button className="wizard-btn secondary" onClick={() => setCurrentStep(currentStep - 1)}>
+                  Back
+                </button>
+                <button className="wizard-btn primary" onClick={handleNext}>
+                  Next
+                </button>
               </div>
             </div>
           )}

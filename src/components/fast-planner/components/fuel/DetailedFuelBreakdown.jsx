@@ -45,6 +45,7 @@ const DetailedFuelBreakdown = ({
   weather = { windSpeed: 0, windDirection: 0 },
   clearKey = '', // NEW: Key to trigger state clearing when flight changes
   locationFuelOverrides = {}, // NEW: Location-specific fuel overrides from FastPlannerApp
+  waiveAlternates = false, // NEW: VFR mode flag
   // NEW: Callback props for updating main app state
   onStopCardsCalculated = () => {}, // Main callback to update stopCards in FastPlannerApp
   // Flight settings callback props (same as SettingsCard)
@@ -330,37 +331,32 @@ const DetailedFuelBreakdown = ({
             console.log(`⚠️ Unknown field type: ${fieldType}`);
         }
         
-        // 🎯 DELAYED TRIGGER: For ALL fuel types that might affect calculations
-        if (fieldType === 'araFuel' || fieldType === 'extraFuel') {
-          console.log('🕐 SETTING UP DELAYED TRIGGER for fieldType:', fieldType);
-          
-          // Capture current context for later trigger
-          const currentStopCard = localStopCards[stopIndex];
-          const currentStopName = currentStopCard?.name || currentStopCard?.stopName || `stop_${stopIndex}`;
+        // 🎯 MODE-SPECIFIC TRIGGERS: Different triggers for IFR vs VFR modes
+        if (fieldType === 'araFuel' || fieldType === 'extraFuel' || fieldType === 'approachFuel') {
+          console.log('🔄 TRIGGER: Setting up trigger for fieldType:', fieldType, 'waiveAlternates:', waiveAlternates);
           
           setTimeout(() => {
-            console.log('🕐 DELAYED TRIGGER: Executing now for fieldType:', fieldType);
-            
-            if (fieldType === 'araFuel') {
-              console.log('🔄 DELAYED TRIGGER: Forcing GLOBAL recalculation by toggling extra fuel');
-              
-              // Get current extra fuel value
-              const currentExtraFuel = flightSettings?.extraFuel || 0;
-              
-              // Force global recalculation by slightly changing extra fuel then changing it back
-              onExtraFuelChange(currentExtraFuel + 0.1); // Tiny change
-              
-              setTimeout(() => {
-                onExtraFuelChange(currentExtraFuel); // Change back to original
-                console.log('🔄 DELAYED TRIGGER: Restored original extra fuel, recalculation should be complete');
-              }, 100);
-              
-            } else if (fieldType === 'extraFuel') {
-              // Re-trigger extra fuel change
+            if (fieldType === 'extraFuel') {
+              console.log('🔄 EXTRA FUEL: Direct extra fuel change');
               onExtraFuelChange(value);
+            } else if (waiveAlternates) {
+              console.log('🔄 VFR MODE: Using extra fuel toggle for reliable recalculation');
+              const currentExtraFuel = flightSettings?.extraFuel || 0;
+              onExtraFuelChange(currentExtraFuel + 0.01);
+              setTimeout(() => {
+                onExtraFuelChange(currentExtraFuel);
+                console.log('🔄 VFR MODE: Extra fuel toggle completed');
+              }, 100);
+            } else {
+              console.log('🔄 IFR MODE: Using extra fuel toggle for recalculation');
+              const currentExtraFuel = flightSettings?.extraFuel || 0;
+              onExtraFuelChange(currentExtraFuel + 0.01);
+              setTimeout(() => {
+                onExtraFuelChange(currentExtraFuel);
+                console.log('🔄 IFR MODE: Extra fuel toggle completed');
+              }, 100);
             }
-            
-          }, 500);
+          }, waiveAlternates ? 800 : 250); // Longer delay for VFR to let value commit
         }
         console.log(`✅ Settings update completed for ${fieldType}`);
       } catch (error) {

@@ -417,6 +417,7 @@ const FastPlannerCore = ({
     console.log(`🛩️ SEGMENT-AWARE: Location-specific fuel override:`, fuelData);
     console.log(`🚨 DEBUG: Refuel stops passed to handleLocationFuelChange:`, fuelData.refuelStops);
     console.log(`🚨 DEBUG: Current waypoints:`, waypoints?.map(w => w.name));
+    console.log(`🛩️ VFR DEBUG: handleLocationFuelChange called with waiveAlternates:`, waiveAlternates, 'refuelStops:', fuelData.refuelStops);
     
     // 🚫 CRITICAL FIX: Store refuel stops from DetailedFuelBreakdown
     if (fuelData.refuelStops && Array.isArray(fuelData.refuelStops)) {
@@ -3355,6 +3356,52 @@ const FastPlannerCore = ({
       setAircraftType(flightData.aircraftType);
     }
     
+    // 🛩️ NEW: Process passenger data from wizard for fuel optimization
+    if (flightData.passengers && flightData.passengers.enabled && flightData.passengers.legData) {
+      console.log('🧙‍♂️ Processing wizard passenger data:', flightData.passengers);
+      
+      const legData = flightData.passengers.legData;
+      
+      // Calculate maximum passenger requirements across all legs for fuel calculations  
+      let maxPassengerCount = 0;
+      let maxTotalCargoWeight = 0;
+      let standardPassengerWeight = 220; // Keep standard weight per passenger
+      
+      Object.values(legData).forEach(leg => {
+        const passengerCount = leg.passengerCount || 0;
+        const totalWeight = leg.totalWeight || 0;
+        const bagWeight = leg.bagWeight || 0;
+        
+        maxPassengerCount = Math.max(maxPassengerCount, passengerCount);
+        maxTotalCargoWeight = Math.max(maxTotalCargoWeight, bagWeight);
+        
+        // Calculate actual weight per passenger from the leg data
+        if (passengerCount > 0) {
+          const actualWeightPerPassenger = (totalWeight - bagWeight) / passengerCount;
+          standardPassengerWeight = Math.max(standardPassengerWeight, actualWeightPerPassenger);
+        }
+      });
+      
+      console.log('🧙‍♂️ Calculated passenger requirements:', {
+        maxPassengerCount,
+        maxTotalCargoWeight,
+        standardPassengerWeight: Math.round(standardPassengerWeight)
+      });
+      
+      // Update flight settings with passenger data (keep standard format)
+      setFlightSettings(prev => ({
+        ...prev,
+        passengerWeight: Math.round(standardPassengerWeight), // Weight PER passenger, not total
+        cargoWeight: maxTotalCargoWeight, // Total cargo weight
+        passengerCount: maxPassengerCount, // 🔧 FIX: Store passenger count for fuel calculations
+        wizardPassengerData: flightData.passengers.legData // 🔧 FIX: Store detailed wizard passenger data
+      }));
+      
+      // Store detailed passenger data for potential fuel optimization
+      // Note: This would trigger fuel stop optimization if passenger count exceeds aircraft capacity
+      console.log('🛩️ Wizard passenger data ready for fuel optimization if needed');
+    }
+    
     // Set departure time if provided
     if (flightData.departureTime) {
       console.log('🧙‍♂️ Setting departure time:', flightData.departureTime);
@@ -3446,10 +3493,17 @@ const FastPlannerCore = ({
   }, [handleFlightLoad]);
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
-  const handleStopCardsCalculated = useCallback((calculatedStopCards) => {
+  const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
     console.log('🛩️ FastPlannerApp: Received calculated stop cards:', calculatedStopCards.length);
     console.log('🛩️ FastPlannerApp: Stop cards data:', calculatedStopCards);
-    setStopCards(calculatedStopCards);
+    
+    if (options.forceVfrRecalc) {
+      console.log('🛩️ VFR FORCE: Forcing recalculation by triggering forceUpdate');
+      // Force a complete recalculation by updating forceUpdate state
+      setForceUpdate(prev => prev + 1);
+    } else {
+      setStopCards(calculatedStopCards);
+    }
   }, []);
   
   // ⛽ FUEL BREAKDOWN: Callback to handle refuel toggle from DetailedFuelBreakdown
@@ -3698,6 +3752,7 @@ const FastPlannerCore = ({
         weather={weather}
         clearKey={`${stopCards?.length || 0}-${waypoints?.length || 0}-${currentFlightId || 'none'}`}
         locationFuelOverrides={locationFuelOverrides}
+        waiveAlternates={waiveAlternates}
         onStopCardsCalculated={handleStopCardsCalculated}
         // Flight settings callback props (same as SettingsCard)
         onExtraFuelChange={(value) => updateFlightSetting('extraFuel', value)}
