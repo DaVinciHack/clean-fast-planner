@@ -19,6 +19,9 @@ import { initializeWeatherSystem } from './modules/WeatherLoader.js';
 // Import extracted utilities
 import { generateStopCardsData as generateStopCardsUtil } from './utilities/FlightUtilities.js';
 
+// Import segment-aware fuel utilities
+import { detectLocationSegment, createSegmentFuelKey, getSegmentBoundaries } from './utilities/SegmentUtils.js';
+
 // Import UI components
 import {
   LeftPanel,
@@ -393,6 +396,9 @@ const FastPlannerCore = ({
   // ✅ NEW: Location-specific fuel overrides state (for ARA/approach fuel)
   const [locationFuelOverrides, setLocationFuelOverrides] = useState({});
   
+  // 🚫 REFUEL SYNC STATE: Store refuel stops from DetailedFuelBreakdown
+  const [currentRefuelStops, setCurrentRefuelStops] = useState([]);
+  
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
     console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
@@ -405,9 +411,23 @@ const FastPlannerCore = ({
   
   // ✅ NEW: Handle location-specific fuel overrides (ARA/approach fuel)
   const handleLocationFuelChange = useCallback((fuelData) => {
-    console.log(`🌦️ Location-specific fuel override:`, fuelData);
+    console.log(`🛩️ SEGMENT-AWARE: Location-specific fuel override:`, fuelData);
+    console.log(`🚨 DEBUG: Refuel stops passed to handleLocationFuelChange:`, fuelData.refuelStops);
+    console.log(`🚨 DEBUG: Current waypoints:`, waypoints?.map(w => w.name));
     
-    const key = `${fuelData.stopName}_${fuelData.fuelType}`;
+    // 🚫 CRITICAL FIX: Store refuel stops from DetailedFuelBreakdown
+    if (fuelData.refuelStops && Array.isArray(fuelData.refuelStops)) {
+      console.log(`🚫 REFUEL SYNC: Storing refuel stops from DetailedFuelBreakdown:`, fuelData.refuelStops);
+      setCurrentRefuelStops(fuelData.refuelStops);
+    }
+    
+    // Detect which segment this location belongs to
+    const segment = detectLocationSegment(fuelData.stopName, waypoints, fuelData.refuelStops || []);
+    
+    // Create segment-aware key
+    const key = createSegmentFuelKey(fuelData.stopName, fuelData.fuelType, segment);
+    
+    console.log(`🛩️ SEGMENT-AWARE: Location "${fuelData.stopName}" is in segment ${segment}, key: "${key}"`);
     
     setLocationFuelOverrides(prev => {
       const newOverrides = {
@@ -417,18 +437,50 @@ const FastPlannerCore = ({
           stopIndex: fuelData.stopIndex,
           fuelType: fuelData.fuelType,
           value: fuelData.value,
-          isRig: fuelData.isRig
+          isRig: fuelData.isRig,
+          segment: segment  // ✅ NEW: Include segment information
         }
       };
       
-      console.log(`🌦️ Updated location fuel overrides:`, newOverrides);
+      console.log(`🛩️ SEGMENT-AWARE: Updated segment fuel overrides:`, newOverrides);
       
-      // Trigger a force update to recalculate fuel with new overrides
-      setForceUpdate(Date.now());
+      return newOverrides;
+    });
+  }, [waypoints]);
+  
+  // ✅ NEW: Handle segment-aware extra fuel changes
+  const handleSegmentExtraFuelChange = useCallback((segmentData) => {
+    console.log(`🛩️ SEGMENT-AWARE: Extra fuel override for segment ${segmentData.segment}:`, segmentData);
+    
+    // Create segment-aware key for extra fuel
+    const key = createSegmentFuelKey(null, 'extraFuel', segmentData.segment);
+    
+    setLocationFuelOverrides(prev => {
+      const newOverrides = {
+        ...prev,
+        [key]: {
+          stopName: null, // Extra fuel is segment-wide, not location-specific
+          fuelType: 'extraFuel',
+          value: segmentData.value,
+          segment: segmentData.segment,
+          isSegmentWide: true
+        }
+      };
+      
+      console.log(`🛩️ SEGMENT-AWARE: Updated segment extra fuel:`, newOverrides);
       
       return newOverrides;
     });
   }, []);
+  
+  // ✅ NEW: Get current flight segment information for UI display
+  const getCurrentSegmentInfo = useCallback(() => {
+    // Get refuel stops from EnhancedStopCardsContainer state
+    // For now, we'll pass this as a prop to components that need it
+    return getSegmentBoundaries(waypoints, []);
+  }, [waypoints]);
+  
+  // ❌ REMOVED: Complex refuel stops handling - was causing refuel stops to jump around
   
   // ✅ NEW: Reset user-entered flight settings to defaults (for new flights)
   const resetUserFlightSettings = useCallback(() => {
@@ -602,7 +654,7 @@ const FastPlannerCore = ({
         } : 'No aircraft'
       });
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
+  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel, locationFuelOverrides]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({
@@ -3653,6 +3705,9 @@ const FastPlannerCore = ({
         onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
         onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
         onLocationFuelChange={handleLocationFuelChange}
+        // ✅ SEGMENT-AWARE: Add segment-aware fuel handling
+        onSegmentExtraFuelChange={handleSegmentExtraFuelChange}
+        getCurrentSegmentInfo={getCurrentSegmentInfo}
       />
       
       {/* RegionAircraftConnector removed - using only event-based region sync */}
@@ -3808,6 +3863,10 @@ const FastPlannerCore = ({
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
+          locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to stop cards
+          currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to components
+          onSegmentExtraFuelChange={handleSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler
+          getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter
           onSARUpdate={handleSARUpdate} // Add SAR update handler
           sarData={sarData} // Pass SAR calculation data
           ref={rightPanelRef} // Add ref to access card change functionality

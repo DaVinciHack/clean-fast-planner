@@ -72,6 +72,14 @@ const MainCard = ({
   onShowFuelBreakdown = null,
   // 🔧 NEW: Callback to receive alternate card data
   onAlternateCardCalculated = null,
+  // ✅ SYNC FIX: Location-specific fuel overrides for stop card synchronization
+  locationFuelOverrides = {},
+  // 🚫 REFUEL SYNC: Current refuel stops from DetailedFuelBreakdown
+  currentRefuelStops = [],
+  // ✅ SEGMENT-AWARE: Segment-specific extra fuel handler
+  onSegmentExtraFuelChange = () => {},
+  // ✅ SEGMENT-AWARE: Function to get current segment information
+  getCurrentSegmentInfo = () => [],
 }) => {
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
@@ -823,6 +831,10 @@ const MainCard = ({
             onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to show modal at app level
             onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback
             currentFlightId={currentFlightId} // 🔧 NEW: Pass current flight ID for fuel save functionality
+            locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to container
+            currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to container
+            onSegmentExtraFuelChange={onSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler to container
+            getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter to container
           />
         )}
       </div>
