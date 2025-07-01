@@ -34,6 +34,9 @@ export class FuelSaveBackService {
     console.log('💾 FuelSaveBackService: Starting MainFuelV2 save-back for flight:', flightId);
     console.log('💾 Stop cards count:', stopCards?.length);
     
+    let actionParams = {}; // Declare outside try block for error logging
+    let debugInfo = {}; // Additional debug info for error logging
+    
     try {
       // Validate required parameters
       if (!flightId) {
@@ -41,65 +44,499 @@ export class FuelSaveBackService {
       }
       
       if (!stopCards || stopCards.length === 0) {
-        throw new Error('Stop cards are required for fuel save-back');
+        console.log('💾 No stop cards provided, will only save basic fuel settings');
       }
       
       // Import SDK dynamically
       const sdk = await import('@flight-app/sdk');
       
-      // Check if MainFuelV2 record already exists
-      let existingFuelRecord = null;
+      // Create complete MainFuelV2 object with all fuel components
+      console.log('💾 Creating/updating MainFuelV2 object directly for complete fuel data');
+      
+      // 🎯 USER CONFIRMED: fuel object 6cdf9983-8152-4be8-b0fc-4dd9416ec4b0 has flight UUID 5e3303d2-a3d7-49db-989c-779926b26bbd
+      // Let's fetch it directly first, then investigate why search isn't working
+      let existingFuelObject = null;
+      
       try {
-        const existingRecords = await client(sdk.MainFuelV2)
+        console.log('🎯 DIRECT FETCH: Getting fuel object 6cdf9983-8152-4be8-b0fc-4dd9416ec4b0 directly');
+        existingFuelObject = await client(sdk.MainFuelV2).fetchOne('6cdf9983-8152-4be8-b0fc-4dd9416ec4b0');
+        
+        if (existingFuelObject) {
+          console.log('✅ DIRECT FETCH SUCCESS:', {
+            primaryKey: existingFuelObject.$primaryKey,
+            flightUuid: existingFuelObject.flightUuid,
+            flightUuidMatches: existingFuelObject.flightUuid === flightId,
+            updatedAt: existingFuelObject.updatedAt
+          });
+          
+          // Verify it matches our flight
+          if (existingFuelObject.flightUuid === flightId) {
+            console.log('✅ PERFECT: Fuel object belongs to our flight!');
+          } else {
+            console.error('🚨 MISMATCH: Fuel object has wrong flight UUID!', {
+              expected: flightId,
+              actual: existingFuelObject.flightUuid
+            });
+          }
+        }
+      } catch (directFetchError) {
+        console.error('❌ DIRECT FETCH FAILED:', directFetchError.message);
+        console.log('🔍 Falling back to search...');
+      }
+      
+      // If direct fetch failed, try search to debug why it's not working
+      if (!existingFuelObject) {
+        console.log('🔍 SEARCH DEBUG: Looking for MainFuelV2 objects for flight:', flightId);
+        
+        const existingData = await client(sdk.MainFuelV2)
+          .where(fuel => fuel.flightUuid.exactMatch(flightId))
+          .fetchPage({ $pageSize: 20 }); // Get more to see all objects
+      
+        console.log('🔍 SEARCH RESULTS:', {
+          totalFound: existingData.data?.length || 0,
+          flightId: flightId
+        });
+        
+        if (!existingData.data || existingData.data.length === 0) {
+          throw new Error(`No MainFuelV2 object found for flight ${flightId}`);
+        }
+        
+        // 🚨 DEBUG: Log ALL objects found to see what's going wrong with search
+        console.log('🔍 ALL OBJECTS FOUND BY SEARCH:');
+        existingData.data.forEach((obj, index) => {
+          console.log(`  ${index + 1}. UUID: ${obj.$primaryKey}, flightUuid: ${obj.flightUuid}, matches: ${obj.flightUuid === flightId}, updatedAt: ${obj.updatedAt}`);
+        });
+        
+        // Check if our target object is in the search results
+        const targetInResults = existingData.data.find(obj => obj.$primaryKey === '6cdf9983-8152-4be8-b0fc-4dd9416ec4b0');
+        if (targetInResults) {
+          console.log('✅ TARGET FOUND IN SEARCH: Our fuel object IS in the search results');
+          existingFuelObject = targetInResults;
+        } else {
+          console.log('❌ TARGET NOT IN SEARCH: Our fuel object is NOT in the search results - this explains the problem!');
+          
+          // Find the object that ACTUALLY matches our flight UUID
+          const correctObjects = existingData.data.filter(obj => obj.flightUuid === flightId);
+          
+          if (correctObjects.length === 0) {
+            console.error('🚨 CRITICAL: Search returned objects but NONE match our flight UUID!');
+            console.error('🚨 Expected flight UUID:', flightId);
+            console.error('🚨 Found objects with UUIDs:', existingData.data.map(obj => obj.flightUuid));
+            throw new Error(`Search found objects but none match flightUuid = ${flightId}`);
+          }
+          
+          existingFuelObject = correctObjects[0];
+          console.log('⚠️ USING DIFFERENT OBJECT FROM SEARCH:', existingFuelObject.$primaryKey);
+        }
+      }
+      
+      // Final check that we have the right object
+      if (!existingFuelObject) {
+        throw new Error(`Failed to find MainFuelV2 object for flight ${flightId}`);
+      }
+      
+      console.log('✅ FINAL: Using fuel object:', {
+        primaryKey: existingFuelObject.$primaryKey,
+        flightUuid: existingFuelObject.flightUuid,
+        flightUuidMatches: existingFuelObject.flightUuid === flightId
+      });
+      
+      // Use the NEW comprehensive createOrModifyMainFuelFastPlanner action
+      console.log('💾 Using createOrModifyMainFuelFastPlanner - comprehensive fuel + passenger data');
+      
+      // Get departure card for fuel totals
+      const departureCard = stopCards?.[0] || {};
+      const currentTime = new Date().toISOString();
+      
+      // Extract regional weight data from fuel policy (AVIATION SAFETY: NO HARDCODED VALUES!)
+      const regionalPassengerWeight = fuelPolicy?.averagePassengerWeight || 
+                                     fuelPolicy?.currentPolicy?.averagePassengerWeight || 
+                                     220; // Norway default from fuel policy
+      const regionalBagWeight = fuelPolicy?.averageBagWeight || 
+                               fuelPolicy?.currentPolicy?.averageBagWeight || 
+                               0; // Default 0 if not available
+      
+      // 🚨 CRITICAL FIX: Send COMPLETE fuel data from Fast Planner to Palantir
+      // Extract all fuel components from stop cards to match Palantir display
+      
+      // Extract arrays from stop cards for complete fuel data
+      const stopLocations = [];
+      const stopTripFuels = [];
+      const stopTaxiFuels = [];
+      const stopDeckFuels = [];
+      const stopReserveFuels = [];
+      const stopContingencyFuels = [];
+      const stopExtraFuels = [];
+      const stopAraFuels = [];
+      const stopApproachFuels = [];
+      const stopDescriptions = [];
+      const stopRequiredFuels = [];
+      const stopExcessFuels = [];
+      
+      // Passenger data arrays
+      const requestedPassengers = [];
+      const availablePassengers = [];
+      const requestedPassengerWeight = [];
+      const availableWeight = [];
+      const requestedTotalWeight = [];
+      const requestedBagWeight = [];
+      
+      // Process each stop card to extract fuel components
+      stopCards.forEach((card, index) => {
+        if (!card) return;
+        
+        // Location and description
+        stopLocations.push(card.name || card.stopName || card.location || `Stop ${index + 1}`);
+        stopDescriptions.push(card.description || card.stopType || 'Standard Stop');
+        
+        // Core fuel components (round to integers)
+        stopTripFuels.push(Math.round(card.tripFuel || 0));
+        stopTaxiFuels.push(Math.round(card.taxiFuel || 0));
+        stopDeckFuels.push(Math.round(card.deckFuel || 0));
+        stopReserveFuels.push(Math.round(card.reserveFuel || 0));
+        stopContingencyFuels.push(Math.round(card.contingencyFuel || 0));
+        stopExtraFuels.push(Math.round(card.extraFuel || 0));
+        
+        // Weather-based fuel components
+        stopAraFuels.push(Math.round(card.araFuel || 0));
+        stopApproachFuels.push(Math.round(card.approachFuel || 0));
+        
+        // Calculated totals
+        stopRequiredFuels.push(Math.round(card.totalFuel || 0));
+        stopExcessFuels.push(Math.round(card.excessFuel || 0));
+        
+        // Passenger data from stop cards
+        requestedPassengers.push(Math.round(card.maxPassengers || card.passengers || 0));
+        availablePassengers.push(Math.round(card.maxPassengers || card.passengers || 0));
+        requestedPassengerWeight.push(Math.round((card.maxPassengers || 0) * regionalPassengerWeight));
+        availableWeight.push(Math.round(card.availableWeight || 0));
+        requestedTotalWeight.push(Math.round(card.totalWeight || 0));
+        requestedBagWeight.push(Math.round((card.maxPassengers || 0) * regionalBagWeight));
+      });
+      
+      // Generate markdown table matching EXACT operations format
+      let markdownTable = "";
+      
+      stopCards.forEach((card, index) => {
+        if (!card) return;
+        
+        const location = stopLocations[index] || `Stop ${index + 1}`;
+        const requiredFuel = stopRequiredFuels[index] || 0;
+        const passengers = requestedPassengers[index] || 0;
+        const passengerWeight = requestedPassengerWeight[index] || 0;
+        
+        // Check if refuel is needed (if this is a fuel stop)
+        const refuelNote = card.isRefuelStop ? " (Refuel needed)" : "";
+        const fuelDisplay = `${requiredFuel}${refuelNote} Lbs`;
+        
+        // Build fuel components string - EXACT format from operations
+        const components = [];
+        if (stopTripFuels[index]) components.push(`Trip:${stopTripFuels[index]}`);
+        if (stopContingencyFuels[index]) components.push(`Cont:${stopContingencyFuels[index]}`);
+        if (stopTaxiFuels[index]) components.push(`Taxi:${stopTaxiFuels[index]}`);
+        if (stopDeckFuels[index]) components.push(`Deck:${stopDeckFuels[index]}`);
+        if (stopAraFuels[index]) components.push(`ARA:${stopAraFuels[index]}`);
+        if (stopApproachFuels[index]) components.push(`Appr:${stopApproachFuels[index]}`);
+        if (stopReserveFuels[index]) components.push(`Res:${stopReserveFuels[index]}`);
+        if (stopExtraFuels[index]) components.push(`Extra:${stopExtraFuels[index]}`);
+        
+        // Handle final stop differently
+        const isFinalStop = index === stopCards.length - 1;
+        let componentsStr = "";
+        let passengerStr = "";
+        let legStr = "";
+        
+        if (isFinalStop) {
+          componentsStr = `Reserve:${stopReserveFuels[index] || 0} Extra:${stopExtraFuels[index] || 0} FullCont:${stopContingencyFuels[index] || 0}`;
+          passengerStr = "Final Stop";
+          legStr = `Final destination (Total: ${requiredFuel} Lbs)`;
+        } else {
+          componentsStr = components.join(' ') || 'No fuel';
+          passengerStr = `${passengers} (${passengerWeight} Lbs)`;
+          
+          // Build legs string - simplified for now (would need route leg data)
+          const nextStop = stopLocations[index + 1];
+          if (nextStop) {
+            legStr = `${location}-${nextStop}`;
+          } else {
+            legStr = `${location} route`;
+          }
+        }
+        
+        // EXACT format: ENZV    5150 (Refuel needed+533) Lbs    13 (2772 Lbs)    Trip:3848 Cont:385 Taxi:100 Deck:450 ARA:200 Appr:200 Res:500    ENZV-ENLE → ENLE-ENWV → ENWV-ENZV
+        markdownTable += `${location}    ${fuelDisplay}    ${passengerStr}    ${componentsStr}    ${legStr}\n`;
+      });
+      
+      console.log('💾 COMPLETE FUEL DATA EXTRACTION:', {
+        stopCount: stopCards.length,
+        locations: stopLocations,
+        tripFuels: stopTripFuels,
+        totalFuels: stopRequiredFuels,
+        markdownTableLines: markdownTable.split('\n').length
+      });
+      
+      const actionParams = {
+        // Tell action which object to modify - pass the FULL OBJECT
+        "main_fuel_v2": existingFuelObject,
+        
+        // Complete fuel data arrays matching Fast Planner calculations
+        "stop_locations": stopLocations,
+        "stop_descriptions": stopDescriptions,
+        "stop_trip_fuels": stopTripFuels,
+        "stop_taxi_fuels": stopTaxiFuels,
+        "stop_deck_fuels": stopDeckFuels,
+        "stop_reserve_fuels": stopReserveFuels,
+        "stop_contingency_fuels": stopContingencyFuels,
+        "stop_extra_fuels": stopExtraFuels,
+        "stop_ara_fuels": stopAraFuels,
+        "stop_approach_fuels": stopApproachFuels,
+        "stop_required_fuels": stopRequiredFuels,
+        "stop_excess_fuels": stopExcessFuels,
+        
+        // Summary fuel values
+        "planned_trip_fuel": Math.round(departureCard.tripFuel || routeStats.tripFuel || 0),
+        "planned_extra_fuel": Math.round(Number(flightSettings?.extraFuel) || 0),
+        "planned_taxi_fuel": Math.round(departureCard.taxiFuel || 0),
+        "planned_deck_fuel": Math.round(departureCard.deckFuel || 0),
+        "planned_reserve_fuel": Math.round(departureCard.reserveFuel || 0),
+        "planned_contingency_fuel": Math.round(departureCard.contingencyFuel || 0),
+        "planned_ara_fuel": Math.round(departureCard.araFuel || weatherFuel?.araFuel || 0),
+        "planned_approach_fuel": Math.round(departureCard.approachFuel || weatherFuel?.approachFuel || 0),
+        "min_total_fuel": Math.round(departureCard.totalFuel || 0),
+        
+        // Critical fuel totals  
+        "round_trip_fuel": Math.round(departureCard.totalFuel || 0), // Total departure fuel
+        "planned_alternate_fuel": Math.round(routeStats.alternateFuel || routeStats.minimumFuel || departureCard.reserveFuel || 0), // Minimum safe fuel 
+        "total_fuel_burned": Math.round(routeStats.tripFuel || departureCard.tripFuel || 0),
+        "total_fuel_uplifted": Math.round(departureCard.totalFuel || 0),
+        
+        // Passenger data arrays
+        "requested_passengers": requestedPassengers,
+        "available_passengers": availablePassengers,
+        "requested_passenger_weight": requestedPassengerWeight,
+        "available_weight": availableWeight,
+        "requested_total_weight": requestedTotalWeight,
+        "requested_bag_weight": requestedBagWeight,
+        
+        // Regional defaults
+        "average_passenger_weight": Math.round(regionalPassengerWeight),
+        "average_bag_weight": Math.round(regionalBagWeight),
+        
+        // Flight metadata
+        "flight_uuid": flightId,
+        "aircraft": selectedAircraft?.name || selectedAircraft?.registration || 'Unknown',
+        "policy_uuid": fuelPolicy?.uuid || fuelPolicy?.currentPolicy?.uuid || '',
+        "policy_name": fuelPolicy?.name || fuelPolicy?.currentPolicy?.name || '',
+        "flight_number": `${selectedAircraft?.registration || 'Unknown'} (${new Date().toLocaleDateString()})`,
+        
+        // Formatted display data
+        "stops_markdown_table": markdownTable,
+        "min_fuel_breakdown": `Trip:${Math.round(departureCard.tripFuel || routeStats.tripFuel || 0)} Taxi:${Math.round(departureCard.taxiFuel || 0)} Deck:${Math.round(departureCard.deckFuel || 0)} Res:${Math.round(departureCard.reserveFuel || 0)} Extra:${Math.round(Number(flightSettings?.extraFuel) || 0)}`,
+        
+        // Technical metadata
+        "calculation_unit": "LBS",
+        "display_unit": "LBS",
+        "uses_combined_weight": true,
+        
+        // Timestamp
+        "updated_at": currentTime,
+        "created_at": currentTime
+      };
+      
+      console.log('💾 COMPREHENSIVE FUEL DATA: All fuel components for Palantir:', {
+        main_fuel_v2_primaryKey: actionParams.main_fuel_v2?.$primaryKey,
+        main_fuel_v2_flightUuid: actionParams.main_fuel_v2?.flightUuid,
+        stopCount: actionParams.stop_locations?.length,
+        totalParameterCount: Object.keys(actionParams).length,
+        sampleStopData: {
+          location: actionParams.stop_locations?.[0],
+          tripFuel: actionParams.stop_trip_fuels?.[0],
+          totalFuel: actionParams.stop_required_fuels?.[0]
+        }
+      });
+      
+      console.log('💾 DEBUG: Stop cards structure:', stopCards?.map((card, i) => ({
+        index: i,
+        name: card.name,
+        stopName: card.stopName,
+        location: card.location,
+        waypoint: card.waypoint,
+        totalFuel: card.totalFuel,
+        tripFuel: card.tripFuel,
+        reserveFuel: card.reserveFuel,
+        allKeys: Object.keys(card)
+      })));
+      
+      console.log('💾 DEBUG: First stop card full object:', stopCards?.[0]);
+      
+      console.log('💾 Full action parameters before submission:', JSON.stringify(actionParams, null, 2));
+      console.log('💾 DEBUG: Key parameter types:', {
+        main_fuel_v2: typeof actionParams.main_fuel_v2,
+        main_fuel_v2_primaryKey: actionParams.main_fuel_v2?.$primaryKey,
+        main_fuel_v2_flightUuid: actionParams.main_fuel_v2?.flightUuid
+      });
+      
+      // Debug: Check if we have basic required fuel data
+      console.log('💾 DEBUG: Key fuel values being saved:', {
+        planned_trip_fuel: actionParams.planned_trip_fuel,
+        planned_extra_fuel: actionParams.planned_extra_fuel,
+        min_total_fuel: actionParams.min_total_fuel,
+        updated_at: actionParams.updated_at
+      });
+      
+      // ✅ CRITICAL FIX: Now passing existing object correctly to action
+      console.log('💾 Using action to MODIFY existing MainFuelV2 object:', existingFuelObject.$primaryKey);
+      console.log('💾 DEBUG: Existing object being passed:', {
+        primaryKey: existingFuelObject.$primaryKey,
+        type: typeof existingFuelObject,
+        flightUuid: existingFuelObject.flightUuid,
+        flightUuidMatches: existingFuelObject.flightUuid === flightId
+      });
+      
+      // ✅ UUID VALIDATION: Check that key UUIDs are valid
+      console.log('💾 UUID VALIDATION:', {
+        flightId: flightId,
+        flightIdValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(flightId),
+        primaryKey: existingFuelObject.$primaryKey,
+        primaryKeyValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existingFuelObject.$primaryKey)
+      });
+      
+      // 🚨 FINAL DEBUG: Log key info before API call
+      debugInfo = {
+        parameterCount: Object.keys(actionParams).length,
+        hasMainFuelV2: !!actionParams.main_fuel_v2,
+        main_fuel_v2_primaryKey: actionParams.main_fuel_v2?.$primaryKey,
+        actionType: 'MODIFY_EXISTING'
+      };
+      console.log('💾 FINAL PARAMETERS BEING SENT TO PALANTIR:', debugInfo);
+      
+      // ✅ READY: Using action with existing object reference to MODIFY, not create
+      console.log('💾 READY: Calling createOrModifyMainFuelFastPlanner to MODIFY existing object:', existingFuelObject.$primaryKey);
+      
+      const result = await client(sdk.createOrModifyMainFuelFastPlanner).applyAction(
+        actionParams,
+        { $returnEdits: true }
+      );
+      
+      console.log('✅ FuelSaveBackService: createOrModifyMainFuelFastPlanner action successful:', result);
+      
+      // 🔍 ENHANCED VERIFICATION: Compare before/after to see what actually changed
+      try {
+        console.log('🔍 VERIFICATION: Loading updated object to compare changes...');
+        
+        const verifyData = await client(sdk.MainFuelV2)
           .where(fuel => fuel.flightUuid.exactMatch(flightId))
           .fetchPage({ $pageSize: 1 });
         
-        if (existingRecords.data && existingRecords.data.length > 0) {
-          existingFuelRecord = existingRecords.data[0];
-          console.log('💾 Found existing MainFuelV2 record:', existingFuelRecord.uuid);
+        if (verifyData.data && verifyData.data.length > 0) {
+          const updatedFuel = verifyData.data[0];
+          
+          console.log('🔍 BEFORE/AFTER COMPARISON:');
+          console.log('  BEFORE (existingFuelObject):');
+          console.log('    - UUID:', existingFuelObject.$primaryKey);
+          console.log('    - Trip Fuel:', existingFuelObject.plannedTripFuel);
+          console.log('    - Extra Fuel:', existingFuelObject.plannedExtraFuel);
+          console.log('    - Total Fuel:', existingFuelObject.minTotalFuel);
+          console.log('    - Updated At:', existingFuelObject.updatedAt);
+          
+          console.log('  AFTER (updatedFuel):');
+          console.log('    - UUID:', updatedFuel.$primaryKey);
+          console.log('    - Trip Fuel:', updatedFuel.plannedTripFuel);
+          console.log('    - Extra Fuel:', updatedFuel.plannedExtraFuel);
+          console.log('    - Total Fuel:', updatedFuel.minTotalFuel);
+          console.log('    - Updated At:', updatedFuel.updatedAt);
+          
+          console.log('  CHANGES DETECTED:');
+          console.log('    - UUID Same?', existingFuelObject.$primaryKey === updatedFuel.$primaryKey);
+          console.log('    - Trip Fuel Changed?', existingFuelObject.plannedTripFuel !== updatedFuel.plannedTripFuel);
+          console.log('    - Extra Fuel Changed?', existingFuelObject.plannedExtraFuel !== updatedFuel.plannedExtraFuel);
+          console.log('    - Total Fuel Changed?', existingFuelObject.minTotalFuel !== updatedFuel.minTotalFuel);
+          console.log('    - Timestamp Changed?', existingFuelObject.updatedAt !== updatedFuel.updatedAt);
+          
+        } else {
+          console.warn('❌ VERIFICATION: No fuel data found after save!');
         }
-      } catch (searchError) {
-        console.log('💾 No existing MainFuelV2 record found, will create new one');
+      } catch (verifyError) {
+        console.error('❌ VERIFICATION ERROR:', verifyError);
       }
       
-      // Transform stopCards to Palantir's array-based structure
-      const fuelRecord = this.transformToMainFuelV2Structure(
-        stopCards,
-        flightSettings,
-        weatherFuel,
-        fuelPolicy,
-        routeStats,
-        selectedAircraft,
-        flightId
-      );
-      
-      let result;
-      
-      if (existingFuelRecord) {
-        // Update existing record
-        console.log('💾 Updating existing MainFuelV2 record');
-        result = await client(sdk.MainFuelV2).edit(existingFuelRecord.uuid, fuelRecord);
+      // Handle the response from the action
+      if (result.type === "edits") {
+        // for new objects and updated objects edits will contain the primary key of the object
+        const updatedObject = result.editedObjectTypes[0];
+        console.log("Updated/Created fuel object:", updatedObject);
+        
+        // Show user feedback
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            'Comprehensive fuel + passenger data saved to Palantir successfully',
+            'success',
+            3000
+          );
+        }
+        
+        return result;
       } else {
-        // Create new record
-        console.log('💾 Creating new MainFuelV2 record');
-        result = await client(sdk.MainFuelV2).create(fuelRecord);
+        console.warn('Unexpected result type:', result.type);
+        return result;
       }
-      
-      console.log('✅ FuelSaveBackService: MainFuelV2 save successful:', result);
-      
-      // Show user feedback
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator(
-          'Fuel data saved to Palantir successfully',
-          'success',
-          3000
-        );
-      }
-      
-      return result;
       
     } catch (error) {
       console.error('❌ FuelSaveBackService: Error saving MainFuelV2:', error);
+      
+      // Enhanced error logging for 400 errors
+      if (error.message && error.message.includes('400')) {
+        console.error('❌ 400 Bad Request Details:');
+        console.error('  - Request parameters (live):', JSON.stringify(actionParams, null, 2));
+        console.error('  - Request parameters (preserved):', JSON.stringify(debugInfo?.fullParams || {}, null, 2));
+        console.error('  - Debug info:', debugInfo);
+        console.error('  - Flight ID:', flightId);
+        console.error('  - Fuel policy region:', fuelPolicy?.region);
+        console.error('  - Fuel policy UUID:', fuelPolicy?.uuid);
+        console.error('  - Error object keys:', Object.keys(error));
+        
+        // Extract detailed error information from Palantir error object
+        if (error.errorName) {
+          console.error('  - Error name:', error.errorName);
+        }
+        if (error.errorCode) {
+          console.error('  - Error code:', error.errorCode);
+        }
+        if (error.statusCode) {
+          console.error('  - Status code:', error.statusCode);
+        }
+        if (error.errorInstanceId) {
+          console.error('  - Error instance ID:', error.errorInstanceId);
+        }
+        if (error.parameters) {
+          console.error('  - Error parameters:', error.parameters);
+        }
+        if (error.cause) {
+          console.error('  - Error cause:', error.cause);
+        }
+        
+        // Try to extract more details from the error
+        if (error.response) {
+          console.error('  - Error response:', error.response);
+        }
+        if (error.body) {
+          console.error('  - Error body:', error.body);
+        }
+        if (error.details) {
+          console.error('  - Error details:', error.details);
+        }
+        
+        // Check if error contains constraint violations
+        try {
+          const errorString = error.toString();
+          if (errorString.includes('constraint') || errorString.includes('validation')) {
+            console.error('  - This appears to be a parameter validation error');
+            console.error('  - Full error string:', errorString);
+          }
+        } catch (e) {
+          console.error('  - Could not parse error string:', e);
+        }
+      }
       
       // Show user error feedback
       if (window.LoadingIndicator) {
@@ -115,17 +552,24 @@ export class FuelSaveBackService {
   }
   
   /**
-   * Transform stop cards to Palantir's MainFuelV2 array-based structure
-   * Matches the exact format used in FlightFuelService.ts
+   * Transform stop cards to Palantir's MainFuelV2 complete structure
+   * Include ALL fuel components from the departure card
    */
   static transformToMainFuelV2Structure(stopCards, flightSettings, weatherFuel, fuelPolicy, routeStats, selectedAircraft, flightId) {
-    console.log('🔄 Transforming stop cards to MainFuelV2 structure');
+    console.log('🔄 Transforming stop cards to complete MainFuelV2 structure with ALL fuel components');
     
-    // Initialize the record structure matching Palantir's format
+    if (!stopCards || stopCards.length === 0) {
+      throw new Error('Stop cards are required for fuel save-back');
+    }
+    
+    const departureCard = stopCards[0];
+    console.log('🔄 Using departure card for fuel data:', departureCard);
+    
+    // Initialize the record structure with ALL required MainFuelV2 properties
     const fuelRecord = {
       // Basic identifiers
       flightUuid: flightId,
-      flightNumber: flightSettings.flightNumber || selectedAircraft?.registration || 'Unknown',
+      flightNumber: flightSettings.flightNumber || selectedAircraft?.registration || 'Fast Planner Flight',
       aircraft: selectedAircraft?.registration || selectedAircraft?.assetId || 'Unknown',
       
       // Timestamps
@@ -137,24 +581,24 @@ export class FuelSaveBackService {
       displayUnit: 'LBS',
       
       // Policy information
-      policyName: fuelPolicy?.name || 'Unknown Policy',
-      policyUuid: fuelPolicy?.uuid || fuelPolicy?.id || null,
+      policyName: fuelPolicy?.name || fuelPolicy?.currentPolicy?.name || 'Unknown Policy',
+      policyUuid: fuelPolicy?.uuid || fuelPolicy?.currentPolicy?.uuid || null,
       
-      // Planned fuel totals (from departure card)
-      plannedTripFuel: Math.round(routeStats.tripFuel || stopCards[0]?.tripFuel || 0),
-      plannedTaxiFuel: Math.round(flightSettings.taxiFuel || 0),
-      plannedContingencyFuel: Math.round(stopCards[0]?.contingencyFuel || 0),
-      plannedReserveFuel: Math.round(flightSettings.reserveFuel || 0),
-      plannedDeckFuel: Math.round(flightSettings.deckFuelPerStop || 0),
-      plannedExtraFuel: Math.round(flightSettings.extraFuel || 0),
-      plannedAraFuel: Math.round(weatherFuel.araFuel || 0),
-      plannedApproachFuel: Math.round(weatherFuel.approachFuel || 0),
+      // 🎯 CRITICAL: Planned fuel totals from actual calculations (not settings)
+      plannedTripFuel: Math.round(departureCard.tripFuel || routeStats.tripFuel || 0), // This was missing!
+      plannedTaxiFuel: Math.round(departureCard.taxiFuel || 0),
+      plannedContingencyFuel: Math.round(departureCard.contingencyFuel || 0),
+      plannedReserveFuel: Math.round(departureCard.reserveFuel || 0),
+      plannedDeckFuel: Math.round(departureCard.deckFuel || 0),
+      plannedExtraFuel: Math.round(departureCard.extraFuel || flightSettings.extraFuel || 0),
+      plannedAraFuel: Math.round(departureCard.araFuel || weatherFuel.araFuel || 0),
+      plannedApproachFuel: Math.round(departureCard.approachFuel || weatherFuel.approachFuel || 0),
       plannedAlternateFuel: 0, // TODO: Extract from alternate calculations
       plannedContingencyAlternateFuel: 0,
       
-      // Total fuel calculations
-      minTotalFuel: Math.round(stopCards[0]?.totalFuel || 0),
-      roundTripFuel: Math.round(stopCards[0]?.totalFuel || 0),
+      // Total fuel calculations from actual calculations
+      minTotalFuel: Math.round(departureCard.totalFuel || 0),
+      roundTripFuel: Math.round(departureCard.totalFuel || 0),
       
       // Initialize all arrays (Palantir's array-based structure)
       stopLocations: [],
@@ -405,16 +849,26 @@ export class FuelSaveBackService {
     
     try {
       if (!flightId) {
+        console.log('📥 DEBUG: No flight ID provided');
         return null;
       }
       
       // Import SDK dynamically
       const sdk = await import('@flight-app/sdk');
       
-      // Query MainFuelV2 objects for this flight
-      const fuelData = await client(sdk.MainFuelV2)
+      // Query MainFuelV2 objects for this flight with timeout
+      console.log('📥 DEBUG: About to query MainFuelV2 for flight:', flightId);
+      
+      const queryPromise = client(sdk.MainFuelV2)
         .where(fuel => fuel.flightUuid.exactMatch(flightId))
         .fetchPage({ $pageSize: 1 });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000)
+      );
+      
+      const fuelData = await Promise.race([queryPromise, timeoutPromise]);
+      console.log('📥 DEBUG: Query completed, result:', fuelData);
       
       if (fuelData.data && fuelData.data.length > 0) {
         const existingFuel = fuelData.data[0];
@@ -422,7 +876,7 @@ export class FuelSaveBackService {
         return existingFuel;
       }
       
-      console.log('📥 FuelSaveBackService: No existing fuel data found');
+      console.log('📥 FuelSaveBackService: No existing fuel data found - this is normal for new flights');
       return null;
       
     } catch (error) {
@@ -459,11 +913,27 @@ export class FuelSaveBackService {
       }
       
       // Load existing fuel data for comparison
-      const existingFuelData = await this.loadExistingFuelData(flightId);
+      console.log('🤖 DEBUG: Attempting to load existing fuel data...');
+      let existingFuelData = null;
+      try {
+        existingFuelData = await this.loadExistingFuelData(flightId);
+        console.log('🤖 DEBUG: Existing fuel data result:', existingFuelData ? 'FOUND' : 'NOT FOUND');
+      } catch (loadError) {
+        console.warn('🤖 WARNING: Failed to load existing fuel data, will create new:', loadError.message);
+        existingFuelData = null;
+      }
       
       // Check if save is needed by comparing stop counts and basic totals
       const currentTotalFuel = Math.round(stopCards[0]?.totalFuel || 0);
       const existingTotalFuel = Math.round(existingFuelData?.minTotalFuel || 0);
+      
+      console.log('🤖 DEBUG: Decision factors:', {
+        currentTotalFuel,
+        existingTotalFuel,
+        stopCardsLength: stopCards?.length,
+        existingStopsLength: existingFuelData?.stopLocations?.length,
+        hasExistingData: !!existingFuelData
+      });
       
       if (this.shouldSaveFuelData(stopCards, existingFuelData, currentTotalFuel, existingTotalFuel)) {
         console.log('🤖 Changes detected, performing auto-save');

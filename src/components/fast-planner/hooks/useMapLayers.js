@@ -124,14 +124,19 @@ const useMapLayers = ({ mapManagerRef }) => {
         console.log("useMapLayers: Creating Observed Weather Stations layer...");
         observedWeatherStationsRef.current = new ObservedWeatherStationsLayer(mapManagerRef.current.map);
         
-        // Initialize the layer
-        observedWeatherStationsRef.current.initialize().then(() => {
-          console.log("useMapLayers: ✅ Observed Weather Stations layer initialized successfully");
-          // Start hidden by default
-          observedWeatherStationsRef.current.setVisible(false);
-        }).catch(error => {
+        // Initialize the layer (returns boolean, not Promise)
+        try {
+          const initialized = observedWeatherStationsRef.current.initialize();
+          if (initialized) {
+            console.log("useMapLayers: ✅ Observed Weather Stations layer initialized successfully");
+            // Start hidden by default
+            observedWeatherStationsRef.current.setVisible(false);
+          } else {
+            console.error("useMapLayers: ❌ Failed to initialize Observed Weather Stations layer");
+          }
+        } catch (error) {
           console.error("useMapLayers: ❌ Failed to initialize Observed Weather Stations layer:", error);
-        });
+        }
       }
       
       setLayersInitialized(true);
