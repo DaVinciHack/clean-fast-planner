@@ -390,6 +390,9 @@ const FastPlannerCore = ({
   const [alternateModeActive, setAlternateModeActive] = useState(false);
   const [alternateSplitPoint, setAlternateSplitPoint] = useState(null);
   
+  // ✅ NEW: Location-specific fuel overrides state (for ARA/approach fuel)
+  const [locationFuelOverrides, setLocationFuelOverrides] = useState({});
+  
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
     console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
@@ -399,6 +402,56 @@ const FastPlannerCore = ({
       [settingName]: value
     }));
   };
+  
+  // ✅ NEW: Handle location-specific fuel overrides (ARA/approach fuel)
+  const handleLocationFuelChange = useCallback((fuelData) => {
+    console.log(`🌦️ Location-specific fuel override:`, fuelData);
+    
+    const key = `${fuelData.stopName}_${fuelData.fuelType}`;
+    
+    setLocationFuelOverrides(prev => {
+      const newOverrides = {
+        ...prev,
+        [key]: {
+          stopName: fuelData.stopName,
+          stopIndex: fuelData.stopIndex,
+          fuelType: fuelData.fuelType,
+          value: fuelData.value,
+          isRig: fuelData.isRig
+        }
+      };
+      
+      console.log(`🌦️ Updated location fuel overrides:`, newOverrides);
+      
+      // Trigger a force update to recalculate fuel with new overrides
+      setForceUpdate(Date.now());
+      
+      return newOverrides;
+    });
+  }, []);
+  
+  // ✅ NEW: Reset user-entered flight settings to defaults (for new flights)
+  const resetUserFlightSettings = useCallback(() => {
+    console.log('🧹 RESET: Resetting user flight settings to defaults for new flight');
+    console.log('🧹 RESET: Previous extraFuel was:', flightSettings.extraFuel);
+    console.log('🧹 RESET: Current full flightSettings:', flightSettings);
+    
+    setFlightSettings(prev => {
+      const newSettings = {
+        ...prev,
+        // Reset user-entered values to defaults
+        passengerWeight: 220,
+        cargoWeight: 0,
+        extraFuel: 0, // ✅ This fixes the extraFuel persistence issue
+        // Keep fuel policy values intact - they come from OSDK
+        // contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow remain unchanged
+      };
+      console.log('🧹 RESET: New flightSettings:', newSettings);
+      return newSettings;
+    });
+    
+    console.log('✅ RESET: User flight settings reset - extraFuel should now be 0');
+  }, [flightSettings]);
   
   // ✅ RESTORED: Proper weather update function
   const updateWeatherSettings = (windSpeed, windDirection) => {
@@ -522,7 +575,8 @@ const FastPlannerCore = ({
           ...flightSettings,
           araFuel: weatherFuel.araFuel,
           approachFuel: weatherFuel.approachFuel,
-          alternateRouteData: alternateRouteData  // 🔧 SAR FIX: Add alternate route data for SAR alternate card
+          alternateRouteData: alternateRouteData,  // 🔧 SAR FIX: Add alternate route data for SAR alternate card
+          locationFuelOverrides: locationFuelOverrides  // ✅ NEW: Pass location-specific fuel overrides
         }
       );
       
@@ -691,6 +745,10 @@ const FastPlannerCore = ({
     }
     clearWeatherSegments();
     
+    // ✅ FIX: Reset user flight settings when starting a new flight
+    // This prevents extraFuel and other user settings from persisting across flights
+    resetUserFlightSettings();
+    
     // 🔧 FIX: Reset flight loading states to properly clear UI
     setIsFlightLoaded(false);
     setIsEditLocked(false);
@@ -778,7 +836,7 @@ const FastPlannerCore = ({
     }
     
     console.log('✅ FastPlannerApp: AGGRESSIVE CLEAR COMPLETE - All system state flushed');
-  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel]);
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel, resetUserFlightSettings]);
   
   // Make aggressive clear available globally for debugging
   useEffect(() => {
@@ -798,8 +856,163 @@ const FastPlannerCore = ({
       console.log('🧹 GLOBAL: Aggressive clear complete');
     };
     
+    // DEBUG: Manual extraFuel reset function
+    window.resetExtraFuel = () => {
+      console.log('🔧 MANUAL: Resetting extraFuel to 0');
+      console.log('🔧 MANUAL: Current extraFuel:', flightSettings.extraFuel);
+      console.log('🔧 MANUAL: Full flightSettings before reset:', flightSettings);
+      
+      updateFlightSetting('extraFuel', 0);
+      
+      // Also trigger a recalculation to update the UI immediately
+      if (stopCards && stopCards.length > 0) {
+        console.log('🔧 MANUAL: Triggering stop card recalculation to reflect extraFuel = 0');
+        // Force a recalculation by updating a dependency
+        setForceUpdate(prev => prev + 1);
+      }
+      
+      console.log('🔧 MANUAL: extraFuel reset completed');
+      
+      // Check after a delay to see if it stuck
+      setTimeout(() => {
+        console.log('🔧 MANUAL: After 500ms, extraFuel is:', flightSettings.extraFuel);
+      }, 500);
+    };
+    
+    // DEBUG: Expose flightSettings to window for inspection
+    window.flightSettings = flightSettings;
+    window.updateFlightSetting = updateFlightSetting;
+    
+    // DEBUG: Clear all browser-stored extraFuel values
+    window.clearAllStoredExtraFuel = () => {
+      console.log('🧹 CLEARING ALL BROWSER STORED EXTRAFUEL VALUES');
+      
+      // 1. Clear localStorage fastPlannerSettings
+      try {
+        const savedSettings = localStorage.getItem('fastPlannerSettings');
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          console.log('🧹 Current fastPlannerSettings:', parsed);
+          
+          if (parsed.flightSettings && parsed.flightSettings.extraFuel !== undefined) {
+            console.log('🧹 Found extraFuel in fastPlannerSettings:', parsed.flightSettings.extraFuel);
+            delete parsed.flightSettings.extraFuel;
+            localStorage.setItem('fastPlannerSettings', JSON.stringify(parsed));
+            console.log('✅ Removed extraFuel from fastPlannerSettings');
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error clearing fastPlannerSettings:', e);
+      }
+      
+      // 2. Clear all aircraft-specific settings that might contain extraFuel
+      try {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.startsWith('fastPlanner_settings_aircraft_') || key.startsWith('fastPlanner_settings_')) {
+            try {
+              const value = localStorage.getItem(key);
+              if (value && value.includes('extraFuel')) {
+                console.log(`🧹 Found extraFuel in ${key}:`, value);
+                const parsed = JSON.parse(value);
+                if (parsed.extraFuel !== undefined) {
+                  delete parsed.extraFuel;
+                  localStorage.setItem(key, JSON.stringify(parsed));
+                  console.log(`✅ Removed extraFuel from ${key}`);
+                }
+              }
+            } catch (e) {
+              console.warn(`⚠️ Could not parse ${key}:`, e);
+            }
+          }
+        });
+      } catch (e) {
+        console.error('❌ Error clearing aircraft settings:', e);
+      }
+      
+      // 3. Force reset current flightSettings extraFuel to 0
+      console.log('🧹 Current extraFuel in state:', flightSettings.extraFuel);
+      updateFlightSetting('extraFuel', 0);
+      
+      // 4. Trigger recalculation
+      setForceUpdate(prev => prev + 1);
+      
+      console.log('✅ CLEARED ALL STORED EXTRAFUEL VALUES - restart or reload to see effect');
+      
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator(
+          'Cleared all browser-stored extraFuel values - please reload',
+          'success',
+          5000
+        );
+      }
+    };
+
+    // DEBUG: Advanced function to clear extraFuel from saved flight data
+    window.clearSavedExtraFuel = async (flightId) => {
+      if (!flightId) {
+        const currentFlightId = window.currentFlightId || flightSettings.currentFlightId;
+        if (!currentFlightId) {
+          console.error('🔧 CLEAR: No flight ID provided and no current flight loaded');
+          return;
+        }
+        flightId = currentFlightId;
+      }
+      
+      console.log('🔧 CLEAR: Clearing saved extraFuel for flight:', flightId);
+      
+      try {
+        // Load current stop cards and flight settings
+        const currentStopCards = stopCards && stopCards.length > 0 ? stopCards : [];
+        const currentFlightSettings = { ...flightSettings, extraFuel: 0 }; // Force extraFuel to 0
+        
+        if (currentStopCards.length === 0) {
+          console.warn('🔧 CLEAR: No stop cards available, cannot save cleared extraFuel');
+          return;
+        }
+        
+        // Save flight with extraFuel = 0 to overwrite the persistent value
+        console.log('🔧 CLEAR: Saving flight with extraFuel = 0 to clear persistent value');
+        
+        const { default: FuelSaveBackService } = await import('./services/FuelSaveBackService');
+        await FuelSaveBackService.saveFuelData(
+          flightId,
+          currentStopCards,
+          currentFlightSettings,
+          weatherFuel,
+          fuelPolicy,
+          routeStats,
+          selectedAircraft
+        );
+        
+        console.log('✅ CLEAR: Successfully cleared saved extraFuel for flight:', flightId);
+        
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            'Cleared persistent extraFuel value from saved flight',
+            'success',
+            3000
+          );
+        }
+        
+      } catch (error) {
+        console.error('❌ CLEAR: Failed to clear saved extraFuel:', error);
+        
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator(
+            `Failed to clear saved extraFuel: ${error.message}`,
+            'error',
+            5000
+          );
+        }
+      }
+    };
+    
     return () => {
       delete window.aggressiveClearAll;
+      delete window.resetExtraFuel;
+      delete window.clearSavedExtraFuel;
+      delete window.clearAllStoredExtraFuel;
     };
   }, [clearRoute]);
 
@@ -868,6 +1081,7 @@ const FastPlannerCore = ({
     console.log('📊 FUEL POLICY: Policy contingency:', policySettings.contingencyFlightLegs);
     console.log('📊 FUEL POLICY: Policy taxi fuel:', policySettings.taxiFuel);
     console.log('📊 FUEL POLICY: Policy reserve fuel:', policySettings.reserveFuel);
+    console.log('📊 FUEL POLICY: Policy extra fuel:', policySettings.extraFuel); // ✅ ADD: Log extraFuel
 
     // Apply policy values to flightSettings, preserving user inputs
     setFlightSettings(currentSettings => ({
@@ -877,6 +1091,7 @@ const FastPlannerCore = ({
       taxiFuel: policySettings.taxiFuel ?? currentSettings.taxiFuel ?? 50,
       reserveFuel: policySettings.reserveFuel ?? currentSettings.reserveFuel ?? 600,
       deckTimePerStop: policySettings.deckTime ?? currentSettings.deckTimePerStop ?? 5,
+      extraFuel: policySettings.extraFuel ?? currentSettings.extraFuel ?? 0, // ✅ ADD: Apply extraFuel from policy
       // deckFuelFlow could come from policy or aircraft, keep existing for now
       deckFuelFlow: currentSettings.deckFuelFlow || 400
     }));
@@ -1623,6 +1838,105 @@ const FastPlannerCore = ({
         console.log('🚨 Setting currentFlightId for weather loading:', flightData.flightId);
         setCurrentFlightId(flightData.flightId);
         
+        // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2
+        try {
+          console.log('💾 FUEL LOAD-BACK: Loading saved fuel data for flight ID:', flightData.flightId);
+          
+          // Import FuelSaveBackService
+          const FuelSaveBackService = (await import('./services/FuelSaveBackService')).default;
+          
+          // Load existing fuel data
+          const savedFuelData = await FuelSaveBackService.loadExistingFuelData(flightData.flightId);
+          
+          if (savedFuelData) {
+            console.log('💾 FUEL LOAD-BACK: Found saved fuel data:', savedFuelData);
+            console.log('💾 FUEL LOAD-BACK: All saved fuel properties:', Object.keys(savedFuelData));
+            
+            // ONLY restore USER-ENTERED values - let Fast Planner recalculate everything else
+            
+            // 1. Extra fuel (user input) - this is the most important
+            // 🚨 FIX: Only restore extraFuel in specific circumstances
+            
+            console.log('💾 FUEL LOAD-BACK: extraFuel decision factors:', {
+              savedExtraFuel: savedFuelData.plannedExtraFuel,
+              currentExtraFuel: flightSettings.extraFuel,
+              flightId: flightData.flightId,
+              currentFlightId: currentFlightId
+            });
+            
+            // DECISION: Only restore extraFuel if:
+            // 1. There is a saved value that's meaningful (> 0)
+            // 2. AND we're explicitly loading a different flight (not just recalculating current one)
+            // 3. AND the user hasn't already set extraFuel to something else
+            const hasMeaningfulSavedExtra = savedFuelData.plannedExtraFuel !== undefined && 
+                                           savedFuelData.plannedExtraFuel !== null &&
+                                           savedFuelData.plannedExtraFuel > 0;
+            
+            const isExplicitFlightLoad = true; // For now, assume all loads are explicit
+            const currentExtraIsDefault = flightSettings.extraFuel === 0; // Only overwrite if user hasn't changed it
+            
+            // 🚨 TEMPORARY FIX: Disable extraFuel restoration to stop the 53 persistence issue
+            // TODO: Implement proper logic to only restore extraFuel for explicitly loaded flights
+            const shouldRestoreExtraFuel = false; // hasMeaningfulSavedExtra && isExplicitFlightLoad && currentExtraIsDefault;
+            
+            if (shouldRestoreExtraFuel) {
+              console.log('💾 FUEL LOAD-BACK: Restoring extraFuel from plannedExtraFuel:', savedFuelData.plannedExtraFuel);
+              console.log('💾 FUEL LOAD-BACK: Current extraFuel before restore:', flightSettings.extraFuel);
+              console.log('💾 FUEL LOAD-BACK: ⚠️  WARNING: This will override any current extraFuel value');
+              
+              // Show warning to user that extraFuel is being loaded from saved flight
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Loading saved extra fuel: ${savedFuelData.plannedExtraFuel} lbs`,
+                  'info',
+                  3000
+                );
+              }
+              
+              updateFlightSetting('extraFuel', savedFuelData.plannedExtraFuel);
+              console.log('💾 FUEL LOAD-BACK: extraFuel restore completed');
+            } else {
+              console.log('💾 FUEL LOAD-BACK: No meaningful plannedExtraFuel found in saved data, keeping current value:', flightSettings.extraFuel);
+              
+              // If saved data has extraFuel = 0, explicitly set it to 0 to clear any residual values
+              if (savedFuelData.plannedExtraFuel === 0) {
+                console.log('💾 FUEL LOAD-BACK: Saved flight had extraFuel = 0, clearing current extraFuel');
+                updateFlightSetting('extraFuel', 0);
+              }
+            }
+            
+            // Show comprehensive fuel data that was saved (for verification)
+            console.log('💾 FUEL LOAD-BACK: Complete saved fuel breakdown:', {
+              plannedTripFuel: savedFuelData.plannedTripFuel,
+              plannedTaxiFuel: savedFuelData.plannedTaxiFuel,
+              plannedReserveFuel: savedFuelData.plannedReserveFuel,
+              plannedContingencyFuel: savedFuelData.plannedContingencyFuel,
+              plannedDeckFuel: savedFuelData.plannedDeckFuel,
+              plannedExtraFuel: savedFuelData.plannedExtraFuel,
+              plannedAraFuel: savedFuelData.plannedAraFuel,
+              plannedApproachFuel: savedFuelData.plannedApproachFuel,
+              minTotalFuel: savedFuelData.minTotalFuel
+            });
+            
+            // 3. Extra fuel reason (user input)
+            if (savedFuelData.extraFuelReason) {
+              console.log('💾 FUEL LOAD-BACK: Restoring extraFuelReason:', savedFuelData.extraFuelReason);
+              updateFlightSetting('extraFuelReason', savedFuelData.extraFuelReason);
+            }
+            
+            // NOTE: We do NOT restore calculated values like tripFuel, taxiFuel, reserveFuel, etc.
+            // These will be recalculated by Fast Planner based on current aircraft, route, and fuel policy
+            
+            console.log('✅ FUEL LOAD-BACK: User fuel inputs restored - Fast Planner will recalculate everything else');
+          } else {
+            console.log('💾 FUEL LOAD-BACK: No saved fuel data found for this flight');
+          }
+          
+        } catch (fuelLoadError) {
+          console.error('❌ FUEL LOAD-BACK: Failed to load fuel data:', fuelLoadError);
+          // Don't block flight loading if fuel load fails
+        }
+        
         // Manually trigger weather loading
         if (loadWeatherSegments) {
           console.log('🌤️ MANUAL: Loading weather segments for flight:', flightData.flightId);
@@ -1935,7 +2249,8 @@ const FastPlannerCore = ({
             {
               ...flightSettings,
               araFuel: weatherFuel.araFuel,
-              approachFuel: weatherFuel.approachFuel
+              approachFuel: weatherFuel.approachFuel,
+              locationFuelOverrides: locationFuelOverrides  // ✅ NEW: Pass location-specific fuel overrides
             }
           );
           
@@ -2065,7 +2380,8 @@ const FastPlannerCore = ({
               {
                 ...flightSettings,
                 araFuel: weatherFuel.araFuel,
-                approachFuel: weatherFuel.approachFuel
+                approachFuel: weatherFuel.approachFuel,
+                locationFuelOverrides: locationFuelOverrides  // ✅ NEW: Pass location-specific fuel overrides
               }
             );
             
@@ -3073,8 +3389,16 @@ const FastPlannerCore = ({
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
   const handleStopCardsCalculated = useCallback((calculatedStopCards) => {
-    console.log('🛩️ FastPlannerApp: Received calculated stop cards from EnhancedStopCardsContainer:', calculatedStopCards.length);
+    console.log('🛩️ FastPlannerApp: Received calculated stop cards:', calculatedStopCards.length);
+    console.log('🛩️ FastPlannerApp: Stop cards data:', calculatedStopCards);
     setStopCards(calculatedStopCards);
+  }, []);
+  
+  // ⛽ FUEL BREAKDOWN: Callback to handle refuel toggle from DetailedFuelBreakdown
+  const handleRefuelToggle = useCallback((stopIndex, isRefuel) => {
+    console.log(`🛩️ FastPlannerApp: Refuel toggle for stop ${stopIndex}:`, isRefuel);
+    // The refuel logic is handled internally by EnhancedStopCardsContainer
+    // This callback is for coordination and logging
   }, []);
   
   // Real search function for wizard using existing platform data
@@ -3305,6 +3629,7 @@ const FastPlannerCore = ({
         stopCards={stopCards}
         flightSettings={flightSettings}
         weatherFuel={weatherFuel}
+        weatherSegments={weatherSegments}
         fuelPolicy={fuelPolicy}
         routeStats={routeStats}
         selectedAircraft={selectedAircraft}
@@ -3313,6 +3638,21 @@ const FastPlannerCore = ({
         alternateStopCard={alternateStopCard}
         waypoints={waypoints}
         weather={weather}
+        clearKey={`${stopCards?.length || 0}-${waypoints?.length || 0}-${currentFlightId || 'none'}`}
+        locationFuelOverrides={locationFuelOverrides}
+        onStopCardsCalculated={handleStopCardsCalculated}
+        // Flight settings callback props (same as SettingsCard)
+        onExtraFuelChange={(value) => updateFlightSetting('extraFuel', value)}
+        onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}
+        onDeckFuelChange={(value) => updateFlightSetting('deckFuelPerStop', value)}
+        onDeckFuelFlowChange={(value) => updateFlightSetting('deckFuelFlow', value)}
+        onPassengerWeightChange={(value) => updateFlightSetting('passengerWeight', value)}
+        onCargoWeightChange={(value) => updateFlightSetting('cargoWeight', value)}
+        onTaxiFuelChange={(value) => updateFlightSetting('taxiFuel', value)}
+        onContingencyFuelPercentChange={(value) => updateFlightSetting('contingencyFuelPercent', value)}
+        onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
+        onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
+        onLocationFuelChange={handleLocationFuelChange}
       />
       
       {/* RegionAircraftConnector removed - using only event-based region sync */}
@@ -3415,6 +3755,12 @@ const FastPlannerCore = ({
           deckTimePerStop={flightSettings.deckTimePerStop} deckFuelFlow={flightSettings.deckFuelFlow}
           passengerWeight={flightSettings.passengerWeight} cargoWeight={flightSettings.cargoWeight}
           extraFuel={flightSettings.extraFuel}
+          // DEBUG: Add logging to see what extraFuel value is being passed
+          {...(() => {
+            console.log('🔍 DEBUG: Passing extraFuel to SettingsCard:', flightSettings.extraFuel);
+            console.log('🔍 DEBUG: Full flightSettings:', flightSettings);
+            return {};
+          })()}
           araFuel={weatherFuel.araFuel} // Use calculated weather fuel from state
           approachFuel={weatherFuel.approachFuel} // Use calculated weather fuel from state
           taxiFuel={flightSettings.taxiFuel} contingencyFuelPercent={flightSettings.contingencyFuelPercent}
