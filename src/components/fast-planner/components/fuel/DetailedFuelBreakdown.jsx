@@ -141,6 +141,34 @@ const DetailedFuelBreakdown = ({
     });
   }, []);
   
+  // 🔄 COMPLETE REFRESH: When modal becomes visible, refresh completely from current stop card state
+  React.useEffect(() => {
+    if (visible && stopCards && stopCards.length > 0) {
+      console.log('🔄 MODAL OPENED: Performing complete refresh from current stop card state');
+      
+      // Clear any stale user overrides and field states
+      setUserOverrides({});
+      setFieldStates({});
+      setIsEditing(null);
+      
+      // Sync refuel stops from actual stop cards
+      const actualRefuelStops = [];
+      stopCards.forEach(card => {
+        if (card.refuelMode === true || card.isRefuelStop === true) {
+          actualRefuelStops.push(card.index);
+        }
+      });
+      
+      console.log('🔄 MODAL REFRESH: Current refuel stops from stop cards:', actualRefuelStops);
+      setLocalRefuelStops(actualRefuelStops);
+      
+      // Force complete sync of local stop cards
+      setLocalStopCards([...stopCards]); // Use spread to force re-render
+      
+      console.log('✅ MODAL REFRESH: Complete refresh completed');
+    }
+  }, [visible]); // Trigger when modal becomes visible
+
   // ✅ COMPREHENSIVE SYNC: "Let it think and then refresh" - Full UI sync after calculation cycle
   React.useEffect(() => {
     console.log('🔄 DetailedFuelBreakdown: stopCards prop changed:', {
@@ -916,28 +944,21 @@ const DetailedFuelBreakdown = ({
                             )}
                           </div>
                           
-                          {/* ✅ REFUEL PERSISTENCE: Refuel Checkbox */}
-                          {!stopCard.isDeparture && !stopCard.isDestination && originalIndex > 0 && originalIndex < localStopCards.length - 1 && (
+                          {/* ✅ REFUEL STATUS DISPLAY: Show refuel status without checkbox (managed from stop cards) */}
+                          {!stopCard.isDeparture && !stopCard.isDestination && originalIndex > 0 && originalIndex < localStopCards.length - 1 && isRefuelStop && (
                             <div style={{ 
                               display: 'flex', 
                               alignItems: 'center', 
                               gap: '6px', 
                               marginTop: '4px',
                               fontSize: '11px',
-                              color: isRefuelStop ? '#FF6B35' : '#ccc'
+                              color: '#FF6B35'
                             }}>
-                              <input
-                                type="checkbox"
-                                checked={localRefuelStops.includes(stopCard.index)}
-                                onChange={(e) => handleRefuelChange(stopCard.index, e.target.checked)}
-                                style={{
-                                  width: '14px',
-                                  height: '14px',
-                                  cursor: 'pointer'
-                                }}
-                              />
                               <span style={{ fontWeight: '600' }}>
-                                {isRefuelStop ? '⛽ REFUEL STOP' : 'Mark as Refuel Stop'}
+                                ⛽ REFUEL STOP
+                              </span>
+                              <span style={{ fontSize: '9px', color: '#ccc', fontStyle: 'italic' }}>
+                                (managed from stop cards)
                               </span>
                             </div>
                           )}
