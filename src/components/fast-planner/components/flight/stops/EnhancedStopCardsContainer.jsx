@@ -97,21 +97,35 @@ const EnhancedStopCardsContainer = ({
     }
   }, [onFuelOverridesChanged, handleFuelOverridesChanged]);
   
-  // 🔄 REFUEL SYNC: Sync refuel stops to parent when they change
+  // 🔄 REFUEL SYNC: Sync refuel stops to parent when they change (but not during parent sync)
+  const isUpdatingFromParentRef = useRef(false);
+  
   useEffect(() => {
-    if (onRefuelStopsChanged) {
+    if (onRefuelStopsChanged && !isUpdatingFromParentRef.current) {
+      console.log('🔄 SYNC TO PARENT: Refuel stops changed locally:', refuelStops);
       onRefuelStopsChanged(refuelStops);
-    } else {
     }
   }, [refuelStops, onRefuelStopsChanged]);
   
   // 🚫 CRITICAL FIX: Sync local refuel stops with currentRefuelStops from DetailedFuelBreakdown
   useEffect(() => {
-    if (currentRefuelStops && Array.isArray(currentRefuelStops) && currentRefuelStops.length > 0) {
-      setRefuelStops(currentRefuelStops);
-    } else {
+    if (currentRefuelStops && Array.isArray(currentRefuelStops)) {
+      // Always sync - whether adding or clearing refuel stops
+      const currentStopsStr = JSON.stringify(currentRefuelStops.sort());
+      const localStopsStr = JSON.stringify(refuelStops.sort());
+      
+      if (currentStopsStr !== localStopsStr) {
+        console.log('🔄 SYNC FROM PARENT: Updating local refuel stops:', currentRefuelStops);
+        isUpdatingFromParentRef.current = true;
+        setRefuelStops(currentRefuelStops);
+        
+        // Reset flag after state update
+        setTimeout(() => {
+          isUpdatingFromParentRef.current = false;
+        }, 0);
+      }
     }
-  }, [currentRefuelStops]);
+  }, [currentRefuelStops]); // Remove refuelStops dependency to prevent loop
   
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
@@ -337,6 +351,7 @@ const EnhancedStopCardsContainer = ({
   
   // Handle refuel checkbox changes
   const handleRefuelChange = (cardIndex, isRefuel) => {
+    console.log(`🔄 REFUEL CHANGE: cardIndex=${cardIndex}, isRefuel=${isRefuel}`);
     
     // Only allow refuel on intermediate stops (not D=departure, F=final)
     if (cardIndex === 'D' || cardIndex === 'F') {
