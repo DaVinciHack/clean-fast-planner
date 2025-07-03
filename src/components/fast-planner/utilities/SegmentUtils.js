@@ -12,10 +12,9 @@
  * @param {string} locationName - Name of the location to check
  * @param {Array} waypoints - Array of flight waypoints
  * @param {Array} refuelStops - Array of refuel stop indices (e.g., [2, 4])
- * @param {string} purpose - 'requirements' (fuel TO REACH) or 'summary' (fuel TO CONTINUE FROM)
  * @returns {number} Segment number (1, 2, 3, etc.)
  */
-export function detectLocationSegment(locationName, waypoints, refuelStops = [], purpose = 'requirements') {
+export function detectLocationSegment(locationName, waypoints, refuelStops = []) {
   if (!waypoints || waypoints.length === 0) {
     return 1; // Default to segment 1
   }
@@ -52,32 +51,18 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   // Sort refuel stops to ensure proper order
   const sortedRefuelStops = [...refuelStops].sort((a, b) => a - b);
   
-  // 🛩️ AVIATION LOGIC: Determine segment based on purpose
+  // Determine which segment based on refuel stop boundaries
   let segment = 1;
-  
-  // 🚨 HARDCODE REMOVED: Testing if indexing fix works for all cases
-  
   for (const refuelStopIndex of sortedRefuelStops) {
-    if (purpose === 'requirements') {
-      // REQUIREMENTS: Fuel needed TO REACH this location
-      // ✅ INDEXING FIX: Convert refuelStops (0-based) to cardIndex format (1-based)
-      const refuelStopCardIndex = refuelStopIndex + 1;
-      console.log(`🔍 INDEXING FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex} (was ${refuelStopIndex})`);
-      if (cardIndex <= refuelStopCardIndex) {
-        console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment}`);
-        break; // Location is at or before refuel stop - fuel carried from current segment
-      }
-      segment++; // Location is after this refuel stop
-      console.log(`➡️ MAIN LOGIC: ${locationName} moving to segment ${segment}`);
-    } else if (purpose === 'summary') {
-      // SUMMARY: Fuel needed TO CONTINUE FROM this location  
-      // Refuel stop itself belongs to the segment AFTER it (fuel for next segment)
-      if (cardIndex < refuelStopIndex) {
-        break; // Location is in current segment
-      }
-      segment++; // Location is at or after this refuel stop
+    if (cardIndex <= refuelStopIndex) {
+      break; // Location is in current segment
     }
+    segment++; // Location is after this refuel stop
   }
+  
+  console.log(`🛩️ SegmentUtils: Location "${locationName}" (card ${cardIndex}) is in segment ${segment}`);
+  console.log(`🛩️ SegmentUtils: Refuel stops:`, sortedRefuelStops);
+  
   return segment;
 }
 
@@ -202,6 +187,7 @@ export function getSegmentBoundaries(waypoints, refuelStops = []) {
     });
   }
   
+  console.log('🛩️ SegmentUtils: Generated segments:', segments);
   return segments;
 }
 
