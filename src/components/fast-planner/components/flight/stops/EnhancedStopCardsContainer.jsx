@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import StopCard from './StopCard';
 import StopCardCalculator from '../../../modules/calculations/flight/StopCardCalculator.js';
+import { detectLocationSegment, createSegmentFuelKey } from '../../../utilities/SegmentUtils.js';
 
 /**
  * Enhanced StopCardsContainer with StopCardCalculator Direct Integration
@@ -42,30 +43,18 @@ const EnhancedStopCardsContainer = ({
   // 🔧 NEW: Current flight ID for fuel save functionality
   currentFlightId = null,
   // ✅ SYNC FIX: Location-specific fuel overrides for calculation synchronization
-  locationFuelOverrides = {},
+  locationFuelOverrides = undefined,
   // 🚫 REFUEL SYNC: Current refuel stops from DetailedFuelBreakdown (overrides local state)
   currentRefuelStops = [],
   // ✅ SEGMENT-AWARE: Segment-specific extra fuel handler
   onSegmentExtraFuelChange = () => {},
   // ✅ SEGMENT-AWARE: Function to get current segment information
-  getCurrentSegmentInfo = () => []
+  getCurrentSegmentInfo = () => [],
+  // 🔥 DIRECT CALLBACK: Function to handle fuel overrides from CleanDetailedFuelBreakdown
+  onFuelOverridesChanged = null,
+  // 🔄 REFUEL SYNC: Callback to sync refuel stops to parent
+  onRefuelStopsChanged = null
 }) => {
-  console.log('🎯 EnhancedStopCardsContainer: Using StopCardCalculator directly - single source of truth');
-  
-  console.log('🔍 EnhancedStopCardsContainer: Props received:', {
-    waypoints: waypoints?.length || 0,
-    hasAircraft: !!selectedAircraft,
-    hasPolicy: !!fuelPolicy,
-    hasWeather: !!weather,
-    hasAlternateRouteData: !!alternateRouteData,
-    alternateRouteName: alternateRouteData?.name,
-    alternateRouteCoords: alternateRouteData?.coordinates?.length,
-    // 🔍 DEBUG: Check weather fuel props
-    araFuel: araFuel,
-    approachFuel: approachFuel,
-    araFuelType: typeof araFuel,
-    approachFuelType: typeof approachFuel
-  });
   
   // State for displaying stop cards
   const [displayStopCards, setDisplayStopCards] = useState([]);
@@ -78,17 +67,49 @@ const EnhancedStopCardsContainer = ({
   // Force recalculation trigger when refuel stops change
   const [forceRecalculation, setForceRecalculation] = useState(0);
   
+  // 🔥 DIRECT FUEL OVERRIDES: Local state for fuel overrides (bypasses prop chain)
+  const [localFuelOverrides, setLocalFuelOverrides] = useState({});
+  const latestOverridesRef = useRef({});
+  
   // Track last notified cards to prevent infinite loop
   const lastNotifiedCardsRef = useRef(null);
   
+  // 🔥 DIRECT CALLBACK HANDLER: Handle fuel overrides from CleanDetailedFuelBreakdown
+  const handleFuelOverridesChanged = useCallback((newOverrides) => {
+    
+    // Update ref immediately for latest values
+    latestOverridesRef.current = newOverrides;
+    
+    // Update state (this will trigger recalculation)
+    setLocalFuelOverrides(prev => {
+      const newState = { ...newOverrides };
+      return newState;
+    });
+    
+    // Trigger recalculation
+    setForceRecalculation(prev => prev + 1);
+  }, []);
+  
+  // 🔥 REGISTER CALLBACK: Make callback available to parent components
+  useEffect(() => {
+    if (onFuelOverridesChanged) {
+      onFuelOverridesChanged(handleFuelOverridesChanged);
+    }
+  }, [onFuelOverridesChanged, handleFuelOverridesChanged]);
+  
+  // 🔄 REFUEL SYNC: Sync refuel stops to parent when they change
+  useEffect(() => {
+    if (onRefuelStopsChanged) {
+      onRefuelStopsChanged(refuelStops);
+    } else {
+    }
+  }, [refuelStops, onRefuelStopsChanged]);
+  
   // 🚫 CRITICAL FIX: Sync local refuel stops with currentRefuelStops from DetailedFuelBreakdown
   useEffect(() => {
-    console.log('🚫 REFUEL SYNC DEBUG: currentRefuelStops prop:', currentRefuelStops, 'type:', typeof currentRefuelStops, 'isArray:', Array.isArray(currentRefuelStops));
     if (currentRefuelStops && Array.isArray(currentRefuelStops) && currentRefuelStops.length > 0) {
-      console.log('🚫 REFUEL SYNC: Updating local refuel stops from currentRefuelStops:', currentRefuelStops);
       setRefuelStops(currentRefuelStops);
     } else {
-      console.log('🚫 REFUEL SYNC: currentRefuelStops is empty/invalid, not updating local refuel stops');
     }
   }, [currentRefuelStops]);
   
@@ -103,12 +124,6 @@ const EnhancedStopCardsContainer = ({
     const hasValidFuelPolicy = fuelPolicy && fuelPolicy.currentPolicy && fuelPolicy.currentPolicy.uuid;
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData) {
-      console.log('🎯 EnhancedStopCardsContainer: Calculating stop cards with StopCardCalculator (ONE SOURCE OF TRUTH)');
-      console.log('🎯 EnhancedStopCardsContainer: Using weather fuel values:', { araFuel, approachFuel });
-      console.log('🎯 EnhancedStopCardsContainer: Fuel policy structure:', fuelPolicy);
-      console.log('🚫 REFUEL DEBUG: About to call StopCardCalculator with refuelStops:', refuelStops);
-      console.log('🚫 REFUEL DEBUG: Calculation trigger - locationFuelOverrides:', Object.keys(locationFuelOverrides));
-      console.log('🛩️ VFR DEBUG: EnhancedStopCardsContainer calling with waiveAlternates:', waiveAlternates, 'alternateStopCard:', !!alternateStopCard);
       
       try {
         const stopCardOptions = {
@@ -123,10 +138,9 @@ const EnhancedStopCardsContainer = ({
           araFuel: Number(araFuel) || 0,      // 🔧 Weather fuel
           approachFuel: Number(approachFuel) || 0,  // 🔧 Weather fuel
           fuelPolicy: fuelPolicy?.currentPolicy,  // 🔧 FIXED: Use currentPolicy like FlightUtilities
-          locationFuelOverrides: locationFuelOverrides  // ✅ SYNC FIX: Pass location fuel overrides
+          locationFuelOverrides: locationFuelOverrides  // ✅ SEGMENT-AWARE: Use props locationFuelOverrides for segment keys
         };
         
-        console.log('🎯 EnhancedStopCardsContainer: Stop card options:', stopCardOptions);
         
         const calculatedStopCards = StopCardCalculator.calculateStopCards(
           waypoints,
@@ -140,10 +154,8 @@ const EnhancedStopCardsContainer = ({
           alternateStopCard // 🛩️ IFR: Pass alternate card data for fuel requirements
         );
         
+        
         if (calculatedStopCards && calculatedStopCards.length > 0) {
-          console.log(`🎯 EnhancedStopCardsContainer: Generated ${calculatedStopCards.length} stop cards with weather fuel`);
-          console.log('🚫 REFUEL DEBUG: StopCardCalculator returned cards with refuel info:', calculatedStopCards.map(c => ({ index: c.index, refuelMode: c.refuelMode, isRefuelStop: c.isRefuelStop })));
-          console.log('🚫 REFUEL DEBUG: Current refuelStops array for restoration:', refuelStops);
           
           // ✅ CLEAN: Simply restore refuel information to calculated cards from local state only
           const cardsWithRefuel = calculatedStopCards.map((card, index) => {
@@ -151,7 +163,6 @@ const EnhancedStopCardsContainer = ({
             const isRefuelStop = refuelStops.includes(cardIndex);
             
             if (isRefuelStop) {
-              console.log(`🛩️ CLEAN: Restoring refuel flag to card ${cardIndex}`);
               return {
                 ...card,
                 refuelMode: true,
@@ -166,7 +177,6 @@ const EnhancedStopCardsContainer = ({
           const currentCardsString = JSON.stringify(displayStopCards);
           
           if (newCardsString !== currentCardsString) {
-            console.log('🔄 EnhancedStopCardsContainer: Stop cards changed, updating display');
             setDisplayStopCards(cardsWithRefuel);
             
             // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
@@ -175,7 +185,6 @@ const EnhancedStopCardsContainer = ({
               onStopCardsCalculated(cardsWithRefuel);
             }
           } else {
-            console.log('🔄 EnhancedStopCardsContainer: Stop cards unchanged, skipping update');
           }
         }
       } catch (error) {
@@ -183,28 +192,14 @@ const EnhancedStopCardsContainer = ({
         setDisplayStopCards([]);
       }
     } else {
-      console.log('🎯 EnhancedStopCardsContainer: Waiting for complete data:', {
-        hasWaypoints: waypoints && waypoints.length >= 2,
-        hasAircraft: !!selectedAircraft,
-        hasFuelPolicy: !!fuelPolicy,
-        hasAircraftData: hasRequiredAircraftData,
-        aircraftInfo: selectedAircraft ? {
-          registration: selectedAircraft.registration,
-          hasUsefulLoad: !!selectedAircraft.usefulLoad,
-          usefulLoadValue: selectedAircraft.usefulLoad,
-          hasFuelBurn: !!selectedAircraft.fuelBurn,
-          fuelBurnValue: selectedAircraft.fuelBurn
-        } : 'No aircraft'
-      });
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, locationFuelOverrides, waiveAlternates]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, localFuelOverrides, waiveAlternates]);
   
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
   useEffect(() => {
     if (window.currentAlternateCard && !alternateStopCard) {
-      console.log('🟠 EnhancedStopCardsContainer: Restoring alternate card from persistent storage:', window.currentAlternateCard);
       setAlternateStopCard(window.currentAlternateCard);
     }
   }, []);
@@ -214,31 +209,18 @@ const EnhancedStopCardsContainer = ({
   // 🟠 ADDED: Persist alternate card to survive component unmount/remount
   useEffect(() => {
     if (alternateStopCard) {
-      console.log('🟠 EnhancedStopCardsContainer: Persisting alternate card to window storage:', alternateStopCard);
       window.currentAlternateCard = alternateStopCard;
     } else if (alternateStopCard === null) {
-      console.log('🟠 EnhancedStopCardsContainer: Clearing persisted alternate card');
       window.currentAlternateCard = null;
     }
   }, [alternateStopCard]);
   
   // 🟠 ADDED: Calculate alternate stop card when alternate route data exists
   useEffect(() => {
-    console.log('🟠 EnhancedStopCardsContainer: Alternate card useEffect triggered with data:', {
-      hasAlternateRouteData: !!alternateRouteData,
-      alternateRouteKeys: alternateRouteData ? Object.keys(alternateRouteData) : [],
-      hasSelectedAircraft: !!selectedAircraft,
-      waypointCount: waypoints.length,
-      hasWeather: !!weather,
-      hasFuelPolicy: !!fuelPolicy,
-      waiveAlternates: waiveAlternates
-    });
     
-    // 🛩️ WAIVE ALTERNATES: Skip calculation if alternates are waived (VFR operations)
+    // 🛩️ VFR MODE: Continue alternate calculations for fuel dependencies (hide visually only)
     if (waiveAlternates) {
-      console.log('🛩️ Waiving alternates for VFR operations - clearing alternate card');
-      setAlternateStopCard(null);
-      return;
+      // Don't return - let alternate calculations continue for fuel dependency
     }
     
     // 🚨 SAFETY: Check aircraft data completeness for alternate card too
@@ -248,13 +230,6 @@ const EnhancedStopCardsContainer = ({
     
     // Only calculate if we have the necessary data AND complete aircraft data
     if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
-      console.log('🟠 EnhancedStopCardsContainer: Calculating alternate stop card with data:', {
-        splitPoint: alternateRouteData.splitPoint,
-        name: alternateRouteData.name,
-        coordinatesLength: alternateRouteData.coordinates?.length || 0,
-        hasWaypoints: waypoints.length >= 2,
-        hasSelectedAircraft: !!selectedAircraft
-      });
       
       try {
         // Prepare parameters for StopCardCalculator (same as StopCardsContainer)
@@ -279,7 +254,13 @@ const EnhancedStopCardsContainer = ({
           approachFuel: Number(approachFuel) || 0,
           fuelPolicy: fuelPolicy?.currentPolicy,
           // 🛩️ REFUEL: Pass refuel stops for future segmented calculations
-          refuelStops: refuelStops
+          refuelStops: refuelStops,
+          // 🚨 CRITICAL: Pass fuel overrides and segment utilities for alternate card ARA fuel
+          locationFuelOverrides: locationFuelOverrides || {},
+          segmentUtils: {
+            detectLocationSegment,
+            createSegmentFuelKey
+          }
         };
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
@@ -292,18 +273,12 @@ const EnhancedStopCardsContainer = ({
         );
         
         if (alternateCard) {
-          console.log('🟠 EnhancedStopCardsContainer: Alternate stop card calculated successfully:', {
-            totalFuel: alternateCard.totalFuel,
-            maxPassengers: alternateCard.maxPassengers,
-            routeDescription: alternateCard.routeDescription
-          });
           
           // 🚨 RACE CONDITION FIX: Only update if alternate card has actually changed
           const newAlternateString = JSON.stringify(alternateCard);
           const currentAlternateString = JSON.stringify(alternateStopCard);
           
           if (newAlternateString !== currentAlternateString) {
-            console.log('🔄 EnhancedStopCardsContainer: Alternate card changed, updating');
             setAlternateStopCard(alternateCard);
             
             // 🔧 NEW: Pass alternate card data up to parent
@@ -311,14 +286,11 @@ const EnhancedStopCardsContainer = ({
               onAlternateCardCalculated(alternateCard);
             }
           } else {
-            console.log('🔄 EnhancedStopCardsContainer: Alternate card unchanged, skipping update');
           }
         } else {
-          console.log('🟠 EnhancedStopCardsContainer: No alternate stop card generated (calculation returned null)');
           
           // 🚨 RACE CONDITION FIX: Only update if currently not null
           if (alternateStopCard !== null) {
-            console.log('🔄 EnhancedStopCardsContainer: Clearing alternate card');
             setAlternateStopCard(null);
             
             // 🔧 NEW: Clear alternate card data in parent
@@ -326,7 +298,6 @@ const EnhancedStopCardsContainer = ({
               onAlternateCardCalculated(null);
             }
           } else {
-            console.log('🔄 EnhancedStopCardsContainer: Alternate card already null, skipping update');
           }
         }
         
@@ -346,20 +317,6 @@ const EnhancedStopCardsContainer = ({
       
     } else {
       // Clear alternate card if conditions not met
-      console.log('🟠 EnhancedStopCardsContainer: Waiting for alternate card data:', {
-        hasAlternateRouteData: !!alternateRouteData,
-        hasSelectedAircraft: !!selectedAircraft,
-        waypointCount: waypoints.length,
-        hasWeather: !!weather,
-        hasAircraftData: hasRequiredAircraftData,
-        aircraftInfo: selectedAircraft ? {
-          registration: selectedAircraft.registration,
-          hasUsefulLoad: !!selectedAircraft.usefulLoad,
-          usefulLoadValue: selectedAircraft.usefulLoad,
-          hasFuelBurn: !!selectedAircraft.fuelBurn,
-          fuelBurnValue: selectedAircraft.fuelBurn
-        } : 'No aircraft'
-      });
       
       // 🚨 RACE CONDITION FIX: Only update if currently not null
       if (alternateStopCard !== null) {
@@ -380,20 +337,9 @@ const EnhancedStopCardsContainer = ({
   
   // Handle refuel checkbox changes
   const handleRefuelChange = (cardIndex, isRefuel) => {
-    console.log(`🛩️ Refuel checkbox changed: Card ${cardIndex} = ${isRefuel}`);
-    console.log(`🛩️ Current refuel stops before change:`, refuelStops);
-    console.log(`🛩️ Card index type:`, typeof cardIndex, `value:`, cardIndex);
-    console.log(`🛩️ All stop cards for reference:`, displayStopCards.map((card, idx) => ({ 
-      arrayIndex: idx, 
-      cardIndex: card.index, 
-      stopName: card.stopName,
-      isDeparture: card.isDeparture,
-      isDestination: card.isDestination
-    })));
     
     // Only allow refuel on intermediate stops (not D=departure, F=final)
     if (cardIndex === 'D' || cardIndex === 'F') {
-      console.log(`🛩️ Ignoring refuel change on departure/destination card: ${cardIndex}`);
       return;
     }
     
@@ -408,7 +354,6 @@ const EnhancedStopCardsContainer = ({
       // Find refuel card position in display order  
       const refuelPosition = displayStopCards.findIndex(card => card.index === cardIndex);
       
-      console.log(`🚨 SAFETY: Split "${alternateRouteData.splitPoint}" at position ${splitPointPosition}, refuel at position ${refuelPosition}`);
       
       if (splitPointPosition !== -1 && refuelPosition > splitPointPosition) {
         const confirmed = window.confirm(
@@ -419,36 +364,33 @@ const EnhancedStopCardsContainer = ({
         );
         
         if (!confirmed) {
-          console.log(`🚨 SAFETY: Refuel after split point cancelled - good decision`);
           return;
         }
       }
     }
     
+    
     setRefuelStops(prev => {
+      
       const newRefuelStops = isRefuel 
         ? (prev.includes(cardIndex) ? prev : [...prev, cardIndex])
         : prev.filter(index => index !== cardIndex);
       
-      console.log(`🛩️ Updated refuel stops:`, newRefuelStops);
+      
       return newRefuelStops;
     });
     
     // 🛩️ PHASE 2: Trigger fuel recalculation
-    console.log(`🔄 Triggering fuel recalculation due to refuel change`);
     setForceRecalculation(prev => prev + 1);
   };
   
   // Handle waive alternates checkbox changes
   const handleWaiveAlternatesChange = (event) => {
     const isWaived = event.target.checked;
-    console.log(`🛩️ ENHANCED CONTAINER: Waive alternates changed: ${isWaived}`);
     
     // 🛩️ NOTIFY PARENT: Call parent callback to update state and hide/show alternate route line on map
     if (onWaiveAlternatesChange) {
-      console.log(`🗺️ ENHANCED CONTAINER: Calling parent callback with: ${isWaived}`);
       onWaiveAlternatesChange(isWaived);
-      console.log(`🗺️ ENHANCED CONTAINER: Parent callback completed`);
     } else {
       console.error(`🚨 ENHANCED CONTAINER: No callback provided! Cannot notify parent.`);
     }
@@ -513,7 +455,6 @@ const EnhancedStopCardsContainer = ({
   };
   
   // COMMENTED OUT BROKEN CODE TO FIX SYNTAX ERROR - WILL REVIEW LATER
-  // console.log('✈️ EnhancedStopCardsContainer: Updating aircraft in manager');
   // updateAircraft(selectedAircraft);
   // }, [selectedAircraft, updateAircraft]);
   
@@ -530,7 +471,6 @@ const EnhancedStopCardsContainer = ({
   //     deckFuelFlow: deckFuelFlow !== undefined ? Number(deckFuelFlow) : 9999
   //   };
   //   
-  //   console.log('⚙️ EnhancedStopCardsContainer: Applying user overrides to manager:', overrides);
   //   applyOverrides(overrides);
   // }, [passengerWeight, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow, applyOverrides]);
   
@@ -538,7 +478,6 @@ const EnhancedStopCardsContainer = ({
   // Update display when calculations change
   // useEffect(() => {
   //   if (calculations && calculations.stopCards) {
-  //     console.log('📊 EnhancedStopCardsContainer: Received calculations from MasterFuelManager');
   //     setDisplayStopCards(calculations.stopCards);
   //   }
   // }, [calculations]);
@@ -552,7 +491,6 @@ const EnhancedStopCardsContainer = ({
   // COMMENTED OUT TO FIX "isLoading is not defined" ERROR - WILL REVIEW LATER
   // Show loading state only if explicitly loading
   // if (isLoading && displayStopCards.length === 0) {
-  //   console.log('🔄 EnhancedStopCardsContainer: Showing loading state');
   //   return (
   //     <div className="route-stops" style={{ margin: '0', padding: '4px 10px' }}>
   //       <h4 className="route-stops-title">ROUTE STOPS (UNIFIED FUEL)</h4>
@@ -566,7 +504,6 @@ const EnhancedStopCardsContainer = ({
   // COMMENTED OUT TO FIX "isReady is not defined" ERROR - WILL REVIEW LATER
   // Show waiting state only if not ready AND no existing cards
   // if (!isReady && displayStopCards.length === 0) {
-  //   console.log('⏸️ EnhancedStopCardsContainer: Showing waiting state - not ready');
   //   return (
   //     <div className="route-stops" style={{ margin: '0', padding: '4px 10px' }}>
   //       <h4 className="route-stops-title">ROUTE STOPS (UNIFIED FUEL)</h4>
@@ -658,7 +595,6 @@ const EnhancedStopCardsContainer = ({
             
             // 🛩️ DEBUG: Log card and index info for refuel debugging
             if (index < 5) { // Only log first few to avoid spam
-              console.log(`🛩️ CARD DEBUG: index=${index}, card.index=${card.index}, isDeparture=${card.isDeparture}, isDestination=${card.isDestination}, refuelStops=${JSON.stringify(refuelStops)}`);
             }
             
             return (
@@ -683,7 +619,7 @@ const EnhancedStopCardsContainer = ({
                 className="unified-fuel-card"
                 // Refuel props - use card.index not array index
                 isRefuelStop={refuelStops.includes(card.index)}
-                onRefuelChange={(cardIndex, isRefuel) => handleRefuelChange(card.index, isRefuel)}
+                onRefuelChange={(isRefuel) => handleRefuelChange(card.index, isRefuel)}
                 // Alternate fuel requirements for IFR display
                 alternateRequirements={card.alternateRequirements}
                 shouldShowStrikethrough={card.shouldShowStrikethrough}
@@ -691,8 +627,8 @@ const EnhancedStopCardsContainer = ({
             );
           })}
           
-          {/* Render alternate stop card if available */}
-          {alternateStopCard && (
+          {/* Render alternate stop card if available and alternates not waived (keep for calculations but hide in VFR) */}
+          {alternateStopCard && !waiveAlternates && (
             <StopCard
               key="alternate-stop-card"
               id="alternate-stop-card"

@@ -36,6 +36,9 @@ const useUIControls = ({
   const [rigsLoading, setRigsLoading] = useState(false);
   const [rigsError, setRigsError] = useState(null);
   
+  // 📊 FUEL BREAKDOWN MODAL STATE
+  const [showFuelBreakdown, setShowFuelBreakdown] = useState(false);
+  
   // Apply saved UI settings on mount
   useEffect(() => {
     // Ensure appSettingsManagerRef.current exists before accessing it
@@ -532,7 +535,10 @@ const useUIControls = ({
     toggleBasesVisibility, // New function for bases
     toggleFuelAvailableVisibility, // New function
     reloadPlatformData,
-    handleRouteInputChange
+    handleRouteInputChange,
+    // 📊 FUEL BREAKDOWN MODAL
+    showFuelBreakdown,
+    setShowFuelBreakdown
   };
 };
 

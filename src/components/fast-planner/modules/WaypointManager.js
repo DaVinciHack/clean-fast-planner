@@ -23,6 +23,18 @@ class WaypointManager {
   }
 
   /**
+   * Validate that map is ready and has required methods for layer/source operations
+   * @returns {boolean} true if map is ready, false otherwise
+   */
+  isMapReadyForOperations() {
+    const map = this.mapManager?.getMap();
+    return !!(map && 
+             this.mapManager.isMapLoaded() && 
+             typeof map.getLayer === 'function' && 
+             typeof map.getSource === 'function');
+  }
+
+  /**
    * Clear stored alternate route data (call when starting new route)
    */
   clearAlternateRouteData() {
@@ -1521,8 +1533,8 @@ class WaypointManager {
     // Use stored alternate route data if no new data provided
     const activeAlternateRouteData = alternateRouteData || this.storedAlternateRouteData;
     const map = this.mapManager.getMap();
-    if (!map || !this.mapManager.isMapLoaded()) {
-      // console.log("WaypointManager.updateRoute: Map not ready.");
+    if (!this.isMapReadyForOperations()) {
+      // console.log("WaypointManager.updateRoute: Map not ready for operations.");
       return;
     }
 
@@ -1899,10 +1911,16 @@ class WaypointManager {
       
       console.log("🧹 Cleaning up route - removing", layersToRemove.length, "layers and", sourcesToRemove.length, "sources");
       
+      // Verify map is ready for operations before cleanup
+      if (!this.isMapReadyForOperations()) {
+        console.warn("🧹 Map not ready for operations, skipping layer/source removal");
+        return;
+      }
+      
       // Remove layers first
       layersToRemove.forEach(layerId => {
         try {
-          if (map.getLayer(layerId)) {
+          if (map.getLayer && typeof map.getLayer === 'function' && map.getLayer(layerId)) {
             map.removeLayer(layerId);
             console.log("🧹 Removed layer:", layerId);
           }
@@ -1914,7 +1932,7 @@ class WaypointManager {
       // Then remove sources
       sourcesToRemove.forEach(sourceId => {
         try {
-          if (map.getSource(sourceId)) {
+          if (map.getSource && typeof map.getSource === 'function' && map.getSource(sourceId)) {
             map.removeSource(sourceId);
             console.log("🧹 Removed source:", sourceId);
           }
@@ -1930,31 +1948,13 @@ class WaypointManager {
   }
   
   _removeRouteLayersAndSources() {
-    // Safely get map object
-    let map = null;
-    try {
-      if (!this.mapManager) {
-        console.warn('WaypointManager: mapManager is not available for _removeRouteLayersAndSources');
-        return;
-      }
-      
-      map = this.mapManager.getMap();
-      if (!map) {
-        console.warn('WaypointManager: map is not available for _removeRouteLayersAndSources');
-        return;
-      }
-      
-      // Check if map is loaded and has functions we need
-      if (!this.mapManager.isMapLoaded() || 
-          typeof map.getLayer !== 'function' || 
-          typeof map.getSource !== 'function') {
-        console.warn('WaypointManager: map is not fully loaded for _removeRouteLayersAndSources');
-        return;
-      }
-    } catch (error) {
-      console.error('WaypointManager: Error accessing map in _removeRouteLayersAndSources:', error);
+    // Check if map is ready for operations
+    if (!this.isMapReadyForOperations()) {
+      console.warn('WaypointManager: map is not ready for operations in _removeRouteLayersAndSources');
       return;
     }
+    
+    const map = this.mapManager.getMap();
 
     const layerIds = [
       'route-glow', 
@@ -2436,10 +2436,10 @@ class WaypointManager {
       }
       
       // Skip if no route or if right-click (context menu)
-      if (!map.getSource('route') || e.originalEvent.button === 2) return;
+      if (!this.isMapReadyForOperations() || !map.getSource('route') || e.originalEvent.button === 2) return;
       
       // Skip if clicking on a platform
-      const platformLayerIds = ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].filter(id => map.getLayer(id));
+      const platformLayerIds = ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].filter(id => map.getLayer && map.getLayer(id));
       if (platformLayerIds.length > 0) {
         const platformFeatures = map.queryRenderedFeatures(e.point, { layers: platformLayerIds });
         if (platformFeatures.length > 0) return;
@@ -2593,15 +2593,17 @@ class WaypointManager {
       isDragging = false;
       
       // Clean up the visualization
-      if (map.getSource('drag-line')) {
+      if (this.isMapReadyForOperations() && map.getSource('drag-line')) {
         map.removeLayer('drag-line');
         map.removeSource('drag-line');
       }
       
       // Show the original route again
-      map.setLayoutProperty('route', 'visibility', 'visible');
-      if (map.getLayer('route-glow')) {
-        map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      if (this.isMapReadyForOperations()) {
+        map.setLayoutProperty('route', 'visibility', 'visible');
+        if (map.getLayer('route-glow')) {
+          map.setLayoutProperty('route-glow', 'visibility', 'visible');
+        }
       }
       
       // Check if we're in waypoint mode
@@ -2655,15 +2657,17 @@ class WaypointManager {
       isDragging = false;
       
       // Clean up the visualization
-      if (map.getSource('drag-line')) {
+      if (this.isMapReadyForOperations() && map.getSource('drag-line')) {
         map.removeLayer('drag-line');
         map.removeSource('drag-line');
       }
       
       // Show the original route again
-      map.setLayoutProperty('route', 'visibility', 'visible');
-      if (map.getLayer('route-glow')) {
-        map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      if (this.isMapReadyForOperations()) {
+        map.setLayoutProperty('route', 'visibility', 'visible');
+        if (map.getLayer('route-glow')) {
+          map.setLayoutProperty('route-glow', 'visibility', 'visible');
+        }
       }
       
       // Reset cursor style
@@ -2756,6 +2760,11 @@ class WaypointManager {
   renderAlternateRoute(alternateRouteData, map) {
     if (!alternateRouteData || !alternateRouteData.coordinates || alternateRouteData.coordinates.length < 2) {
       console.warn('⭐ renderAlternateRoute: Invalid alternate route data');
+      return;
+    }
+    
+    if (!this.isMapReadyForOperations()) {
+      console.warn('⭐ renderAlternateRoute: Map not ready for operations');
       return;
     }
 
@@ -2863,6 +2872,11 @@ class WaypointManager {
   clearAlternateRoute(map) {
     console.log('⭐ clearAlternateRoute called - checking for existing layers...');
     
+    if (!this.isMapReadyForOperations()) {
+      console.warn('⭐ clearAlternateRoute: Map not ready for operations');
+      return;
+    }
+    
     const layersToRemove = [
       'alternate-route',
       'alternate-route-shadow', 
@@ -2878,7 +2892,7 @@ class WaypointManager {
 
     // Remove layers
     layersToRemove.forEach(layerId => {
-      if (map.getLayer(layerId)) {
+      if (map.getLayer && map.getLayer(layerId)) {
         map.removeLayer(layerId);
         console.log('⭐ Removed alternate route layer:', layerId);
         removedAny = true;
@@ -2887,7 +2901,7 @@ class WaypointManager {
 
     // Remove sources
     sourcesToRemove.forEach(sourceId => {
-      if (map.getSource(sourceId)) {
+      if (map.getSource && map.getSource(sourceId)) {
         map.removeSource(sourceId);
         console.log('⭐ Removed alternate route source:', sourceId);
         removedAny = true;
