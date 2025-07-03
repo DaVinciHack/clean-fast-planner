@@ -115,13 +115,20 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const extraFuelValue = Number(extraFuel) || 0;
   
   // ✅ SEGMENT-AWARE: Helper function to get location-specific fuel with segment detection
-  const getLocationFuel = (waypoint, fuelType) => {
+  const getLocationFuel = (waypoint, fuelType, cardIndex = null) => {
     const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
     if (!waypointName) return 0;
     
+    console.log('🔍 getLocationFuel CALLED:', {
+      waypointName,
+      fuelType,
+      hasWeatherSegments: !!weatherSegments && weatherSegments.length > 0,
+      hasFuelPolicy: !!fuelPolicy
+    });
+    
     
     // 🛩️ SEGMENT-AWARE: Detect which segment this location's fuel REQUIREMENTS belong to
-    const locationSegment = detectLocationSegment(waypointName, stopsToProcess, refuelStops, 'requirements');
+    const locationSegment = detectLocationSegment(waypointName, stopsToProcess, refuelStops, 'requirements', cardIndex);
     
     // 🛩️ SEGMENT-AWARE: Check for segment-specific user override first
     const segmentKey = createSegmentFuelKey(waypointName, fuelType, locationSegment);
@@ -174,15 +181,49 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     if (fuelType === 'araFuel') {
       // ARA fuel: Only for rigs with ranking 8 or 5
       if (isRig && (ranking === 8 || ranking === 5)) {
-        const araAmount = fuelPolicy?.araFuelDefault || 200;
-        return araAmount;
+        // Check multiple possible property names in the fuel policy  
+        let araAmount = 0;
+        if (fuelPolicy?.fuelTypes?.araFuel?.default) {
+          araAmount = fuelPolicy.fuelTypes.araFuel.default;
+        } else if (fuelPolicy?.araFuelDefault) {
+          araAmount = fuelPolicy.araFuelDefault;
+        }
+        
+        console.log('🚨 ARA FUEL DEBUG:', {
+          fuelPolicy: !!fuelPolicy,
+          araFuelDefault: fuelPolicy?.araFuelDefault,
+          fuelTypesPath: fuelPolicy?.fuelTypes?.araFuel?.default,
+          currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.araFuel?.default,
+          finalAmount: araAmount,
+          waypointName,
+          ranking,
+          isRig
+        });
+        return araAmount; // Only return OSDK value
       }
       return 0;
     } else if (fuelType === 'approachFuel') {
       // Approach fuel: Only for airports with ranking 10 or 5
       if (!isRig && (ranking === 10 || ranking === 5)) {
-        const approachAmount = fuelPolicy?.approachFuelDefault || 200;
-        return approachAmount;
+        // Check multiple possible property names in the fuel policy
+        let approachAmount = 0;
+        if (fuelPolicy?.fuelTypes?.approachFuel?.default) {
+          approachAmount = fuelPolicy.fuelTypes.approachFuel.default;
+        } else if (fuelPolicy?.approachFuelDefault) {
+          approachAmount = fuelPolicy.approachFuelDefault;
+        }
+        
+        console.log('🚨 APPROACH FUEL DEBUG:', {
+          fuelPolicy: !!fuelPolicy,
+          approachFuelDefault: fuelPolicy?.approachFuelDefault,
+          fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
+          currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.approachFuel?.default,
+          finalAmount: approachAmount,
+          waypointName,
+          ranking,
+          isRig
+        });
+        return approachAmount; // Only return OSDK value
       }
       return 0;
     } else if (fuelType === 'extraFuel') {
@@ -203,11 +244,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       if (!waypointName) return;
       
       // 🛩️ REQUIREMENTS: Detect which segment this waypoint's fuel REQUIREMENTS belong to
-      const waypointSegment = detectLocationSegment(waypointName, stopsToProcess, refuelStops, 'requirements');
+      const waypointSegment = detectLocationSegment(waypointName, stopsToProcess, refuelStops, 'requirements', index + 1);
       
       // Only include fuel for the specified segment
       if (waypointSegment === segmentNumber) {
-        const locationFuel = getLocationFuel(waypoint, fuelType);
+        const locationFuel = getLocationFuel(waypoint, fuelType, index + 1);
         if (locationFuel > 0) {
           total += locationFuel;
         }
@@ -219,14 +260,16 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // ✅ SEGMENT-AWARE: Calculate ARA fuel for SEGMENT 1 ONLY (departure fuel)
   let dynamicAraFuel = calculateSegmentLocationFuel('araFuel', 1);
   
-  // 🚨 SIMPLE FIX: If there are refuel stops, don't calculate approach fuel for entire route
+  // 🚨 APPROACH FUEL FIX: Calculate approach fuel for final segment
   let dynamicApproachFuel = 0;
   let approachFuelSource = 'none';
   
   if (hasRefuelStops) {
-    // With refuel stops, approach fuel will be calculated per segment, not globally
-    dynamicApproachFuel = 0;
-    approachFuelSource = 'segmented';
+    // With refuel stops: calculate approach fuel for FINAL SEGMENT (from last refuel to destination)
+    const finalSegmentNumber = refuelStops.length + 1; // Last segment number
+    dynamicApproachFuel = calculateSegmentLocationFuel('approachFuel', finalSegmentNumber);
+    approachFuelSource = dynamicApproachFuel > 0 ? 'final_segment' : 'none';
+    console.log(`🛩️ APPROACH FUEL: Final segment ${finalSegmentNumber} needs ${dynamicApproachFuel} lbs approach fuel`);
   } else {
     // No refuel stops: calculate approach fuel for destination normally
     const destinationWaypoint = stopsToProcess[stopsToProcess.length - 1];
@@ -282,16 +325,22 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn
     });
     
-    // Use provided reserve fuel value as fallback instead of failing
-    calculatedReserveFuel = Number(reserveFuel) || 20; // Default to 20 lbs if all else fails
-    console.warn(`🟡 FALLBACK: Using reserve fuel: ${calculatedReserveFuel} lbs`);
+    // 🚨 TEMPORARY: Allow calculation without fuel policy for debugging
+    console.warn('🟡 WARNING: Reserve fuel policy conversion failed, using provided value');
+    console.warn('🟡 DETAILS:', {
+      hasFuelPolicy: !!fuelPolicy,
+      hasFuelTypes: !!fuelPolicy?.fuelTypes,
+      hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
+      hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn
+    });
+    
+    // 🚨 AVIATION SAFETY: NO FALLBACKS - FAIL PROPERLY
+    throw new Error('CRITICAL: No fuel policy data available from OSDK. Cannot calculate fuel requirements without verified policy data.');
   }
   
   // 🛡️ FINAL SAFETY CHECK: Ensure we have a valid converted value
   if (calculatedReserveFuel === null || calculatedReserveFuel === undefined || isNaN(calculatedReserveFuel)) {
-    console.warn('🟡 WARNING: Reserve fuel conversion produced invalid result, using fallback');
-    calculatedReserveFuel = 20; // Safe fallback instead of failing
-    console.warn(`🟡 FALLBACK: Using safe reserve fuel: ${calculatedReserveFuel} lbs`);
+    throw new Error('CRITICAL: Reserve fuel calculation failed. Invalid OSDK fuel policy data cannot be used for aviation calculations.');
   }
   
   // Log all received values for debugging
@@ -1015,26 +1064,16 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       
       // 🛩️ AVIATION LOGIC: Check how much ARA/approach fuel THIS location consumes
       // This fuel is consumed ON APPROACH to this location, so it won't be in this location's summary
-      const araFuelNeededHere = currentLocationConsumesAra ? getLocationFuel(toWaypoint, 'araFuel') : 0;
+      const araFuelNeededHere = currentLocationConsumesAra ? getLocationFuel(toWaypoint, 'araFuel', i + 1) : 0;
       
       
-      // 🛩️ SIMPLE FIX: For approach fuel with refuel stops, only calculate if this location is after last refuel
+      // 🛩️ APPROACH FUEL FIX: Approach fuel consumption logic
       let approachFuelNeededHere = 0;
       if (currentLocationConsumesApproach) {
-        if (hasRefuelStops) {
-          // Check if this location is after the last refuel stop
-          const lastRefuelStopIndex = Math.max(...refuelStops);
-          const currentStopIndex = i + 1; // Convert to 1-based index
-          
-          if (currentStopIndex > lastRefuelStopIndex) {
-            // This location is after the last refuel - include approach fuel
-            approachFuelNeededHere = getLocationFuel(toWaypoint, 'approachFuel');
-          } else {
-          }
-        } else {
-          // No refuel stops - calculate approach fuel normally
-          approachFuelNeededHere = getLocationFuel(toWaypoint, 'approachFuel');
-        }
+        // Approach fuel is consumed AT this location (airport)
+        // The fuel was carried in previous cards and is consumed here
+        approachFuelNeededHere = getLocationFuel(toWaypoint, 'approachFuel', i + 1);
+        console.log(`🛩️ APPROACH FUEL: ${toWaypoint.name} consumes ${approachFuelNeededHere} lbs approach fuel`);
       }
       
       // 🛩️ AVIATION LOGIC: Update cumulative consumption BEFORE calculating remaining fuel
@@ -1052,9 +1091,30 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       const remainingAraFuel = Math.max(0, dynamicAraFuel - cumulativeAraFuelConsumed);
       
       
-      // 🛩️ AVIATION LOGIC: Approach fuel carried from departure, consumed at airports
-      // Calculate remaining approach fuel after cumulative consumption
-      const remainingApproachFuel = Math.max(0, dynamicApproachFuel - cumulativeApproachFuelConsumed);
+      // 🛩️ APPROACH FUEL FIX: Segment-aware approach fuel logic
+      let remainingApproachFuel = 0;
+      
+      if (hasRefuelStops) {
+        // With refuel stops: cards in the final segment carry approach fuel
+        const finalSegmentNumber = refuelStops.length + 1;
+        const currentCardIndex = shouldTreatAsFinal ? 'F' : (i + 1);
+        const currentCardSegment = detectLocationSegment(toWaypoint.name || toWaypoint.stopName, stopsToProcess, refuelStops, 'requirements', currentCardIndex);
+        
+        console.log(`🛩️ APPROACH FUEL DEBUG: Location ${toWaypoint.name}, segment ${currentCardSegment}, final segment ${finalSegmentNumber}, refuel stops:`, refuelStops);
+        
+        if (currentCardSegment === finalSegmentNumber) {
+          // This card is in the final segment - it should carry approach fuel
+          remainingApproachFuel = Math.max(0, dynamicApproachFuel - cumulativeApproachFuelConsumed);
+          console.log(`🛩️ APPROACH FUEL: ${toWaypoint.name} (segment ${currentCardSegment}) carries ${remainingApproachFuel} lbs approach fuel`);
+        } else {
+          // This card is NOT in the final segment - no approach fuel
+          remainingApproachFuel = 0;
+          console.log(`🛩️ APPROACH FUEL: ${toWaypoint.name} (segment ${currentCardSegment}) carries no approach fuel (not final segment)`);
+        }
+      } else {
+        // No refuel stops: normal approach fuel logic from departure
+        remainingApproachFuel = Math.max(0, dynamicApproachFuel - cumulativeApproachFuelConsumed);
+      }
       
       
       // 🛩️ AVIATION LOGIC: Extra fuel carry-through until refuel stop or destination
@@ -1848,12 +1908,12 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     let segment1AraTotal = 0;
     
     // Look through all landing stops to find segment 1 ARA fuel requirements
-    landingStopsOnly.forEach((waypoint) => {
+    landingStopsOnly.forEach((waypoint, index) => {
       const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
       if (waypointName && options.refuelStops) {
         // Use the same segment detection logic
         if (detectLocationSegment) {
-          const waypointSegment = detectLocationSegment(waypointName, landingStopsOnly, options.refuelStops, 'requirements');
+          const waypointSegment = detectLocationSegment(waypointName, landingStopsOnly, options.refuelStops, 'requirements', index + 1);
           
           console.log(`🔍 ALTERNATE CARD SEGMENT: ${waypointName} detected as segment ${waypointSegment}, refuelStops:`, options.refuelStops);
           

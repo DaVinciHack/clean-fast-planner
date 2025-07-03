@@ -12,9 +12,11 @@
  * @param {string} locationName - Name of the location to check
  * @param {Array} waypoints - Array of flight waypoints
  * @param {Array} refuelStops - Array of refuel stop indices (e.g., [2, 4])
+ * @param {string} purpose - Purpose of detection ('requirements' or other)
+ * @param {number} cardIndex - Optional: specific card index to check (for duplicate names)
  * @returns {number} Segment number (1, 2, 3, etc.)
  */
-export function detectLocationSegment(locationName, waypoints, refuelStops = []) {
+export function detectLocationSegment(locationName, waypoints, refuelStops = [], purpose = 'requirements', cardIndex = null) {
   if (!waypoints || waypoints.length === 0) {
     return 1; // Default to segment 1
   }
@@ -29,11 +31,20 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [])
   });
   
   // Find the location index in landing stops
-  const locationIndex = landingStopsOnly.findIndex(wp => 
-    wp.name === locationName || 
-    wp.stopName === locationName ||
-    wp.location === locationName
-  );
+  let locationIndex = -1;
+  
+  if (cardIndex !== null) {
+    // 🔧 DUPLICATE NAME FIX: Use specific card index if provided
+    locationIndex = cardIndex - 1; // Convert from 1-based to 0-based
+    console.log(`🔧 DUPLICATE FIX: Using provided cardIndex ${cardIndex} for ${locationName}`);
+  } else {
+    // Find by name (may have duplicate name issues)
+    locationIndex = landingStopsOnly.findIndex(wp => 
+      wp.name === locationName || 
+      wp.stopName === locationName ||
+      wp.location === locationName
+    );
+  }
   
   if (locationIndex === -1) {
     console.warn(`🚨 SegmentUtils: Location "${locationName}" not found in waypoints`);
@@ -41,7 +52,7 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [])
   }
   
   // Convert to card index (1-based)
-  const cardIndex = locationIndex + 1;
+  const finalCardIndex = locationIndex + 1;
   
   // If no refuel stops, everything is segment 1
   if (!refuelStops || refuelStops.length === 0) {
@@ -54,14 +65,23 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [])
   // Determine which segment based on refuel stop boundaries
   let segment = 1;
   for (const refuelStopIndex of sortedRefuelStops) {
-    if (cardIndex <= refuelStopIndex) {
-      break; // Location is in current segment
+    // ✅ CRITICAL INDEXING FIX: Convert refuelStops (0-based) to cardIndex format (1-based)
+    // 🚨 DO NOT REMOVE THIS +1 CONVERSION! 
+    // Without this, ARA fuel and approach fuel break when refuel stops are used
+    // RefuelStops array uses 0-based indices, but card.index uses 1-based indices
+    const refuelStopCardIndex = refuelStopIndex + 1;
+    console.log(`🔍 INDEXING FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex} (was ${refuelStopIndex})`);
+    if (cardIndex <= refuelStopCardIndex) {
+      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment}`);
+      break; // Location is at or before refuel stop - fuel carried from current segment
     }
     segment++; // Location is after this refuel stop
+    console.log(`➡️ MAIN LOGIC: ${locationName} moving to segment ${segment}`);
   }
   
   console.log(`🛩️ SegmentUtils: Location "${locationName}" (card ${cardIndex}) is in segment ${segment}`);
   console.log(`🛩️ SegmentUtils: Refuel stops:`, sortedRefuelStops);
+  console.log(`🛩️ SegmentUtils: All waypoints:`, landingStopsOnly.map((wp, i) => `${i+1}:${wp.name || wp.stopName}`));
   
   return segment;
 }

@@ -60,36 +60,31 @@ const CleanDetailedFuelBreakdown = ({
     return stopCard?.alternateRequirements || false;
   }, []);
   
-  // Read refuel stops from stopCards when component opens or stopCards change
+  // Read refuel stops from stopCards ONLY when component first opens (not on every stopCards change)
   useEffect(() => {
-    if (!stopCards || stopCards.length === 0) {
+    if (!visible || isInitialized) {
       return;
     }
     
-    // Only read when visible and either not initialized or stopCards have changed
-    if (!visible) {
-      return;
+    console.log('🔄 INITIAL: Reading refuel stops from stopCards on component open');
+    
+    let stops = [];
+    
+    // Try to read from stopCards if available
+    if (stopCards && stopCards.length > 0) {
+      stopCards.forEach((card, index) => {
+        if (card.refuelMode === true || card.isRefuelStop === true) {
+          stops.push(card.index || index); // Use card.index like EnhancedStopCardsContainer
+        }
+      });
     }
     
-    const stops = [];
-    stopCards.forEach((card, index) => {
-      if (card.refuelMode === true || card.isRefuelStop === true) {
-        stops.push(card.index || index); // Use card.index like EnhancedStopCardsContainer
-      }
-    });
+    // Only update refuel stops on first initialization, not on every change
+    refuelStopsRef.current = stops;
+    setIsInitialized(true);
     
-    // Always update refuel stops when stopCards change (not just first time)
-    const newStopsStr = JSON.stringify(stops.sort());
-    const currentStopsStr = JSON.stringify(refuelStopsRef.current.sort());
-    
-    if (newStopsStr !== currentStopsStr) {
-      refuelStopsRef.current = stops;
-    }
-    
-    if (!isInitialized) {
-      setIsInitialized(true);
-    }
-  }, [visible, stopCards, isInitialized]); // Re-read when visible, stopCards change, or initialization state changes
+    console.log('🔄 INITIAL: Set refuel stops to:', stops);
+  }, [visible, isInitialized, stopCards]); // Include stopCards but only for initial read
   
   const refuelStops = refuelStopsRef.current;
 
@@ -114,6 +109,12 @@ const CleanDetailedFuelBreakdown = ({
       return stopCards; // Fallback to prop if can't calculate
     }
     
+    // 🚨 TIMING FIX: Don't calculate if fuel policy isn't loaded yet
+    if (!fuelPolicy || !fuelPolicy?.currentPolicy || !fuelPolicy?.currentPolicy?.fuelTypes || !fuelPolicy?.currentPolicy?.uuid) {
+      console.log('🔄 MEMO: Fuel policy not fully loaded yet, using prop stopCards');
+      return stopCards; // Use prop until OSDK data is ready
+    }
+    
     try {
       // Format overrides to match expected structure
       const formattedOverrides = {};
@@ -123,7 +124,8 @@ const CleanDetailedFuelBreakdown = ({
       
       const effectiveSettings = {
         ...flightSettings,
-        locationFuelOverrides: formattedOverrides
+        locationFuelOverrides: formattedOverrides,
+        fuelPolicy: fuelPolicy?.currentPolicy  // 🚨 AVIATION SAFETY: Pass verified fuel policy
       };
       
       // Just call StopCardCalculator normally - it should handle segments via refuelStops parameter
@@ -186,15 +188,14 @@ const CleanDetailedFuelBreakdown = ({
     setIsMounted(true);
   }, []);
   
-  // Reset initialization when component becomes visible
+  // Reset initialization when component closes so it can re-read refuel stops next time
   useEffect(() => {
-    if (visible && !isInitialized) {
-    }
     if (!visible && isInitialized) {
+      console.log('🔄 RESET: Component closed, resetting for next open');
       setIsInitialized(false);
-      refuelStopsRef.current = [];
+      // Don't clear refuelStopsRef here - let it be re-read on next open
     }
-  }, [visible]);
+  }, [visible, isInitialized]);
   
   // 🚀 DIRECT CALCULATOR: Removed - now handled directly in setState callback to avoid closure issues
   
@@ -297,7 +298,10 @@ const CleanDetailedFuelBreakdown = ({
   
   // Get weather values for inputs
   const getWeatherValue = (stopName, fuelType) => {
-    if (!weatherSegments || weatherSegments.length === 0) return 0;
+    if (!weatherSegments || weatherSegments.length === 0) {
+      console.log('🚨 getWeatherValue: No weather segments available');
+      return 0;
+    }
     
     const segment = weatherSegments.find(segment => 
       segment.airportIcao === stopName ||
@@ -306,15 +310,50 @@ const CleanDetailedFuelBreakdown = ({
       segment.uniqueId === stopName
     );
     
-    if (!segment) return 0;
+    if (!segment) {
+      console.log('🚨 getWeatherValue: No weather segment found for', stopName);
+      return 0;
+    }
+    
+    console.log('🚨 getWeatherValue DEBUG:', {
+      stopName,
+      fuelType,
+      segment: {
+        isRig: segment.isRig,
+        ranking2: segment.ranking2
+      },
+      fuelPolicy: !!fuelPolicy
+    });
     
     // Simple logic: if ranking indicates fuel needed, suggest amount
     if (fuelType === 'araFuel' && segment.isRig && (segment.ranking2 === 8 || segment.ranking2 === 5)) {
-      return fuelPolicy?.araFuelDefault || 200;
+      // Use EXACT same path as EnhancedStopCardsContainer
+      let araAmount = 0;
+      if (fuelPolicy?.currentPolicy?.fuelTypes?.araFuel?.default) {
+        araAmount = fuelPolicy.currentPolicy.fuelTypes.araFuel.default;
+      }
+      return araAmount;
     }
     
     if (fuelType === 'approachFuel' && !segment.isRig && (segment.ranking2 === 10 || segment.ranking2 === 5)) {
-      return fuelPolicy?.approachFuelDefault || 150;
+      // Use EXACT same path as EnhancedStopCardsContainer
+      let approachAmount = 0;
+      if (fuelPolicy?.currentPolicy?.fuelTypes?.approachFuel?.default) {
+        approachAmount = fuelPolicy.currentPolicy.fuelTypes.approachFuel.default;
+      }
+      
+      console.log('🚨 DETAILS APPROACH FUEL DEBUG:', {
+        fuelPolicy: !!fuelPolicy,
+        fuelPolicyKeys: Object.keys(fuelPolicy || {}),
+        fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
+        approachFuelDefault: fuelPolicy?.approachFuelDefault,
+        fullFuelPolicy: fuelPolicy,
+        finalAmount: approachAmount,
+        stopName,
+        ranking: segment.ranking2,
+        isRig: segment.isRig
+      });
+      return approachAmount;
     }
     
     return 0;
@@ -847,51 +886,82 @@ const CleanDetailedFuelBreakdown = ({
                             marginBottom: '6px' 
                           }}>(pounds)</label>
                           <div style={{ textAlign: 'center' }}>
-                            <input
-                              type="number"
-                              value={isRig ? (getFuelValue(stopName, 'araFuel') || '') : (getFuelValue(stopName, 'approachFuel') || '')}
-                              onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
-                                if (isRig) {
-                                  handleFuelChange(stopName, 'araFuel', value);
-                                } else {
-                                  handleFuelChange(stopName, 'approachFuel', value);
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
-                                if (isRig) {
-                                  handleFuelBlur(stopName, 'araFuel', value);
-                                } else {
-                                  handleFuelBlur(stopName, 'approachFuel', value);
-                                }
-                              }}
-                              placeholder="0"
-                              disabled={isDeparture && !isRig} // Disable approach fuel for departure
-                              style={{
-                                width: 'clamp(60px, 12vw, 80px)',
-                                padding: '4px 6px',
-                                backgroundColor: (isDeparture && !isRig) ? '#1a1a1a' : '#2c2c2c', // Darker for disabled
-                                color: (isDeparture && !isRig) ? '#666' : '#fff', // Dimmed text for disabled
-                                border: '1px solid #4A9EFF', // Keep border consistent
-                                borderRadius: '4px',
-                                textAlign: 'center',
-                                fontSize: 'clamp(12px, 2.5vw, 14px)',
-                                height: '24px',
-                                cursor: (isDeparture && !isRig) ? 'not-allowed' : 'text' // Show disabled cursor
-                              }}
-                            />
-                            <div style={{ 
-                              color: (isDeparture && !isRig) ? '#444' : '#666', 
-                              fontSize: '0.6rem', 
-                              marginTop: '2px',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              maxWidth: 'clamp(60px, 12vw, 80px)'
-                            }}>
-                              {isDeparture && !isRig ? 'N/A (Departure)' : (isDeparture ? 'Departure' : (stopName.length > 8 ? stopName.substring(0, 8) + '...' : stopName))}
-                            </div>
+                            {(() => {
+                              const fuelType = isRig ? 'araFuel' : 'approachFuel';
+                              const userValue = getFuelValue(stopName, fuelType);
+                              const weatherValue = getWeatherValue(stopName, fuelType);
+                              const displayValue = userValue !== '' ? userValue : weatherValue;
+                              const isWeatherSuggested = userValue === '' && weatherValue > 0;
+                              const isUserEntered = userValue !== '';
+                              
+                              return (
+                                <input
+                                  type="number"
+                                  value={displayValue || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
+                                    if (isRig) {
+                                      handleFuelChange(stopName, 'araFuel', value);
+                                    } else {
+                                      handleFuelChange(stopName, 'approachFuel', value);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                                    if (isRig) {
+                                      handleFuelBlur(stopName, 'araFuel', value);
+                                    } else {
+                                      handleFuelBlur(stopName, 'approachFuel', value);
+                                    }
+                                  }}
+                                  placeholder="0"
+                                  disabled={isDeparture} // Disable approach fuel for ALL departures
+                                  style={{
+                                    width: 'clamp(60px, 12vw, 80px)',
+                                    padding: '4px 6px',
+                                    backgroundColor: isDeparture ? '#1a1a1a' : '#2c2c2c',
+                                    color: isDeparture ? '#666' : '#fff',
+                                    border: `2px solid ${
+                                      isDeparture ? '#666' : 
+                                      isUserEntered ? '#22c55e' : // Green for user-entered
+                                      isWeatherSuggested ? '#8b5cf6' : // Softer purple for weather-suggested  
+                                      '#4A9EFF' // Default blue
+                                    }`,
+                                    borderRadius: '4px',
+                                    textAlign: 'center',
+                                    fontSize: 'clamp(12px, 2.5vw, 14px)',
+                                    height: '24px',
+                                    cursor: isDeparture ? 'not-allowed' : 'text'
+                                  }}
+                                />
+                              );
+                            })()}
+                            {(() => {
+                              const fuelType = isRig ? 'araFuel' : 'approachFuel';
+                              const userValue = getFuelValue(stopName, fuelType);
+                              const weatherValue = getWeatherValue(stopName, fuelType);
+                              const isWeatherSuggested = userValue === '' && weatherValue > 0;
+                              const isUserEntered = userValue !== '';
+                              
+                              return (
+                                <div style={{ 
+                                  color: isDeparture ? '#444' : 
+                                         isUserEntered ? '#22c55e' : 
+                                         isWeatherSuggested ? '#8b5cf6' : '#666',
+                                  fontSize: '0.6rem', 
+                                  marginTop: '2px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: 'clamp(60px, 12vw, 80px)'
+                                }}>
+                                  {isDeparture ? 'N/A (Departure)' : 
+                                   isUserEntered ? 'Custom' :
+                                   isWeatherSuggested ? 'Weather' : 
+                                   'Manual'}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                         
