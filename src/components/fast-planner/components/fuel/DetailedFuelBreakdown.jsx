@@ -63,7 +63,9 @@ const DetailedFuelBreakdown = ({
   onLocationFuelChange = () => {},  // Callback for ARA/approach fuel changes
   // ✅ SEGMENT-AWARE: Segment-specific fuel callbacks
   onSegmentExtraFuelChange = () => {},  // Callback for segment extra fuel changes
-  getCurrentSegmentInfo = () => []      // Function to get current segment information
+  getCurrentSegmentInfo = () => [],     // Function to get current segment information
+  // 🔄 MANUAL RECALC: Force recalculation function
+  onForceRecalculation = () => {}       // Force recalculation in parent component
 }) => {
   console.log('🚨🚨🚨 DetailedFuelBreakdown RENDERING! visible=', visible);
   
@@ -179,14 +181,40 @@ const DetailedFuelBreakdown = ({
       hasApproachFuel: stopCards?.[0]?.approachFuel
     });
     
-    // 🚫 SMART FILTER: Protect refuel stops but allow final correct updates
+    // 🚫 MODE-SPECIFIC FILTER: Different filtering for IFR vs VFR modes
     console.log('🔄 DetailedFuelBreakdown: Received new stopCards, checking refuel integrity');
+    console.log('🔄 MODE CHECK: waiveAlternates =', waiveAlternates);
     
     const expectedRefuelStops = localRefuelStops;
     let shouldUpdate = true;
     
-    if (expectedRefuelStops.length > 0) {
-      // Check if the stop cards have the expected refuel information
+    if (waiveAlternates) {
+      // VFR MODE: Only reject if we lose ALL refuel data completely
+      if (expectedRefuelStops.length > 0) {
+        const actualRefuelInCards = [];
+        stopCards.forEach(card => {
+          if (card.refuelMode === true || card.isRefuelStop === true) {
+            actualRefuelInCards.push(card.index);
+          }
+        });
+        
+        console.log('🛩️ VFR FILTER: Expected refuel stops:', expectedRefuelStops);
+        console.log('🛩️ VFR FILTER: Actual refuel in cards:', actualRefuelInCards);
+        
+        // VFR: Only reject if we have NO refuel data at all (complete loss)
+        if (actualRefuelInCards.length === 0) {
+          console.log('❌ VFR FILTER: Rejecting - would lose all refuel stops');
+          shouldUpdate = false;
+        } else {
+          console.log('✅ VFR FILTER: Accepting - refuel data preserved');
+          shouldUpdate = true;
+        }
+      } else {
+        console.log('✅ VFR FILTER: No refuel stops expected, accepting update');
+        shouldUpdate = true;
+      }
+    } else if (expectedRefuelStops.length > 0) {
+      // IFR MODE: Use smart filtering to protect refuel stops
       const actualRefuelInCards = [];
       stopCards.forEach(card => {
         if (card.refuelMode === true || card.isRefuelStop === true) {
@@ -194,8 +222,8 @@ const DetailedFuelBreakdown = ({
         }
       });
       
-      console.log('🚫 SMART FILTER: Expected refuel stops:', expectedRefuelStops);
-      console.log('🚫 SMART FILTER: Actual refuel in cards:', actualRefuelInCards);
+      console.log('🚫 IFR FILTER: Expected refuel stops:', expectedRefuelStops);
+      console.log('🚫 IFR FILTER: Actual refuel in cards:', actualRefuelInCards);
       
       // Only reject if we expect refuel stops but the cards have NONE
       const hasAnyRefuelStops = actualRefuelInCards.length > 0;
@@ -203,10 +231,27 @@ const DetailedFuelBreakdown = ({
     }
     
     if (shouldUpdate) {
-      console.log('✅ SMART FILTER: Accepting stop cards update');
+      console.log('✅ FILTER: Accepting stop cards update');
       setLocalStopCards(stopCards);
+      
+      // VFR MODE: Restore refuel stops if they were lost during update
+      if (waiveAlternates && expectedRefuelStops.length > 0) {
+        setTimeout(() => {
+          const actualRefuelInCards = [];
+          stopCards.forEach(card => {
+            if (card.refuelMode === true || card.isRefuelStop === true) {
+              actualRefuelInCards.push(card.index);
+            }
+          });
+          
+          if (actualRefuelInCards.length === 0) {
+            console.log('🛩️ VFR RESTORE: Refuel stops missing, restoring:', expectedRefuelStops);
+            setLocalRefuelStops([...expectedRefuelStops]); // Restore original refuel stops
+          }
+        }, 50);
+      }
     } else {
-      console.log('❌ SMART FILTER: Rejecting update - missing ALL refuel stops');
+      console.log('❌ FILTER: Rejecting update - missing ALL refuel stops');
     }
     
     // 🎯 FORCE REFRESH: When stop cards update, force UI to re-render with new summaries
@@ -331,32 +376,24 @@ const DetailedFuelBreakdown = ({
             console.log(`⚠️ Unknown field type: ${fieldType}`);
         }
         
-        // 🎯 MODE-SPECIFIC TRIGGERS: Different triggers for IFR vs VFR modes
+        // 🎯 RESTORE WORKING TRIGGER: Extra fuel toggle for recalculation (like it was working)
         if (fieldType === 'araFuel' || fieldType === 'extraFuel' || fieldType === 'approachFuel') {
-          console.log('🔄 TRIGGER: Setting up trigger for fieldType:', fieldType, 'waiveAlternates:', waiveAlternates);
+          console.log('🔄 TRIGGER: Setting up trigger for fieldType:', fieldType);
           
           setTimeout(() => {
             if (fieldType === 'extraFuel') {
               console.log('🔄 EXTRA FUEL: Direct extra fuel change');
               onExtraFuelChange(value);
-            } else if (waiveAlternates) {
-              console.log('🔄 VFR MODE: Using extra fuel toggle for reliable recalculation');
-              const currentExtraFuel = flightSettings?.extraFuel || 0;
-              onExtraFuelChange(currentExtraFuel + 0.01);
-              setTimeout(() => {
-                onExtraFuelChange(currentExtraFuel);
-                console.log('🔄 VFR MODE: Extra fuel toggle completed');
-              }, 100);
             } else {
-              console.log('🔄 IFR MODE: Using extra fuel toggle for recalculation');
+              console.log('🔄 ARA/APPROACH: Using extra fuel toggle for recalculation');
               const currentExtraFuel = flightSettings?.extraFuel || 0;
               onExtraFuelChange(currentExtraFuel + 0.01);
               setTimeout(() => {
                 onExtraFuelChange(currentExtraFuel);
-                console.log('🔄 IFR MODE: Extra fuel toggle completed');
+                console.log('🔄 ARA/APPROACH: Extra fuel toggle completed');
               }, 100);
             }
-          }, waiveAlternates ? 800 : 250); // Longer delay for VFR to let value commit
+          }, 250);
         }
         console.log(`✅ Settings update completed for ${fieldType}`);
       } catch (error) {
@@ -800,15 +837,15 @@ const DetailedFuelBreakdown = ({
                   background: 'linear-gradient(to bottom, #2e7d32, #1b5e20)',
                   color: 'white',
                   border: '1px solid #4caf50',
-                  padding: '8px 16px',
+                  padding: '6px 12px',
                   borderRadius: '4px',
-                  fontSize: '12px',
+                  fontSize: '11px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
-                💾 Save Fuel Settings
+                💾 Save
               </button>
             )}
             <button

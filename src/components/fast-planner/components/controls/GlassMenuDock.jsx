@@ -33,13 +33,24 @@ const GlassMenuDock = ({
   onSARCard,
   onSaveCard,
   onLoadCard,
-  onLayersCard
+  onLayersCard,
+  // LIVE weather toggle props
+  onLiveWeatherToggle,
+  liveWeatherActive = false
 }) => {
 
   // State for expanded/compact mode
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!isVisible) return null;
+  
+  // Debug logging for LIVE weather button
+  console.log('🔍 GlassMenuDock render:', {
+    isExpanded,
+    hasLiveWeatherToggle: !!onLiveWeatherToggle,
+    liveWeatherActive,
+    shouldShowLiveButton: !isExpanded && !!onLiveWeatherToggle
+  });
 
   // Toggle expanded state when menu button is clicked
   const handleMenuClick = () => {
@@ -280,6 +291,31 @@ const GlassMenuDock = ({
             </button>
           </div>
         ))}
+
+        {/* LIVE Weather Toggle - Only visible in compact mode */}
+        {!isExpanded && onLiveWeatherToggle && (
+          <div className="glass-button-container">
+            <button 
+              className={`glass-button icon-above-text live-weather-button ${liveWeatherActive ? 'active' : ''}`}
+              onClick={() => {
+                console.log('🌩️ LIVE BUTTON CLICK DETECTED!');
+                console.log('🌩️ onLiveWeatherToggle function:', onLiveWeatherToggle);
+                onLiveWeatherToggle();
+              }}
+              title={liveWeatherActive ? 
+                'Disable LIVE weather (Lightning + NOAA + Radar)' : 
+                'Enable LIVE weather monitoring (Lightning + NOAA + Radar)'
+              }
+            >
+              <div className="glass-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+              </div>
+              <span className="button-label">LIVE</span>
+            </button>
+          </div>
+        )}
 
         {/* Always visible: Menu/Close button - Round with no text */}
         <div className="glass-button-container">

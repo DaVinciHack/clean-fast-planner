@@ -12,9 +12,10 @@
  * @param {string} locationName - Name of the location to check
  * @param {Array} waypoints - Array of flight waypoints
  * @param {Array} refuelStops - Array of refuel stop indices (e.g., [2, 4])
+ * @param {string} purpose - 'requirements' (fuel TO REACH) or 'summary' (fuel TO CONTINUE FROM)
  * @returns {number} Segment number (1, 2, 3, etc.)
  */
-export function detectLocationSegment(locationName, waypoints, refuelStops = []) {
+export function detectLocationSegment(locationName, waypoints, refuelStops = [], purpose = 'requirements') {
   if (!waypoints || waypoints.length === 0) {
     return 1; // Default to segment 1
   }
@@ -51,17 +52,42 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [])
   // Sort refuel stops to ensure proper order
   const sortedRefuelStops = [...refuelStops].sort((a, b) => a - b);
   
-  // Determine which segment based on refuel stop boundaries
+  // 🛩️ AVIATION LOGIC: Determine segment based on purpose
   let segment = 1;
-  for (const refuelStopIndex of sortedRefuelStops) {
-    if (cardIndex <= refuelStopIndex) {
-      break; // Location is in current segment
+  
+  // 🚨 SPECIAL CASE: For ARA fuel requirements, first landing stop after departure is ALWAYS segment 1
+  // because ARA fuel for first rig must be carried from departure
+  if (purpose === 'requirements' && landingStopsOnly.length >= 2) {
+    // The first landing stop after departure is at array index 1 (second element)
+    // Convert to cardIndex (1-based): array index 1 = cardIndex 2
+    const firstRigCardIndex = 2;
+    if (cardIndex === firstRigCardIndex) {
+      return 1; // First rig after departure is always segment 1 for fuel requirements
     }
-    segment++; // Location is after this refuel stop
   }
   
-  console.log(`🛩️ SegmentUtils: Location "${locationName}" (card ${cardIndex}) is in segment ${segment}`);
-  console.log(`🛩️ SegmentUtils: Refuel stops:`, sortedRefuelStops);
+  for (const refuelStopIndex of sortedRefuelStops) {
+    if (purpose === 'requirements') {
+      // REQUIREMENTS: Fuel needed TO REACH this location
+      // Refuel stop itself belongs to the segment BEFORE it (carried from previous segment)
+      // ✅ CRITICAL AVIATION FIX: For REQUIREMENTS, fuel to reach ANY location 
+      // is carried from the segment that STARTED before the NEXT refuel stop
+      // This means locations AT the refuel stop still get fuel from previous segment
+      if (cardIndex <= refuelStopIndex) {
+        break; // Location is at or before refuel stop - fuel carried from current segment
+      }
+      segment++; // Location is after this refuel stop
+    } else if (purpose === 'summary') {
+      // SUMMARY: Fuel needed TO CONTINUE FROM this location  
+      // Refuel stop itself belongs to the segment AFTER it (fuel for next segment)
+      if (cardIndex < refuelStopIndex) {
+        break; // Location is in current segment
+      }
+      segment++; // Location is at or after this refuel stop
+    }
+  }
+  
+  // Removed excessive debug logging
   
   return segment;
 }
@@ -187,7 +213,6 @@ export function getSegmentBoundaries(waypoints, refuelStops = []) {
     });
   }
   
-  console.log('🛩️ SegmentUtils: Generated segments:', segments);
   return segments;
 }
 

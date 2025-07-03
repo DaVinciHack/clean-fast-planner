@@ -36,8 +36,8 @@ import GlassMenuDock from './components/controls/GlassMenuDock';
 // Import FlightWizard for guided flight planning
 import FlightWizard from './components/wizard/FlightWizard';
 
-// Import DetailedFuelBreakdown for fuel analysis popup
-import DetailedFuelBreakdown from './components/fuel/DetailedFuelBreakdown';
+// Import CLEAN DetailedFuelBreakdown for fuel analysis popup
+import CleanDetailedFuelBreakdown from './components/fuel/CleanDetailedFuelBreakdown';
 
 // Import MapZoomHandler for waypoint display
 import MapZoomHandler from './components/map/MapZoomHandler';
@@ -91,7 +91,6 @@ const FastPlannerCore = ({
   // Make region globally accessible for weather system
   useEffect(() => {
     window.activeRegionFromContext = activeRegionFromContext;
-    console.log('🌍 REGION: Set global region for weather system:', activeRegionFromContext?.name);
   }, [activeRegionFromContext]); 
   
   // Initialize fuel policy management
@@ -107,10 +106,7 @@ const FastPlannerCore = ({
   
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
-  
-  // 📊 FUEL BREAKDOWN STATE: Detailed fuel analysis modal
-  const [showFuelBreakdown, setShowFuelBreakdown] = useState(false);
-  
+
   // 🔧 NEW: State to store alternate card data
   const [alternateStopCard, setAlternateStopCard] = useState(null);
   
@@ -119,6 +115,9 @@ const FastPlannerCore = ({
   
   // 🚁 SAR STATE: Search and Rescue mode state
   const [sarData, setSarData] = useState(null);
+  
+  // ⚡ LIVE WEATHER STATE: Real-time weather monitoring toggle
+  const [liveWeatherActive, setLiveWeatherActive] = useState(false);
   
   // Check if wizard should show on load (first time users)
   useEffect(() => {
@@ -163,8 +162,6 @@ const FastPlannerCore = ({
   
   // DEBUG: Track loadedFlightData state changes
   useEffect(() => {
-    console.log('🔄 FASTPLANNER STATE CHANGE: loadedFlightData =', loadedFlightData);
-    console.log('🔄 FASTPLANNER STATE CHANGE: loadedFlightData is null?', loadedFlightData === null);
   }, [loadedFlightData]);
   
   // Glass menu states for flight-loaded controls
@@ -175,8 +172,7 @@ const FastPlannerCore = ({
   React.useEffect(() => {
     window.isEditLocked = isEditLocked;
   }, [isEditLocked]);
-  
-  
+
   // State for weather-based fuel calculations
   const [weatherFuel, setWeatherFuel] = useState({ araFuel: 0, approachFuel: 0 });
   
@@ -257,7 +253,6 @@ const FastPlannerCore = ({
     }
   }, [waypointManagerRef, platformManagerRef, appManagers.addWaypoint, addWaypointDirectImplementation]);
 
-
   const {
     aircraftType, setAircraftType, aircraftRegistration, setAircraftRegistration,
     selectedAircraft, setSelectedAircraft, aircraftList, aircraftTypes, aircraftsByType,
@@ -276,25 +271,16 @@ const FastPlannerCore = ({
   // Effect to select appropriate fuel policy when aircraft changes
   useEffect(() => {
     if (!selectedAircraft || !activeRegionFromContext?.osdkRegion) {
-      console.log(`🛩️ AIRCRAFT: Skipping aircraft policy selection - missing aircraft (${!!selectedAircraft}) or region (${!!activeRegionFromContext?.osdkRegion})`);
       return;
     }
 
-    console.log(`🛩️ AIRCRAFT: Aircraft changed to: ${selectedAircraft.registration}`);
-    console.log(`🛩️ AIRCRAFT: Has policies available: ${fuelPolicy.hasPolicies}`);
-    console.log(`🛩️ AIRCRAFT: Available policies count: ${fuelPolicy.availablePolicies?.length || 0}`);
-    
     // Aircraft policy selection with enhanced logging
     if (fuelPolicy.hasPolicies && fuelPolicy.selectDefaultPolicyForAircraft) {
-      console.log(`🛩️ AIRCRAFT: Attempting to select aircraft-specific policy...`);
       const defaultPolicy = fuelPolicy.selectDefaultPolicyForAircraft(selectedAircraft);
       if (defaultPolicy) {
-        console.log(`✅ AIRCRAFT: Selected aircraft-specific policy: ${defaultPolicy.name}`);
       } else {
-        console.log(`⚠️ AIRCRAFT: No specific policy found for aircraft ${selectedAircraft.registration}`);
       }
     } else {
-      console.log(`⚠️ AIRCRAFT: Cannot select aircraft policy - hasPolicies: ${fuelPolicy.hasPolicies}, selectFunction: ${!!fuelPolicy.selectDefaultPolicyForAircraft}`);
     }
   }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length]);
 
@@ -308,7 +294,7 @@ const FastPlannerCore = ({
       waypointCount: waypoints?.length,
       hasFuelPolicy: fuelPolicy?.hasPolicies
     });
-    
+
     // Only calculate if SAR is enabled
     if (!sarManager.sarEnabled) {
       setSarData(null);
@@ -344,7 +330,6 @@ const FastPlannerCore = ({
   // Memoize the region change handler to maintain stable reference
   const handleRegionChange = useCallback((event) => {
     if (event.detail && event.detail.region) {
-      console.log(`FastPlannerCore: Received region change event: ${event.detail.region.name}`);
       // The actual region update is delegated to the stabilized function in useAircraft
       setCurrentAircraftRegion(event.detail.region);
     }
@@ -352,10 +337,8 @@ const FastPlannerCore = ({
 
   // Set up the event listener with the memoized handler
   useEffect(() => {
-    console.log('FastPlannerCore: Setting up region-changed event listener');
     window.addEventListener('region-changed', handleRegionChange);
     return () => {
-      console.log('FastPlannerCore: Removing region-changed event listener');
       window.removeEventListener('region-changed', handleRegionChange);
     };
   }, [handleRegionChange]);
@@ -368,7 +351,9 @@ const FastPlannerCore = ({
     airfieldsVisible, fixedPlatformsVisible, movablePlatformsVisible,
     blocksVisible, basesVisible, fuelAvailableVisible, // New state variables
     toggleAirfieldsVisibility, toggleFixedPlatformsVisibility, toggleMovablePlatformsVisibility,
-    toggleBlocksVisibility, toggleBasesVisibility, toggleFuelAvailableVisibility // New toggle functions
+    toggleBlocksVisibility, toggleBasesVisibility, toggleFuelAvailableVisibility, // New toggle functions
+    // 📊 FUEL BREAKDOWN MODAL
+    showFuelBreakdown, setShowFuelBreakdown
   } = useUIControls({ appSettingsManagerRef, platformManagerRef, client, routeInput, setRouteInput });
   
   // Initialize map layers
@@ -404,7 +389,6 @@ const FastPlannerCore = ({
   
   // ✅ RESTORED: Proper flight setting update function
   const updateFlightSetting = (settingName, value) => {
-    console.log(`⚙️ RESTORED: updateFlightSetting(${settingName}, ${value})`);
     
     setFlightSettings(prev => ({
       ...prev,
@@ -414,47 +398,35 @@ const FastPlannerCore = ({
   
   // ✅ NEW: Handle location-specific fuel overrides (ARA/approach fuel)
   const handleLocationFuelChange = useCallback((fuelData) => {
-    console.log(`🛩️ SEGMENT-AWARE: Location-specific fuel override:`, fuelData);
-    console.log(`🚨 DEBUG: Refuel stops passed to handleLocationFuelChange:`, fuelData.refuelStops);
-    console.log(`🚨 DEBUG: Current waypoints:`, waypoints?.map(w => w.name));
-    console.log(`🛩️ VFR DEBUG: handleLocationFuelChange called with waiveAlternates:`, waiveAlternates, 'refuelStops:', fuelData.refuelStops);
     
-    // 🚫 CRITICAL FIX: Store refuel stops from DetailedFuelBreakdown
+    // 🚫 PRESERVE REFUEL STATE: DetailedFuelBreakdown should NOT override main UI refuel stops
     if (fuelData.refuelStops && Array.isArray(fuelData.refuelStops)) {
-      console.log(`🚫 REFUEL SYNC: Storing refuel stops from DetailedFuelBreakdown:`, fuelData.refuelStops);
-      setCurrentRefuelStops(fuelData.refuelStops);
+      // DON'T setCurrentRefuelStops - let main UI control refuel stops
+    } else {
     }
     
-    // Detect which segment this location belongs to
-    const segment = detectLocationSegment(fuelData.stopName, waypoints, fuelData.refuelStops || []);
+    // Detect which segment this location belongs to using CURRENT refuel stops from main UI
+    const activeRefuelStops = currentRefuelStops || [];
+    const segment = detectLocationSegment(fuelData.stopName, waypoints, activeRefuelStops, 'requirements');
     
     // Create segment-aware key
     const key = createSegmentFuelKey(fuelData.stopName, fuelData.fuelType, segment);
     
-    console.log(`🛩️ SEGMENT-AWARE: Location "${fuelData.stopName}" is in segment ${segment}, key: "${key}"`);
-    
-    setLocationFuelOverrides(prev => {
-      const newOverrides = {
-        ...prev,
-        [key]: {
-          stopName: fuelData.stopName,
-          stopIndex: fuelData.stopIndex,
-          fuelType: fuelData.fuelType,
-          value: fuelData.value,
-          isRig: fuelData.isRig,
-          segment: segment  // ✅ NEW: Include segment information
-        }
-      };
-      
-      console.log(`🛩️ SEGMENT-AWARE: Updated segment fuel overrides:`, newOverrides);
-      
-      return newOverrides;
-    });
+    setLocationFuelOverrides(prev => ({
+      ...prev,
+      [key]: {
+        stopName: fuelData.stopName,
+        stopIndex: fuelData.stopIndex,
+        fuelType: fuelData.fuelType,
+        value: fuelData.value,
+        isRig: fuelData.isRig,
+        segment: segment
+      }
+    }));
   }, [waypoints]);
   
   // ✅ NEW: Handle segment-aware extra fuel changes
   const handleSegmentExtraFuelChange = useCallback((segmentData) => {
-    console.log(`🛩️ SEGMENT-AWARE: Extra fuel override for segment ${segmentData.segment}:`, segmentData);
     
     // Create segment-aware key for extra fuel
     const key = createSegmentFuelKey(null, 'extraFuel', segmentData.segment);
@@ -470,9 +442,7 @@ const FastPlannerCore = ({
           isSegmentWide: true
         }
       };
-      
-      console.log(`🛩️ SEGMENT-AWARE: Updated segment extra fuel:`, newOverrides);
-      
+
       return newOverrides;
     });
   }, []);
@@ -488,9 +458,6 @@ const FastPlannerCore = ({
   
   // ✅ NEW: Reset user-entered flight settings to defaults (for new flights)
   const resetUserFlightSettings = useCallback(() => {
-    console.log('🧹 RESET: Resetting user flight settings to defaults for new flight');
-    console.log('🧹 RESET: Previous extraFuel was:', flightSettings.extraFuel);
-    console.log('🧹 RESET: Current full flightSettings:', flightSettings);
     
     setFlightSettings(prev => {
       const newSettings = {
@@ -502,16 +469,13 @@ const FastPlannerCore = ({
         // Keep fuel policy values intact - they come from OSDK
         // contingencyFuelPercent, taxiFuel, reserveFuel, deckTimePerStop, deckFuelFlow remain unchanged
       };
-      console.log('🧹 RESET: New flightSettings:', newSettings);
       return newSettings;
     });
     
-    console.log('✅ RESET: User flight settings reset - extraFuel should now be 0');
   }, [flightSettings]);
   
   // ✅ RESTORED: Proper weather update function
   const updateWeatherSettings = (windSpeed, windDirection) => {
-    console.log(`🌬️ updateWeatherSettings(${windSpeed}, ${windDirection})`);
     
     setWeather(prev => ({
       ...prev,
@@ -522,23 +486,10 @@ const FastPlannerCore = ({
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: useEffect triggered');
-    console.log('🚀 TIMESTAMP:', new Date().toISOString());
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: waypoints length:', waypoints?.length);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: waypoints actual:', waypoints?.map(wp => wp.name));
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has selectedAircraft:', !!selectedAircraft);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has appManagers.routeCalculator:', !!appManagers?.routeCalculator);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: appManagers keys:', appManagers ? Object.keys(appManagers) : 'NO APPMANAGERS');
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: routeCalculator type:', typeof appManagers?.routeCalculator);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: has fuelPolicy:', !!fuelPolicy);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: flightSettings:', Object.keys(flightSettings || {}));
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: weather:', weather);
-    console.log('🚀 LIVE UPDATE BROKEN DEBUG: weatherFuel:', weatherFuel);
     
     // 🔍 DEBUG: Always log aircraft data to see what's available
     if (selectedAircraft) {
-      console.log('🔍 AIRCRAFT DEBUG - All properties:', Object.keys(selectedAircraft));
-      console.log('🔍 AIRCRAFT DEBUG - Data dump:', {
+      const aircraftDebug = {
         emptyWeight: selectedAircraft.emptyWeight,
         empty_weight: selectedAircraft.empty_weight,
         emptyWeightLbs: selectedAircraft.emptyWeightLbs,
@@ -549,7 +500,7 @@ const FastPlannerCore = ({
         weight: selectedAircraft.weight,
         maxGrossWeight: selectedAircraft.maxGrossWeight,
         maxTakeoffWeight: selectedAircraft.maxTakeoffWeight
-      });
+      };
     }
     
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
@@ -557,28 +508,25 @@ const FastPlannerCore = ({
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
-    console.log('🔧 CONDITION CHECK:', {
+    const debugInfo = {
       hasWaypoints: waypoints && waypoints.length >= 2,
       hasSelectedAircraft: !!selectedAircraft,
       hasRequiredAircraftData: hasRequiredAircraftData,
       usefulLoad: selectedAircraft?.usefulLoad,
       fuelBurn: selectedAircraft?.fuelBurn
-    });
+    };
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
-      console.log('🔄 CONDITION PASSED: Starting calculations');
-      console.log('🔧 EFFECT TRIGGERED - Current extraFuel:', flightSettings.extraFuel);
       
       // 🔧 DEBUG: Log flightSettings to see what we're passing
-      console.log('🔧 FastPlannerApp DEBUG: flightSettings being passed:', {
+      const settingsDebug = {
         flightSettings,
         extraFuel: flightSettings.extraFuel,
         cargoWeight: flightSettings.cargoWeight
-      });
+      };
       
       // 🔧 PROPER FIX: Calculate routeStats with FILTERED landing stops only (matches StopCardCalculator)
       if (appManagers?.routeCalculatorRef?.current && waypoints.length >= 2) {
-        console.log('🔧 PROPER FIX: Calculating routeStats with filtered landing stops for Finance Calculator');
         
         // Filter out navigation waypoints (same logic as StopCardCalculator)
         const landingStopsOnly = waypoints.filter(wp => {
@@ -587,12 +535,6 @@ const FastPlannerCore = ({
             wp.isWaypoint === true || 
             wp.type === 'WAYPOINT';
           return !isWaypoint;
-        });
-        
-        console.log('🔧 FILTERED WAYPOINTS:', {
-          originalCount: waypoints.length,
-          filteredCount: landingStopsOnly.length,
-          removed: waypoints.length - landingStopsOnly.length
         });
         
         const coordinates = landingStopsOnly.map(wp => wp.coords).filter(Boolean);
@@ -607,20 +549,12 @@ const FastPlannerCore = ({
           
           if (newRouteStats) {
             setRouteStats(newRouteStats);
-            console.log('🔧 PROPER FIX: RouteStats updated with correct filtered waypoints');
           }
         }
       } else {
-        console.log('🔧 PROPER FIX: No routeCalculatorRef.current available');
       }
 
       // Generate stop cards and update header - KEEP EXISTING FUEL FLOW
-      console.log('🔧 STOP CARDS DEBUG: About to call generateStopCardsData');
-      console.log('🔧 STOP CARDS DEBUG: waypoints:', waypoints?.length);
-      console.log('🔧 STOP CARDS DEBUG: routeStats:', routeStats);
-      console.log('🔧 STOP CARDS DEBUG: selectedAircraft:', !!selectedAircraft);
-      console.log('🔧 STOP CARDS DEBUG: weather:', weather);
-      console.log('🔧 SAR DEBUG: alternateRouteData:', alternateRouteData);
       
       const newStopCards = generateStopCardsData(
         waypoints,
@@ -635,28 +569,13 @@ const FastPlannerCore = ({
           locationFuelOverrides: locationFuelOverrides  // ✅ NEW: Pass location-specific fuel overrides
         }
       );
-      
-      console.log('🔧 STOP CARDS DEBUG: generateStopCardsData returned:', newStopCards?.length || 'null/undefined');
-      
+
       if (newStopCards && newStopCards.length > 0) {
         setStopCards(newStopCards);
-        console.log('✅ STOP CARDS SUCCESS: Updated stopCards state - header and finance calculator should update');
       } else {
-        console.log('🚨 STOP CARDS FAILED: No cards generated');
       }
     } else {
-      console.log('🔄 FastPlannerApp: Waiting for complete data:', {
-        hasWaypoints: waypoints && waypoints.length >= 2,
-        hasAircraft: !!selectedAircraft,
-        hasAircraftData: hasRequiredAircraftData,
-        aircraftInfo: selectedAircraft ? {
-          registration: selectedAircraft.registration,
-          hasDryWeight: !!selectedAircraft.dryWeight,
-          hasFuelBurn: !!selectedAircraft.fuelBurn,
-          dryWeight: selectedAircraft.dryWeight,
-          fuelBurn: selectedAircraft.fuelBurn
-        } : 'No aircraft'
-      });
+      setStopCards([]);
     }
   }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel, locationFuelOverrides]);
 
@@ -666,7 +585,7 @@ const FastPlannerCore = ({
     mapManagerRef,
     onWeatherUpdate: updateWeatherSettings // Now using stub function
   });
-  
+
   const {
     weatherSegments,
     weatherSegmentsLoading,
@@ -678,17 +597,6 @@ const FastPlannerCore = ({
 
   // Calculate weather-based fuel requirements whenever dependencies change
   useEffect(() => {
-    // DEBUG: Always log what we have
-    console.log('🔍 WEATHER FUEL CHECK:', {
-      hasWeatherSegments: !!weatherSegments,
-      weatherSegmentsLength: weatherSegments?.length || 0,
-      hasWaypoints: !!waypoints,
-      waypointsLength: waypoints?.length || 0,
-      hasFuelPolicy: !!fuelPolicy,
-      // Get actual fuel policy settings
-      actualFuelPolicy: fuelPolicy?.getCurrentPolicySettings ? fuelPolicy.getCurrentPolicySettings() : 'No getCurrentPolicySettings method',
-      currentPolicy: fuelPolicy?.currentPolicy,
-    });
     
     // RACE CONDITION FIX: Add proper checks and prevent infinite loops
     if (weatherSegments && 
@@ -701,19 +609,12 @@ const FastPlannerCore = ({
       
       // Get actual fuel policy settings
       const actualFuelPolicy = fuelPolicy.getCurrentPolicySettings();
-      console.log('🔍 ACTUAL FUEL POLICY:', actualFuelPolicy);
       
       if (actualFuelPolicy && 
           actualFuelPolicy.araFuel !== undefined && 
           actualFuelPolicy.approachFuel !== undefined) {
       
       try {
-        console.log('🔍 DEBUG: Starting weather fuel analysis with:', {
-          weatherSegments: weatherSegments.length,
-          waypoints: waypoints.map(wp => wp.name || wp),
-          araFuelDefault: actualFuelPolicy.araFuel,
-          approachFuelDefault: actualFuelPolicy.approachFuel
-        });
         
         const weatherAnalyzer = new WeatherFuelAnalyzer();
         const weatherAnalysis = weatherAnalyzer.analyzeWeatherForFuel(
@@ -725,26 +626,12 @@ const FastPlannerCore = ({
           }
         );
         
-        console.log('🔍 DEBUG: Weather analysis result:', {
-          totalAraFuel: weatherAnalysis.totalAraFuel,
-          totalApproachFuel: weatherAnalysis.totalApproachFuel,
-          araRequirements: weatherAnalysis.araRequirements,
-          approachRequirements: weatherAnalysis.approachRequirements,
-          rigStops: weatherAnalysis.rigStops
-        });
-        
         const calculatedAraFuel = weatherAnalysis.totalAraFuel || 0;
         const calculatedApproachFuel = weatherAnalysis.totalApproachFuel || 0;
         
         // Only update state if values actually changed to prevent infinite loops
         setWeatherFuel(prevFuel => {
           if (prevFuel.araFuel !== calculatedAraFuel || prevFuel.approachFuel !== calculatedApproachFuel) {
-            console.log('🌤️ Weather fuel updated:', {
-              araFuel: calculatedAraFuel,
-              approachFuel: calculatedApproachFuel,
-              weatherSegments: weatherSegments.length,
-              waypoints: waypoints.length
-            });
             return {
               araFuel: calculatedAraFuel,
               approachFuel: calculatedApproachFuel
@@ -763,13 +650,11 @@ const FastPlannerCore = ({
         });
       }
       } else {
-        console.log('🔍 Fuel policy missing ARA/Approach values:', actualFuelPolicy);
       }
     } else {
       // Only reset if currently not zero to prevent infinite loops
       setWeatherFuel(prevFuel => {
         if (prevFuel.araFuel !== 0 || prevFuel.approachFuel !== 0) {
-          console.log('🌤️ Weather fuel reset - missing dependencies');
           return { araFuel: 0, approachFuel: 0 };
         }
         return prevFuel;
@@ -779,7 +664,6 @@ const FastPlannerCore = ({
 
   // AGGRESSIVE clearRoute that flushes all system state 
   const clearRoute = useCallback((preserveFlightData = false) => {
-    console.log('🧹 FastPlannerApp: AGGRESSIVE CLEARING - Flushing all system state');
     
     // Call the hook's clearRoute function
     hookClearRoute();
@@ -834,7 +718,6 @@ const FastPlannerCore = ({
     if (window.rigWeatherIntegration) {
       try {
         window.rigWeatherIntegration.removeWeatherGraphics();
-        console.log('🧹 CLEAR: Removed wind arrows and cleaned up popups');
       } catch (e) {
         console.warn('🧹 CLEAR: Error removing wind arrows:', e.message);
       }
@@ -847,7 +730,6 @@ const FastPlannerCore = ({
         const orphanedPopups = mapContainer.querySelectorAll('.mapboxgl-popup, .rig-weather-popup, .unified-weather-popup');
         orphanedPopups.forEach(popup => popup.remove());
         if (orphanedPopups.length > 0) {
-          console.log(`🧹 CLEAR: Removed ${orphanedPopups.length} additional orphaned popups`);
         }
       }
     } catch (e) {
@@ -867,14 +749,12 @@ const FastPlannerCore = ({
     setWeatherFuel({ araFuel: 0, approachFuel: 0 });
     
     // 🚁 Clear SAR mode elements (helicopter and range circles)
-    console.log('🚁 CLEAR: Clearing SAR mode elements');
     setSarData(null);
     
     // Reset SAR manager to clear helicopter and range circles
     if (sarManager) {
       try {
         sarManager.reset();
-        console.log('🚁 CLEAR: SAR manager reset successfully');
       } catch (e) {
         console.warn('🚁 CLEAR: Error resetting SAR manager:', e.message);
       }
@@ -885,19 +765,16 @@ const FastPlannerCore = ({
       try {
         window.currentSARRangeCircle.removeRangeCircle();
         window.currentSARRangeCircle = null;
-        console.log('🚁 CLEAR: SAR range circles removed');
       } catch (e) {
         console.warn('🚁 CLEAR: Error removing SAR range circles:', e.message);
       }
     }
     
-    console.log('✅ FastPlannerApp: AGGRESSIVE CLEAR COMPLETE - All system state flushed');
   }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel, resetUserFlightSettings]);
   
   // Make aggressive clear available globally for debugging
   useEffect(() => {
     window.aggressiveClearAll = () => {
-      console.log('🧹 GLOBAL: Performing aggressive system clear');
       clearRoute();
       
       // Additional cleanup that might not be in regular clear
@@ -909,29 +786,21 @@ const FastPlannerCore = ({
         window.gc();
       }
       
-      console.log('🧹 GLOBAL: Aggressive clear complete');
     };
     
     // DEBUG: Manual extraFuel reset function
     window.resetExtraFuel = () => {
-      console.log('🔧 MANUAL: Resetting extraFuel to 0');
-      console.log('🔧 MANUAL: Current extraFuel:', flightSettings.extraFuel);
-      console.log('🔧 MANUAL: Full flightSettings before reset:', flightSettings);
       
       updateFlightSetting('extraFuel', 0);
       
       // Also trigger a recalculation to update the UI immediately
       if (stopCards && stopCards.length > 0) {
-        console.log('🔧 MANUAL: Triggering stop card recalculation to reflect extraFuel = 0');
         // Force a recalculation by updating a dependency
         setForceUpdate(prev => prev + 1);
       }
-      
-      console.log('🔧 MANUAL: extraFuel reset completed');
-      
+
       // Check after a delay to see if it stuck
       setTimeout(() => {
-        console.log('🔧 MANUAL: After 500ms, extraFuel is:', flightSettings.extraFuel);
       }, 500);
     };
     
@@ -941,20 +810,16 @@ const FastPlannerCore = ({
     
     // DEBUG: Clear all browser-stored extraFuel values
     window.clearAllStoredExtraFuel = () => {
-      console.log('🧹 CLEARING ALL BROWSER STORED EXTRAFUEL VALUES');
       
       // 1. Clear localStorage fastPlannerSettings
       try {
         const savedSettings = localStorage.getItem('fastPlannerSettings');
         if (savedSettings) {
           const parsed = JSON.parse(savedSettings);
-          console.log('🧹 Current fastPlannerSettings:', parsed);
           
           if (parsed.flightSettings && parsed.flightSettings.extraFuel !== undefined) {
-            console.log('🧹 Found extraFuel in fastPlannerSettings:', parsed.flightSettings.extraFuel);
             delete parsed.flightSettings.extraFuel;
             localStorage.setItem('fastPlannerSettings', JSON.stringify(parsed));
-            console.log('✅ Removed extraFuel from fastPlannerSettings');
           }
         }
       } catch (e) {
@@ -969,12 +834,10 @@ const FastPlannerCore = ({
             try {
               const value = localStorage.getItem(key);
               if (value && value.includes('extraFuel')) {
-                console.log(`🧹 Found extraFuel in ${key}:`, value);
                 const parsed = JSON.parse(value);
                 if (parsed.extraFuel !== undefined) {
                   delete parsed.extraFuel;
                   localStorage.setItem(key, JSON.stringify(parsed));
-                  console.log(`✅ Removed extraFuel from ${key}`);
                 }
               }
             } catch (e) {
@@ -987,14 +850,11 @@ const FastPlannerCore = ({
       }
       
       // 3. Force reset current flightSettings extraFuel to 0
-      console.log('🧹 Current extraFuel in state:', flightSettings.extraFuel);
       updateFlightSetting('extraFuel', 0);
       
       // 4. Trigger recalculation
       setForceUpdate(prev => prev + 1);
-      
-      console.log('✅ CLEARED ALL STORED EXTRAFUEL VALUES - restart or reload to see effect');
-      
+
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator(
           'Cleared all browser-stored extraFuel values - please reload',
@@ -1014,9 +874,7 @@ const FastPlannerCore = ({
         }
         flightId = currentFlightId;
       }
-      
-      console.log('🔧 CLEAR: Clearing saved extraFuel for flight:', flightId);
-      
+
       try {
         // Load current stop cards and flight settings
         const currentStopCards = stopCards && stopCards.length > 0 ? stopCards : [];
@@ -1028,7 +886,6 @@ const FastPlannerCore = ({
         }
         
         // Save flight with extraFuel = 0 to overwrite the persistent value
-        console.log('🔧 CLEAR: Saving flight with extraFuel = 0 to clear persistent value');
         
         const { default: FuelSaveBackService } = await import('./services/FuelSaveBackService');
         await FuelSaveBackService.saveFuelData(
@@ -1040,9 +897,7 @@ const FastPlannerCore = ({
           routeStats,
           selectedAircraft
         );
-        
-        console.log('✅ CLEAR: Successfully cleared saved extraFuel for flight:', flightId);
-        
+
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator(
             'Cleared persistent extraFuel value from saved flight',
@@ -1078,28 +933,22 @@ const FastPlannerCore = ({
   const regionIdRef = useRef(null);
   useEffect(() => {
     if (!activeRegionFromContext?.id) {
-      console.log('No active region for fuel policy loading');
       return;
     }
 
     // Skip if this is the same region
     if (regionIdRef.current === activeRegionFromContext.id) {
-      console.log('Same region, skipping fuel policy reload');
       return;
     }
 
     if (!fuelPolicy || !fuelPolicy.loadPoliciesForRegion) {
-      console.log('Fuel policy hook not ready yet');
       return;
     }
 
     regionIdRef.current = activeRegionFromContext.id;
-    console.log(`🌍 FastPlannerApp: Loading fuel policies for region change to: ${activeRegionFromContext.name}`);
 
-    console.log(`Loading fuel policies for region: ${activeRegionFromContext.name} (OSDK: ${activeRegionFromContext.osdkRegion})`);
     fuelPolicy.loadPoliciesForRegion(activeRegionFromContext.osdkRegion)
       .then(policies => {
-        console.log(`📋 REGION: Loaded ${policies.length} fuel policies for ${activeRegionFromContext.name}`);
         
         if (policies.length === 0) {
           console.warn(`📋 REGION: No policies found for region ${activeRegionFromContext.name}`);
@@ -1109,10 +958,8 @@ const FastPlannerCore = ({
         // Only auto-select if no current policy or current policy is not from this region
         const currentPolicy = fuelPolicy.currentPolicy;
         if (!currentPolicy || !policies.find(p => p.uuid === currentPolicy.uuid)) {
-          console.log(`📋 REGION: Auto-selecting first policy for region: ${policies[0].name}`);
           fuelPolicy.selectPolicy(policies[0]);
         } else {
-          console.log(`📋 REGION: Keeping current policy: ${currentPolicy.name}`);
         }
       })
       .catch(error => {
@@ -1123,21 +970,13 @@ const FastPlannerCore = ({
   // ✅ CRITICAL FIX: Apply fuel policy values to flightSettings when policy changes
   useEffect(() => {
     if (!fuelPolicy.currentPolicy) {
-      console.log('⚙️ FUEL POLICY: No current policy, skipping flightSettings update');
       return;
     }
 
     const policySettings = fuelPolicy.getCurrentPolicySettings();
     if (!policySettings) {
-      console.log('⚙️ FUEL POLICY: No policy settings available');
       return;
     }
-
-    console.log('🔄 FUEL POLICY: Applying policy values to flightSettings');
-    console.log('📊 FUEL POLICY: Policy contingency:', policySettings.contingencyFlightLegs);
-    console.log('📊 FUEL POLICY: Policy taxi fuel:', policySettings.taxiFuel);
-    console.log('📊 FUEL POLICY: Policy reserve fuel:', policySettings.reserveFuel);
-    console.log('📊 FUEL POLICY: Policy extra fuel:', policySettings.extraFuel); // ✅ ADD: Log extraFuel
 
     // Apply policy values to flightSettings, preserving user inputs
     setFlightSettings(currentSettings => ({
@@ -1152,7 +991,6 @@ const FastPlannerCore = ({
       deckFuelFlow: currentSettings.deckFuelFlow || 400
     }));
 
-    console.log('✅ FUEL POLICY: Applied policy values to flightSettings');
   }, [fuelPolicy.currentPolicy?.uuid, fuelPolicy.getCurrentPolicySettings]); // Trigger when policy changes
 
   // Effect to clear route when activeRegionFromContext (from useRegion) changes
@@ -1177,9 +1015,7 @@ const FastPlannerCore = ({
     
     // Update reference for next comparison
     lastRegionId.current = activeRegionFromContext.id;
-    
-    console.log('FastPlannerCore: activeRegionFromContext changed to', activeRegionFromContext.name);
-    
+
     // Just clear React state since RegionContext now handles the map cleanup
     setWaypoints([]);
     setRouteStats(null);
@@ -1188,6 +1024,16 @@ const FastPlannerCore = ({
     // 🚨 REMOVED: No cache writes - regional change only clears route state
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
+  // 🔄 REFUEL SYNC: Handle refuel stops changes from main cards
+  const handleRefuelStopsChanged = useCallback((newRefuelStops) => {
+    setCurrentRefuelStops(newRefuelStops); // This was missing!
+    setStopCards(prev => prev.map(card => ({
+      ...card,
+      refuelMode: newRefuelStops.includes(card.index),
+      isRefuelStop: newRefuelStops.includes(card.index)
+    })));
+  }, []);
+
   const handleAddFavoriteLocation = (location) => {
     if (appManagers.favoriteLocationsManagerRef && appManagers.favoriteLocationsManagerRef.current) {
       // Get current region with enhanced detection
@@ -1195,7 +1041,6 @@ const FastPlannerCore = ({
       
       // Fallback: try to detect region from activeRegionFromContext
       if (!currentRegion || !currentRegion.id) {
-        console.log('FastPlannerApp: No region from RegionManager, trying activeRegionFromContext:', activeRegionFromContext);
         currentRegion = activeRegionFromContext;
       }
       
@@ -1204,13 +1049,6 @@ const FastPlannerCore = ({
       if (regionId && typeof regionId === 'string') {
         regionId = regionId.toLowerCase().replace(/\s+/g, '-');
       }
-      
-      console.log('FastPlannerApp: Adding favorite location to region:', regionId, location);
-      console.log('FastPlannerApp: Region detection details:', {
-        fromRegionManager: appManagers.regionManagerRef?.current?.getCurrentRegion(),
-        fromContext: activeRegionFromContext,
-        finalRegionId: regionId
-      });
       
       // Add to the correct region
       appManagers.favoriteLocationsManagerRef.current.addFavoriteLocation(regionId, location);
@@ -1231,7 +1069,6 @@ const FastPlannerCore = ({
 
   // Make addToFavorites available globally for popup heart icons
   window.addToFavorites = (name, coords) => {
-    console.log('Global addToFavorites called:', { name, coords });
     
     // Create location object in the format expected by handleAddFavoriteLocation
     const location = {
@@ -1245,23 +1082,19 @@ const FastPlannerCore = ({
   // Debug function to check localStorage
   window.checkFavoritesStorage = () => {
     const stored = localStorage.getItem('fastPlannerFavorites_v2');
-    console.log('Raw localStorage content:', stored);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        console.log('Parsed localStorage favorites:', parsed);
       } catch (e) {
         console.error('Error parsing favorites:', e);
       }
     } else {
-      console.log('No favorites found in localStorage');
     }
   };
 
   // Debug function to check current region
   window.checkCurrentRegion = () => {
     const currentRegion = appManagers.regionManagerRef?.current?.getCurrentRegion();
-    console.log('Current region from RegionManager:', currentRegion);
     return currentRegion;
   };
 
@@ -1269,7 +1102,6 @@ const FastPlannerCore = ({
   window.loadFavoritesForRegion = (regionId) => {
     if (appManagers.favoriteLocationsManagerRef?.current) {
       const favorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
-      console.log(`Favorites for region ${regionId}:`, favorites);
       setFavoriteLocations(favorites);
       return favorites;
     }
@@ -1295,15 +1127,8 @@ const FastPlannerCore = ({
         }
         
         const regionFavorites = appManagers.favoriteLocationsManagerRef.current.getFavoriteLocationsByRegion(regionId);
-        console.log(`FastPlannerApp: Loading ${regionFavorites.length} favorites for region ${regionId} on startup`, regionFavorites);
-        console.log('FastPlannerApp: Region loading details:', {
-          fromRegionManager: appManagers.regionManagerRef?.current?.getCurrentRegion(),
-          fromContext: activeRegionFromContext,
-          finalRegionId: regionId
-        });
         setFavoriteLocations(regionFavorites);
       } else {
-        console.log('FastPlannerApp: No region available for loading favorites');
       }
     }
   }, [appManagers.favoriteLocationsManagerRef, appManagers.regionManagerRef, activeRegionFromContext]);
@@ -1323,9 +1148,7 @@ const FastPlannerCore = ({
       if (regionId && typeof regionId === 'string') {
         regionId = regionId.toLowerCase().replace(/\s+/g, '-');
       }
-      
-      console.log('FastPlannerApp: Removing favorite location from region:', regionId, locationId);
-      
+
       // Remove from the correct region
       appManagers.favoriteLocationsManagerRef.current.removeFavoriteLocation(regionId, locationId);
       
@@ -1337,54 +1160,39 @@ const FastPlannerCore = ({
 
   // 🛩️ VFR OPERATIONS: Handle waive alternates checkbox changes
   const handleWaiveAlternatesChange = useCallback((isWaived) => {
-    console.log(`🛩️ FASTPLANNER APP: Waive alternates changed: ${isWaived}`);
     
     // Update local state
     setWaiveAlternates(isWaived);
-    console.log(`🛩️ FASTPLANNER APP: Managers available:`, {
-      waypointManager: !!waypointManagerRef.current,
-      mapManager: !!mapManagerRef.current,
-      map: !!mapManagerRef.current?.map,
-      weatherCirclesLayer: !!window.currentWeatherCirclesLayer
-    });
-    
+
     // Control alternate route line visibility on map via WaypointManager
     if (waypointManagerRef.current && mapManagerRef.current) {
       // 🛩️ Update WaypointManager's waive alternates state first
       waypointManagerRef.current.setWaiveAlternates(isWaived);
       
       if (isWaived) {
-        console.log('🗺️ FASTPLANNER APP: Clearing alternate route line from map (alternates waived)');
         // 1. Clear traditional alternate route from WaypointManager
         waypointManagerRef.current.clearAlternateRoute(mapManagerRef.current.map);
         
         // 2. Clear weather-based alternate lines from WeatherCirclesLayer
         if (window.currentWeatherCirclesLayer) {
-          console.log('🌦️ FASTPLANNER APP: Also clearing weather-based alternate lines');
           try {
             window.currentWeatherCirclesLayer.removeWeatherCircles();
-            console.log('🌦️ FASTPLANNER APP: ✅ Weather circles layer cleared successfully');
           } catch (error) {
             console.warn('🌦️ FASTPLANNER APP: Warning clearing weather circles:', error.message);
           }
         } else {
-          console.log('🌦️ FASTPLANNER APP: No weather circles layer to clear');
         }
       } else {
-        console.log('🗺️ FASTPLANNER APP: Restoring alternate route line on map (alternates not waived)');
         // Check if we have stored alternate route data to restore
         if (waypointManagerRef.current.storedAlternateRouteData) {
-          console.log('🗺️ FASTPLANNER APP: Found stored alternate data, rendering...');
           waypointManagerRef.current.renderAlternateRoute(
             waypointManagerRef.current.storedAlternateRouteData, 
             mapManagerRef.current.map
           );
         } else {
-          console.log('🗺️ FASTPLANNER APP: No stored alternate data to restore');
         }
         
         // Note: Weather circles layer restoration is handled automatically by the weather system
-        console.log('🌦️ FASTPLANNER APP: Weather circles will be restored automatically by the weather system');
       }
     } else {
       console.error('🚨 FASTPLANNER APP: Managers not available for alternate route line control:', {
@@ -1394,21 +1202,49 @@ const FastPlannerCore = ({
     }
   }, [waypointManagerRef, mapManagerRef]);
 
+  // Handle custom chart loading
+  const loadCustomChart = useCallback(() => {
+    // Placeholder function for custom chart loading
+    console.log('Custom chart loading requested');
+  }, []);
+
   // Handle alternate route input changes
   const handleAlternateRouteInputChange = (value) => {
     setAlternateRouteInput(value);
   };
 
+  // 📊 FUEL BREAKDOWN: Handle fuel data changes from clean fuel system
+  const handleFuelDataChanged = useCallback((effectiveSettings) => {
+    
+    // ✅ FIX: Single setFlightSettings call to avoid race conditions
+    setFlightSettings(prev => {
+      const newSettings = {
+        ...prev,
+        ...effectiveSettings,
+        // ✅ FIX: Create completely new object reference for React detection
+        locationFuelOverrides: effectiveSettings.locationFuelOverrides ? 
+          JSON.parse(JSON.stringify(effectiveSettings.locationFuelOverrides)) : {},
+        // Add unique timestamp to force React update
+        _fuelUpdateTimestamp: Date.now(),
+        lastFuelUpdate: Date.now() // Combined both timestamp updates
+      };
+
+      return newSettings;
+    });
+
+    // Trigger recalculation with multiple state updates to force re-render
+    setForceUpdate(prev => prev + 1);
+    setRouteStats(prev => prev ? {...prev, _fuelUpdate: Date.now()} : prev);
+  }, [setFlightSettings, setForceUpdate]);
+
   // Alternate mode toggle function (defined after handleAlternateRouteInputChange to avoid reference error)
   const toggleAlternateMode = useCallback((active) => {
-    console.log(`🎯 ALTERNATE MODE: ${active ? 'ENTERING' : 'EXITING'} alternate mode`);
     
     setAlternateModeActive(active);
     window.isAlternateModeActive = active;
     
     // Call PlatformManager directly for visibility toggle (same pattern as waypoint mode)
     if (platformManagerRef.current && typeof platformManagerRef.current.toggleAlternateMode === 'function') {
-      console.log('🎯 ALTERNATE MODE: Calling PlatformManager.toggleAlternateMode');
       platformManagerRef.current.toggleAlternateMode(active);
     } else {
       console.warn('🎯 ALTERNATE MODE: PlatformManager.toggleAlternateMode not available');
@@ -1423,13 +1259,10 @@ const FastPlannerCore = ({
       // 🎯 LOADED FLIGHT FIX: Clear alternateRouteInput when entering alternate mode
       // This makes loaded flights behave like new flights (click anywhere works)
       if (alternateRouteInput && alternateRouteInput.includes(' ')) {
-        console.log('🎯 ALTERNATE MODE: Clearing loaded flight alternateRouteInput for click-anywhere behavior');
-        console.log('🎯 ALTERNATE MODE: Was:', alternateRouteInput);
         setAlternateRouteInput('');
       }
       
       window.alternateModeClickHandler = (clickPoint, clickedFeature) => {
-        console.log('🎯 Alternate mode click:', clickedFeature?.name || 'map location');
         
         // First check if this click is on an existing route waypoint
         const clickedWaypoint = waypoints.find(wp => {
@@ -1443,11 +1276,9 @@ const FastPlannerCore = ({
         
         if (clickedWaypoint) {
           // Click on existing route waypoint - set as new split point
-          console.log('🎯 Setting new split point:', clickedWaypoint.name);
           setAlternateSplitPoint(clickedWaypoint.name);
           
           // Clear the alternate input and set only the split point (no submission)
-          console.log('🎯 Clearing alternate input and setting split point only:', clickedWaypoint.name);
           handleAlternateRouteInputChange(clickedWaypoint.name);
           
           // Show user feedback that we're waiting for alternate destination
@@ -1477,7 +1308,6 @@ const FastPlannerCore = ({
             
             if (isLocationInRoute) {
               // This location is in the route - set as split point and wait for alternate
-              console.log('🎯 Split point set:', locationName);
               window.currentSplitPoint = locationName;
               handleAlternateRouteInputChange(locationName);
               
@@ -1495,13 +1325,11 @@ const FastPlannerCore = ({
             let alternateString;
             if (window.currentSplitPoint) {
               // Use custom split point to create pair
-              console.log('🎯 Creating alternate pair:', window.currentSplitPoint, '→', locationName);
               alternateString = `${window.currentSplitPoint} ${locationName}`;
               window.currentSplitPoint = null; // Reset for next time
             } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
               // We have a single location in input (split point from route click), add destination to complete pair
               alternateString = `${alternateRouteInput.trim()} ${locationName}`;
-              console.log('🎯 CREATED PAIR STRING:', alternateString);
               // Clear the split point state since we're using it
               setAlternateSplitPoint(null);
             } else {
@@ -1509,14 +1337,11 @@ const FastPlannerCore = ({
               const splitPoint = loadedFlightData?.stops?.[1];
               if (splitPoint) {
                 alternateString = `${splitPoint} ${locationName}`;
-                console.log('🎯 MODE 1: Using stops[1] as split point:', alternateString);
               } else {
-                console.log('🎯 MODE 1: No stops[1] found, using single location');
                 alternateString = locationName;
               }
             }
             
-            console.log('🎯 Final alternate input string:', alternateString);
             handleAlternateRouteInputChange(alternateString);
             // Automatically trigger the alternate route submission to create the orange line
             setTimeout(() => {
@@ -1524,7 +1349,6 @@ const FastPlannerCore = ({
             }, 100); // Small delay to ensure input is set first
             return true; // Click handled
           } else {
-            console.log('🎯 Platform clicked but not fuel-capable or airport, ignoring');
             return false; // Not a valid alternate
           }
         }
@@ -1543,7 +1367,6 @@ const FastPlannerCore = ({
             
             if (isLocationInRoute) {
               // This location is in the route - set as split point and wait for alternate
-              console.log('🎯 Location is in route, setting as split point:', locationName);
               // Clear the state variable and only use the input field for route clicks
               setAlternateSplitPoint(null);
               handleAlternateRouteInputChange(locationName);
@@ -1562,7 +1385,6 @@ const FastPlannerCore = ({
             let alternateString;
             if (window.currentSplitPoint) {
               // Use custom split point to create pair
-              console.log('🎯 Creating alternate pair:', window.currentSplitPoint, '→', locationName);
               alternateString = `${window.currentSplitPoint} ${locationName}`;
               window.currentSplitPoint = null; // Reset for next time
             } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
@@ -1573,9 +1395,7 @@ const FastPlannerCore = ({
               const splitPoint = loadedFlightData?.stops?.[1];
               if (splitPoint) {
                 alternateString = `${splitPoint} ${locationName}`;
-                console.log('🎯 MODE 1: Using stops[1] as split point:', alternateString);
               } else {
-                console.log('🎯 MODE 1: No stops[1] found, using single location');
                 alternateString = locationName;
               }
             }
@@ -1590,7 +1410,6 @@ const FastPlannerCore = ({
         }
         
         // No suitable alternate found
-        console.log('🎯 No suitable alternate at click location');
         return false; // Click not handled
       };
     } else {
@@ -1602,7 +1421,6 @@ const FastPlannerCore = ({
 
   // Clear alternate route function
   const clearAlternate = useCallback(() => {
-    console.log('🧹 CLEAR ALTERNATE: Clearing all alternate route data');
     
     // Clear alternate route data and input
     setAlternateRouteData(null);
@@ -1619,7 +1437,6 @@ const FastPlannerCore = ({
     
     // Clear alternate route from map using WaypointManager
     if (waypointManagerRef.current && typeof waypointManagerRef.current.clearAlternateRoute === 'function') {
-      console.log('🧹 CLEAR ALTERNATE: Calling WaypointManager.clearAlternateRoute');
       const map = mapManagerRef.current?.getMap();
       if (map) {
         waypointManagerRef.current.clearAlternateRoute(map);
@@ -1629,20 +1446,15 @@ const FastPlannerCore = ({
     
     // Clear alternate from PlatformManager
     if (platformManagerRef.current && typeof platformManagerRef.current.toggleAlternateMode === 'function') {
-      console.log('🧹 CLEAR ALTERNATE: Turning off PlatformManager alternate mode');
       platformManagerRef.current.toggleAlternateMode(false);
     }
     
-    console.log('✅ CLEAR ALTERNATE: All alternate data cleared');
   }, [waypointManagerRef, mapManagerRef, platformManagerRef]);
 
   // Helper function to determine split point for new flights
   const determineNewFlightSplitPoint = useCallback((currentWaypoints) => {
-    console.log('🎯 Determining split point for new flight');
-    console.log('🎯 Current waypoints:', currentWaypoints?.length || 0);
     
     if (!currentWaypoints || currentWaypoints.length === 0) {
-      console.log('🎯 No waypoints available, using default split point: ENXW');
       return "ENXW"; // Default fallback
     }
     
@@ -1651,12 +1463,9 @@ const FastPlannerCore = ({
     for (let i = 0; i < currentWaypoints.length; i++) {
       const waypoint = currentWaypoints[i];
       const waypointName = waypoint.name || waypoint.id || '';
-      
-      console.log(`🎯 Checking waypoint ${i}: ${waypointName}`);
-      
+
       // Skip departure point
       if (waypointName.includes('(Dep)')) {
-        console.log('🎯 Skipping departure point');
         continue;
       }
       
@@ -1664,14 +1473,12 @@ const FastPlannerCore = ({
       if (waypointName.includes('(Stop') || waypointName.includes('(Des)')) {
         // Extract the base location name (remove the label)
         const splitPoint = waypointName.split(' (')[0].trim();
-        console.log(`🎯 Found first landing point as split point: ${splitPoint}`);
         return splitPoint;
       }
       
       // If waypoint doesn't have labels, assume stops are any waypoint after departure
       if (i > 0) {
         const splitPoint = waypointName.trim();
-        console.log(`🎯 Using waypoint ${i} as split point (no labels): ${splitPoint}`);
         return splitPoint;
       }
     }
@@ -1680,28 +1487,20 @@ const FastPlannerCore = ({
     if (currentWaypoints.length > 0) {
       const lastWaypoint = currentWaypoints[currentWaypoints.length - 1];
       const splitPoint = (lastWaypoint.name || lastWaypoint.id || '').split(' (')[0].trim();
-      console.log(`🎯 Using last waypoint as split point: ${splitPoint}`);
       return splitPoint;
     }
     
-    console.log('🎯 No suitable waypoints found, using default: ENXW');
     return "ENXW"; // Ultimate fallback
   }, []);
 
   // Handle alternate route submission
   const handleAlternateRouteSubmit = async (input) => {
-    console.log('🛣️ handleAlternateRouteSubmit called with:', input);
     
     try {
       // Parse the input to determine if it's single location or pair
       const trimmedInput = input.trim();
       const locations = trimmedInput.split(/\s+/).filter(loc => loc.length > 0);
-      
-      console.log('🛣️ handleAlternateRouteSubmit called with input:', input);
-      console.log('🛣️ Parsed locations:', locations);
-      console.log('🛣️ Current alternateRouteInput state:', alternateRouteInput);
-      console.log('🛣️ Current alternateSplitPoint state:', alternateSplitPoint);
-      
+
       // Helper function to look up coordinates for a location
       const getLocationCoordinates = async (locationName) => {
         try {
@@ -1714,7 +1513,6 @@ const FastPlannerCore = ({
             );
             
             if (platform && platform.coordinates) {
-              console.log(`🛣️ Found coordinates for ${locationName}:`, platform.coordinates);
               return platform.coordinates; // [lng, lat]
             }
           }
@@ -1729,7 +1527,6 @@ const FastPlannerCore = ({
       
       if (locations.length === 1) {
         // Single location - determine split point based on context
-        console.log('🛣️ Single location alternate route');
         const destination = locations[0];
         
         // ENHANCED SPLIT POINT LOGIC
@@ -1739,15 +1536,12 @@ const FastPlannerCore = ({
         if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
           // We have a single location in input - this is a manual split point from route click
           currentSplitPoint = alternateRouteInput.trim();
-          console.log('🛣️ Using manual split point from input:', currentSplitPoint);
         } else if (alternateRouteData?.splitPoint) {
           // LOADED FLIGHT: Use existing split point from flight data
           currentSplitPoint = alternateRouteData.splitPoint;
-          console.log('🛣️ Using existing split point from loaded flight:', currentSplitPoint);
         } else {
           // NEW FLIGHT: Determine split point from current waypoints
           currentSplitPoint = determineNewFlightSplitPoint(waypoints);
-          console.log('🛣️ Determined split point for new flight:', currentSplitPoint);
         }
         
         // Look up coordinates for both locations
@@ -1766,12 +1560,10 @@ const FastPlannerCore = ({
             legIds: []
           };
           
-          console.log('🛣️ Created single location alternate route with real coordinates:', newAlternateRouteData);
           setAlternateRouteData(newAlternateRouteData);
           
           // Trigger map update immediately
           if (appManagers.waypointManagerRef?.current) {
-            console.log('🛣️ Triggering immediate map update for new alternate route');
             appManagers.waypointManagerRef.current.updateRoute(routeStats, newAlternateRouteData);
           }
         } else {
@@ -1781,9 +1573,7 @@ const FastPlannerCore = ({
         
       } else if (locations.length === 2) {
         // Pair of locations - custom from/to route
-        console.log('🛣️ Custom from/to alternate route');
         const [from, to] = locations;
-        console.log(`🛣️ Creating alternate route from ${from} to ${to}`);
         
         // Look up coordinates for both locations
         const fromCoords = await getLocationCoordinates(from);
@@ -1801,12 +1591,10 @@ const FastPlannerCore = ({
             legIds: []
           };
           
-          console.log('🛣️ Created custom from/to alternate route with real coordinates:', newAlternateRouteData);
           setAlternateRouteData(newAlternateRouteData);
           
           // Trigger map update immediately
           if (appManagers.waypointManagerRef?.current) {
-            console.log('🛣️ Triggering immediate map update for new alternate route');
             appManagers.waypointManagerRef.current.updateRoute(routeStats, newAlternateRouteData);
           }
         } else {
@@ -1830,76 +1618,45 @@ const FastPlannerCore = ({
     }
   };
 
-
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
-    console.log('🚨 FLIGHT LOAD STARTED - FlightSequenceController will handle the sequence');
     
     // 🎬 CRITICAL: Store flight data globally for FlightSequenceController
     window.currentFlightData = flightData;
     window.appManagers = appManagers;
     window.currentRouteStats = routeStats;
-    console.log('🎬 STORED: Flight data stored globally for FlightSequenceController access');
-    
-    // 🔍 DEBUG: Log the complete flightData structure to find flight ID
-    console.log('🔍 COMPLETE FLIGHT DATA STRUCTURE:', JSON.stringify(flightData, null, 2));
-    console.log('🔍 FLIGHT DATA KEYS:', Object.keys(flightData));
-    console.log('🔍 LOOKING FOR FLIGHT ID:', {
-      flightId: flightData.flightId,
-      id: flightData.id,
-      uuid: flightData.uuid,
-      flightUuid: flightData.flightUuid,
-      flightNumber: flightData.flightNumber
-    });
     
     try {
-      console.log('🚁 handleFlightLoad CALLED with flight:', flightData.flightNumber || flightData.name);
-      console.log('🚁 Aircraft ID in flight data:', flightData.aircraftId);
       
       // 🎯 GLASS MENU: Activate glass menu when flight loads
       setIsFlightLoaded(true);
       setIsEditLocked(true); // Always start locked to prevent accidental edits
       setLoadedFlightData(flightData); // Store flight data for AppHeader display
-      console.log('🚁 FLIGHT STORAGE DEBUG: Setting loadedFlightData =', flightData);
-      console.log('🚁 FLIGHT STORAGE DEBUG: flightData keys =', Object.keys(flightData));
-      console.log('🏗️ Glass menu activated for loaded flight');
       
       // 🎯 NEW BEHAVIOR: Close BOTH panels when flight loads and apply lock
-      console.log('🔒 FLIGHT LOAD: Closing both panels and applying edit lock');
-      console.log('🔒 FLIGHT LOAD: Current panel states - left:', leftPanelVisible, 'right:', rightPanelVisible);
       
       // Add a small delay to ensure flight load card transitions complete first
       setTimeout(() => {
-        console.log('🔒 FLIGHT LOAD: Panel closing timeout triggered');
         
         // Close BOTH panels after flight load to show clean map
         if (leftPanelVisible) {
-          console.log('📦 Closing left panel after flight load');
           toggleLeftPanel();
         } else {
-          console.log('📦 Left panel already closed');
         }
         
         if (rightPanelVisible) {
-          console.log('📦 Closing right panel after flight load');  
           toggleRightPanel();
         } else {
-          console.log('📦 Right panel already closed');
         }
         
-        console.log('🔒 Both panels closed - clean map view with loaded flight');
       }, 300); // Small delay to ensure smooth transitions
-      
-      console.log('🔒 Edit lock applied - click unlock to enable editing, then manually open panels as needed');
-      
+
       // 🚨 CRITICAL: Set current flight ID and load weather segments
       if (flightData.flightId) {
-        console.log('🚨 Setting currentFlightId for weather loading:', flightData.flightId);
         setCurrentFlightId(flightData.flightId);
         
         // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2
         try {
-          console.log('💾 FUEL LOAD-BACK: Loading saved fuel data for flight ID:', flightData.flightId);
           
           // Import FuelSaveBackService
           const FuelSaveBackService = (await import('./services/FuelSaveBackService')).default;
@@ -1908,20 +1665,11 @@ const FastPlannerCore = ({
           const savedFuelData = await FuelSaveBackService.loadExistingFuelData(flightData.flightId);
           
           if (savedFuelData) {
-            console.log('💾 FUEL LOAD-BACK: Found saved fuel data:', savedFuelData);
-            console.log('💾 FUEL LOAD-BACK: All saved fuel properties:', Object.keys(savedFuelData));
             
             // ONLY restore USER-ENTERED values - let Fast Planner recalculate everything else
             
             // 1. Extra fuel (user input) - this is the most important
             // 🚨 FIX: Only restore extraFuel in specific circumstances
-            
-            console.log('💾 FUEL LOAD-BACK: extraFuel decision factors:', {
-              savedExtraFuel: savedFuelData.plannedExtraFuel,
-              currentExtraFuel: flightSettings.extraFuel,
-              flightId: flightData.flightId,
-              currentFlightId: currentFlightId
-            });
             
             // DECISION: Only restore extraFuel if:
             // 1. There is a saved value that's meaningful (> 0)
@@ -1939,9 +1687,6 @@ const FastPlannerCore = ({
             const shouldRestoreExtraFuel = false; // hasMeaningfulSavedExtra && isExplicitFlightLoad && currentExtraIsDefault;
             
             if (shouldRestoreExtraFuel) {
-              console.log('💾 FUEL LOAD-BACK: Restoring extraFuel from plannedExtraFuel:', savedFuelData.plannedExtraFuel);
-              console.log('💾 FUEL LOAD-BACK: Current extraFuel before restore:', flightSettings.extraFuel);
-              console.log('💾 FUEL LOAD-BACK: ⚠️  WARNING: This will override any current extraFuel value');
               
               // Show warning to user that extraFuel is being loaded from saved flight
               if (window.LoadingIndicator) {
@@ -1953,42 +1698,25 @@ const FastPlannerCore = ({
               }
               
               updateFlightSetting('extraFuel', savedFuelData.plannedExtraFuel);
-              console.log('💾 FUEL LOAD-BACK: extraFuel restore completed');
             } else {
-              console.log('💾 FUEL LOAD-BACK: No meaningful plannedExtraFuel found in saved data, keeping current value:', flightSettings.extraFuel);
               
               // If saved data has extraFuel = 0, explicitly set it to 0 to clear any residual values
               if (savedFuelData.plannedExtraFuel === 0) {
-                console.log('💾 FUEL LOAD-BACK: Saved flight had extraFuel = 0, clearing current extraFuel');
                 updateFlightSetting('extraFuel', 0);
               }
             }
             
             // Show comprehensive fuel data that was saved (for verification)
-            console.log('💾 FUEL LOAD-BACK: Complete saved fuel breakdown:', {
-              plannedTripFuel: savedFuelData.plannedTripFuel,
-              plannedTaxiFuel: savedFuelData.plannedTaxiFuel,
-              plannedReserveFuel: savedFuelData.plannedReserveFuel,
-              plannedContingencyFuel: savedFuelData.plannedContingencyFuel,
-              plannedDeckFuel: savedFuelData.plannedDeckFuel,
-              plannedExtraFuel: savedFuelData.plannedExtraFuel,
-              plannedAraFuel: savedFuelData.plannedAraFuel,
-              plannedApproachFuel: savedFuelData.plannedApproachFuel,
-              minTotalFuel: savedFuelData.minTotalFuel
-            });
             
             // 3. Extra fuel reason (user input)
             if (savedFuelData.extraFuelReason) {
-              console.log('💾 FUEL LOAD-BACK: Restoring extraFuelReason:', savedFuelData.extraFuelReason);
               updateFlightSetting('extraFuelReason', savedFuelData.extraFuelReason);
             }
             
             // NOTE: We do NOT restore calculated values like tripFuel, taxiFuel, reserveFuel, etc.
             // These will be recalculated by Fast Planner based on current aircraft, route, and fuel policy
             
-            console.log('✅ FUEL LOAD-BACK: User fuel inputs restored - Fast Planner will recalculate everything else');
           } else {
-            console.log('💾 FUEL LOAD-BACK: No saved fuel data found for this flight');
           }
           
         } catch (fuelLoadError) {
@@ -1998,36 +1726,27 @@ const FastPlannerCore = ({
         
         // Manually trigger weather loading
         if (loadWeatherSegments) {
-          console.log('🌤️ MANUAL: Loading weather segments for flight:', flightData.flightId);
           loadWeatherSegments(flightData.flightId)
             .then(result => {
-              console.log('🌤️ MANUAL: Weather segments loaded successfully');
               
               // Store weather segments and auto-show circles if data is available
               if (result && result.segments && result.segments.length > 0) {
-                console.log('🌤️ MANUAL: Weather segments loaded, storing and auto-showing circles');
-                console.log('🌤️ MANUAL: Loaded segments:', result.segments.length);
                 
                 // Store the segments for toggle to use
                 window.loadedWeatherSegments = result.segments;
-                console.log('🌤️ MANUAL: Weather segments stored in window.loadedWeatherSegments');
                 
                 // 🚁 HYBRID WEATHER SYSTEM: Auto-show weather circles for airports + rig graphics for rigs
                 setTimeout(() => {
                   try {
-                    console.log('🚁 HYBRID: Creating hybrid weather display - circles for airports, graphics for rigs');
                     
                     // Split segments into airports vs rigs
                     const airportSegments = result.segments.filter(segment => !segment.isRig);
                     const rigSegments = result.segments.filter(segment => segment.isRig === true);
-                    
-                    console.log(`🚁 HYBRID: Found ${airportSegments.length} airports and ${rigSegments.length} rigs`);
-                    
+
                     // 1. Create weather circles for AIRPORTS ONLY
                     if (airportSegments.length > 0) {
                       import('./modules/layers/WeatherCirclesLayer').then(({ default: WeatherCirclesLayer }) => {
                         if (mapManagerRef?.current?.map) {
-                          console.log('🌤️ HYBRID: Creating weather circles for airports only');
                           
                           // Clean up any existing layer first
                           if (window.currentWeatherCirclesLayer) {
@@ -2041,7 +1760,6 @@ const FastPlannerCore = ({
                           const weatherCirclesLayer = new WeatherCirclesLayer(mapManagerRef.current.map);
                           weatherCirclesLayer.addWeatherCircles(airportSegments); // Only airports
                           window.currentWeatherCirclesLayer = weatherCirclesLayer;
-                          console.log(`🌤️ HYBRID: ✅ Weather circles displayed for ${airportSegments.length} airports`);
                         }
                       }).catch(importError => {
                         console.error('🌤️ HYBRID: Error importing WeatherCirclesLayer:', importError);
@@ -2050,7 +1768,6 @@ const FastPlannerCore = ({
                     
                     // 2. Create rig weather graphics for RIGS ONLY with REAL API data
                     if (rigSegments.length > 0) {
-                      console.log('🚁 HYBRID: Auto-enabling rig weather graphics with real API data');
                       
                       // 🚨 RACE CONDITION FIX: Wait for rig weather integration to be available
                       const waitForRigWeatherIntegration = () => {
@@ -2059,7 +1776,6 @@ const FastPlannerCore = ({
                             if (window.rigWeatherIntegration) {
                               resolve();
                             } else {
-                              console.log('🚁 RACE FIX: Waiting for rig weather integration...');
                               setTimeout(checkIntegration, 100);
                             }
                           };
@@ -2071,12 +1787,10 @@ const FastPlannerCore = ({
                       waitForRigWeatherIntegration().then(() => {
                         if (window.rigWeatherIntegration) {
                           window.rigWeatherIntegration.toggleVisibility(true);
-                          console.log('🚁 HYBRID: ✅ Rig weather graphics enabled (after race condition fix)');
                         }
                       });
                       
                       // DISABLED: Competing rig-only system - WeatherCirclesLayer now handles ALL arrows  
-                      console.log(`🌬️ UNIFIED: Weather data loaded for ${rigSegments.length} rigs - WeatherCirclesLayer handles all arrows automatically`);
                     }
                     
                   } catch (autoShowError) {
@@ -2092,32 +1806,11 @@ const FastPlannerCore = ({
       }
       
       // CRITICAL FIX: Apply wind data from loaded flight - use Palantir automation calculated wind
-      console.log('🌬️ Checking for wind data in loaded flight:', {
-        'flightData.windSpeed': flightData.windSpeed,
-        'flightData.windDirection': flightData.windDirection,
-        'flightData.windData': flightData.windData,
-        'current weather': weather
-      });
       
       if (flightData.windSpeed !== undefined || flightData.windDirection !== undefined || flightData.windData) {
         // Priority: Use windData structure first, then direct fields (from automation)
         const windSpeed = flightData.windData?.windSpeed || flightData.windSpeed || 0;
         const windDirection = flightData.windData?.windDirection || flightData.windDirection || 0;
-        
-        console.log('🌬️ EXTRACTED WIND VALUES:', {
-          'flightData.windData?.windSpeed': flightData.windData?.windSpeed,
-          'flightData.windData?.windDirection': flightData.windData?.windDirection,
-          'flightData.windSpeed': flightData.windSpeed,
-          'flightData.windDirection': flightData.windDirection,
-          'final windSpeed': windSpeed,
-          'final windDirection': windDirection
-        });
-        
-        console.log('🌬️ Applying Palantir automation wind data:', {
-          windSpeed,
-          windDirection,
-          source: 'palantir_automation'
-        });
         
         const newWeather = {
           windSpeed,
@@ -2125,23 +1818,17 @@ const FastPlannerCore = ({
           source: 'palantir_automation'
         };
         
-        console.log('🌬️ Setting new weather state:', newWeather);
         setWeather(newWeather);
         
         // Force a re-render to ensure UI updates
         setTimeout(() => {
-          console.log('🌬️ Weather state after setWeather:', {
-            current: weather,
-            expected: newWeather
-          });
+          // Force re-render
         }, 100);
         
       } else {
-        console.log('⚠️ No wind data found in loaded flight:', flightData);
       }
       
       // Clear existing route data but preserve loaded flight data
-      console.log('🧹 FLIGHT LOAD: Clearing existing route data before loading new flight');
       hookClearRoute(); // Clear waypoints, stop cards, route stats
       setAlternateRouteData(null); // Clear alternate route
       setAlternateRouteInput('');
@@ -2150,7 +1837,6 @@ const FastPlannerCore = ({
       // Clear weather circles immediately (don't wait for new flight to load)
       if (window.currentWeatherCirclesLayer) {
         try {
-          console.log('🌤️ FLIGHT LOAD: Removing old weather circles immediately');
           window.currentWeatherCirclesLayer.removeWeatherCircles();
           window.currentWeatherCirclesLayer = null;
         } catch (e) {
@@ -2177,7 +1863,6 @@ const FastPlannerCore = ({
       
       // 🎬 BEFORE FLIGHT LOADS: Switch to satellite if in edit mode
       if (currentMapMode !== '3d' && mapManagerRef?.current?.map) {
-        console.log('🌟 BEFORE LOADING: Switching to satellite mode first');
         const map = mapManagerRef.current.map;
         map.setStyle('mapbox://styles/mapbox/satellite-v9');
         setCurrentMapMode('3d');
@@ -2185,13 +1870,10 @@ const FastPlannerCore = ({
         // Wait for style to load before continuing
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      
-      console.log('🎬 Flight loading - proceeding in mode:', currentMapMode);
-      
+
       // Remove this - check mode later at actual animation time
       
       // SIMPLE: Let the normal flight loading work like the wizard does
-      console.log('🚁 SIMPLE: Proceeding with normal flight loading (like wizard)');
       
       // 🚨 CRITICAL FIX: Always check for displayWaypoints in raw flight data first
       // The issue was that extracted waypoints were incomplete, causing fallback to route string
@@ -2199,24 +1881,14 @@ const FastPlannerCore = ({
       const hasExtractedWaypoints = (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) ||
                                   (flightData.waypoints && flightData.waypoints.length > 0);
       
-      console.log('🚨 FLIGHT LOAD DEBUG:', {
-        hasRawDisplayWaypoints: !!hasRawDisplayWaypoints,
-        hasExtractedWaypoints,
-        stopsLength: flightData.stops?.length || 0,
-        rawDisplayWaypoints: hasRawDisplayWaypoints,
-        extractedWaypoints: flightData.waypoints?.length || 0
-      });
-      
       // 🚨 NEVER use hookAddWaypoint for flight loading - it puts data in route input!
       // Only process stops as a route string if we have NO waypoint data at all
       if (flightData.stops && flightData.stops.length > 0 && !hasRawDisplayWaypoints && !hasExtractedWaypoints) {
-        console.log('🚨 FALLBACK: Loading stops as simple route (NO waypoint data found anywhere)');
         
         // 🚨 CRITICAL: Use direct waypoint manager instead of hookAddWaypoint
         // hookAddWaypoint puts data in route input field, not waypoint list!
         try {
           if (appManagers.waypointManagerRef?.current) {
-            console.log('🚨 FALLBACK: Using WaypointManager to create waypoints from stops');
             
             // Clear existing waypoints first
             if (typeof appManagers.waypointManagerRef.current.clearWaypoints === 'function') {
@@ -2226,7 +1898,6 @@ const FastPlannerCore = ({
             // Add each stop as a landing stop waypoint
             for (let i = 0; i < flightData.stops.length; i++) {
               const stopName = flightData.stops[i];
-              console.log(`🚨 FALLBACK: Adding stop ${i + 1}/${flightData.stops.length}: ${stopName}`);
               
               try {
                 if (appManagers.waypointManagerRef.current.addWaypointByName) {
@@ -2234,7 +1905,6 @@ const FastPlannerCore = ({
                     isWaypoint: false, // This is a landing stop
                     type: 'LANDING_STOP'
                   });
-                  console.log(`🚨 FALLBACK: Successfully added stop: ${stopName}`);
                 }
                 
                 // Small delay between additions
@@ -2244,7 +1914,6 @@ const FastPlannerCore = ({
               }
             }
             
-            console.log('🚨 FALLBACK: All stops processed via WaypointManager');
           } else {
             console.error('🚨 FALLBACK: WaypointManager not available for stop processing');
           }
@@ -2253,7 +1922,6 @@ const FastPlannerCore = ({
         }
         
         // Wait for waypoint processing to complete with improved timing
-        console.log('Waiting for waypoint processing to complete...');
         
         // Use a more robust waiting mechanism
         let attempts = 0;
@@ -2270,15 +1938,11 @@ const FastPlannerCore = ({
                                      window.waypointManager?.getWaypoints?.() || 
                                      appManagers.waypointManagerRef?.current?.getWaypoints?.() ||
                                      [];
-              
-              console.log(`Attempt ${attempts}: Found ${currentWaypoints.length} waypoints`);
-              
+
               // Check if we have the expected number of waypoints (at least the stops)
               if (currentWaypoints.length >= flightData.stops.length || attempts >= maxAttempts) {
-                console.log(`Waypoint processing complete: ${currentWaypoints.length} waypoints created`);
                 resolve(currentWaypoints);
               } else {
-                console.log(`Waiting for more waypoints... (expected at least ${flightData.stops.length})`);
                 setTimeout(checkWaypoints, checkInterval);
               }
             };
@@ -2290,14 +1954,9 @@ const FastPlannerCore = ({
         // Wait for waypoints to be processed
         const processedWaypoints = await waitForWaypoints();
         
-        console.log('Triggering stop card generation after flight load...');
         const currentRouteStats = routeStats || window.currentRouteStats;
-          
-        console.log(`Found ${processedWaypoints.length} waypoints for stop card generation`);
-        console.log('Waypoints:', processedWaypoints.map(wp => wp.name || 'unnamed').join(', '));
-        
+
         if (processedWaypoints && processedWaypoints.length >= 2) {
-          console.log(`Generating stop cards for ${processedWaypoints.length} waypoints`);
           
           // Generate stop cards using the same logic as normal route building
           const newStopCards = generateStopCardsData(
@@ -2314,15 +1973,12 @@ const FastPlannerCore = ({
           );
           
           // 🌤️ DEFERRED: Weather segments and circles moved to AFTER flight sequence completion
-          console.log('🌤️ DEFERRED: Weather processing deferred until after flight sequence complete');
           
           if (newStopCards && newStopCards.length > 0) {
-            console.log(`Generated ${newStopCards.length} stop cards for loaded flight`);
             setStopCards(newStopCards);
             
             // Make stop cards globally available for debugging
             window.debugStopCards = newStopCards;
-            console.log('Stop cards available at window.debugStopCards');
             
             // 🚫 REMOVED: Second auto-zoom was happening too late and zooming too close without alternates
             // The first auto-zoom (after direct coordinate loading) is perfect - keep only that one
@@ -2360,7 +2016,6 @@ const FastPlannerCore = ({
       // Load weather segments for the flight if flightId is available
       if (flightData.flightId || flightData.id) {
         const flightId = flightData.flightId || flightData.id;
-        console.log('🌤️ Loading weather segments for flight:', flightId);
         
         // Set current flight ID for WeatherCard
         setCurrentFlightId(flightId);
@@ -2368,7 +2023,6 @@ const FastPlannerCore = ({
         try {
           const weatherResult = await loadWeatherSegments(flightId);
           if (weatherResult && weatherResult.segments && weatherResult.segments.length > 0) {
-            console.log(`🌤️ Loaded ${weatherResult.segments.length} weather segments`);
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator(
                 `Weather segments loaded: ${weatherResult.segments.length} locations`, 
@@ -2377,20 +2031,16 @@ const FastPlannerCore = ({
               );
             }
           } else {
-            console.log('🌤️ No weather segments found for this flight');
           }
         } catch (weatherError) {
           console.error('🌤️ Error loading weather segments:', weatherError);
           // Don't block flight loading if weather fails
         }
       } else {
-        console.log('🌤️ No flight ID available for weather segments loading');
       }
       
       // CRITICAL FIX: Force wind input UI update at the end of flight loading
       if (flightData.windData) {
-        console.log('🌬️ FINAL: Updating wind input UI with loaded flight data');
-        console.log('🌬️ Wind data to apply:', flightData.windData);
         
         // Force update wind input fields by setting values directly
         setTimeout(() => {
@@ -2405,13 +2055,11 @@ const FastPlannerCore = ({
           if (windDirectionInput) {
             windDirectionInput.value = flightData.windData.windDirection;
             windDirectionInput.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('🌬️ Updated wind direction input to:', flightData.windData.windDirection);
           }
           
           if (windSpeedInput) {
             windSpeedInput.value = flightData.windData.windSpeed;
             windSpeedInput.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('🌬️ Updated wind speed input to:', flightData.windData.windSpeed);
           }
           
           // CRITICAL FIX: Force stop cards regeneration with new wind data
@@ -2421,7 +2069,6 @@ const FastPlannerCore = ({
             selectedAircraft.fuelBurn;
             
           if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
-            console.log('🔄 Regenerating stop cards with loaded flight wind data');
             const currentRouteStats = routeStats || window.currentRouteStats;
             
             // Use the updated weather state for stop card regeneration
@@ -2445,15 +2092,10 @@ const FastPlannerCore = ({
             );
             
             if (newStopCards && newStopCards.length > 0) {
-              console.log('🔄 Updated stop cards with new wind data:', newStopCards.length, 'cards');
               setStopCards(newStopCards);
             }
           } else {
-            console.log('🔄 Skipping stop cards regeneration - waiting for complete aircraft data:', {
-              hasWaypoints: waypoints && waypoints.length >= 2,
-              hasAircraft: !!selectedAircraft,
-              hasAircraftData: hasRequiredAircraftData
-            });
+            // Waiting for aircraft or waypoint data
           }
         }, 100);
       }
@@ -2462,64 +2104,44 @@ const FastPlannerCore = ({
       setTimeout(() => {
         // The RightPanel should automatically show stop cards if they exist
         // This timeout ensures the panel switches back to main view after loading
-        console.log('Flight loading complete - returning to main view');
       }, 2000);
       
       // 🚨 CRITICAL FIX: Ensure waypoint processing uses proper sources
       // Process waypoints - handle both displayWaypoints (strings) and waypoints (objects)
       let waypointsToProcess = [];
       
-      console.log('🚨 WAYPOINT PROCESSING DEBUG:', {
-        'flightData.displayWaypoints': flightData.displayWaypoints,
-        'flightData.waypoints length': flightData.waypoints?.length || 0,
-        '_rawFlight.displayWaypoints': flightData._rawFlight?.displayWaypoints,
-        'stops': flightData.stops
-      });
-      
       // Priority 1: Use flightData.displayWaypoints if available
       if (flightData.displayWaypoints && flightData.displayWaypoints.length > 0) {
-        console.log('🚨 Using flightData.displayWaypoints format');
         waypointsToProcess = flightData.displayWaypoints;
       } 
       // Priority 2: Check raw flight displayWaypoints
       else if (flightData._rawFlight?.displayWaypoints) {
-        console.log('🚨 Using _rawFlight.displayWaypoints format');
         const rawDisplayWaypoints = flightData._rawFlight.displayWaypoints;
         
         if (typeof rawDisplayWaypoints === 'string' && rawDisplayWaypoints.includes('|')) {
           waypointsToProcess = rawDisplayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
-          console.log('🚨 Parsed raw displayWaypoints:', waypointsToProcess);
         } else if (Array.isArray(rawDisplayWaypoints)) {
           waypointsToProcess = rawDisplayWaypoints;
-          console.log('🚨 Using raw displayWaypoints array:', waypointsToProcess);
         } else {
-          console.log('🚨 Raw displayWaypoints is neither string nor array:', typeof rawDisplayWaypoints, rawDisplayWaypoints);
         }
       }
       // Priority 3: Fall back to extracted waypoints + stops reconstruction  
       else if (flightData.waypoints && flightData.waypoints.length > 0) {
-        console.log('🚨 Using extracted waypoints format - converting to displayWaypoints format');
-        console.log('🚨 Flight waypoints:', flightData.waypoints);
-        console.log('🚨 Flight stops:', flightData.stops);
         
         // We need to reconstruct the full sequence from the original displayWaypoints
         // Check if we have the raw flight data with the original displayWaypoints
         if (flightData._rawFlight && flightData._rawFlight.displayWaypoints) {
           const rawDisplayWaypoints = flightData._rawFlight.displayWaypoints;
-          console.log('Found raw displayWaypoints:', rawDisplayWaypoints);
           
           if (typeof rawDisplayWaypoints === 'string' && rawDisplayWaypoints.includes('|')) {
             waypointsToProcess = rawDisplayWaypoints.split('|').map(wp => wp.trim()).filter(wp => wp.length > 0);
-            console.log('Using parsed raw displayWaypoints:', waypointsToProcess);
           } else if (Array.isArray(rawDisplayWaypoints)) {
             waypointsToProcess = rawDisplayWaypoints;
-            console.log('Using raw displayWaypoints array:', waypointsToProcess);
           }
         }
         
         // Fallback: reconstruct from waypoints + stops if raw data not available
         if (waypointsToProcess.length === 0) {
-          console.log('Reconstructing displayWaypoints from waypoints and stops...');
           
           // Create a basic sequence: departure + waypoints + destination
           const stops = flightData.stops || [];
@@ -2546,11 +2168,9 @@ const FastPlannerCore = ({
           }
         }
         
-        console.log('Final converted waypoints:', waypointsToProcess);
       }
       
       if (waypointsToProcess.length > 0) {
-        console.log(`Loading flight waypoints with coordinate placement - ${waypointsToProcess.length} waypoints`);
         
         // Process the route data (stops are processed via waypoint loading, no need to fill input field)
         
@@ -2559,21 +2179,14 @@ const FastPlannerCore = ({
           const rawFlight = flightData._rawFlight;
           let routeCoordinates = [];
           let alternateRouteData = null;
-          
-          console.log('DEBUG: Raw flight object:', rawFlight);
-          
+
           if (rawFlight && rawFlight.fullRouteGeoShape) {
-            console.log('DEBUG: Found fullRouteGeoShape, extracting coordinates...');
             // Extract coordinates from the GeoShape
             const geoShape = rawFlight.fullRouteGeoShape.toGeoJson ? 
               rawFlight.fullRouteGeoShape.toGeoJson() : rawFlight.fullRouteGeoShape;
-              
-            console.log('DEBUG: GeoShape:', geoShape);
-              
+
             if (geoShape && geoShape.coordinates) {
               routeCoordinates = geoShape.coordinates;
-              console.log(`Found ${routeCoordinates.length} coordinate points in route`);
-              console.log('First few coordinates:', routeCoordinates.slice(0, 3));
             } else {
               console.warn('DEBUG: No coordinates found in geoShape');
             }
@@ -2582,26 +2195,21 @@ const FastPlannerCore = ({
           }
           
           // MOVED: Alternate route processing will happen AFTER main route loads
-          console.log('🟠 DEFERRED: Alternate route processing deferred until after main route');
           
           // Get the waypoint names with labels
           const displayWaypoints = waypointsToProcess;
-          console.log(`Display waypoints: ${displayWaypoints.join(', ')}`);
           
           // Match waypoints with coordinates and place them directly
           if (routeCoordinates.length > 0 && displayWaypoints.length === routeCoordinates.length) {
-            console.log('Coordinate count matches waypoint count - proceeding with direct placement');
             
             // Wait for stops to be processed first
             await new Promise(resolve => setTimeout(resolve, 500));
             
             // Clear any existing waypoints first
             if (appManagers.waypointManagerRef?.current) {
-              console.log('Clearing existing waypoints before loading flight waypoints');
               if (typeof appManagers.waypointManagerRef.current.clearWaypoints === 'function') {
                 appManagers.waypointManagerRef.current.clearWaypoints();
               } else {
-                console.log('clearWaypoints method not available, skipping waypoint clearing');
               }
             }
             
@@ -2617,9 +2225,7 @@ const FastPlannerCore = ({
               
               // Clean name (remove labels)
               const cleanName = waypointLabel.replace(/\s*\([^)]*\)\s*$/, '').trim();
-              
-              console.log(`Adding ${isStop ? 'STOP' : 'WAYPOINT'}: ${cleanName} at [${coordinates[0]}, ${coordinates[1]}]`);
-              
+
               try {
                 // Add the waypoint using direct coordinates
                 if (appManagers.waypointManagerRef?.current) {
@@ -2631,7 +2237,6 @@ const FastPlannerCore = ({
                       type: isStop ? 'LANDING_STOP' : 'WAYPOINT'
                     }
                   );
-                  console.log(`Successfully placed ${isStop ? 'stop' : 'waypoint'}: ${cleanName}`);
                 }
                 
                 // Small delay between placements to avoid conflicts
@@ -2642,21 +2247,16 @@ const FastPlannerCore = ({
                 // Continue with other waypoints even if one fails
               }
             }
-            
-            console.log('All flight waypoints and stops loaded successfully');
-            
+
             // EXTRACT AND RENDER: Process alternate route AFTER main route is complete
-            console.log('🟠 EXTRACTING: Processing alternate route data after main route completion');
             
             let alternateRouteData = null;
             
             // Extract alternate route data (moved from earlier)
             const rawFlight = flightData._rawFlight;
             if (flightData.alternateRouteData) {
-              console.log('🟠 EXTRACT: Using alternate data passed from RightPanel');
               alternateRouteData = flightData.alternateRouteData;
             } else if (rawFlight && rawFlight.alternateFullRouteGeoShape) {
-              console.log('🟠 EXTRACT: Found alternateFullRouteGeoShape, extracting...');
               
               const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
                 rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
@@ -2669,10 +2269,6 @@ const FastPlannerCore = ({
                   geoPoint: rawFlight.alternateGeoPoint || null,
                   legIds: rawFlight.alternateLegIds || []
                 };
-                console.log('🟠 EXTRACT: Created alternateRouteData:', {
-                  coordinateCount: alternateRouteData.coordinates.length,
-                  name: alternateRouteData.name
-                });
               }
             }
             
@@ -2686,7 +2282,6 @@ const FastPlannerCore = ({
               setTimeout(() => {
                 if (appManagers.waypointManagerRef?.current && alternateRouteData) {
                   appManagers.waypointManagerRef.current.updateRoute(routeStats, alternateRouteData);
-                  console.log('🟠 RENDERED: Alternate route rendered after main route');
                 }
               }, 300); // Small delay after main route completion
             } else {
@@ -2703,26 +2298,22 @@ const FastPlannerCore = ({
               coordinates: coords
             }));
             window.currentWaypoints = waypointObjects;
-            console.log('🛢️ RIG WEATHER: Direct coordinate waypoints made globally available:', waypointObjects.length);
             
             // 🎯 ZOOM: Always zoom to flight after it loads
             setTimeout(() => {
               if (routeCoordinates && routeCoordinates.length > 0 && mapManagerRef?.current) {
-                console.log('🎯 ZOOM: Zooming to flight including alternates');
                 
                 // Combine main route with alternates for bounding box
                 let allCoordinates = [...waypointObjects];
                 
                 // Add alternate route coordinates if available
                 if (alternateRouteData?.coordinates) {
-                  console.log('🎯 Including alternate coordinates in zoom bounds');
                   const alternateWaypoints = alternateRouteData.coordinates.map(coord => ({
                     lat: coord[1],
                     lng: coord[0],
                     name: 'Alternate'
                   }));
                   allCoordinates = [...allCoordinates, ...alternateWaypoints];
-                  console.log(`🎯 Zoom bounds: ${waypointObjects.length} main + ${alternateWaypoints.length} alternate waypoints`);
                 }
                 
                 // Zoom to include both main route and alternates
@@ -2735,7 +2326,7 @@ const FastPlannerCore = ({
                 });
                 
                 if (zoomSuccess) {
-                  console.log('🎯 ZOOM: Successfully zoomed to flight');
+                  // Zoom succeeded
                 } else {
                   console.warn('🎯 ZOOM: Failed to zoom to flight');
                 }
@@ -2745,7 +2336,6 @@ const FastPlannerCore = ({
             // 🎯 SMOOTH TILT: Just smooth tilt, accept current map style
             setTimeout(() => {
               if (mapManagerRef?.current?.map) {
-                console.log('🌟 SMOOTH TILT: Applying smooth tilt only');
                 const map = mapManagerRef.current.map;
                 
                 // Smooth tilt without changing anything else
@@ -2772,7 +2362,6 @@ const FastPlannerCore = ({
           } else {
             console.warn(`Coordinate/waypoint count mismatch: ${routeCoordinates.length} coordinates vs ${displayWaypoints.length} waypoints`);
             // Fallback to the original method if counts don't match
-            console.log('Falling back to name-based waypoint loading...');
             
             for (const waypointLabel of displayWaypoints) {
               const isStop = waypointLabel.includes('(Dep)') || 
@@ -2801,12 +2390,9 @@ const FastPlannerCore = ({
           console.error('Error loading flight waypoints:', error);
         }
       } else {
-        console.log('DEBUG: No displayWaypoints found, checking combinedWaypoints...');
         
         // Fallback: try using combinedWaypoints if displayWaypoints is not available
         if (flightData.combinedWaypoints && flightData.combinedWaypoints.length > 0) {
-          console.log('DEBUG: Using combinedWaypoints as fallback');
-          console.log('Combined waypoints:', flightData.combinedWaypoints);
           
           try {
             // Process combinedWaypoints - these don't have labels so we need to determine type differently
@@ -2816,7 +2402,6 @@ const FastPlannerCore = ({
               const isStop = stops.includes(waypointName);
               
               if (!isStop) { // Only add navigation waypoints, stops are already handled
-                console.log(`Adding navigation waypoint from combinedWaypoints: ${waypointName}`);
                 
                 try {
                   if (appManagers.waypointManagerRef?.current?.addWaypointByName) {
@@ -2824,7 +2409,6 @@ const FastPlannerCore = ({
                       isWaypoint: true,
                       type: 'WAYPOINT'
                     });
-                    console.log(`Successfully added waypoint: ${waypointName}`);
                   }
                   await new Promise(resolve => setTimeout(resolve, 100));
                 } catch (error) {
@@ -2836,23 +2420,15 @@ const FastPlannerCore = ({
             console.error('Error processing combinedWaypoints:', error);
           }
         } else {
-          console.log('DEBUG: No waypoints to load (neither displayWaypoints nor combinedWaypoints available)');
         }
       }
       
       // Set aircraft if available
-      console.log('🛩️ Checking aircraft restoration conditions:');
-      console.log('🛩️ flightData.aircraftId:', flightData.aircraftId);
-      console.log('🛩️ appManagers.aircraftManagerRef?.current exists:', !!appManagers.aircraftManagerRef?.current);
       
       if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
-        console.log(`Restoring aircraft: ${flightData.aircraftId}`);
         try {
           // Get available aircraft using the correct method
           const availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
-          console.log(`Searching in ${availableAircraft.length} available aircraft for region: ${flightData.region}`);
-          console.log('🔍 Sample aircraft structure:', availableAircraft[0]);
-          console.log('🔍 Looking for aircraftId:', flightData.aircraftId);
           
           const matchingAircraft = availableAircraft.find(aircraft => {
             return aircraft.aircraftId === flightData.aircraftId || 
@@ -2863,7 +2439,6 @@ const FastPlannerCore = ({
           });
           
           if (matchingAircraft) {
-            console.log(`✅ Aircraft restored: ${matchingAircraft.name || matchingAircraft.registration || matchingAircraft.aircraftId}`);
             setSelectedAircraft(matchingAircraft);
             
             if (window.LoadingIndicator) {
@@ -2881,7 +2456,6 @@ const FastPlannerCore = ({
           console.error('Error restoring aircraft:', error);
         }
       } else {
-        console.log('🛩️ Aircraft restoration skipped - missing aircraftId or aircraftManager');
       }
       
       // Update status
@@ -2904,8 +2478,6 @@ const FastPlannerCore = ({
       }
     }
   };
-  
-  const loadCustomChart = () => console.log("loadCustomChart - Not implemented");
 
   // RegionAircraftConnector removed - using only event-based region sync
 
@@ -2913,7 +2485,6 @@ const FastPlannerCore = ({
   const handleToggleLock = () => {
     const newLockState = !isEditLocked;
     setIsEditLocked(newLockState);
-    console.log('🔒 Edit lock toggled:', newLockState ? 'LOCKED' : 'UNLOCKED');
     
     // Update global edit lock state for managers
     window.isEditLocked = newLockState;
@@ -2921,7 +2492,6 @@ const FastPlannerCore = ({
     // 🚫 IMPLEMENT ACTUAL LOCKING - Disable map interactions when locked
     if (newLockState) {
       // LOCKED - Disable map interactions
-      console.log('🚫 LOCKING: Disabling map interactions and waypoint modifications');
       
       // Disable map click handlers
       if (appManagers.mapInteractionHandlerRef?.current) {
@@ -2983,7 +2553,6 @@ const FastPlannerCore = ({
       
     } else {
       // UNLOCKED - Re-enable map interactions
-      console.log('🔓 UNLOCKING: Re-enabling map interactions and waypoint modifications');
       
       // Re-enable map click handlers
       if (appManagers.mapInteractionHandlerRef?.current) {
@@ -3046,37 +2615,28 @@ const FastPlannerCore = ({
 
   // Phone layout: Right panel toggle handler for glass dock
   const handleToggleRightPanel = () => {
-    console.log('📱 Phone layout: Right panel toggle clicked - Current rightPanelVisible:', rightPanelVisible);
     toggleRightPanel();
-    console.log('📱 toggleRightPanel called');
   };
 
   const handleOpenRoute = () => {
-    console.log('🗺️ Route button clicked - Current leftPanelVisible:', leftPanelVisible);
     toggleLeftPanel();
-    console.log('🗺️ toggleLeftPanel called');
   };
 
   const handleOpenMenu = () => {
-    console.log('⚙️ Menu button clicked - Current panel states: left:', leftPanelVisible, 'right:', rightPanelVisible);
     
     // Menu button ONLY closes panels, never opens them
     // If either panel is open, close BOTH panels
     if (leftPanelVisible || rightPanelVisible) {
-      console.log('⚙️ Closing both panels via menu button');
       
       if (leftPanelVisible) {
         toggleLeftPanel();
-        console.log('⚙️ Closed left panel');
       }
       
       if (rightPanelVisible) {
         toggleRightPanel();
-        console.log('⚙️ Closed right panel');
       }
     } else {
       // If both panels are already closed, do nothing
-      console.log('⚙️ Both panels already closed - no action needed');
     }
   };
 
@@ -3087,26 +2647,21 @@ const FastPlannerCore = ({
   // 🎯 SMART TOGGLE: Listen for flight load events and detect final mode
   useEffect(() => {
     const handleFlightLoadComplete = (event) => {
-      console.log('🎯 SMART TOGGLE: Flight load event received:', event.detail?.flightName);
       
       // Show button and detect mode after flight loads with 3D transition
       setTimeout(() => {
-        console.log('🎯 SMART TOGGLE: ✅ Flight loaded - showing toggle button');
         setShowEditButton(true);
         
         // DISABLED: This was overriding FlightSequenceController's state setting
         // FlightSequenceController now properly manages currentMapMode
-        console.log('🎯 SMART TOGGLE: Using FlightSequenceController for state management');
       }, 1000);
     };
     
     // 🎯 SMART TOGGLE: Listen for map mode changes from flight loading
     const handleMapModeChanged = (event) => {
-      console.log('🎯 SMART TOGGLE: Map mode changed event received:', event.detail);
       const { mode, source } = event.detail;
       
       if (source === 'flight-loading') {
-        console.log('🎯 SMART TOGGLE: ✅ Flight loading completed 3D transition - updating button to show "Edit"');
         setCurrentMapMode(mode); // This will make the button show "Edit" instead of "Satellite"
       }
     };
@@ -3124,17 +2679,14 @@ const FastPlannerCore = ({
   // 🎯 SMART TOGGLE: Show button when flight is loaded, hide when cleared
   useEffect(() => {
     if (!loadedFlightData) {
-      console.log('🎯 SMART TOGGLE: No loaded flight data, hiding button');
       setShowEditButton(false);
     } else {
-      console.log('🎯 SMART TOGGLE: Flight loaded, showing toggle button');
       setShowEditButton(true);
     }
   }, [loadedFlightData]);
   
   // 🎯 SMART TOGGLE: Toggle between satellite and edit modes (like 3D toggle button)
   const handleToggleMode = async () => {
-    console.log('🎯 SMART TOGGLE: Toggle clicked! Current mode:', currentMapMode);
     
     try {
       const mapManager = mapManagerRef?.current;
@@ -3145,9 +2697,7 @@ const FastPlannerCore = ({
       
       // Use our tracked state instead of map detection (more reliable)
       const newStyle = currentMapMode === '3d' ? 'dark' : '3d';
-      
-      console.log(`🎯 SMART TOGGLE: Switching from ${currentMapMode} to ${newStyle}`);
-      
+
       // Update state immediately to prevent double-clicks
       setCurrentMapMode(newStyle);
       
@@ -3156,12 +2706,10 @@ const FastPlannerCore = ({
       // CRITICAL: Reset camera to top-down view when switching back to 2D
       const map = mapManager.getMap();
       if (newStyle === 'dark' && map) {
-        console.log('🎯 SMART TOGGLE: 📐 Switching to EDIT MODE - resetting camera to top-down 2D view');
         
         // First reset terrain to avoid conflicts
         if (map.getTerrain()) {
           map.setTerrain(null);
-          console.log('🎯 SMART TOGGLE: Removed 3D terrain');
         }
         
         // Then smooth transition to vertical 
@@ -3171,17 +2719,13 @@ const FastPlannerCore = ({
             bearing: 0,   // North up
             duration: 1200 // Longer duration for smoother animation
           });
-          console.log('🎯 SMART TOGGLE: Applied top-down camera for edit mode');
         }, 100); // Small delay after terrain removal
       } else if (newStyle === '3d') {
-        console.log('🎯 SMART TOGGLE: 🛰️ Switching to SATELLITE MODE - maintaining 3D view');
+        // 3D style selected
       }
-      
-      console.log(`🎯 SMART TOGGLE: 🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
-      
+
       // RESTORE LAYERS after style switch (same timing as MapLayersCard)
       setTimeout(() => {
-        console.log('🎯 SMART TOGGLE: 🔄 Restoring layers after style switch...');
         
         // Emit the same events as MapLayersCard to restore all layers
         setTimeout(() => {
@@ -3198,11 +2742,8 @@ const FastPlannerCore = ({
             window.dispatchEvent(event);
           });
           
-          console.log('🎯 SMART TOGGLE: 📢 Notified other components to restore layers');
         }, 500);
-        
-        console.log('🎯 SMART TOGGLE: ✅ Layer restoration events dispatched');
-        
+
       }, 1000); // Wait 1 second for style to fully load (same as MapLayersCard)
       
       // Update mode tracking and editing lock
@@ -3211,18 +2752,15 @@ const FastPlannerCore = ({
       if (newStyle === 'dark') {
         setIsEditLocked(false);
         window.isEditLocked = false;
-        console.log('🎯 SMART TOGGLE: Unlocked editing (2D mode)');
         
         // 🔧 FIX: Reset any flight sequence flags when entering edit mode
         // This prevents tilt flags from persisting when loading new flights
         if (window.flightSequenceController) {
           window.flightSequenceController.reset();
-          console.log('🎯 SMART TOGGLE: Reset FlightSequenceController flags for edit mode');
         }
       } else {
         setIsEditLocked(true);
         window.isEditLocked = true;
-        console.log('🎯 SMART TOGGLE: Locked editing (3D satellite mode)');
       }
       
     } catch (error) {
@@ -3238,18 +2776,14 @@ const FastPlannerCore = ({
 
   // Function to handle card changes from glass dock buttons with toggle functionality
   const handleCardChange = useCallback((cardId) => {
-    console.log(`🎛️ Glass dock: ${cardId} button clicked`);
-    console.log(`🎛️ Current state: panel=${rightPanelVisible}, activeCard=${currentActiveCard}`);
     
     // If panel is open and same card is clicked → close panel (toggle off)
     if (rightPanelVisible && currentActiveCard === cardId) {
-      console.log(`🎛️ Toggle OFF: Closing ${cardId} card`);
       toggleRightPanel();
       return;
     }
     
     // Otherwise → open panel and/or switch to card
-    console.log(`🎛️ Opening/switching to ${cardId} card`);
     
     // Open panel if closed
     if (!rightPanelVisible) {
@@ -3270,7 +2804,6 @@ const FastPlannerCore = ({
   const handleWeatherCard = () => handleCardChange('weather');
   const handleFinanceCard = () => handleCardChange('finance');
   const handleSARCard = () => {
-    console.log('🚁 handleSARCard called - switching to SAR card');
     handleCardChange('sar');
   };
   const handleSaveCard = () => handleCardChange('saveflight');
@@ -3278,16 +2811,11 @@ const FastPlannerCore = ({
   
   // Handle flight loading from wizard - use EXACT same path as RightPanel
   const handleLoadFlight = async (flight) => {
-    console.log('🧙‍♂️ Wizard: Loading flight via handleLoadFlight - using EXACT LoadFlightsCard workflow');
     
     // 🎯 CRITICAL: Process flight data exactly like RightPanel.handleLoadFlight does
     // This ensures the exact same stereolight mode, 3D camera, object clearing workflow
-    
-    console.log('🟠 WIZARD LOAD: Load flight data from wizard:', flight);
-    console.log('🟠 WIZARD LOAD: Raw flight available:', !!flight._rawFlight);
-    
+
     // 🧹 CRITICAL: Clear all old weather graphics before loading new flight
-    console.log('🧹 FLIGHT LOAD: Clearing old weather graphics');
     if (window.clearRigWeatherGraphics) {
       window.clearRigWeatherGraphics();
     }
@@ -3313,9 +2841,7 @@ const FastPlannerCore = ({
         date: flight.date,
         etd: flight.etd
       };
-      
-      console.log('🟠 WIZARD LOAD: Processed flight data for main app:', flightData);
-      
+
       // Now call the main flight load handler (same as RightPanel does)
       await handleFlightLoad(flightData);
       
@@ -3324,29 +2850,104 @@ const FastPlannerCore = ({
     }
   };
   const handleLayersCard = () => handleCardChange('maplayers');
+  
+  // LIVE weather toggle handler for glass menu - direct implementation
+  const handleLiveWeatherToggle = useCallback(async () => {
+    
+    try {
+      const mapInstance = appManagers.mapManagerRef?.current?.getMap();
+      if (!mapInstance) {
+        console.error('🌩️ No map instance available');
+        return;
+      }
+      
+      // Determine current state by checking for lightning, NOAA stations, and radar
+      const hasLightningLayer = !!mapInstance.getLayer('simple-lightning-layer');
+      const hasNOAAStations = !!observedWeatherStationsRef?.current?.isVisible;
+      const hasConusRadar = !!mapInstance.getLayer('noaa-conus-layer');
+      const isCurrentlyActive = hasLightningLayer || hasNOAAStations || hasConusRadar;
+      
+      if (!isCurrentlyActive) {
+        // Turn ON lightning + NOAA stations + radar
+        
+        // Import weather loading functions
+        const { addSimpleLightningOverlay, addNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
+        
+        // Enable lightning
+        if (!hasLightningLayer) {
+          const lightningSuccess = await addSimpleLightningOverlay(mapInstance);
+          if (lightningSuccess) {
+          }
+        }
+        
+        // Enable NOAA weather stations
+        if (observedWeatherStationsRef?.current && !hasNOAAStations) {
+          observedWeatherStationsRef.current.setVisible(true);
+        } else if (!observedWeatherStationsRef?.current) {
+          // Try to initialize NOAA stations if they don't exist
+          try {
+            const ObservedWeatherStationsLayer = (await import('./modules/layers/ObservedWeatherStationsLayer')).default;
+            const stationsLayer = new ObservedWeatherStationsLayer(mapInstance);
+            await stationsLayer.initialize();
+            observedWeatherStationsRef.current = stationsLayer;
+            stationsLayer.setVisible(true);
+          } catch (initError) {
+            console.error('❌ Failed to initialize NOAA weather stations:', initError);
+          }
+        }
+        
+        // Enable CONUS radar (test in all regions for now)
+        if (!hasConusRadar) {
+          const radarSuccess = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+          if (radarSuccess) {
+          } else {
+          }
+        }
+        
+        setLiveWeatherActive(true);
+        
+      } else {
+        // Turn OFF lightning + NOAA stations + radar
+        
+        // Remove lightning layer
+        if (hasLightningLayer) {
+          if (mapInstance.getSource('simple-lightning')) {
+            mapInstance.removeLayer('simple-lightning-layer');
+            mapInstance.removeSource('simple-lightning');
+          }
+        }
+        
+        // Disable NOAA weather stations
+        if (observedWeatherStationsRef?.current && hasNOAAStations) {
+          observedWeatherStationsRef.current.setVisible(false);
+        }
+        
+        // Remove CONUS radar
+        if (hasConusRadar) {
+          const { removeNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
+          await removeNOAAWeatherOverlay(mapInstance, 'CONUS');
+        }
+        
+        setLiveWeatherActive(false);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in LIVE weather toggle:', error);
+    }
+  }, [liveWeatherActive, appManagers.mapManagerRef, observedWeatherStationsRef]);
 
   // 🚁 SAR HANDLERS: Search and Rescue mode functionality
   const handleSARUpdate = useCallback((sarUpdate) => {
-    console.log('🚁 FastPlannerApp: SAR update received:', {
-      enabled: sarUpdate?.enabled,
-      hasCalculation: !!sarUpdate?.calculation,
-      hasFinalWaypoint: !!sarUpdate?.finalWaypoint,
-      finalWaypoint: sarUpdate?.finalWaypoint,
-      operationalRadiusNM: sarUpdate?.calculation?.operationalRadiusNM
-    });
-    
     // Sync SARManager state with the useSARMode state
     if (sarManager) {
       sarManager.sarEnabled = sarUpdate?.enabled || false;
     }
     
-    console.log('🚁 FastPlannerApp: Setting sarData state:', sarUpdate);
     setSarData(sarUpdate);
   }, []);
 
   // 🧙‍♂️ WIZARD HANDLERS: Flight planning wizard functionality
   const handleWizardComplete = useCallback((flightData) => {
-    console.log('🧙‍♂️ Wizard completed with flight data:', flightData);
     
     // Set aircraft if selected
     if (flightData.aircraft) {
@@ -3358,7 +2959,6 @@ const FastPlannerCore = ({
     
     // 🛩️ NEW: Process passenger data from wizard for fuel optimization
     if (flightData.passengers && flightData.passengers.enabled && flightData.passengers.legData) {
-      console.log('🧙‍♂️ Processing wizard passenger data:', flightData.passengers);
       
       const legData = flightData.passengers.legData;
       
@@ -3382,12 +2982,9 @@ const FastPlannerCore = ({
         }
       });
       
-      console.log('🧙‍♂️ Calculated passenger requirements:', {
         maxPassengerCount,
         maxTotalCargoWeight,
-        standardPassengerWeight: Math.round(standardPassengerWeight)
-      });
-      
+
       // Update flight settings with passenger data (keep standard format)
       setFlightSettings(prev => ({
         ...prev,
@@ -3399,20 +2996,16 @@ const FastPlannerCore = ({
       
       // Store detailed passenger data for potential fuel optimization
       // Note: This would trigger fuel stop optimization if passenger count exceeds aircraft capacity
-      console.log('🛩️ Wizard passenger data ready for fuel optimization if needed');
     }
     
     // Set departure time if provided
     if (flightData.departureTime) {
-      console.log('🧙‍♂️ Setting departure time:', flightData.departureTime);
       const etdDate = new Date(flightData.departureTime);
-      console.log('🧙‍♂️ Converted to Date object:', etdDate);
       setFlightSettings(prev => {
         const newSettings = {
           ...prev,
           etd: etdDate
         };
-        console.log('🧙‍♂️ New flight settings:', newSettings);
         return newSettings;
       });
     }
@@ -3431,20 +3024,14 @@ const FastPlannerCore = ({
     
     // If auto-run is requested, trigger the MainCard AutoPlan button
     if (flightData.autoRun) {
-      console.log('🧙‍♂️ Auto-planning flight...');
-      console.log('🧙‍♂️ Wizard flight name:', flightData.flightName);
       
       // 🧙‍♂️ WIZARD FIX: Store wizard flight name for Auto Plan to use
       if (flightData.flightName) {
         window.wizardCustomFlightName = flightData.flightName;
-        console.log('🧙‍♂️ Stored wizard flight name globally:', flightData.flightName);
       }
       
       // Wait for React state updates to process before triggering automation
       setTimeout(() => {
-        console.log('🧙‍♂️ Triggering MainCard AutoPlan button');
-        console.log('🧙‍♂️ Current waypoints:', waypoints.length);
-        console.log('🧙‍♂️ Current selectedAircraft:', selectedAircraft);
         
         // Simple approach: Find and click the AutoPlan button
         const buttons = Array.from(document.querySelectorAll('button'));
@@ -3455,35 +3042,28 @@ const FastPlannerCore = ({
         );
         
         if (autoPlanButton) {
-          console.log('🧙‍♂️ Found AutoPlan button:', autoPlanButton.textContent);
           autoPlanButton.click();
         } else {
           console.error('🧙‍♂️ No AutoPlan button found');
-          console.log('🧙‍♂️ Available buttons:', buttons.map(btn => btn.textContent.trim()).filter(text => text));
         }
       }, 1000);
     }
   }, [setWaypoints, setAircraftRegistration, setSelectedAircraft]);
   
   const handleWizardSkip = useCallback(() => {
-    console.log('🧙‍♂️ Wizard skipped - using manual mode');
     setIsWizardVisible(false);
   }, []);
   
   const handleWizardClose = useCallback(() => {
-    console.log('🧙‍♂️ Wizard closed');
     setIsWizardVisible(false);
   }, []);
   
   // 🎯 FIX: Handle flight loading from wizard through proper RightPanel workflow
   const handleWizardFlightLoad = useCallback((flight) => {
-    console.log('🧙‍♂️ Wizard: Flight selected for loading:', flight.flightNumber || flight.name);
-    console.log('🧙‍♂️ Wizard: Using CORRECT RightPanel workflow for satellite mode and map clearing');
     
     // Get reference to the right panel's handleLoadFlight function
     // This ensures the wizard gets the same satellite mode switching and map clearing behavior
     if (window.rightPanelHandleLoadFlight) {
-      console.log('🧙‍♂️ Wizard: ✅ Using RightPanel.handleLoadFlight for proper processing');
       window.rightPanelHandleLoadFlight(flight);
     } else {
       console.warn('🧙‍♂️ Wizard: ⚠️ RightPanel.handleLoadFlight not available, falling back to direct call');
@@ -3494,11 +3074,8 @@ const FastPlannerCore = ({
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
   const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
-    console.log('🛩️ FastPlannerApp: Received calculated stop cards:', calculatedStopCards.length);
-    console.log('🛩️ FastPlannerApp: Stop cards data:', calculatedStopCards);
     
     if (options.forceVfrRecalc) {
-      console.log('🛩️ VFR FORCE: Forcing recalculation by triggering forceUpdate');
       // Force a complete recalculation by updating forceUpdate state
       setForceUpdate(prev => prev + 1);
     } else {
@@ -3508,14 +3085,12 @@ const FastPlannerCore = ({
   
   // ⛽ FUEL BREAKDOWN: Callback to handle refuel toggle from DetailedFuelBreakdown
   const handleRefuelToggle = useCallback((stopIndex, isRefuel) => {
-    console.log(`🛩️ FastPlannerApp: Refuel toggle for stop ${stopIndex}:`, isRefuel);
     // The refuel logic is handled internally by EnhancedStopCardsContainer
     // This callback is for coordination and logging
   }, []);
   
   // Real search function for wizard using existing platform data
   const handleWizardSearch = useCallback(async (searchTerm) => {
-    console.log('🧙‍♂️ Wizard: Searching for:', searchTerm);
     
     if (!searchTerm || !searchTerm.trim()) {
       return [];
@@ -3536,21 +3111,11 @@ const FastPlannerCore = ({
     
     // Use raw OSDK data which has all the fields (locationDescription, LOCATION NOTES, etc.)
     const allLocations = [...rawOSDKData, ...osdkWaypoints];
-    
-    console.log(`🧙‍♂️ Wizard: Searching ${allLocations.length} real locations`);
-    
+
     // DEBUG: Let's see what fields we have for a few sample locations
-    console.log('🔍 DEBUG: Sample of location data structure:');
     allLocations.slice(0, 3).forEach((loc, i) => {
-      console.log(`Location ${i + 1}:`, {
-        name: loc.name,
-        locationDescription: loc.locationDescription,
-        'LOCATION NOTES': loc['LOCATION NOTES'],
-        locationNotes: loc.locationNotes,
-        'LOC ALIAS': loc['LOC ALIAS'], 
-        locAlias: loc.locAlias,
-        allKeys: Object.keys(loc)
-      });
+      // Debug location fields
+
     });
     
     // DEBUG: Specifically search for anything with "delta" in any field
@@ -3558,12 +3123,6 @@ const FastPlannerCore = ({
       const allValues = Object.values(loc).join(' ').toLowerCase();
       return allValues.includes('delta');
     });
-    console.log(`🔍 DEBUG: Found ${deltaMatches.length} locations containing "delta":`, deltaMatches.map(loc => ({
-      name: loc.name,
-      matchingFields: Object.entries(loc).filter(([key, value]) => 
-        typeof value === 'string' && value.toLowerCase().includes('delta')
-      )
-    })));
     
     // Enhanced hierarchical search like the existing fuzzy search
     const searchResults = [];
@@ -3662,7 +3221,7 @@ const FastPlannerCore = ({
                        description.includes(normalizedSearch) ? 'locationDescription' :
                        locationNotes.includes(normalizedSearch) ? 'locationNotes' :
                        locAlias.includes(normalizedSearch) ? 'locAlias' : 'type',
-            priority: 6
+            priority: 3
           });
         }
       });
@@ -3712,7 +3271,6 @@ const FastPlannerCore = ({
         };
       });
     
-    console.log(`🧙‍♂️ Wizard: Found ${results.length} real matches`);
     return results;
   }, [platformManagerRef]);
 
@@ -3734,8 +3292,8 @@ const FastPlannerCore = ({
         onAircraftSelect={setSelectedAircraft}
       />
       
-      {/* Detailed Fuel Breakdown Modal - Rendered at App Level for True Popup */}
-      <DetailedFuelBreakdown
+      {/* 📊 CLEAN FUEL BREAKDOWN MODAL - Rendered at App Level for True Popup */}
+      <CleanDetailedFuelBreakdown
         visible={showFuelBreakdown}
         onClose={() => setShowFuelBreakdown(false)}
         stopCards={stopCards}
@@ -3745,30 +3303,13 @@ const FastPlannerCore = ({
         fuelPolicy={fuelPolicy}
         routeStats={routeStats}
         selectedAircraft={selectedAircraft}
-        currentFlightId={currentFlightId}
-        alternateRouteData={alternateRouteData}
-        alternateStopCard={alternateStopCard}
         waypoints={waypoints}
         weather={weather}
-        clearKey={`${stopCards?.length || 0}-${waypoints?.length || 0}-${currentFlightId || 'none'}`}
         locationFuelOverrides={locationFuelOverrides}
         waiveAlternates={waiveAlternates}
-        onStopCardsCalculated={handleStopCardsCalculated}
-        // Flight settings callback props (same as SettingsCard)
-        onExtraFuelChange={(value) => updateFlightSetting('extraFuel', value)}
-        onDeckTimeChange={(value) => updateFlightSetting('deckTimePerStop', value)}
-        onDeckFuelChange={(value) => updateFlightSetting('deckFuelPerStop', value)}
-        onDeckFuelFlowChange={(value) => updateFlightSetting('deckFuelFlow', value)}
-        onPassengerWeightChange={(value) => updateFlightSetting('passengerWeight', value)}
-        onCargoWeightChange={(value) => updateFlightSetting('cargoWeight', value)}
-        onTaxiFuelChange={(value) => updateFlightSetting('taxiFuel', value)}
-        onContingencyFuelPercentChange={(value) => updateFlightSetting('contingencyFuelPercent', value)}
-        onReserveMethodChange={(value) => updateFlightSetting('reserveMethod', value)}
-        onReserveFuelChange={(value) => updateFlightSetting('reserveFuel', value)}
-        onLocationFuelChange={handleLocationFuelChange}
-        // ✅ SEGMENT-AWARE: Add segment-aware fuel handling
-        onSegmentExtraFuelChange={handleSegmentExtraFuelChange}
-        getCurrentSegmentInfo={getCurrentSegmentInfo}
+        alternateStopCard={alternateStopCard}
+        alternateRouteData={alternateRouteData}
+        onFuelDataChanged={handleLocationFuelChange}
       />
       
       {/* RegionAircraftConnector removed - using only event-based region sync */}
@@ -3816,17 +3357,6 @@ const FastPlannerCore = ({
             const operationalRadiusNM = calculation?.operationalRadiusNM;
             
             const shouldShow = sarEnabled && sarData && !calculation?.error && finalWaypoint && operationalRadiusNM;
-            console.log('🚁 SAR Circle Render Check:', {
-              sarEnabled,
-              sarData: !!sarData,
-              hasCalculation: !!calculation,
-              hasError: !!calculation?.error,
-              hasFinalWaypoint: !!finalWaypoint,
-              hasRadius: !!operationalRadiusNM,
-              operationalRadiusNM,
-              shouldShow,
-              mapManager: !!appManagers.mapManagerRef?.current
-            });
             
             return shouldShow && (
               <SARRangeCircle
@@ -3874,8 +3404,6 @@ const FastPlannerCore = ({
           extraFuel={flightSettings.extraFuel}
           // DEBUG: Add logging to see what extraFuel value is being passed
           {...(() => {
-            console.log('🔍 DEBUG: Passing extraFuel to SettingsCard:', flightSettings.extraFuel);
-            console.log('🔍 DEBUG: Full flightSettings:', flightSettings);
             return {};
           })()}
           araFuel={weatherFuel.araFuel} // Use calculated weather fuel from state
@@ -3896,6 +3424,17 @@ const FastPlannerCore = ({
           onStopCardsCalculated={handleStopCardsCalculated} // 🛩️ HEADER SYNC: Callback for stop cards synchronization
           onShowFuelBreakdown={() => setShowFuelBreakdown(true)} // 📊 FUEL BREAKDOWN: Callback to show modal
           onAlternateCardCalculated={setAlternateStopCard} // 🔧 NEW: Callback to receive alternate card data
+          onRefuelStopsChanged={handleRefuelStopsChanged} // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
+          
+          // ✅ FIX: Pass locationFuelOverrides from state to RightPanel
+          locationFuelOverrides={(() => {
+            return locationFuelOverrides || {};
+          })()}
+          
+          // 🔥 DIRECT CALLBACK: Pass fuel overrides callback to enable direct communication
+          onFuelOverridesChanged={(callback) => {
+            window.fuelOverridesCallback = callback;
+          }}
           
           // Fuel policy props
           fuelPolicy={fuelPolicy}
@@ -3961,6 +3500,9 @@ const FastPlannerCore = ({
         onSaveCard={handleSaveCard}
         onLoadCard={handleLoadCard}
         onLayersCard={handleLayersCard}
+        // LIVE weather toggle props
+        onLiveWeatherToggle={handleLiveWeatherToggle}
+        liveWeatherActive={liveWeatherActive}
       />
     </>
   );
@@ -3984,20 +3526,15 @@ const FastPlannerApp = () => {
 
   // 🔍 DEBUG: Track flightSettings changes to find when contingencyFuelPercent gets corrupted
   useEffect(() => {
-    console.log('🔍 FLIGHT SETTINGS CHANGED:', {
-      contingencyFuelPercent: flightSettings.contingencyFuelPercent,
-      passengerWeight: flightSettings.passengerWeight,
-      taxiFuel: flightSettings.taxiFuel,
-      reserveFuel: flightSettings.reserveFuel,
-      deckFuelFlow: flightSettings.deckFuelFlow, // ✅ Add this to track aircraft updates
-      deckTimePerStop: flightSettings.deckTimePerStop
-    });
+    // Flight settings monitoring logic would go here
   }, [flightSettings.contingencyFuelPercent, flightSettings.passengerWeight, flightSettings.taxiFuel, flightSettings.reserveFuel, flightSettings.deckFuelFlow, flightSettings.deckTimePerStop]);
   const [weather, setWeather] = useState({ windSpeed: 15, windDirection: 270 });
   
+  // LIVE weather toggle state for glass menu
+  const [liveWeatherActive, setLiveWeatherActive] = useState(false);
+  
   // Debug weather state changes
   useEffect(() => {
-    console.log('🌬️ WEATHER STATE CHANGED:', weather);
   }, [weather]);
   const [favoriteLocations, setFavoriteLocations] = useState([]);
   const [waypoints, setWaypoints] = useState([]);
@@ -4005,9 +3542,7 @@ const FastPlannerApp = () => {
   
   // Debug waypoints state changes
   useEffect(() => {
-    console.log('🎯 FastPlannerApp: waypoints state changed:', waypoints.length, 'waypoints');
     if (waypoints.length > 0) {
-      console.log('🎯 FastPlannerApp: waypoints data:', waypoints.map(wp => ({ name: wp.name, coords: wp.coords, id: wp.id })));
     }
   }, [waypoints]);
   const [routeStats, setRouteStats] = useState(null);
@@ -4047,7 +3582,6 @@ const FastPlannerApp = () => {
 
   const addWaypointDirectImpl = async (waypointData) => {
     const { waypointManagerRef, platformManagerRef } = appManagers; 
-    console.log('🔧 Using direct addWaypoint implementation (FastPlannerApp)');
     if (!waypointManagerRef.current) {
       console.error('Cannot add waypoint: No waypoint manager ref');
       return;
@@ -4056,7 +3590,6 @@ const FastPlannerApp = () => {
         console.warn('Platform manager ref not available for name lookup, proceeding if coordinates are provided.');
     }
     let coords, name, isWaypoint = false;
-    console.log('🌐 Direct: Adding waypoint with data:', waypointData);
     if (Array.isArray(waypointData)) {
       coords = waypointData; name = null;
     } else if (typeof waypointData === 'string') {
@@ -4104,7 +3637,6 @@ const FastPlannerApp = () => {
         appManagers.waypointManagerRef.current.addWaypoint(coords, name, { isWaypoint, type: isWaypoint ? 'WAYPOINT' : 'STOP' });
         const updatedWaypoints = appManagers.waypointManagerRef.current.getWaypoints();
         await new Promise(resolve => { setWaypoints([...updatedWaypoints]); setTimeout(resolve, 0); });
-        console.log('🌐 Waypoints updated using direct implementation');
     } else {
         console.error('addWaypointDirectImpl: waypointManagerRef is not available on appManagers');
     }
@@ -4116,24 +3648,20 @@ const FastPlannerApp = () => {
         addWaypointDirectRef.current.implementation = addWaypointDirectImpl;
         // Ensure the addWaypointDirectImpl function is available globally for the input handlers
         window.addWaypointClean = addWaypointDirectImpl;
-        console.log('🔧 Setting up global addWaypointClean function for input handlers');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appManagers.waypointManagerRef, appManagers.platformManagerRef]); 
 
   // Add mapReady handler to load aircraft data when map is ready
   const handleMapReadyImpl = useCallback((mapInstance) => {
-    console.log("🗺️ Map is ready", mapInstance);
 
     // Wrap in try/catch for safety
     try {
       // Once the map is ready, load aircraft
       if (appManagers.aircraftManagerRef && appManagers.aircraftManagerRef.current && client) {
-        console.log("Loading aircraft after map initialization");
         
         appManagers.aircraftManagerRef.current.loadAircraftFromOSDK(client)
           .then(() => {
-            console.log("Aircraft loaded successfully");
             // Force update to refresh the UI with aircraft data
             setForceUpdate(prev => prev + 1);
           })
@@ -4144,7 +3672,6 @@ const FastPlannerApp = () => {
 
       // Initialize map interactions if available
       if (appManagers.mapInteractionHandlerRef && appManagers.mapInteractionHandlerRef.current) {
-        console.log("🗺️ Initializing map interaction handler...");
         appManagers.mapInteractionHandlerRef.current.initialize();
       }
     } catch (error) {
@@ -4163,12 +3690,9 @@ const FastPlannerApp = () => {
   useEffect(() => {
     const initWeatherSystem = async () => {
       if (appManagers && appManagers.mapManagerRef?.current) {
-        console.log('🌤️ Initializing weather system for testing...');
         try {
           const weatherTest = await initializeWeatherSystem();
           if (weatherTest) {
-            console.log('✅ Weather system initialized and ready for testing');
-            console.log('🚀 Test in console with: window.weatherTest.quickTest()');
           }
         } catch (error) {
           console.error('❌ Weather system initialization failed:', error);

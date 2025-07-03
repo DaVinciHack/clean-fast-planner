@@ -135,7 +135,7 @@ const StopCard = React.forwardRef(({
             <input
               type="checkbox"
               checked={isRefuelStop}
-              onChange={(e) => onRefuelChange(index, e.target.checked)}
+              onChange={(e) => onRefuelChange && onRefuelChange(e.target.checked)}
               style={{
                 width: '12px',
                 height: '12px',

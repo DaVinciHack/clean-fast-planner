@@ -34,7 +34,9 @@ const MapLayersCard = ({
   weatherSegmentsHook, // Pass the entire weather segments hook
   // Flight data props for AutoFlight
   waypoints, // Current flight waypoints
-  routeStats // Route statistics
+  routeStats, // Route statistics
+  // LIVE weather toggle from glass menu
+  onLiveWeatherToggled // Callback to notify parent when LIVE weather state changes
 }) => {
   const { currentRegion } = useRegion();
   
@@ -1041,6 +1043,94 @@ const MapLayersCard = ({
     return () => window.removeEventListener('layer-visibility-changed', handleGlobalLayerChange);
   }, []);
 
+  // LIVE Weather Toggle Function - toggles weather radar and CONUS satellite at once
+  const toggleLiveWeather = async () => {
+    console.log('⚡ LIVE WEATHER FUNCTION CALLED: Starting toggle...');
+    console.log('⚡ LIVE WEATHER: Current region:', currentRegion?.id);
+    console.log('⚡ LIVE WEATHER: Current layer states:', {
+      weather: layers.weather,
+      satelliteConus: layers.satelliteConus,
+      allLayers: layers
+    });
+    
+    try {
+      // Check current state - LIVE is active if ANY of the 2 features are on
+      const isCurrentlyLive = layers.lightning || layers.observedWeatherStations;
+      const newLiveState = !isCurrentlyLive;
+      
+      console.log(`⚡ LIVE WEATHER: Current live state: ${isCurrentlyLive}, switching to: ${newLiveState}`);
+      
+      if (newLiveState) {
+        // Turn ON lightning and NOAA weather stations
+        console.log('⚡ LIVE WEATHER: Enabling lightning and NOAA weather stations...');
+        
+        // Enable lightning
+        if (!layers.lightning) {
+          console.log('⚡ LIVE WEATHER: Enabling lightning...');
+          await toggleLayer('lightning');
+          console.log('⚡ LIVE WEATHER: Lightning toggle completed');
+        }
+        
+        // Enable NOAA weather stations
+        if (!layers.observedWeatherStations) {
+          console.log('⚡ LIVE WEATHER: Enabling NOAA weather stations...');
+          await toggleLayer('observedWeatherStations');
+          console.log('⚡ LIVE WEATHER: NOAA weather stations toggle completed');
+        }
+        
+        console.log('✅ LIVE WEATHER: Lightning and NOAA weather stations enabled');
+      } else {
+        // Turn OFF lightning and NOAA weather stations
+        console.log('⚡ LIVE WEATHER: Disabling lightning and NOAA weather stations...');
+        
+        // Disable lightning
+        if (layers.lightning) {
+          console.log('⚡ LIVE WEATHER: Disabling lightning...');
+          await toggleLayer('lightning');
+          console.log('⚡ LIVE WEATHER: Lightning disabled');
+        }
+        
+        // Disable NOAA weather stations
+        if (layers.observedWeatherStations) {
+          console.log('⚡ LIVE WEATHER: Disabling NOAA weather stations...');
+          await toggleLayer('observedWeatherStations');
+          console.log('⚡ LIVE WEATHER: NOAA weather stations disabled');
+        }
+        
+        console.log('✅ LIVE WEATHER: Lightning and NOAA weather stations disabled');
+      }
+      
+      // Notify parent component of the state change
+      if (onLiveWeatherToggled) {
+        onLiveWeatherToggled(newLiveState);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error toggling LIVE weather:', error);
+    }
+  };
+  
+  // Expose the toggle function globally so parent components can call it
+  React.useEffect(() => {
+    console.log('🔧 EXPOSING window.toggleLiveWeather function');
+    window.toggleLiveWeather = toggleLiveWeather;
+    console.log('🔧 window.toggleLiveWeather set:', !!window.toggleLiveWeather);
+    return () => {
+      console.log('🔧 CLEANING UP window.toggleLiveWeather function');
+      delete window.toggleLiveWeather;
+    };
+  }, [layers.lightning, layers.observedWeatherStations, toggleLiveWeather]);
+  
+  // Calculate current LIVE weather state for parent
+  const isLiveWeatherActive = layers.lightning || layers.observedWeatherStations;
+  
+  // Notify parent when LIVE state changes
+  React.useEffect(() => {
+    if (onLiveWeatherToggled) {
+      onLiveWeatherToggled(isLiveWeatherActive);
+    }
+  }, [isLiveWeatherActive, onLiveWeatherToggled]);
+
   // Listen for master toggle events from MainCard to keep buttons synchronized
   useEffect(() => {
     const handleMasterToggleFromMainCard = (event) => {
@@ -1133,13 +1223,12 @@ const MapLayersCard = ({
       <h3 className="panel-card-title">Map Layers</h3>
       
       <div className="panel-card-content">
-        <div className="layer-section">
-          <h4>Base Layers</h4>
-          {renderLayerToggle('grid', 'Coordinate Grid')}
-        </div>
-        
-        <div className="layer-section">
-          <h4>Platforms & Airfields</h4>
+        {/* Section 1: Common to All Regions */}
+        <div className="layer-section section-border">
+          <h4>🌍 Common to All Regions</h4>
+          
+          {/* Platforms & Airfields */}
+          <div className="subsection-header">Platforms & Airfields</div>
           
           {/* Master toggle button for all platform layers */}
           <div className="button-row" style={{ marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
@@ -1216,106 +1305,179 @@ const MapLayersCard = ({
             {renderLayerToggle('bases', 'Bases')}
             {renderLayerToggle('fuelAvailable', 'Fuel Available')}
           </div>
-        </div>
-        
-        <div className="layer-section">
-          <h4>Region-Specific Layers</h4>
-          {renderLayerToggle(
-            'gulfCoastHeli', 
-            'Gulf Coast Helicopter Map', 
-            true // Make always available for testing
-          )}
           
-          {/* Opacity slider for Gulf Coast map */}
-          {layers.gulfCoastHeli && (
-            <div className="opacity-slider-container">
-              <label className="opacity-slider-label">
-                Map Opacity: {Math.round(gulfCoastOpacity * 100)}%
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={gulfCoastOpacity}
-                onChange={handleGulfCoastOpacityChange}
-                className="opacity-slider"
-              />
-              <div className="opacity-slider-marks">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <div className="layer-section">
-          <h4>Aviation Layers</h4>
-          {renderLayerToggle('weather', 'Weather Overlay', true)}
-          
-          {/* NEW: Real NOAA Weather Stations - Always available */}
-          {renderLayerToggle('observedWeatherStations', 'NOAA Weather Stations', true)}
-          
-          {/* Wind arrows are now automatic with weather circles - no separate toggle needed */}
-          
-          {/* All Other Regions: Standard Weather Circles */}
-          {currentRegion?.id !== 'gulf-of-mexico' && (
-            <>
-              {renderLayerToggle('weatherCircles', 'Weather Circles', !!weatherSegmentsHook)}
-            </>
-          )}
-          
-          {renderLayerToggle('vfrCharts', 'VFR Charts', !!vfrChartsRef?.current)}
-        </div>
-        
-        <div className="layer-section">
-          <h4>Weather Satellite Layers</h4>
-          
-          {/* Global Lightning - Available in all regions */}
-          <div className="button-row">
-            {renderLayerToggle('lightning', '⚡ Lightning (Global)', true)}
-          </div>
-          
-          {/* Lightning opacity slider - always visible when lightning is on */}
-          {layers.lightning && (
-            <div className="opacity-slider-container">
-              <label className="opacity-slider-label">
-                Lightning Opacity: {Math.round(weatherOpacities.lightning * 100)}%
-              </label>
-              <input
-                type="range"
-                min="0.2"
-                max="1"
-                step="0.05"
-                value={weatherOpacities.lightning}
-                onChange={(e) => {
-                  const newOpacity = parseFloat(e.target.value);
-                  setWeatherOpacities(prev => ({ ...prev, lightning: newOpacity }));
-                  // Apply opacity to lightning layer
-                  const mapInstance = mapManagerRef?.current?.map;
-                  if (mapInstance && mapInstance.getLayer('simple-lightning-layer')) {
-                    try {
-                      mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', newOpacity);
-                    } catch (error) {
-                      console.warn('Could not set lightning opacity:', error);
-                    }
+          {/* 3D Map Toggle */}
+          <div className="subsection-header">Map View</div>
+          <div className="map-view-controls">
+            <button 
+              className="map-3d-toggle-button"
+              onClick={async () => {
+                try {
+                  console.log('🗺️ Switching map view...');
+                  
+                  const mapManager = mapManagerRef?.current;
+                  if (!mapManager) {
+                    console.error('Map manager not available');
+                    return;
                   }
-                }}
-                className="opacity-slider"
-              />
-              <div className="opacity-slider-marks">
-                <span>20%</span>
-                <span>60%</span>
-                <span>100%</span>
-              </div>
-            </div>
-          )}
+                  
+                  // SAVE CURRENT LAYER STATE before switching
+                  const currentLayers = { ...layers };
+                  const currentWeatherOpacities = { ...weatherOpacities };
+                  console.log('💾 Saving layer state before style switch:', currentLayers);
+                  
+                  // Toggle between dark and 3D style
+                  const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
+                  const newStyle = currentStyle === '3d' ? 'dark' : '3d';
+                  
+                  console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
+                  
+                  await mapManager.switchMapStyle(newStyle);
+                  
+                  // CRITICAL: Reset camera to top-down view when switching back to 2D
+                  const map = mapManager.getMap();
+                  if (newStyle === 'dark' && map) {
+                    console.log('📐 Resetting camera to top-down 2D view');
+                    map.easeTo({
+                      pitch: 0,     // Top-down view
+                      bearing: 0,   // North up
+                      duration: 800 // Smooth transition
+                    });
+                  }
+                  
+                  console.log(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
+                  
+                  // RESTORE LAYERS after style switch (small delay to ensure style is loaded)
+                  setTimeout(async () => {
+                    console.log('🔄 Restoring layers after style switch...');
+                    const mapInstance = mapManager.getMap();
+                    
+                    try {
+                      // Restore lightning if it was on
+                      if (currentLayers.lightning && !mapInstance.getLayer('simple-lightning-layer')) {
+                        console.log('⚡ Restoring lightning...');
+                        const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
+                        await addSimpleLightningOverlay(mapInstance);
+                        setTimeout(() => {
+                          try {
+                            mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', currentWeatherOpacities.lightning);
+                          } catch (e) { console.warn('Lightning opacity restore failed:', e); }
+                        }, 200);
+                      }
+                      
+                      // Restore Gulf weather layers if in Gulf region
+                      if (currentRegion?.id === 'gulf-of-mexico') {
+                        const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
+                        
+                        if (currentLayers.satelliteConus && !mapInstance.getLayer('noaa-conus-layer')) {
+                          console.log('🌧️ Restoring CONUS radar...');
+                          await addNOAAWeatherOverlay(mapInstance, 'CONUS');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', currentWeatherOpacities.satelliteConus);
+                            } catch (e) { console.warn('CONUS opacity restore failed:', e); }
+                          }, 200);
+                        }
+                        
+                        if (currentLayers.satelliteLongwave && !mapInstance.getLayer('noaa-longwave-layer')) {
+                          console.log('🛰️ Restoring Longwave IR...');
+                          await addNOAAWeatherOverlay(mapInstance, 'LONGWAVE');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-longwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteLongwave);
+                            } catch (e) { console.warn('Longwave opacity restore failed:', e); }
+                          }, 200);
+                        }
+                        
+                        if (currentLayers.satelliteShortwave && !mapInstance.getLayer('noaa-shortwave-layer')) {
+                          console.log('🛰️ Restoring Shortwave IR...');
+                          await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
+                          setTimeout(() => {
+                            try {
+                              mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteShortwave);
+                            } catch (e) { console.warn('Shortwave opacity restore failed:', e); }
+                          }, 200);
+                        }
+                      }
+                      
+                      // Emit multiple events to notify all components to restore their layers
+                      setTimeout(() => {
+                        const eventDetail = { 
+                          newStyle, 
+                          previousLayers: currentLayers,
+                          restoreAlternateLines: true,
+                          restoreWeatherCircles: true 
+                        };
+
+                        // Emit multiple event types for maximum compatibility
+                        ['map-style-switched', 'map-style-changed'].forEach(eventName => {
+                          const event = new CustomEvent(eventName, { detail: eventDetail });
+                          window.dispatchEvent(event);
+                        });
+                        
+                        console.log('📢 Notified other components to restore layers (multiple event types)');
+                      }, 500);
+                      
+                      console.log('✅ Layer restoration completed');
+                      
+                    } catch (error) {
+                      console.error('❌ Error during layer restoration:', error);
+                    }
+                  }, 1000); // Wait 1 second for style to fully load
+                  
+                } catch (error) {
+                  console.error('3D map switch failed:', error);
+                }
+              }}
+            >
+              🗺️ Toggle 3D Map
+            </button>
+          </div>
+        </div>
+        
+        {/* Section 2: Region-Specific Layers */}
+        <div className="layer-section section-border">
+          <h4>🗺️ {currentRegion?.name || 'Region-Specific'} Layers</h4>
           
-          {/* Gulf Region Specific Weather Layers */}
+          {/* Coordinate Grid - moved here as requested */}
+          <div className="subsection-header">Coordinate Grid</div>
+          {renderLayerToggle('grid', 'Coordinate Grid')}
+          
+          {/* Gulf Coast Region */}
           {currentRegion?.id === 'gulf-of-mexico' && (
             <>
-              <div className="region-specific-label">Gulf Region Weather:</div>
+              <div className="subsection-header">Gulf Coast Layers</div>
+              {renderLayerToggle(
+                'gulfCoastHeli', 
+                'Gulf Coast Helicopter Map', 
+                true
+              )}
+          
+              {/* Opacity slider for Gulf Coast map */}
+              {layers.gulfCoastHeli && (
+                <div className="opacity-slider-container">
+                  <label className="opacity-slider-label">
+                    Map Opacity: {Math.round(gulfCoastOpacity * 100)}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={gulfCoastOpacity}
+                    onChange={handleGulfCoastOpacityChange}
+                    className="opacity-slider"
+                  />
+                  <div className="opacity-slider-marks">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Gulf Region Specific Weather Layers */}
+              <div className="subsection-header">Gulf Weather Layers</div>
               <div className="button-row">
                 {renderLayerToggle('satelliteConus', '🌧️ Radar (CONUS)', true)}
                 {renderLayerToggle('satelliteLongwave', '🛰️ Longwave IR', true)}
@@ -1442,26 +1604,87 @@ const MapLayersCard = ({
             </>
           )}
           
-          {/* Norway Region Specific Weather Layers (for future implementation) */}
+          {/* Norway Region Specific Layers */}
           {currentRegion?.id === 'norway' && (
             <>
-              <div className="region-specific-label">Norway Region Weather:</div>
+              <div className="subsection-header">Norway Regional Maps</div>
               <div className="layer-placeholder">
-                <em>Wind maps and triggered lightning coming soon...</em>
+                <em>Norway helicopter routes and wind maps coming soon...</em>
+              </div>
+              
+              <div className="subsection-header">Norway Weather Layers</div>
+              <div className="layer-placeholder">
+                <em>Norwegian MET data and triggered lightning coming soon...</em>
+              </div>
+              
+              {/* Norway-specific weather circles if available */}
+              {renderLayerToggle('weatherCircles', 'Weather Circles', !!weatherSegmentsHook)}
+            </>
+          )}
+          
+          {/* Other regions - standard weather circles */}
+          {currentRegion?.id !== 'gulf-of-mexico' && currentRegion?.id !== 'norway' && (
+            <>
+              <div className="subsection-header">{currentRegion?.name || 'Regional'} Weather Layers</div>
+              {renderLayerToggle('weatherCircles', 'Weather Circles', !!weatherSegmentsHook)}
+              
+              <div className="layer-placeholder">
+                <em>Additional regional layers will be available as they are implemented</em>
               </div>
             </>
           )}
           
-          {/* Other regions */}
-          {currentRegion?.id !== 'gulf-of-mexico' && currentRegion?.id !== 'norway' && (
-            <div className="region-specific-label">
-              <em>Additional weather layers available in Gulf and Norway regions</em>
+          {/* US/Gulf-specific Aviation Layers */}
+          {(currentRegion?.id === 'gulf-of-mexico' || currentRegion?.id === 'north-sea' || !currentRegion?.id) && (
+            <>
+              <div className="subsection-header">Aviation Layers</div>
+              {renderLayerToggle('observedWeatherStations', 'NOAA Weather Stations', true)}
+            </>
+          )}
+          
+          {/* Global Weather Satellite Layers */}
+          <div className="subsection-header">Global Weather Layers</div>
+          {renderLayerToggle('lightning', '⚡ Lightning (Global)', true)}
+          
+          {/* Lightning opacity slider - always visible when lightning is on */}
+          {layers.lightning && (
+            <div className="opacity-slider-container">
+              <label className="opacity-slider-label">
+                Lightning Opacity: {Math.round(weatherOpacities.lightning * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0.2"
+                max="1"
+                step="0.05"
+                value={weatherOpacities.lightning}
+                onChange={(e) => {
+                  const newOpacity = parseFloat(e.target.value);
+                  setWeatherOpacities(prev => ({ ...prev, lightning: newOpacity }));
+                  // Apply opacity to lightning layer
+                  const mapInstance = mapManagerRef?.current?.map;
+                  if (mapInstance && mapInstance.getLayer('simple-lightning-layer')) {
+                    try {
+                      mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', newOpacity);
+                    } catch (error) {
+                      console.warn('Could not set lightning opacity:', error);
+                    }
+                  }
+                }}
+                className="opacity-slider"
+              />
+              <div className="opacity-slider-marks">
+                <span>20%</span>
+                <span>60%</span>
+                <span>100%</span>
+              </div>
             </div>
           )}
         </div>
         
-        <div className="layer-section">
-          <h4>🛩️ Auto Flight</h4>
+        {/* Section 3: AutoFlight Controls */}
+        <div className="layer-section section-border">
+          <h4>🛩️ AutoFlight Controls</h4>
           <div className="button-row">
             {renderLayerToggle('autoFlight', '🛩️ Auto Flight', true)}
           </div>
@@ -1553,136 +1776,6 @@ const MapLayersCard = ({
               )}
             </div>
           )}
-        </div>
-        
-        <div className="layer-section">
-          <h4>Map View</h4>
-          <div className="map-view-controls">
-            <button 
-              className="map-3d-toggle-button"
-              onClick={async () => {
-                try {
-                  console.log('🗺️ Switching map view...');
-                  
-                  const mapManager = mapManagerRef?.current;
-                  if (!mapManager) {
-                    console.error('Map manager not available');
-                    return;
-                  }
-                  
-                  // SAVE CURRENT LAYER STATE before switching
-                  const currentLayers = { ...layers };
-                  const currentWeatherOpacities = { ...weatherOpacities };
-                  console.log('💾 Saving layer state before style switch:', currentLayers);
-                  
-                  // Toggle between dark and 3D style
-                  const currentStyle = mapManager.getCurrentStyle ? mapManager.getCurrentStyle() : 'dark';
-                  const newStyle = currentStyle === '3d' ? 'dark' : '3d';
-                  
-                  console.log(`🗺️ Switching from ${currentStyle} to ${newStyle}`);
-                  
-                  await mapManager.switchMapStyle(newStyle);
-                  
-                  // CRITICAL: Reset camera to top-down view when switching back to 2D
-                  const map = mapManager.getMap();
-                  if (newStyle === 'dark' && map) {
-                    console.log('📐 Resetting camera to top-down 2D view');
-                    map.easeTo({
-                      pitch: 0,     // Top-down view
-                      bearing: 0,   // North up
-                      duration: 800 // Smooth transition
-                    });
-                  }
-                  
-                  console.log(`🗺️ Switched to ${newStyle === '3d' ? '3D Standard' : '2D Top View'} style`);
-                  
-                  // RESTORE LAYERS after style switch (small delay to ensure style is loaded)
-                  setTimeout(async () => {
-                    console.log('🔄 Restoring layers after style switch...');
-                    const mapInstance = mapManager.getMap();
-                    
-                    try {
-                      // Restore lightning if it was on
-                      if (currentLayers.lightning && !mapInstance.getLayer('simple-lightning-layer')) {
-                        console.log('⚡ Restoring lightning...');
-                        const { addSimpleLightningOverlay } = await import('../../../modules/WeatherLoader.js');
-                        await addSimpleLightningOverlay(mapInstance);
-                        setTimeout(() => {
-                          try {
-                            mapInstance.setPaintProperty('simple-lightning-layer', 'raster-opacity', currentWeatherOpacities.lightning);
-                          } catch (e) { console.warn('Lightning opacity restore failed:', e); }
-                        }, 200);
-                      }
-                      
-                      // Restore Gulf weather layers if in Gulf region
-                      if (currentRegion?.id === 'gulf-of-mexico') {
-                        const { addNOAAWeatherOverlay } = await import('../../../modules/WeatherLoader.js');
-                        
-                        if (currentLayers.satelliteConus && !mapInstance.getLayer('noaa-conus-layer')) {
-                          console.log('🌧️ Restoring CONUS radar...');
-                          await addNOAAWeatherOverlay(mapInstance, 'CONUS');
-                          setTimeout(() => {
-                            try {
-                              mapInstance.setPaintProperty('noaa-conus-layer', 'raster-opacity', currentWeatherOpacities.satelliteConus);
-                            } catch (e) { console.warn('CONUS opacity restore failed:', e); }
-                          }, 200);
-                        }
-                        
-                        if (currentLayers.satelliteLongwave && !mapInstance.getLayer('noaa-longwave-layer')) {
-                          console.log('🛰️ Restoring Longwave IR...');
-                          await addNOAAWeatherOverlay(mapInstance, 'LONGWAVE');
-                          setTimeout(() => {
-                            try {
-                              mapInstance.setPaintProperty('noaa-longwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteLongwave);
-                            } catch (e) { console.warn('Longwave opacity restore failed:', e); }
-                          }, 200);
-                        }
-                        
-                        if (currentLayers.satelliteShortwave && !mapInstance.getLayer('noaa-shortwave-layer')) {
-                          console.log('🛰️ Restoring Shortwave IR...');
-                          await addNOAAWeatherOverlay(mapInstance, 'SHORTWAVE');
-                          setTimeout(() => {
-                            try {
-                              mapInstance.setPaintProperty('noaa-shortwave-layer', 'raster-opacity', currentWeatherOpacities.satelliteShortwave);
-                            } catch (e) { console.warn('Shortwave opacity restore failed:', e); }
-                          }, 200);
-                        }
-                      }
-                      
-                      // Emit multiple events to notify all components to restore their layers
-                      setTimeout(() => {
-                        const eventDetail = { 
-                          newStyle, 
-                          previousLayers: currentLayers,
-                          restoreAlternateLines: true,
-                          restoreWeatherCircles: true 
-                        };
-
-                        // Emit multiple event types for maximum compatibility
-                        ['map-style-switched', 'map-style-changed'].forEach(eventName => {
-                          const event = new CustomEvent(eventName, { detail: eventDetail });
-                          window.dispatchEvent(event);
-                        });
-                        
-                        console.log('📢 Notified other components to restore layers (multiple event types)');
-                      }, 500);
-                      
-                      console.log('✅ Layer restoration completed');
-                      
-                    } catch (error) {
-                      console.error('❌ Error during layer restoration:', error);
-                    }
-                  }, 1000); // Wait 1 second for style to fully load
-                  
-                } catch (error) {
-                  console.error('3D map switch failed:', error);
-                }
-              }}
-            >
-              🗺️ Toggle 3D Map
-            </button>
-            
-          </div>
         </div>
         
         <div className="layer-info">
