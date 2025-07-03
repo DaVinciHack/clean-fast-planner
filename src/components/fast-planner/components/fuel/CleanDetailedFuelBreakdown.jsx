@@ -51,6 +51,14 @@ const CleanDetailedFuelBreakdown = ({
   // 🔥 STABLE REFUEL DETECTION: Use ref to maintain refuel stops during fuel input
   const refuelStopsRef = useRef([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [globalSettingsCollapsed, setGlobalSettingsCollapsed] = useState(true);
+  
+  // ✅ ALTERNATE REQUIREMENTS DETECTION: Check which specific values are affected by alternate minimums
+  const getAlternateRequirements = useCallback((stopCard) => {
+    // Return the alternateRequirements flag from the specific stop card
+    // This tells us if THIS specific stop's fuel/passenger values are constrained by alternates
+    return stopCard?.alternateRequirements || false;
+  }, []);
   
   // Read refuel stops from stopCards when component opens or stopCards change
   useEffect(() => {
@@ -224,17 +232,38 @@ const CleanDetailedFuelBreakdown = ({
     }
   }, [onFuelDataChanged, refuelStops]);
   
+  // ✅ SIMPLE FIX: Get reserve fuel from stop cards (they already have it calculated correctly)
+  const getReserveFuelFromStopCards = useCallback(() => {
+    // The stop cards already have the correct calculated reserve fuel
+    if (stopCards && stopCards.length > 0) {
+      const departureCard = stopCards.find(card => card.isDeparture);
+      if (departureCard && departureCard.fuelComponentsObject?.reserveFuel) {
+        return departureCard.fuelComponentsObject.reserveFuel;
+      }
+    }
+    // Fallback: use raw value from flight settings
+    return flightSettings.reserveFuel || 30;
+  }, [stopCards, flightSettings]);
+
   const getFuelValue = useCallback((stopName, fuelType) => {
     const key = `${stopName}_${fuelType}`;
+    
+    // For reserve fuel, use calculated value from stop cards instead of raw settings
+    if (fuelType === 'reserveFuel') {
+      const value = fuelOverrides[key];
+      return value !== undefined ? value : getReserveFuelFromStopCards();
+    }
+    
     // For taxi fuel, check override first, then fall back to flight settings
     if (fuelType === 'taxiFuel') {
       const value = fuelOverrides[key];
       return value !== undefined ? value : (flightSettings.taxiFuel || 30);
     }
+    
     // For other fuel types, return the override value or empty string (for input display)
     const value = fuelOverrides[key];
     return value !== undefined ? value : '';
-  }, [fuelOverrides, flightSettings]);
+  }, [fuelOverrides, flightSettings, getReserveFuelFromStopCards]);
   
   const handleApplyChanges = useCallback(() => {
     
@@ -325,9 +354,32 @@ const CleanDetailedFuelBreakdown = ({
         <div className="fuel-modal-body">
           
           {/* Global Fuel Settings */}
-          <div className="fuel-section">
-            <h3>Global Fuel Settings</h3>
-            <div className="fuel-grid">
+          <div style={{ marginBottom: '12px' }}>
+            <h3 
+              onClick={() => setGlobalSettingsCollapsed(!globalSettingsCollapsed)}
+              style={{ 
+                cursor: 'pointer', 
+                userSelect: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.8rem',
+                margin: '0',
+                padding: '6px 12px',
+                backgroundColor: '#2a2a2a',
+                borderRadius: '4px',
+                height: '32px'
+              }}
+            >
+              <span style={{ 
+                transform: globalSettingsCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+                fontSize: '0.7rem'
+              }}>▼</span>
+              Global Fuel Settings
+            </h3>
+            {!globalSettingsCollapsed && (
+            <div className="fuel-grid" style={{ padding: '8px 0', marginTop: '4px' }}>
               
               <div className="fuel-row">
                 <label style={{fontSize: '0.6rem'}}>Extra Fuel (lbs):</label>
@@ -385,37 +437,12 @@ const CleanDetailedFuelBreakdown = ({
                       return '(lbs)';
                     })()}
                   </div>
-                  <input type="number" value={(() => {
-                    // Use the same calculation logic as useReserveFuel hook and StopCardCalculator
-                    const currentPolicy = fuelPolicy?.currentPolicy;
-                    
-                    if (!currentPolicy || !selectedAircraft) {
-                      return flightSettings?.reserveFuel || 0;
-                    }
-
-                    // Check if policy has the expected structure
-                    if (!currentPolicy.fuelTypes || !currentPolicy.fuelTypes.reserveFuel) {
-                      return flightSettings?.reserveFuel || 0;
-                    }
-
-                    const reserveType = currentPolicy.fuelTypes.reserveFuel.type || 'fixed';
-                    const policyValue = currentPolicy.fuelTypes.reserveFuel.default || 0;
-
-                    if (reserveType === 'time' && selectedAircraft.fuelBurn) {
-                      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
-                      const timeMinutes = policyValue;
-                      const fuelFlowPerHour = selectedAircraft.fuelBurn;
-                      const fuelAmount = Math.round((timeMinutes * fuelFlowPerHour) / 60);
-                      return fuelAmount;
-                    } else {
-                      // Fixed amount - the policy value is already in lbs
-                      return policyValue;
-                    }
-                  })()} placeholder="20" style={{width: '80px', padding: '6px', backgroundColor: '#2c2c2c', color: '#fff', border: '1px solid #666', borderRadius: '4px'}} readOnly />
+                  <input type="number" value={getReserveFuelFromStopCards()} placeholder="20" style={{width: '80px', padding: '6px', backgroundColor: '#2c2c2c', color: '#fff', border: '1px solid #666', borderRadius: '4px'}} readOnly />
                 </div>
               </div>
               
             </div>
+            )}
           </div>
           
           {/* Stop Cards with Fuel Inputs */}
@@ -534,14 +561,26 @@ const CleanDetailedFuelBreakdown = ({
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><DistanceIcon /> {card.totalDistance || card.distance || '0.0'} nm</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><TimeIcon /> {formatTime(card.totalTime || card.timeHours || 0)}</span>
                       <div style={{
-                        background: '#0066cc',
+                        background: getAlternateRequirements(card) ? 'rgba(52, 52, 52, 0.8)' : '#0066cc',
                         color: 'white',
                         padding: '4px 12px',
                         borderRadius: '4px',
                         fontSize: '0.9rem',
-                        fontWeight: '600'
+                        fontWeight: '600',
+                        border: getAlternateRequirements(card) ? '2px solid #f39c12' : 'none'
                       }}>
-                        Required Fuel: {card.totalFuel || 0} lbs
+                        Required Fuel: <span style={getAlternateRequirements(card) ? { color: '#f39c12' } : {}}>{card.totalFuel || 0}</span> lbs
+                        {getAlternateRequirements(card) && (
+                          <span style={{
+                            fontSize: '0.7em',
+                            marginLeft: '8px',
+                            fontWeight: 'bold',
+                            opacity: 0.9,
+                            color: '#f39c12'
+                          }}>
+                            ALT FUEL REQUIRED
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -599,7 +638,7 @@ const CleanDetailedFuelBreakdown = ({
                               marginBottom: '1px'
                             }}>Available</div>
                             <div style={{
-                              color: '#fff',
+                              color: getAlternateRequirements(card) ? '#f39c12' : '#fff',
                               fontSize: '1.1rem',
                               fontWeight: '600',
                               marginBottom: '6px'
@@ -633,7 +672,7 @@ const CleanDetailedFuelBreakdown = ({
                               marginBottom: '1px'
                             }}>Available</div>
                             <div style={{
-                              color: '#fff',
+                              color: getAlternateRequirements(card) ? '#f39c12' : '#fff',
                               fontSize: '1.1rem',
                               fontWeight: '600',
                               marginBottom: '6px'
@@ -917,7 +956,7 @@ const CleanDetailedFuelBreakdown = ({
                           // The user override is what this airport CONSUMES, not what it carries forward
                           const app = card.fuelComponentsObject?.approachFuel || 0;
                           const extra = getFuelValue(stopName, 'extraFuel') || card.fuelComponentsObject?.extraFuel || 0;
-                          const res = card.fuelComponentsObject?.reserveFuel || 0;
+                          const res = getFuelValue(stopName, 'reserveFuel') || card.fuelComponentsObject?.reserveFuel || 0;
                           
                           if (taxi > 0) parts.push(`Taxi:${taxi}`);
                           if (trip > 0) parts.push(`Trip:${trip}`);

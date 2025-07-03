@@ -33,6 +33,18 @@ import { detectLocationSegment, createSegmentFuelKey, parseSegmentFuelKey } from
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false, alternateStopCard = null) => {
   
+  console.log('🚨 STOPCARDCALCULATOR CALLED:', {
+    waypoints: waypoints?.length,
+    selectedAircraft: !!selectedAircraft,
+    fuelPolicy: !!options?.fuelPolicy,
+    reserveFuel: options?.reserveFuel
+  });
+  
+  // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END
+  setTimeout(() => {
+    console.log('🚨 CALCULATED RESERVE FUEL RESULT:', calculatedReserveFuel);
+  }, 100);
+  
   // First, verify we have the necessary input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
     console.error('StopCardCalculator: Missing required input data');
@@ -231,7 +243,20 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   let calculatedReserveFuel = null; // Start with null - no dangerous defaults
   
   // ✅ ENHANCED DEBUG: Reserve fuel conversion with detailed logging
-  // Debug logging would go here
+  console.log('🔍 RESERVE FUEL DEBUG:', {
+    hasFuelPolicy: !!fuelPolicy,
+    hasFuelTypes: !!fuelPolicy?.fuelTypes,
+    hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
+    reserveType: fuelPolicy?.fuelTypes?.reserveFuel?.type,
+    reserveDefault: fuelPolicy?.fuelTypes?.reserveFuel?.default,
+    hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn,
+    aircraftFuelBurn: selectedAircraft?.fuelBurn,
+    rawReserveFuel: reserveFuel
+  });
+  
+  console.log('🚨 FUEL POLICY FULL OBJECT:', fuelPolicy);
+  console.log('🚨 AIRCRAFT FULL OBJECT:', selectedAircraft);
+  console.log('🚨 AIRCRAFT FUEL BURN:', selectedAircraft?.fuelBurn);
   
   if (fuelPolicy && fuelPolicy.fuelTypes?.reserveFuel && selectedAircraft?.fuelBurn) {
     const reserveType = fuelPolicy.fuelTypes.reserveFuel.type || 'fixed';
