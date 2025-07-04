@@ -99,7 +99,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
-    extraFuel = 0,        // Manual extra fuel override (global - for settings page)
+    extraFuel = 0,        // ❌ DEPRECATED: Global extra fuel (no longer used - use locationFuelOverrides)
     cargoWeight = 0,      // Cargo weight for payload calculations
     araFuel = 0,          // ARA fuel from weather analysis
     approachFuel = 0,     // Approach fuel from weather analysis
@@ -108,8 +108,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   } = options;
   
   
-  // 🔧 DEBUG: Log extraFuel value to see what we're getting
-  // Debug logging would go here
+  // ✅ EXTRA FUEL: Now uses location-specific fuel only (no global fallbacks)
   
   // 🔍 SPECIFIC DEBUG: Check for ST127-A_araFuel
   
@@ -1350,7 +1349,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         const alternateLegFuel = alternateStopCard?.fuelComponentsObject?.altFuel || 0;
         const alternateContingency = Math.round((tripFuelToSplit + alternateLegFuel) * contingencyFuelPercentValue / 100);
         
-        const intermediateAlternateFuel = tripFuelToSplit + alternateLegFuel + alternateContingency + remainingDeckFuel + reserveFuelValue + (extraFuel || 0);
+        // ✅ EXTRA FUEL FIX: Use location-specific extra fuel, not global fallback
+        const locationExtraFuel = getLocationFuel(toWaypoint, 'extraFuel', cardIndex) || 0;
+        const intermediateAlternateFuel = tripFuelToSplit + alternateLegFuel + alternateContingency + remainingDeckFuel + reserveFuelValue + locationExtraFuel;
         
         // Override the fuel amount
         fuelNeeded = intermediateAlternateFuel;
@@ -1362,14 +1363,14 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           contingencyFuel: alternateContingency,
           deckFuel: remainingDeckFuel,
           reserveFuel: reserveFuelValue,
-          extraFuel: extraFuel || 0
+          extraFuel: locationExtraFuel
         };
         
         // Update fuel components text
         let alternateParts = [`Trip:${tripFuelToSplit}`, `Alt:${alternateLegFuel}`, `Cont:${alternateContingency}`];
         if (remainingDeckFuel > 0) alternateParts.push(`Deck:${remainingDeckFuel}`);
         alternateParts.push(`Res:${reserveFuelValue}`);
-        if (extraFuel > 0) alternateParts.push(`Extra:${extraFuel}`);
+        if (locationExtraFuel > 0) alternateParts.push(`Extra:${locationExtraFuel}`);
         fuelComponentsText = alternateParts.join(' ') + ' (alternate)';
         
         intermediateAlternateRequirements = {
@@ -1711,7 +1712,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     reserveFuel = 0,      // Default to 0 to make missing settings obvious
     deckTimePerStop = 0,  // Default to 0 to make missing settings obvious
     deckFuelFlow = 0,     // Default to 0 to make missing settings obvious
-    extraFuel = 0,        // 🔧 ADDED: Missing extraFuel parameter
+    extraFuel = 0,        // ❌ DEPRECATED: Global extra fuel (no longer used - use locationFuelOverrides)
     araFuel = 0,          // 🔧 FIXED: Missing araFuel parameter (was causing error)
     approachFuel = 0,     // 🔧 FIXED: Missing approachFuel parameter (was causing error)
     fuelPolicy = null     // 🔧 CRITICAL: Add fuel policy for reserve fuel conversion
