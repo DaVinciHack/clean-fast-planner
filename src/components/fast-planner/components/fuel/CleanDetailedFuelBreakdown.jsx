@@ -116,8 +116,15 @@ const CleanDetailedFuelBreakdown = ({
     }
     
     try {
-      // Format overrides to match expected structure
+      // 🔄 MERGE OVERRIDES: Combine local state (typing) with parent state (synced)
       const formattedOverrides = {};
+      
+      // First, add parent overrides (synced values)
+      Object.entries(locationFuelOverrides || {}).forEach(([key, override]) => {
+        formattedOverrides[key] = override;
+      });
+      
+      // Then, overlay local overrides (for immediate typing feedback)
       Object.entries(fuelOverrides).forEach(([key, val]) => {
         formattedOverrides[key] = { value: val };
       });
@@ -165,7 +172,7 @@ const CleanDetailedFuelBreakdown = ({
       console.error('🔥 MEMO: Calculation error:', error);
       return stopCards; // Fallback to prop if calculation fails
     }
-  }, [waypoints, selectedAircraft, routeStats, weather, flightSettings, weatherSegments, refuelStops, waiveAlternates, alternateStopCard, fuelOverrides]);
+  }, [waypoints, selectedAircraft, routeStats, weather, flightSettings, weatherSegments, refuelStops, waiveAlternates, alternateStopCard, fuelOverrides, locationFuelOverrides]);
   
   // 🛡️ RACE CONDITION FIX: Only allow updates after component is mounted
   const [isMounted, setIsMounted] = useState(false);
@@ -200,35 +207,39 @@ const CleanDetailedFuelBreakdown = ({
   // 🚀 DIRECT CALCULATOR: Removed - now handled directly in setState callback to avoid closure issues
   
   // 🚀 SIMPLE FUEL CHANGE: Update local state and recalculate immediately  
-  const handleFuelChange = useCallback((stopName, fuelType, value) => {
+  const handleFuelChange = useCallback((stopName, fuelType, value, cardIndex = null) => {
+    console.log('🔧 FUEL CHANGE:', { stopName, fuelType, value, cardIndex });
     
     // Update local state with simple key-value overrides (NO SYNC during typing)
     setFuelOverrides(prev => {
-      const key = `${stopName}_${fuelType}`;
+      const key = cardIndex ? `${stopName}_${cardIndex}_${fuelType}` : `${stopName}_${fuelType}`;
+      console.log('🔧 STORING KEY:', key, '=', value);
       const newOverrides = {
         ...prev,
         [key]: value
       };
       
-      
+      console.log('🔧 NEW OVERRIDES:', newOverrides);
       return newOverrides;
     });
   }, []);
   
   // Separate function for when user finishes typing (onBlur)
-  const handleFuelBlur = useCallback((stopName, fuelType, value) => {
+  const handleFuelBlur = useCallback((stopName, fuelType, value, cardIndex = null) => {
     
-    // Only sync to parent when user finishes typing
-    if (onFuelDataChanged && value !== '') {
+    // 🔧 SYNC ALL VALUES: Allow empty strings, zeros, and all values to sync to parent
+    if (onFuelDataChanged) {
       const fuelChangeData = {
         stopName: stopName,
         fuelType: fuelType, 
-        value: value,
+        value: value, // Allow all values including 0 and empty string
+        cardIndex: cardIndex, // 🔧 UNIQUE KEYS: Send cardIndex for unique key generation
         // 🚫 DO NOT SEND REFUEL STOPS: Detailed page should not override main UI refuel state
         stopIndex: undefined, // Will be detected in handleLocationFuelChange
         isRig: undefined // Will be detected in handleLocationFuelChange
       };
       
+      console.log('🔄 BLUR SYNC:', fuelChangeData);
       onFuelDataChanged(fuelChangeData);
     }
   }, [onFuelDataChanged, refuelStops]);
@@ -246,31 +257,41 @@ const CleanDetailedFuelBreakdown = ({
     return flightSettings.reserveFuel || 30;
   }, [stopCards, flightSettings]);
 
-  const getFuelValue = useCallback((stopName, fuelType) => {
-    const key = `${stopName}_${fuelType}`;
+  const getFuelValue = useCallback((stopName, fuelType, cardIndex = null) => {
+    const key = cardIndex ? `${stopName}_${cardIndex}_${fuelType}` : `${stopName}_${fuelType}`;
+    
+    // 🔄 DUAL SOURCE: Check local state first (for immediate typing feedback), then parent state (for persistence)
+    let value = fuelOverrides[key];
+    
+    // If not in local state, check parent state (for values set elsewhere or on reload)
+    if (value === undefined && locationFuelOverrides[key]) {
+      const parentOverride = locationFuelOverrides[key];
+      value = parentOverride && typeof parentOverride === 'object' ? parentOverride.value : parentOverride;
+    }
+    
+    console.log('🔍 READING KEY:', key, 'local:', fuelOverrides[key], 'parent:', locationFuelOverrides[key], 'final:', value);
     
     // For reserve fuel, use calculated value from stop cards instead of raw settings
     if (fuelType === 'reserveFuel') {
-      const value = fuelOverrides[key];
       return value !== undefined ? value : getReserveFuelFromStopCards();
     }
     
     // For taxi fuel, check override first, then fall back to flight settings
     if (fuelType === 'taxiFuel') {
-      const value = fuelOverrides[key];
       return value !== undefined ? value : (flightSettings.taxiFuel || 30);
     }
     
     // For other fuel types, return the override value or empty string (for input display)
-    const value = fuelOverrides[key];
     return value !== undefined ? value : '';
-  }, [fuelOverrides, flightSettings, getReserveFuelFromStopCards]);
+  }, [fuelOverrides, locationFuelOverrides, flightSettings, getReserveFuelFromStopCards]);
   
   const handleApplyChanges = useCallback(() => {
     
     // Convert simple overrides to FuelInputManager format
     Object.entries(fuelOverrides).forEach(([key, value]) => {
-      const [stopName, fuelType] = key.split('_');
+      const parts = key.split('_');
+      const stopName = parts[0];
+      const fuelType = parts.length === 3 ? parts[2] : parts[1]; // Handle both old and new formats
       fuelManager.updateLocationFuel(stopName, fuelType, value);
     });
     
@@ -774,21 +795,21 @@ const CleanDetailedFuelBreakdown = ({
                           <div style={{ textAlign: 'center' }}>
                             <input
                               type="number"
-                              value={isDeparture ? (getFuelValue(stopName, 'taxiFuel') || '') : (getFuelValue(stopName, 'deckTime') || '')}
+                              value={isDeparture ? (getFuelValue(stopName, 'taxiFuel', card.index) || '') : (getFuelValue(stopName, 'deckTime', card.index) || '')}
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0;
                                 if (isDeparture) {
-                                  handleFuelChange(stopName, 'taxiFuel', value);
+                                  handleFuelChange(stopName, 'taxiFuel', value, card.index);
                                 } else {
-                                  handleFuelChange(stopName, 'deckTime', value);
+                                  handleFuelChange(stopName, 'deckTime', value, card.index);
                                 }
                               }}
                               onBlur={(e) => {
                                 const value = parseFloat(e.target.value) || 0;
                                 if (isDeparture) {
-                                  handleFuelBlur(stopName, 'taxiFuel', value);
+                                  handleFuelBlur(stopName, 'taxiFuel', value, card.index);
                                 } else {
-                                  handleFuelBlur(stopName, 'deckTime', value);
+                                  handleFuelBlur(stopName, 'deckTime', value, card.index);
                                 }
                               }}
                               placeholder={isDeparture ? "30" : (isRig ? "15" : "0")}
@@ -836,14 +857,14 @@ const CleanDetailedFuelBreakdown = ({
                           <div style={{ textAlign: 'center' }}>
                             <input
                               type="number"
-                              value={getFuelValue(stopName, 'extraFuel') || ''}
+                              value={getFuelValue(stopName, 'extraFuel', card.index) || ''}
                               onChange={(e) => {
                                 const value = parseFloat(e.target.value) || 0;
-                                handleFuelChange(stopName, 'extraFuel', value);
+                                handleFuelChange(stopName, 'extraFuel', value, card.index);
                               }}
                               onBlur={(e) => {
                                 const value = parseFloat(e.target.value) || 0;
-                                handleFuelBlur(stopName, 'extraFuel', value);
+                                handleFuelBlur(stopName, 'extraFuel', value, card.index);
                               }}
                               placeholder="0"
                               disabled={!showExtraFuelInput} // Disable if not departure/refuel
@@ -888,7 +909,7 @@ const CleanDetailedFuelBreakdown = ({
                           <div style={{ textAlign: 'center' }}>
                             {(() => {
                               const fuelType = isRig ? 'araFuel' : 'approachFuel';
-                              const userValue = getFuelValue(stopName, fuelType);
+                              const userValue = getFuelValue(stopName, fuelType, card.index);
                               const weatherValue = getWeatherValue(stopName, fuelType);
                               const displayValue = userValue !== '' ? userValue : weatherValue;
                               const isWeatherSuggested = userValue === '' && weatherValue > 0;
@@ -901,17 +922,17 @@ const CleanDetailedFuelBreakdown = ({
                                   onChange={(e) => {
                                     const value = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
                                     if (isRig) {
-                                      handleFuelChange(stopName, 'araFuel', value);
+                                      handleFuelChange(stopName, 'araFuel', value, card.index);
                                     } else {
-                                      handleFuelChange(stopName, 'approachFuel', value);
+                                      handleFuelChange(stopName, 'approachFuel', value, card.index);
                                     }
                                   }}
                                   onBlur={(e) => {
                                     const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
                                     if (isRig) {
-                                      handleFuelBlur(stopName, 'araFuel', value);
+                                      handleFuelBlur(stopName, 'araFuel', value, card.index);
                                     } else {
-                                      handleFuelBlur(stopName, 'approachFuel', value);
+                                      handleFuelBlur(stopName, 'approachFuel', value, card.index);
                                     }
                                   }}
                                   placeholder="0"
@@ -938,7 +959,7 @@ const CleanDetailedFuelBreakdown = ({
                             })()}
                             {(() => {
                               const fuelType = isRig ? 'araFuel' : 'approachFuel';
-                              const userValue = getFuelValue(stopName, fuelType);
+                              const userValue = getFuelValue(stopName, fuelType, card.index);
                               const weatherValue = getWeatherValue(stopName, fuelType);
                               const isWeatherSuggested = userValue === '' && weatherValue > 0;
                               const isUserEntered = userValue !== '';
@@ -1001,7 +1022,7 @@ const CleanDetailedFuelBreakdown = ({
                         textAlign: 'center',
                         marginBottom: '6px'
                       }}>
-                        Overrides: Extra={getFuelValue(stopName, 'extraFuel')} ARA={getFuelValue(stopName, 'araFuel')} Approach={getFuelValue(stopName, 'approachFuel')}
+                        Overrides: Extra={getFuelValue(stopName, 'extraFuel', card.index)} ARA={getFuelValue(stopName, 'araFuel', card.index)} Approach={getFuelValue(stopName, 'approachFuel', card.index)}
                       </div>
                       
                       <div style={{
@@ -1015,7 +1036,7 @@ const CleanDetailedFuelBreakdown = ({
                           const parts = [];
                           
                           // Taxi fuel: Only show on departure card (consumed immediately on takeoff)
-                          const taxi = isDeparture ? (getFuelValue(stopName, 'taxiFuel') || card.fuelComponentsObject?.taxiFuel || 0) : 0;
+                          const taxi = isDeparture ? (getFuelValue(stopName, 'taxiFuel', card.index) || card.fuelComponentsObject?.taxiFuel || 0) : 0;
                           const trip = card.fuelComponentsObject?.tripFuel || card.tripFuel || 0;
                           const cont = card.fuelComponentsObject?.contingencyFuel || 0;
                           const deck = card.fuelComponentsObject?.deckFuel || 0;
@@ -1025,8 +1046,8 @@ const CleanDetailedFuelBreakdown = ({
                           // Approach fuel: Use CALCULATED remaining amount, not user override for this airport
                           // The user override is what this airport CONSUMES, not what it carries forward
                           const app = card.fuelComponentsObject?.approachFuel || 0;
-                          const extra = getFuelValue(stopName, 'extraFuel') || card.fuelComponentsObject?.extraFuel || 0;
-                          const res = getFuelValue(stopName, 'reserveFuel') || card.fuelComponentsObject?.reserveFuel || 0;
+                          const extra = getFuelValue(stopName, 'extraFuel', card.index) || card.fuelComponentsObject?.extraFuel || 0;
+                          const res = getFuelValue(stopName, 'reserveFuel', card.index) || card.fuelComponentsObject?.reserveFuel || 0;
                           
                           if (taxi > 0) parts.push(`Taxi:${taxi}`);
                           if (trip > 0) parts.push(`Trip:${trip}`);
@@ -1082,7 +1103,9 @@ const CleanDetailedFuelBreakdown = ({
               ) : (
                 <div>
                   {Object.entries(fuelOverrides).map(([key, value]) => {
-                    const [location, fuelType] = key.split('_');
+                    const parts = key.split('_');
+                    const location = parts[0];
+                    const fuelType = parts.length === 3 ? parts[2] : parts[1]; // Handle both old and new formats
                     const typeLabel = fuelType === 'araFuel' ? '🚁 ARA' : '🛬 Approach';
                     return (
                       <div key={key} style={{ fontSize: '0.9em', marginBottom: '2px' }}>
@@ -1173,8 +1196,8 @@ const CleanDetailedFuelBreakdown = ({
               <div style={{ marginLeft: '10px', color: '#FF6B6B', fontSize: '11px' }}>
                 {displayStopCards.map((card, i) => {
                   const stopName = card.name || card.stopName;
-                  const araOverride = getFuelValue(stopName, 'araFuel');
-                  const approachOverride = getFuelValue(stopName, 'approachFuel');
+                  const araOverride = getFuelValue(stopName, 'araFuel', card.index);
+                  const approachOverride = getFuelValue(stopName, 'approachFuel', card.index);
                   if (araOverride > 0 || approachOverride > 0) {
                     return (
                       <div key={i} style={{ marginBottom: '2px' }}>

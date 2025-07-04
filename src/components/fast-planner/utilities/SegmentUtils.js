@@ -65,15 +65,16 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   // Determine which segment based on refuel stop boundaries
   let segment = 1;
   for (const refuelStopIndex of sortedRefuelStops) {
-    // ✅ CRITICAL INDEXING FIX: Convert refuelStops (0-based) to cardIndex format (1-based)
-    // 🚨 DO NOT REMOVE THIS +1 CONVERSION! 
-    // Without this, ARA fuel and approach fuel break when refuel stops are used
-    // RefuelStops array uses 0-based indices, but card.index uses 1-based indices
-    const refuelStopCardIndex = refuelStopIndex + 1;
-    console.log(`🔍 INDEXING FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex} (was ${refuelStopIndex})`);
-    if (cardIndex <= refuelStopCardIndex) {
-      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment}`);
-      break; // Location is at or before refuel stop - fuel carried from current segment
+    // 🔧 PHASE 3 FIX: RefuelStops now uses 1-based card indices, no conversion needed
+    // RefuelStops array and card.index both use 1-based indices: [1, 2, 3, 'F']
+    const refuelStopCardIndex = refuelStopIndex; // Direct comparison, no +1 needed
+    console.log(`🔍 PHASE 3 FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex}`);
+    if (cardIndex < refuelStopCardIndex) {
+      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment} (before refuel stop)`);
+      break; // Location is before refuel stop - fuel carried from current segment
+    } else if (cardIndex === refuelStopCardIndex) {
+      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment} (IS the refuel stop)`);
+      break; // Location IS the refuel stop - end of current segment
     }
     segment++; // Location is after this refuel stop
     console.log(`➡️ MAIN LOGIC: ${locationName} moving to segment ${segment}`);
