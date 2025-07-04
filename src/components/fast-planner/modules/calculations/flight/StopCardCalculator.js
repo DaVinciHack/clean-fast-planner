@@ -652,8 +652,26 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // 🔍 DEBUG: Check what fuel flow data we have from aircraft
   // Debug logging would go here
   
-  // Calculate deck time and fuel
-  const deckTimeHours = (intermediateStops * deckTimePerStopValue) / 60; // Convert from minutes to hours
+  // Calculate deck time and fuel using individual stop overrides
+  let totalDeckTimeMinutes = 0;
+  
+  // 🔧 DECK TIME FIX: Check each intermediate stop for individual deck time overrides
+  for (let i = 1; i < stopsToProcess.length - 1; i++) { // Skip departure (0) and destination (last)
+    const stop = stopsToProcess[i];
+    const stopName = stop?.name || stop?.stopName || stop?.location;
+    const cardIndex = i + 1; // Convert to 1-based card index
+    
+    // Check for individual deck time override
+    const individualDeckTime = getLocationFuel(stop, 'deckTime', cardIndex);
+    const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
+    
+    totalDeckTimeMinutes += deckTimeForThisStop;
+    
+    console.log(`🔧 DECK TIME: ${stopName} (card ${cardIndex}) = ${deckTimeForThisStop} minutes (override: ${individualDeckTime})`);
+  }
+  
+  const deckTimeHours = totalDeckTimeMinutes / 60; // Convert from minutes to hours
+  console.log(`🔧 TOTAL DECK TIME: ${totalDeckTimeMinutes} minutes = ${deckTimeHours} hours`);
   
   // 🚨 AVIATION SAFETY: REQUIRE OSDK aircraft data - NO FALLBACKS ALLOWED
   if (!aircraft?.flatPitchFuelBurnDeckFuel) {
@@ -698,9 +716,21 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         tripFuelToFirstRefuel += legDetails[i].fuel;
       }
       
-      // Calculate deck fuel for stops before first refuel (intermediate stops only)
-      const stopsBeforeFirstRefuel = firstRefuelStopIndex - 1; // -1 because we don't count departure
-      deckFuelToFirstRefuel = Math.round((stopsBeforeFirstRefuel * deckTimePerStopValue / 60) * actualDeckFuelFlow);
+      // 🔧 DECK TIME FIX: Calculate deck fuel for stops before first refuel using individual overrides
+      let deckTimeMinutesToFirstRefuel = 0;
+      for (let i = 1; i < firstRefuelStopIndex; i++) { // Skip departure (0), count intermediate stops
+        if (i < stopsToProcess.length) {
+          const stop = stopsToProcess[i];
+          const cardIndex = i + 1; // Convert to 1-based card index
+          const individualDeckTime = getLocationFuel(stop, 'deckTime', cardIndex);
+          const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
+          deckTimeMinutesToFirstRefuel += deckTimeForThisStop;
+          
+          console.log(`🔧 REFUEL DECK TIME: ${stop?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
+        }
+      }
+      deckFuelToFirstRefuel = Math.round((deckTimeMinutesToFirstRefuel / 60) * actualDeckFuelFlow);
+      console.log(`🔧 REFUEL TOTAL DECK: ${deckTimeMinutesToFirstRefuel} minutes = ${deckFuelToFirstRefuel} lbs`);
       
       // Calculate contingency based on trip fuel to first refuel
       const contingencyToFirstRefuel = Math.round((tripFuelToFirstRefuel * contingencyFuelPercentValue) / 100);
@@ -715,8 +745,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       console.log(`🔍 DEPARTURE APPROACH FUEL DEBUG: calculateSegmentLocationFuel('approachFuel', 1) = ${updatedSegment1ApproachFuel}`);
       const segment1ApproachFuel = updatedSegment1ApproachFuel;
       
-      // For departure to first refuel: Taxi + Trip(to refuel) + Contingency(for refuel segment) + Reserve + ARA(if needed) + Approach(if destination in segment) + Deck(for intermediate stops)
-      departureFuelNeeded = taxiFuelValue + tripFuelToFirstRefuel + contingencyToFirstRefuel + deckFuelToFirstRefuel + reserveFuelValue + segment1ExtraFuel;
+      // 🛩️ VFR MODE: When alternates are waived, use minimal fuel for maximum passengers
+      const segmentReserveFuel = waiveAlternates ? 0 : reserveFuelValue; // VFR: no reserve fuel required
+      
+      // For departure to first refuel: Taxi + Trip(to refuel) + Contingency(for refuel segment) + Reserve(VFR=0) + ARA(if needed) + Approach(if destination in segment) + Deck(for intermediate stops)
+      departureFuelNeeded = taxiFuelValue + tripFuelToFirstRefuel + contingencyToFirstRefuel + deckFuelToFirstRefuel + segmentReserveFuel + segment1ExtraFuel;
       
       // ✅ SEGMENT-AWARE: Recalculate ARA fuel including user overrides for segment 1
       console.log(`🎯 DEBUG: Available fuel overrides:`, Object.keys(locationFuelOverrides));
@@ -735,7 +768,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         trip: tripFuelToFirstRefuel,
         contingency: contingencyToFirstRefuel,
         deck: deckFuelToFirstRefuel,
-        reserve: reserveFuelValue,
+        reserve: segmentReserveFuel,  // ✅ VFR MODE: Use segment-specific reserve fuel
         ara: updatedSegment1AraFuel,
         approach: segment1ApproachFuel,  // ✅ SEGMENT-AWARE: Only approach fuel for segment 1
         extra: segment1ExtraFuel  // ✅ SEGMENT-AWARE: Use segment 1 extra fuel
@@ -852,6 +885,25 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     // DEBUG: Log the fuel components for departure
     // Debug logging would go here
     
+    // 🛡️ FUEL CAPACITY CHECK: Check if required fuel exceeds aircraft maximum capacity
+    const aircraftMaxFuel = selectedAircraft.maxFuel || null;
+    console.log(`🔍 FUEL CAPACITY DEBUG: Required=${Math.round(departureFuelNeeded)}, Max=${aircraftMaxFuel}, Aircraft:`, selectedAircraft);
+    console.log(`🔍 COMPARISON DEBUG: aircraftMaxFuel=${aircraftMaxFuel}, departureFuelNeeded=${departureFuelNeeded}, comparison=${departureFuelNeeded > aircraftMaxFuel}`);
+    const exceedsCapacity = aircraftMaxFuel && departureFuelNeeded > aircraftMaxFuel;
+    console.log(`🔍 EXCEEDS CAPACITY: ${exceedsCapacity}`);
+    const excessAmount = exceedsCapacity ? departureFuelNeeded - aircraftMaxFuel : 0;
+    
+    const fuelCapacityWarning = exceedsCapacity ? {
+      exceedsCapacity: true,
+      excessAmount: Math.round(excessAmount),
+      requiredFuel: Math.round(departureFuelNeeded),
+      maxCapacity: Math.round(aircraftMaxFuel)
+    } : null;
+    
+    if (exceedsCapacity) {
+      console.log(`🚨 FUEL CAPACITY WARNING: Required ${Math.round(departureFuelNeeded)} lbs exceeds aircraft capacity ${Math.round(aircraftMaxFuel)} lbs by ${Math.round(excessAmount)} lbs`);
+    }
+    
     // Create departure card with detailed console logging
     // ✅ ALTERNATE LOGIC: Already handled correctly at lines 795-801
     // No duplicate override needed - the proper logic already preserves refuel-optimized fuel
@@ -893,12 +945,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       },
       // Add alternate fuel requirements for UI display
       alternateRequirements: alternateRequirements,
+      // Add fuel capacity warning for UI display
+      fuelCapacityWarning: fuelCapacityWarning,
       shouldShowStrikethrough: shouldShowStrikethrough,
       isDeparture: true,
       isDestination: false
     };
     
     // Add the departure card to our cards array
+    console.log(`🔍 DEPARTURE CARD DEBUG: fuelCapacityWarning=`, departureCard.fuelCapacityWarning);
     cards.push(departureCard);
   }
 
@@ -989,13 +1044,39 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       remainingTripFuel += legDetails[j].fuel;
     }
 
-    // Calculate remaining number of deck stops to calculation end point
-    // Count intermediate stops between current position and calculation end point
-    remainingIntermediateStops = Math.max(0, calculationEndPoint - (i + 2) - 1); // 🔧 INDEXING FIX: -1 because end point doesn't count as intermediate
+    // 🔧 DECK FUEL FIX: Count actual intermediate rigs between current position and calculation end point
+    remainingIntermediateStops = 0;
+    for (let j = i + 1; j < legDetails.length && j < calculationEndPoint - 1; j++) {
+      const nextWaypoint = legDetails[j]?.toWaypoint;
+      if (nextWaypoint) {
+        // Count all landing stops as potential deck fuel locations (rigs and airports)
+        const isLandingStop = !nextWaypoint.isWaypoint && nextWaypoint.pointType !== 'NAVIGATION_WAYPOINT';
+        if (isLandingStop) {
+          remainingIntermediateStops++;
+        }
+      }
+    }
+    console.log(`🔧 DECK FUEL DEBUG: From leg ${i} to endpoint ${calculationEndPoint}, found ${remainingIntermediateStops} intermediate stops`);
 
-    // Calculate remaining deck fuel - only for intermediate stops
-    const remainingDeckTimeHours = (remainingIntermediateStops * deckTimePerStopValue) / 60;
+    // 🔧 DECK TIME FIX: Calculate remaining deck fuel using individual overrides for remaining stops
+    let remainingDeckTimeMinutes = 0;
+    for (let j = i + 1; j < legDetails.length && j < calculationEndPoint - 1; j++) {
+      const nextWaypoint = legDetails[j]?.toWaypoint;
+      if (nextWaypoint) {
+        const isLandingStop = !nextWaypoint.isWaypoint && nextWaypoint.pointType !== 'NAVIGATION_WAYPOINT';
+        if (isLandingStop) {
+          const cardIndex = j + 2; // Convert to 1-based card index for non-departure stops
+          const individualDeckTime = getLocationFuel(nextWaypoint, 'deckTime', cardIndex);
+          const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
+          remainingDeckTimeMinutes += deckTimeForThisStop;
+          
+          console.log(`🔧 REMAINING DECK TIME: ${nextWaypoint?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
+        }
+      }
+    }
+    const remainingDeckTimeHours = remainingDeckTimeMinutes / 60;
     const remainingDeckFuel = Math.round(remainingDeckTimeHours * actualDeckFuelFlow);
+    console.log(`🔧 REMAINING TOTAL DECK: ${remainingDeckTimeMinutes} minutes = ${remainingDeckFuel} lbs`);
 
     // Calculate remaining contingency fuel (proportional to remaining trip fuel)
     let remainingContingencyFuel = 0;
@@ -1974,10 +2055,22 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   // Calculate fuel components using same logic as normal stop cards
   const alternateContingencyFuel = Math.round((totalAlternateTripFuel * contingencyFuelPercentValue) / 100);
   
-  // Calculate deck fuel for intermediate stops TO the split point only
-  const intermediateStopsToSplit = Math.max(0, splitPointIndex - 1); // Exclude departure and split point
-  const alternateDeckTimeHours = (intermediateStopsToSplit * deckTimePerStopValue) / 60;
+  // 🔧 DECK TIME FIX: Calculate deck fuel for intermediate stops TO the split point using individual overrides
+  let alternateDeckTimeMinutes = 0;
+  for (let i = 1; i < splitPointIndex; i++) { // Skip departure (0), count up to split point
+    if (i < waypoints.length) {
+      const stop = waypoints[i];
+      const cardIndex = i + 1; // Convert to 1-based card index
+      const individualDeckTime = getLocationFuel(stop, 'deckTime', cardIndex);
+      const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
+      alternateDeckTimeMinutes += deckTimeForThisStop;
+      
+      console.log(`🔧 ALTERNATE DECK TIME: ${stop?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
+    }
+  }
+  const alternateDeckTimeHours = alternateDeckTimeMinutes / 60;
   const alternateDeckFuel = Math.round(alternateDeckTimeHours * deckFuelFlowValue);
+  console.log(`🔧 ALTERNATE TOTAL DECK: ${alternateDeckTimeMinutes} minutes = ${alternateDeckFuel} lbs`);
   
   // 🚨 CRITICAL FIX: Calculate segment 1 ARA fuel for alternate card (same as main calculation)
   // Import the segment-aware utilities if not already available

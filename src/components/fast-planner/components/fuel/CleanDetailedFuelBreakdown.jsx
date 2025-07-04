@@ -28,6 +28,22 @@ const formatTime = (timeHours) => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
+// Standardized input styling
+const getInputStyle = (isDisabled, borderColor = '#4A9EFF') => ({
+  width: 'clamp(50px, 10vw, 65px)',
+  padding: '2px 4px',
+  backgroundColor: isDisabled ? '#3a3a3a' : '#1f1f1f', // Lighter for disabled, darker for enabled
+  color: isDisabled ? '#888' : '#fff',
+  border: `1px solid ${borderColor}`,
+  borderRadius: '3px',
+  textAlign: 'center',
+  fontSize: 'clamp(11px, 2vw, 12px)',
+  height: '20px',
+  cursor: isDisabled ? 'not-allowed' : 'text',
+  position: 'relative',
+  backgroundImage: isDisabled ? 'linear-gradient(45deg, transparent 47%, #555 48%, #555 52%, transparent 53%)' : 'none'
+});
+
 const CleanDetailedFuelBreakdown = ({
   visible = false,
   onClose = () => {},
@@ -383,15 +399,19 @@ const CleanDetailedFuelBreakdown = ({
       zIndex: 1000,
       padding: '20px'
     }} onClick={onClose}>
-      <div style={{
+      <div className="fuel-modal-content" style={{
         background: '#1e1e1e',
-        borderRadius: '12px',
+        borderRadius: '18px',
         width: 'min(95vw, 750px)',
         maxHeight: '90vh',
         overflowY: 'auto',
+        overflowX: 'hidden',
         boxShadow: '0 12px 48px rgba(0, 0, 0, 0.6)',
         color: '#fff',
-        fontSize: 'clamp(0.7rem, 2vw, 0.8rem)'
+        fontSize: 'clamp(0.7rem, 2vw, 0.8rem)',
+        paddingRight: '6px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#444 transparent'
       }} onClick={(e) => e.stopPropagation()}>
         <div className="fuel-modal-header">
           <h2>Detailed Fuel & Passenger Management</h2>
@@ -413,8 +433,8 @@ const CleanDetailedFuelBreakdown = ({
                 fontSize: '0.8rem',
                 margin: '0',
                 padding: '6px 12px',
-                backgroundColor: '#2a2a2a',
-                borderRadius: '4px',
+                backgroundColor: '#242424',
+                borderRadius: '16px',
                 height: '32px'
               }}
             >
@@ -543,7 +563,7 @@ const CleanDetailedFuelBreakdown = ({
                   marginBottom: 'clamp(16px, 3vw, 24px)',
                   border: '1px solid #333',
                   borderRadius: '8px',
-                  background: 'linear-gradient(to bottom, rgba(25, 25, 30, 0.95), rgba(15, 15, 20, 0.98))',
+                  background: 'linear-gradient(to bottom, rgba(50, 50, 50, 0.95), rgba(20, 20, 20, 0.98))',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
@@ -608,16 +628,32 @@ const CleanDetailedFuelBreakdown = ({
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><DistanceIcon /> {card.totalDistance || card.distance || '0.0'} nm</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><TimeIcon /> {formatTime(card.totalTime || card.timeHours || 0)}</span>
                       <div style={{
-                        background: getAlternateRequirements(card) ? 'rgba(52, 52, 52, 0.8)' : '#0066cc',
+                        background: card.fuelCapacityWarning?.exceedsCapacity ? 'rgba(52, 52, 52, 0.8)' : 
+                                   getAlternateRequirements(card) ? 'rgba(52, 52, 52, 0.8)' : '#0066cc',
                         color: 'white',
                         padding: '4px 12px',
                         borderRadius: '4px',
                         fontSize: '0.9rem',
                         fontWeight: '600',
-                        border: getAlternateRequirements(card) ? '2px solid #f39c12' : 'none'
+                        border: card.fuelCapacityWarning?.exceedsCapacity ? '2px solid #dc2626' :
+                               getAlternateRequirements(card) ? '2px solid #f39c12' : 'none'
                       }}>
-                        Required Fuel: <span style={getAlternateRequirements(card) ? { color: '#f39c12' } : {}}>{card.totalFuel || 0}</span> lbs
-                        {getAlternateRequirements(card) && (
+                        Required Fuel: <span style={
+                          card.fuelCapacityWarning?.exceedsCapacity ? { color: '#dc2626' } :
+                          getAlternateRequirements(card) ? { color: '#f39c12' } : {}
+                        }>{card.totalFuel || 0}</span> lbs
+                        {card.fuelCapacityWarning?.exceedsCapacity && (
+                          <span style={{
+                            fontSize: '0.7em',
+                            marginLeft: '8px',
+                            fontWeight: 'bold',
+                            opacity: 0.9,
+                            color: '#dc2626'
+                          }}>
+                            REFUEL ({card.fuelCapacityWarning.excessAmount} lbs)
+                          </span>
+                        )}
+                        {getAlternateRequirements(card) && !card.fuelCapacityWarning?.exceedsCapacity && (
                           <span style={{
                             fontSize: '0.7em',
                             marginLeft: '8px',
@@ -800,17 +836,7 @@ const CleanDetailedFuelBreakdown = ({
                                 }
                               }}
                               placeholder={isDeparture ? "30" : (isRig ? "15" : "0")}
-                              style={{
-                                width: 'clamp(60px, 12vw, 80px)',
-                                padding: '4px 6px',
-                                backgroundColor: '#2c2c2c',
-                                color: '#fff',
-                                border: '1px solid #4A9EFF',
-                                borderRadius: '4px',
-                                textAlign: 'center',
-                                fontSize: 'clamp(12px, 2.5vw, 14px)',
-                                height: '24px'
-                              }}
+                              style={getInputStyle(false, '#4A9EFF')}
                             />
                             <div style={{ 
                               color: '#666', 
@@ -855,22 +881,12 @@ const CleanDetailedFuelBreakdown = ({
                               }}
                               placeholder="0"
                               disabled={!showExtraFuelInput} // Disable if not departure/refuel
-                              style={{
-                                width: 'clamp(60px, 12vw, 80px)',
-                                padding: '4px 6px',
-                                backgroundColor: !showExtraFuelInput ? '#1a1a1a' : '#2c2c2c', // Dark for disabled
-                                color: !showExtraFuelInput ? '#666' : '#fff', // Dimmed text for disabled
-                                border: `2px solid ${
-                                  !showExtraFuelInput ? '#666' : 
-                                  (getFuelValue(stopName, 'extraFuel', card.index) && getFuelValue(stopName, 'extraFuel', card.index) !== '') ? '#22c55e' : // Green for user-entered
-                                  '#4A9EFF' // Default blue
-                                }`,
-                                borderRadius: '4px',
-                                textAlign: 'center',
-                                fontSize: 'clamp(12px, 2.5vw, 14px)',
-                                height: '24px',
-                                cursor: !showExtraFuelInput ? 'not-allowed' : 'text' // Show disabled cursor
-                              }}
+                              style={getInputStyle(
+                                !showExtraFuelInput, 
+                                !showExtraFuelInput ? '#666' : 
+                                (getFuelValue(stopName, 'extraFuel', card.index) && getFuelValue(stopName, 'extraFuel', card.index) !== '') ? '#22c55e' : // Green for user-entered
+                                '#4A9EFF' // Default blue
+                              )}
                             />
                             <div style={{ 
                               color: !showExtraFuelInput ? '#444' : '#666', 
@@ -928,23 +944,13 @@ const CleanDetailedFuelBreakdown = ({
                                   }}
                                   placeholder="0"
                                   disabled={isDeparture} // Disable approach fuel for ALL departures
-                                  style={{
-                                    width: 'clamp(60px, 12vw, 80px)',
-                                    padding: '4px 6px',
-                                    backgroundColor: isDeparture ? '#1a1a1a' : '#2c2c2c',
-                                    color: isDeparture ? '#666' : '#fff',
-                                    border: `2px solid ${
-                                      isDeparture ? '#666' : 
-                                      isUserEntered ? '#22c55e' : // Green for user-entered
-                                      isWeatherSuggested ? '#8b5cf6' : // Softer purple for weather-suggested  
-                                      '#4A9EFF' // Default blue
-                                    }`,
-                                    borderRadius: '4px',
-                                    textAlign: 'center',
-                                    fontSize: 'clamp(12px, 2.5vw, 14px)',
-                                    height: '24px',
-                                    cursor: isDeparture ? 'not-allowed' : 'text'
-                                  }}
+                                  style={getInputStyle(
+                                    isDeparture, 
+                                    isDeparture ? '#666' : 
+                                    isUserEntered ? '#22c55e' : // Green for user-entered
+                                    isWeatherSuggested ? '#8b5cf6' : // Softer purple for weather-suggested  
+                                    '#4A9EFF' // Default blue
+                                  )}
                                 />
                               );
                             })()}
@@ -1058,9 +1064,20 @@ const CleanDetailedFuelBreakdown = ({
           
         </div>
         
-        {/* 📊 COMPREHENSIVE FUEL SUMMARY */}
+        {/* COMPREHENSIVE FUEL SUMMARY */}
         <div className="fuel-section">
-          <h3>📊 Flight Fuel Summary</h3>
+          <h3 style={{
+            color: '#10B981',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.8rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: '12px'
+          }}>
+            <FuelIcon /> Flight Fuel Summary
+          </h3>
           <div className="fuel-summary-grid" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -1073,18 +1090,49 @@ const CleanDetailedFuelBreakdown = ({
             
             {/* Total Fuel Overview */}
             <div className="summary-card" style={{ backgroundColor: '#2c2c2c', padding: '12px', borderRadius: '6px' }}>
-              <h4 style={{ color: '#4CAF50', margin: '0 0 8px 0' }}>🛫 Departure Total</h4>
+              <h4 style={{ 
+                color: '#10B981', 
+                margin: '0 0 8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.7rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <FuelIcon /> Departure Total
+              </h4>
               <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#fff' }}>
                 {displayStopCards[0]?.totalFuel || 0} lbs
               </div>
               <div style={{ fontSize: '0.8em', color: '#aaa', marginTop: '4px' }}>
                 Trip: {displayStopCards[0]?.fuelComponentsObject?.tripFuel || 0} lbs
               </div>
+              <div style={{ fontSize: '0.8em', color: '#10B981', marginTop: '4px', fontWeight: '600' }}>
+                Flight Total: {(() => {
+                  // Calculate total fuel for entire flight (sum all trip fuel from each segment)
+                  const totalTripFuel = displayStopCards.reduce((sum, card) => {
+                    return sum + (card.fuelComponentsObject?.tripFuel || 0);
+                  }, 0);
+                  return totalTripFuel;
+                })()} lbs
+              </div>
             </div>
             
             {/* User Overrides Summary */}
             <div className="summary-card" style={{ backgroundColor: '#2c2c2c', padding: '12px', borderRadius: '6px' }}>
-              <h4 style={{ color: '#FF6B35', margin: '0 0 8px 0' }}>✏️ Your Overrides</h4>
+              <h4 style={{ 
+                color: '#3B82F6', 
+                margin: '0 0 8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.7rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <FuelIcon /> Your Overrides
+              </h4>
               {Object.keys(fuelOverrides).length === 0 ? (
                 <div style={{ color: '#666' }}>None yet</div>
               ) : (
@@ -1093,7 +1141,7 @@ const CleanDetailedFuelBreakdown = ({
                     const parts = key.split('_');
                     const location = parts[0];
                     const fuelType = parts.length === 3 ? parts[2] : parts[1]; // Handle both old and new formats
-                    const typeLabel = fuelType === 'araFuel' ? '🚁 ARA' : '🛬 Approach';
+                    const typeLabel = fuelType === 'araFuel' ? 'ARA' : 'Approach';
                     return (
                       <div key={key} style={{ fontSize: '0.9em', marginBottom: '2px' }}>
                         <span style={{ color: '#FFA726' }}>{typeLabel}:</span> {value} lbs @ {location}
@@ -1106,7 +1154,18 @@ const CleanDetailedFuelBreakdown = ({
             
             {/* Weather Suggestions */}
             <div className="summary-card" style={{ backgroundColor: '#2c2c2c', padding: '12px', borderRadius: '6px' }}>
-              <h4 style={{ color: '#2196F3', margin: '0 0 8px 0' }}>🌦️ Weather Suggestions</h4>
+              <h4 style={{ 
+                color: '#2196F3', 
+                margin: '0 0 8px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.7rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                <FuelIcon /> Weather Suggestions
+              </h4>
               {displayStopCards.length === 0 ? (
                 <div style={{ color: '#666' }}>No stops loaded</div>
               ) : (
@@ -1119,7 +1178,7 @@ const CleanDetailedFuelBreakdown = ({
                     if (araWeather > 0 || approachWeather > 0) {
                       return (
                         <div key={index} style={{ fontSize: '0.8em', marginBottom: '2px' }}>
-                          {stopName}: {araWeather > 0 ? `🚁${araWeather}` : ''} {approachWeather > 0 ? `🛬${approachWeather}` : ''}
+                          {stopName}: {araWeather > 0 ? `ARA: ${araWeather}` : ''} {approachWeather > 0 ? `Approach: ${approachWeather}` : ''}
                         </div>
                       );
                     }
@@ -1129,82 +1188,7 @@ const CleanDetailedFuelBreakdown = ({
               )}
             </div>
             
-            {/* Fuel Components Breakdown */}
-            <div className="summary-card" style={{ backgroundColor: '#2c2c2c', padding: '12px', borderRadius: '6px' }}>
-              <h4 style={{ color: '#9C27B0', margin: '0 0 8px 0' }}>⛽ Fuel Components</h4>
-              {displayStopCards[0]?.fuelComponentsObject ? (
-                <div style={{ fontSize: '0.8em' }}>
-                  <div>Trip: {displayStopCards[0].fuelComponentsObject.tripFuel || 0} lbs</div>
-                  <div>Taxi: {displayStopCards[0].fuelComponentsObject.taxiFuel || 0} lbs</div>
-                  <div>Reserve: {displayStopCards[0].fuelComponentsObject.reserveFuel || 0} lbs</div>
-                  <div>ARA: {displayStopCards[0].fuelComponentsObject.araFuel || 0} lbs</div>
-                  <div>Approach: {displayStopCards[0].fuelComponentsObject.approachFuel || 0} lbs</div>
-                  <div>Extra: {displayStopCards[0].fuelComponentsObject.extraFuel || 0} lbs</div>
-                </div>
-              ) : (
-                <div style={{ color: '#666' }}>No fuel data</div>
-              )}
-            </div>
             
-          </div>
-        </div>
-        
-        {/* Debug Section */}
-        <div className="fuel-section">
-          <h3>🔧 Debug Information</h3>
-          <div style={{ fontSize: '0.7rem', color: '#aaa' }}>
-            <div>Segments: {fuelManager.getCurrentSegments().length}</div>
-            <div>Refuel Stops: {JSON.stringify(refuelStops)}</div>
-            <div>Stop Cards: {displayStopCards.length}</div>
-            {fuelManager.getCurrentSegments().map((segment, i) => (
-              <div key={i}>
-                Segment {i + 1}: {segment.startLocation} → {segment.endLocation} 
-                (ARA: {segment.fuelRequirements.araFuel}, Approach: {segment.fuelRequirements.approachFuel})
-              </div>
-            ))}
-            
-            <div style={{ marginTop: '10px' }}>
-              <strong>Current Fuel Overrides:</strong>
-              <div style={{ marginLeft: '10px', color: '#4CAF50', fontSize: '11px' }}>
-                {Object.keys(fuelOverrides).length === 0 ? 
-                  'None' : 
-                  Object.entries(fuelOverrides).map(([key, value]) => (
-                    <div key={key} style={{ marginBottom: '4px' }}>
-                      <span style={{ color: '#FFA726' }}>{key}:</span> {value}
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
-            
-            {/* 🔍 DEBUG: Cross-connection detection */}
-            <div style={{ marginTop: '10px' }}>
-              <strong>Cross-Connection Debug:</strong>
-              <div style={{ marginLeft: '10px', color: '#FF6B6B', fontSize: '11px' }}>
-                {displayStopCards.map((card, i) => {
-                  const stopName = card.name || card.stopName;
-                  const araOverride = getFuelValue(stopName, 'araFuel', card.index);
-                  const approachOverride = getFuelValue(stopName, 'approachFuel', card.index);
-                  if (araOverride > 0 || approachOverride > 0) {
-                    return (
-                      <div key={i} style={{ marginBottom: '2px' }}>
-                        {stopName}: ARA={araOverride} Approach={approachOverride}
-                      </div>
-                    );
-                  }
-                  return null;
-                }).filter(Boolean)}
-              </div>
-            </div>
-            
-            <div style={{ marginTop: '10px' }}>
-              <strong>Stop Card Properties:</strong>
-              {displayStopCards.map((card, i) => (
-                <div key={i} style={{ marginLeft: '10px' }}>
-                  Stop {i}: {JSON.stringify(Object.keys(card), null, 2)}
-                </div>
-              ))}
-            </div>
           </div>
         </div>
         

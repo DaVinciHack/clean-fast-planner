@@ -252,15 +252,16 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 22px 12px 16px;
   border-bottom: 1px solid #333;
   background: #2c2c2c;
+  margin-right: -6px;
 }
 
 .fuel-modal-header h2 {
   margin: 0;
   font-size: 1rem;
-  color: #fff;
+  color: #3498db;
 }
 
 .fuel-close-button {
@@ -629,4 +630,26 @@
     max-width: 58px;
     font-size: 0.68rem;
   }
+}
+
+/* Custom Scrollbar Styling for Fuel Modal */
+.fuel-modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.fuel-modal-content::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+.fuel-modal-content::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.fuel-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+  background-clip: content-box;
 }

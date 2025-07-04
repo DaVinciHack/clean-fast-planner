@@ -638,6 +638,8 @@ const EnhancedStopCardsContainer = ({
                 // Alternate fuel requirements for IFR display
                 alternateRequirements={card.alternateRequirements}
                 shouldShowStrikethrough={card.shouldShowStrikethrough}
+                // Fuel capacity warning for aircraft limits
+                fuelCapacityWarning={card.fuelCapacityWarning}
               />
             );
           })}
