@@ -33,16 +33,17 @@ const formatTime = (timeHours) => {
 const getInputStyle = (isDisabled, borderColor = '#4A9EFF') => ({
   width: 'clamp(50px, 10vw, 65px)',
   padding: '2px 4px',
-  backgroundColor: isDisabled ? '#3a3a3a' : '#1f1f1f', // Lighter for disabled, darker for enabled
-  color: isDisabled ? '#888' : '#fff',
-  border: `1px solid ${borderColor}`,
+  backgroundColor: isDisabled ? '#2a2a2a' : '#1f1f1f',
+  color: isDisabled ? '#666' : '#fff',
+  border: `1px solid ${isDisabled ? '#555' : borderColor}`,
   borderRadius: '3px',
   textAlign: 'center',
   fontSize: 'clamp(11px, 2vw, 12px)',
   height: '20px',
   cursor: isDisabled ? 'not-allowed' : 'text',
   position: 'relative',
-  backgroundImage: isDisabled ? 'linear-gradient(45deg, transparent 47%, #555 48%, #555 52%, transparent 53%)' : 'none'
+  opacity: isDisabled ? 0.5 : 1,
+  backgroundImage: 'none'
 });
 
 const CleanDetailedFuelBreakdown = ({
@@ -268,9 +269,19 @@ const CleanDetailedFuelBreakdown = ({
     if (!displayStopCards || displayStopCards.length === 0) return [];
     
     return displayStopCards.filter(card => {
+      // 🛩️ AVIATION LOGIC: Skip final destinations - passenger capacity doesn't apply to arrival
+      if (card.isDestination || card.maxPassengers === null) {
+        console.log(`🛩️ SKIPPING final destination ${card.name || card.stopName} from overload check`);
+        return false;
+      }
+      
       const requested = getPassengerRequest(card.name || card.stopName, 'passengerCount');
       const available = card.maxPassengers || 0;
-      return requested > available;
+      const isOverloaded = requested > available;
+      
+      console.log(`🎯 OVERLOAD CHECK: ${card.name || card.stopName} - requested: ${requested}, available: ${available}, overloaded: ${isOverloaded}`);
+      
+      return isOverloaded;
     });
   }, [displayStopCards, getPassengerRequest, passengerRequests]);
   
@@ -322,9 +333,17 @@ const CleanDetailedFuelBreakdown = ({
           maxPassengersRequested,
           overloadedStops: overloadedStops.map(card => card.name || card.stopName),
           // Get real platform data from platform manager - NO MOCK DATA
-          availablePlatforms: platformManager?.getAllPlatforms ? platformManager.getAllPlatforms() : [],
+          availablePlatforms: platformManager?.getPlatforms ? platformManager.getPlatforms() : [],
           platformManager: platformManager
         };
+        
+        // Debug platform data before optimization
+        console.log('🎯 PLATFORM MANAGER DEBUG:', {
+          hasManager: !!platformManager,
+          platformCount: platformManager?.getPlatforms ? platformManager.getPlatforms().length : 'getPlatforms not available',
+          platforms: platformManager?.platforms ? platformManager.platforms.length : 'platforms property not available',
+          firstFewPlatforms: platformManager?.getPlatforms ? platformManager.getPlatforms().slice(0, 3).map(p => ({ name: p.name, hasFuel: p.hasFuel, fuelAvailable: p.fuelAvailable })) : 'none'
+        });
         
         // Run optimization with detailed logging
         console.log('🎯 FLIGHT CONFIGURATION:', flightConfiguration);
@@ -919,18 +938,18 @@ const CleanDetailedFuelBreakdown = ({
                             marginBottom: '4px',
                             textTransform: 'uppercase'
                           }}>PASSENGERS</label>
-                          <div style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '33px' }}>
                             <div style={{
                               fontSize: '0.5rem',
-                              color: '#888',
-                              marginBottom: '1px'
-                            }}>Available</div>
+                              color: '#888'
+                            }}>Avail</div>
                             <div style={{
                               color: getAlternateRequirements(card) ? '#f39c12' : '#fff',
-                              fontSize: '1.1rem',
-                              fontWeight: '600',
-                              marginBottom: '6px'
+                              fontSize: '0.8rem',
+                              fontWeight: '600'
                             }}>{card.maxPassengers || 0}</div>
+                          </div>
+                          <div style={{ textAlign: 'center', marginTop: '6px' }}>
                             <input
                               type="number"
                               min="0"
@@ -939,19 +958,18 @@ const CleanDetailedFuelBreakdown = ({
                               onChange={(e) => setPassengerRequest(card.name || card.stopName, 'passengerCount', parseInt(e.target.value) || 0)}
                               placeholder="0"
                               style={{
-                                width: '100px',
-                                padding: '8px',
-                                background: '#2a2a2a',
+                                width: '60px',
+                                height: '20px',
+                                padding: '2px 4px',
+                                backgroundColor: '#1f1f1f',
                                 color: '#fff',
                                 border: getPassengerRequest(card.name || card.stopName, 'passengerCount') > (card.maxPassengers || 0) 
-                                  ? '2px solid #e74c3c' 
-                                  : '1px solid #555',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
+                                  ? '1px solid #e74c3c' 
+                                  : '1px solid #4A9EFF',
+                                borderRadius: '3px',
+                                fontSize: '12px',
                                 textAlign: 'center',
-                                boxShadow: getPassengerRequest(card.name || card.stopName, 'passengerCount') > (card.maxPassengers || 0)
-                                  ? '0 0 5px rgba(231, 76, 60, 0.3)'
-                                  : 'none'
+                                cursor: 'text'
                               }}
                             />
                           </div>
@@ -966,18 +984,18 @@ const CleanDetailedFuelBreakdown = ({
                             marginBottom: '4px',
                             textTransform: 'uppercase'
                           }}>WEIGHT (LBS)</label>
-                          <div style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '20px' }}>
                             <div style={{
                               fontSize: '0.5rem',
-                              color: '#888',
-                              marginBottom: '1px'
-                            }}>Available</div>
+                              color: '#888'
+                            }}>Avail</div>
                             <div style={{
                               color: getAlternateRequirements(card) ? '#f39c12' : '#fff',
-                              fontSize: '1.1rem',
-                              fontWeight: '600',
-                              marginBottom: '6px'
+                              fontSize: '0.8rem',
+                              fontWeight: '600'
                             }}>{card.availableWeight || card.maxPassengersWeight || 0}</div>
+                          </div>
+                          <div style={{ textAlign: 'center', marginTop: '6px' }}>
                             <input
                               type="number"
                               min="0"
@@ -986,19 +1004,18 @@ const CleanDetailedFuelBreakdown = ({
                               onChange={(e) => setPassengerRequest(card.name || card.stopName, 'totalWeight', parseInt(e.target.value) || 0)}
                               placeholder="0"
                               style={{
-                                width: '100px',
-                                padding: '8px',
-                                background: '#2a2a2a',
+                                width: '65px',
+                                height: '20px',
+                                padding: '2px 4px',
+                                backgroundColor: '#1f1f1f',
                                 color: '#fff',
                                 border: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || card.maxPassengersWeight || 0)
-                                  ? '2px solid #e74c3c'
-                                  : '1px solid #555',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
+                                  ? '1px solid #e74c3c'
+                                  : '1px solid #4A9EFF',
+                                borderRadius: '3px',
+                                fontSize: '12px',
                                 textAlign: 'center',
-                                boxShadow: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || card.maxPassengersWeight || 0)
-                                  ? '0 0 5px rgba(231, 76, 60, 0.3)'
-                                  : 'none'
+                                cursor: 'text'
                               }}
                             />
                           </div>
@@ -1156,7 +1173,7 @@ const CleanDetailedFuelBreakdown = ({
                               return (
                                 <input
                                   type="number"
-                                  value={displayValue || ''}
+                                  value={isDeparture ? '' : (displayValue || '')} // Empty string for disabled inputs (no 0)
                                   onChange={(e) => {
                                     const value = e.target.value === '' ? '' : (parseFloat(e.target.value) || 0);
                                     if (isRig) {
@@ -1173,7 +1190,7 @@ const CleanDetailedFuelBreakdown = ({
                                       handleFuelBlur(stopName, 'approachFuel', value, card.index);
                                     }
                                   }}
-                                  placeholder="0"
+                                  placeholder={isDeparture ? '' : '0'} // No placeholder for disabled
                                   disabled={isDeparture} // Disable approach fuel for ALL departures
                                   style={getInputStyle(
                                     isDeparture, 
@@ -1468,9 +1485,9 @@ const CleanDetailedFuelBreakdown = ({
         }
       }}>
         <div style={{
-          background: '#2a2a2a',
-          border: '2px solid #e74c3c',
-          borderRadius: '8px',
+          background: 'linear-gradient(to bottom, #404040, #1a1a1a)',
+          border: '2px solid #ff3333',
+          borderRadius: '12px',
           padding: '20px',
           maxWidth: '400px',
           width: '90%',
@@ -1487,29 +1504,43 @@ const CleanDetailedFuelBreakdown = ({
               
               {/* Show overload details */}
               <div style={{ marginBottom: '16px' }}>
-                {overloadedStops.filter(card => {
-                  const requested = getPassengerRequest(card.name || card.stopName, 'passengerCount');
-                  return requested > (card.maxPassengers || 0);
-                }).map((card, index) => {
-                  const requestedPassengers = getPassengerRequest(card.name || card.stopName, 'passengerCount');
-                  const requestedWeight = getPassengerRequest(card.name || card.stopName, 'totalWeight');
-                  const availablePassengers = card.maxPassengers || 0;
-                  const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
-                  return (
+                {(() => {
+                  // 🔧 DEDUPLICATE: Group by location name and show most restrictive capacity
+                  const locationGroups = {};
+                  overloadedStops.forEach(card => {
+                    const locationName = card.name || card.stopName;
+                    const requestedPassengers = getPassengerRequest(locationName, 'passengerCount');
+                    const requestedWeight = getPassengerRequest(locationName, 'totalWeight');
+                    const availablePassengers = card.maxPassengers || 0;
+                    const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+                    
+                    if (!locationGroups[locationName] || availablePassengers < locationGroups[locationName].availablePassengers) {
+                      locationGroups[locationName] = {
+                        locationName,
+                        requestedPassengers,
+                        requestedWeight,
+                        availablePassengers,
+                        availableWeight
+                      };
+                    }
+                  });
+                  
+                  return Object.values(locationGroups).map((location, index) => (
                     <div key={index} style={{
-                      fontSize: '0.9rem',
+                      fontSize: '0.8rem',
                       color: '#fff',
                       marginBottom: '8px',
-                      padding: '8px',
-                      background: 'rgba(231, 76, 60, 0.2)',
-                      borderRadius: '4px'
+                      padding: '10px',
+                      background: 'rgba(231, 76, 60, 0.25)',
+                      borderRadius: '8px',
+                      border: '1px solid #ff3333'
                     }}>
-                      <strong>{card.name || card.stopName}</strong><br/>
-                      Passengers: {requestedPassengers} requested vs {availablePassengers} available<br/>
-                      Weight: {requestedWeight} lbs requested vs {availableWeight} lbs available
+                      <strong>{location.locationName}</strong><br/>
+                      Passengers: {location.requestedPassengers} requested vs {location.availablePassengers} available<br/>
+                      Weight: {location.requestedWeight} lbs requested vs {location.availableWeight} lbs available
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
               
               <div style={{ 

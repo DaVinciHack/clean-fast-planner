@@ -178,6 +178,22 @@ const FlightWizard = ({
     console.log('🧙‍♂️ Wizard: Selected flight:', flight.flightNumber || flight.name);
     console.log('🧙‍♂️ Wizard: Using EXACT LoadFlightsCard workflow');
     
+    // 🎯 VISUAL FIX: Hide ALL map elements immediately before any map changes to prevent flash
+    console.log('🎯 WIZARD: Hiding all map elements to prevent flash during flight load');
+    try {
+      if (window.platformManager) {
+        window.platformManager.toggleFixedPlatformsVisibility(false);
+        window.platformManager.toggleMovablePlatformsVisibility(false);
+        window.platformManager.toggleBlocksVisibility(false);
+        window.platformManager.toggleBasesVisibility(false);
+        // Hide airports/airfields too
+        window.platformManager.toggleAirfieldsVisibility(false);
+      }
+    } catch (error) {
+      console.warn('🎯 Warning: Could not hide map elements in wizard:', error);
+      // Continue with flight loading even if hiding fails
+    }
+    
     // 🎯 WIZARD MAP STATE AWARE: Check current state before transitioning
     if (window.mapManager?.map) {
       const mapState = window.mapManager.getMapState();
