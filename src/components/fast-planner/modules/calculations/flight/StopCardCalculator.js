@@ -853,16 +853,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     // Debug logging would go here
     
     // Create departure card with detailed console logging
-    // 🚨 FINAL ALTERNATE OVERRIDE: Apply alternate requirements just before creating departure card
-    // Debug logging would go here
-    
-    if (hasRefuelStops && !waiveAlternates && alternateStopCard) {
-      const originalFuel = departureFuelNeeded;
-      departureFuelNeeded = alternateStopCard.totalFuel;
-      departureMaxPassengers = alternateStopCard.maxPassengers;
-      
-    } else {
-    }
+    // ✅ ALTERNATE LOGIC: Already handled correctly at lines 795-801
+    // No duplicate override needed - the proper logic already preserves refuel-optimized fuel
     
     const departureCard = {
       index: 1, // 🔧 INDEXING FIX: Use numeric index 1 for departure instead of 'D'
@@ -1155,11 +1147,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       
       
       
-      // 🔧 BACK TO ORIGINAL WORKING LOGIC: Use the old cumulative consumption approach
-      // 🛩️ AVIATION LOGIC: Update cumulative consumption BEFORE calculating remaining fuel
-      // This ensures that the location consuming the fuel doesn't show it in its own summary
-      if (currentLocationConsumesAra && araFuelNeededHere > 0) {
+      // 🔧 REFUEL FIX: Don't add consumption at refuel stops to new segment's cumulative count
+      // This prevents segment 1 ARA from contaminating segment 2 calculations
+      if (currentLocationConsumesAra && araFuelNeededHere > 0 && !isRefuelStop) {
         cumulativeAraFuelConsumed += araFuelNeededHere;
+        console.log(`🛩️ ARA CONSUMPTION: ${toWaypoint.name} consumes ${araFuelNeededHere} lbs, cumulative now ${cumulativeAraFuelConsumed}`);
+      } else if (isRefuelStop) {
+        console.log(`🔧 REFUEL STOP: ${toWaypoint.name} ARA consumption (${araFuelNeededHere}) NOT added to new segment cumulative`);
       }
       
       // 🛩️ AVIATION LOGIC: Calculate remaining fuel AFTER consumption at this location
@@ -1180,10 +1174,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         lookupKey: `${toWaypoint.name}_${cardIndex}_approachFuel`
       });
       
-      // 🛩️ AVIATION LOGIC: Update cumulative consumption BEFORE calculating remaining fuel
-      if (currentLocationConsumesApproach && approachFuelNeededHere > 0) {
+      // 🔧 REFUEL FIX: Don't add approach consumption at refuel stops to new segment's cumulative count
+      if (currentLocationConsumesApproach && approachFuelNeededHere > 0 && !isRefuelStop) {
         cumulativeApproachFuelConsumed += approachFuelNeededHere;
-        console.log(`🛩️ APPROACH FUEL: ${toWaypoint.name} consumes ${approachFuelNeededHere} lbs approach fuel`);
+        console.log(`🛩️ APPROACH CONSUMPTION: ${toWaypoint.name} consumes ${approachFuelNeededHere} lbs, cumulative now ${cumulativeApproachFuelConsumed}`);
+      } else if (isRefuelStop && currentLocationConsumesApproach) {
+        console.log(`🔧 REFUEL STOP: ${toWaypoint.name} approach consumption (${approachFuelNeededHere}) NOT added to new segment cumulative`);
       }
       
       // 🛩️ AVIATION LOGIC: Calculate remaining fuel AFTER consumption at this location
