@@ -40,10 +40,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     reserveFuel: options?.reserveFuel
   });
   
-  // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END
-  setTimeout(() => {
-    console.log('🚨 CALCULATED RESERVE FUEL RESULT:', calculatedReserveFuel);
-  }, 100);
+  // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END - MOVED TO AFTER CALCULATION
   
   // First, verify we have the necessary input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
@@ -368,6 +365,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const passengerWeightValue = Number(passengerWeight);
   const contingencyFuelPercentValue = Number(contingencyFuelPercent);
   const reserveFuelValue = Number(calculatedReserveFuel); // ✅ Use converted reserve fuel
+  
+  // 🔍 LOG THE CALCULATED RESERVE FUEL RESULT
+  console.log('🚨 CALCULATED RESERVE FUEL RESULT:', calculatedReserveFuel);
   const deckTimePerStopValue = Number(deckTimePerStop);
   const deckFuelFlowValue = Number(deckFuelFlow);
   
@@ -1776,6 +1776,34 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
  * @returns {Object|null} Alternate stop card object or null if no alternate route
  */
 const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, selectedAircraft, weather, options = {}) => {
+  
+  // Helper function to get location-specific fuel (recreated for alternate calculations)
+  const getLocationFuel = (waypoint, fuelType, cardIndex = null) => {
+    const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
+    if (!waypointName) return 0;
+    
+    const locationFuelOverrides = options?.locationFuelOverrides || {};
+    const weatherSegments = options?.weatherSegments || [];
+    const fuelPolicy = options?.fuelPolicy;
+    
+    // Check for override first
+    const cardIndexKey = cardIndex ? `${waypointName}_${cardIndex}_${fuelType}` : null;
+    const cardIndexOverride = cardIndexKey ? locationFuelOverrides[cardIndexKey] : null;
+    
+    if (cardIndexOverride !== undefined && cardIndexOverride !== null) {
+      const overrideValue = (typeof cardIndexOverride === 'object' && cardIndexOverride.value !== undefined) 
+        ? Number(cardIndexOverride.value) || 0
+        : Number(cardIndexOverride) || 0;
+      return overrideValue;
+    }
+    
+    // Check weather conditions if no override
+    if (fuelType === 'deckTime' && weatherSegments.length === 0) {
+      return 0; // Return 0 for deck time if no override and no weather data
+    }
+    
+    return 0; // Default return
+  };
   
   // Verify we have the necessary input data
   if (!waypoints || waypoints.length < 2 || !selectedAircraft || !alternateRouteData) {
