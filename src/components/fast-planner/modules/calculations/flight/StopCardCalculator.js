@@ -1033,16 +1033,23 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       const nextRefuelStops = refuelStops.filter(refuelIndex => refuelIndex > currentCardIndex).sort((a, b) => a - b);
       
       if (nextRefuelStops.length > 0) {
-        const nextRefuelStopIndex = nextRefuelStops[0];
-        calculationEndPoint = nextRefuelStopIndex; // Calculate only to next refuel stop
+        const nextRefuelStopCardIndex = nextRefuelStops[0]; // This is a 1-based card index
+        calculationEndPoint = nextRefuelStopCardIndex - 1; // Convert to 0-based leg index
+        
+        console.log(`🔧 CALCULATION ENDPOINT: Current position=${currentCardIndex}, Next refuel card=${nextRefuelStopCardIndex}, Using leg endpoint=${calculationEndPoint}`);
       } else {
+        console.log(`🔧 CALCULATION ENDPOINT: No more refuel stops, calculating to end of route`);
       }
     }
     
     // Calculate remaining trip fuel - sum of legs to calculation end point
+    console.log(`🔧 TRIP FUEL CALCULATION: ${toWaypoint.name} - summing legs ${i + 1} to ${calculationEndPoint - 1}`);
     for (let j = i + 1; j < legDetails.length && j < calculationEndPoint; j++) {
-      remainingTripFuel += legDetails[j].fuel;
+      const legFuel = legDetails[j].fuel;
+      remainingTripFuel += legFuel;
+      console.log(`🔧 LEG ${j}: ${legDetails[j]?.fromWaypoint?.name} → ${legDetails[j]?.toWaypoint?.name} = ${legFuel} lbs`);
     }
+    console.log(`🔧 TOTAL REMAINING TRIP FUEL: ${remainingTripFuel} lbs`);
 
     // 🔧 DECK FUEL FIX: Count actual intermediate rigs between current position and calculation end point
     remainingIntermediateStops = 0;
@@ -1078,10 +1085,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const remainingDeckFuel = Math.round(remainingDeckTimeHours * actualDeckFuelFlow);
     console.log(`🔧 REMAINING TOTAL DECK: ${remainingDeckTimeMinutes} minutes = ${remainingDeckFuel} lbs`);
 
-    // Calculate remaining contingency fuel (proportional to remaining trip fuel)
+    // 🔧 REFUEL SEGMENT FIX: Calculate contingency fuel directly for remaining trip fuel (not proportional)
     let remainingContingencyFuel = 0;
-    if (totalTripFuel > 0) {
-      remainingContingencyFuel = Math.round((remainingTripFuel / totalTripFuel) * contingencyFuelValue);
+    if (remainingTripFuel > 0) {
+      remainingContingencyFuel = Math.round((remainingTripFuel * contingencyFuelPercentValue) / 100);
+      console.log(`🔧 SEGMENT CONTINGENCY: ${remainingTripFuel} lbs trip fuel × ${contingencyFuelPercentValue}% = ${remainingContingencyFuel} lbs contingency`);
     }
     
 
