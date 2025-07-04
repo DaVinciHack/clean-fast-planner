@@ -565,7 +565,7 @@ const EnhancedStopCardsContainer = ({
             e.target.style.borderColor = '#4FC3F7';
           }}
         >
-          View Detailed Fuel Breakdown
+          Edit Fuel and Passengers
         </button>
       
       {/* 🛩️ VFR OPERATIONS: Waive Alternates Checkbox */}

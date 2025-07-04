@@ -1619,6 +1619,22 @@ const FastPlannerCore = ({
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
     
+    // 🎯 VISUAL FIX: Hide ALL map elements immediately to prevent flash during satellite switch
+    console.log('🎯 HIDING ALL ELEMENTS: Preventing flash during satellite switch');
+    try {
+      if (appManagers.platformManagerRef?.current) {
+        appManagers.platformManagerRef.current.toggleFixedPlatformsVisibility(false);
+        appManagers.platformManagerRef.current.toggleMovablePlatformsVisibility(false);
+        appManagers.platformManagerRef.current.toggleBlocksVisibility(false);
+        appManagers.platformManagerRef.current.toggleBasesVisibility(false);
+        // Hide airports/airfields too
+        appManagers.platformManagerRef.current.toggleAirfieldsVisibility(false);
+      }
+    } catch (error) {
+      console.warn('🎯 Warning: Could not hide map elements:', error);
+      // Continue with flight loading even if hiding fails
+    }
+    
     // 🎬 CRITICAL: Store flight data globally for FlightSequenceController
     window.currentFlightData = flightData;
     window.appManagers = appManagers;
