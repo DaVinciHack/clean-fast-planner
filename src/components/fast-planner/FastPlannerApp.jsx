@@ -1331,8 +1331,8 @@ const FastPlannerCore = ({
               // Clear the split point state since we're using it
               setAlternateSplitPoint(null);
             } else {
-              // 🎯 LOADED FLIGHT FIX: Use stops[1] (always the first landing stop)
-              const splitPoint = loadedFlightData?.stops?.[1];
+              // 🎯 LOADED FLIGHT FIX: Use stops[0] (always the first landing stop)
+              const splitPoint = loadedFlightData?.stops?.[0];
               if (splitPoint) {
                 alternateString = `${splitPoint} ${locationName}`;
               } else {
@@ -1389,8 +1389,8 @@ const FastPlannerCore = ({
               // We have a single location in input (split point from route click), add destination to complete pair
               alternateString = `${alternateRouteInput.trim()} ${locationName}`;
             } else {
-              // 🎯 LOADED FLIGHT FIX: Use stops[1] (always the first landing stop)
-              const splitPoint = loadedFlightData?.stops?.[1];
+              // 🎯 LOADED FLIGHT FIX: Use stops[0] (always the first landing stop)
+              const splitPoint = loadedFlightData?.stops?.[0];
               if (splitPoint) {
                 alternateString = `${splitPoint} ${locationName}`;
               } else {
@@ -3315,6 +3315,7 @@ const FastPlannerCore = ({
         alternateStopCard={alternateStopCard}
         alternateRouteData={alternateRouteData}
         currentRefuelStops={currentRefuelStops}
+        platformManager={platformManagerRef.current}
         onFuelDataChanged={handleLocationFuelChange}
       />
       

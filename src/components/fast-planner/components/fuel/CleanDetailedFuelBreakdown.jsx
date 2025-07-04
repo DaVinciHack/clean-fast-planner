@@ -18,6 +18,7 @@ import SimpleFuelInput from './SimpleFuelInput';
 import StopCardCalculator from '../../modules/calculations/flight/StopCardCalculator';
 import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon } from '../flight/stops/StopIcons';
 import { detectLocationSegment, getSegmentLocations } from '../../utilities/SegmentUtils.js';
+import { FuelStopOptimizationManager } from '../../modules/optimization/FuelStopOptimizationManager.js';
 import './FuelStyles.css'; // Import the existing fuel breakdown styles
 
 // Time formatting function
@@ -61,6 +62,8 @@ const CleanDetailedFuelBreakdown = ({
   alternateStopCard = null,
   alternateRouteData = null,
   currentRefuelStops = [],
+  // Platform manager for real platform data
+  platformManager = null,
   // Main callback to update parent
   onFuelDataChanged = () => {}
 }) => {
@@ -105,6 +108,89 @@ const CleanDetailedFuelBreakdown = ({
   
   // 🚀 SIMPLE STATE: Direct fuel overrides (must be declared before useMemo)
   const [fuelOverrides, setFuelOverrides] = useState({});
+  
+  // 🎯 PASSENGER REQUEST STATE: Track passenger requests per stop
+  const [passengerRequests, setPassengerRequests] = useState({});
+  
+  // 🚨 FUEL STOP OPTIMIZATION POPUP STATE
+  const [fuelStopPopup, setFuelStopPopup] = useState(null);
+  const [hasTriggeredOptimization, setHasTriggeredOptimization] = useState(false);
+  
+  // 🎯 OPTIMIZATION MANAGER: Initialize the fuel stop optimization system
+  const optimizationManager = useMemo(() => {
+    const manager = new FuelStopOptimizationManager();
+    manager.setCallbacks({
+      onSuggestionsReady: (suggestions) => {
+        console.log('🎯 OPTIMIZATION: Suggestions ready:', suggestions);
+        setFuelStopPopup({
+          type: 'suggestions',
+          data: suggestions,
+          timestamp: Date.now()
+        });
+      },
+      onError: (error) => {
+        console.log('🎯 OPTIMIZATION: Error:', error);
+        setFuelStopPopup({
+          type: 'error',
+          message: error,
+          timestamp: Date.now()
+        });
+      },
+      onProcessingUpdate: (isProcessing) => {
+        if (isProcessing) {
+          setFuelStopPopup({
+            type: 'processing',
+            timestamp: Date.now()
+          });
+        }
+      }
+    });
+    return manager;
+  }, []);
+  
+  // 🎯 WIZARD DATA EXTRACTION: Extract passenger data from wizard
+  const getWizardPassengerData = useCallback(() => {
+    const wizardData = flightSettings?.wizardPassengerData || {};
+    console.log('🎯 WIZARD DATA:', wizardData);
+    
+    
+    return wizardData;
+  }, [flightSettings?.wizardPassengerData]);
+  
+  // 🎯 PASSENGER REQUEST HELPERS: Get and set passenger requests per stop
+  const getPassengerRequest = useCallback((stopName, requestType) => {
+    const key = `${stopName}_${requestType}`;
+    
+    // First check if we have a local override
+    if (passengerRequests[key] !== undefined) {
+      return passengerRequests[key];
+    }
+    
+    // Then check wizard data for initial values
+    const wizardData = getWizardPassengerData();
+    const legKey = stopName === (stopCards[0]?.name || stopCards[0]?.stopName) ? 'departure' : 
+                   `leg-${stopCards.findIndex(card => (card.name || card.stopName) === stopName)}`;
+    
+    // Debug removed to reduce console spam
+    
+    if (wizardData[legKey]) {
+      if (requestType === 'passengerCount') {
+        return wizardData[legKey].passengerCount || 0;
+      } else if (requestType === 'totalWeight') {
+        return wizardData[legKey].totalWeight || 0;
+      }
+    }
+    
+    return 0;
+  }, [passengerRequests, getWizardPassengerData, stopCards]);
+  
+  const setPassengerRequest = useCallback((stopName, requestType, value) => {
+    const key = `${stopName}_${requestType}`;
+    setPassengerRequests(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  }, []);
   
   // 🔥 DIRECT CALCULATION: Calculate stop cards directly in render to avoid state sync issues
   const displayStopCards = useMemo(() => {
@@ -177,6 +263,17 @@ const CleanDetailedFuelBreakdown = ({
     }
   }, [waypoints, selectedAircraft, routeStats, weather, flightSettings, weatherSegments, refuelStops, waiveAlternates, alternateStopCard, fuelOverrides, locationFuelOverrides]);
   
+  // 🚨 OVERLOADED STOPS: Calculate which stops exceed passenger capacity (after displayStopCards is defined)
+  const overloadedStops = useMemo(() => {
+    if (!displayStopCards || displayStopCards.length === 0) return [];
+    
+    return displayStopCards.filter(card => {
+      const requested = getPassengerRequest(card.name || card.stopName, 'passengerCount');
+      const available = card.maxPassengers || 0;
+      return requested > available;
+    });
+  }, [displayStopCards, getPassengerRequest, passengerRequests]);
+  
   // 🛡️ RACE CONDITION FIX: Only allow updates after component is mounted
   const [isMounted, setIsMounted] = useState(false);
   
@@ -192,6 +289,84 @@ const CleanDetailedFuelBreakdown = ({
       onFuelDataChangedRef.current(effectiveSettings);
     }
   }, []);
+  
+  // 🎯 PASSENGER OPTIMIZATION: Trigger capacity analysis when passenger requests change
+  useEffect(() => {
+    if (!displayStopCards || displayStopCards.length === 0) return;
+    
+    const timeoutId = setTimeout(() => {
+      const maxPassengersRequested = Math.max(
+        ...displayStopCards.map(card => 
+          getPassengerRequest(card.name || card.stopName, 'passengerCount')
+        )
+      );
+      
+      // Use the memoized overloadedStops from above
+      
+      // Optimization check (reduced logging)
+      
+      // 🚨 RUN FUEL STOP OPTIMIZATION (only once per overload session)
+      if (overloadedStops.length > 0 && !hasTriggeredOptimization) {
+        console.log('🎯 RUNNING FUEL STOP OPTIMIZATION...');
+        setHasTriggeredOptimization(true);
+        
+        // Build flight configuration for optimization
+        const flightConfiguration = {
+          selectedAircraft,
+          waypoints,
+          stopCards: displayStopCards,
+          flightSettings,
+          weatherSegments,
+          routeStats,
+          alternateRouteData,
+          maxPassengersRequested,
+          overloadedStops: overloadedStops.map(card => card.name || card.stopName),
+          // Get real platform data from platform manager - NO MOCK DATA
+          availablePlatforms: platformManager?.getAllPlatforms ? platformManager.getAllPlatforms() : [],
+          platformManager: platformManager
+        };
+        
+        // Run optimization with detailed logging
+        console.log('🎯 FLIGHT CONFIGURATION:', flightConfiguration);
+        optimizationManager.checkAndOptimize(flightConfiguration)
+          .then(result => {
+            console.log('🎯 OPTIMIZATION RESULT:', result);
+          })
+          .catch(error => {
+            console.error('🎯 OPTIMIZATION ERROR:', error);
+            setFuelStopPopup({
+              type: 'error',
+              message: error.message || 'Unknown optimization error',
+              timestamp: Date.now()
+            });
+          });
+      } else if (overloadedStops.length === 0) {
+        // Reset when no overload
+        setFuelStopPopup(null);
+        setHasTriggeredOptimization(false);
+      }
+      
+      if (maxPassengersRequested > 0 && onFuelDataChanged) {
+        console.log('🚨 TRIGGERING PASSENGER OPTIMIZATION CALLBACK');
+        
+        onFuelDataChanged({
+          type: 'passengerRequest',
+          maxPassengersRequested,
+          hasOverload: overloadedStops.length > 0,
+          overloadedStops: overloadedStops.map(card => card.name || card.stopName),
+          stopRequests: displayStopCards.map(card => ({
+            stopName: card.name || card.stopName,
+            requestedPassengers: getPassengerRequest(card.name || card.stopName, 'passengerCount'),
+            requestedWeight: getPassengerRequest(card.name || card.stopName, 'totalWeight'),
+            availablePassengers: card.maxPassengers || 0,
+            availableWeight: card.availableWeight || card.maxPassengersWeight || 0
+          }))
+        });
+      }
+    }, 500); // Debounce for 500ms
+    
+    return () => clearTimeout(timeoutId);
+  }, [passengerRequests, displayStopCards, getPassengerRequest, onFuelDataChanged, overloadedStops, selectedAircraft, waypoints, weatherSegments, routeStats, alternateRouteData, platformManager]);
   
   // Mark component as mounted after initial render
   useEffect(() => {
@@ -272,7 +447,7 @@ const CleanDetailedFuelBreakdown = ({
       value = parentOverride && typeof parentOverride === 'object' ? parentOverride.value : parentOverride;
     }
     
-    console.log('🔍 READING KEY:', key, 'local:', fuelOverrides[key], 'parent:', locationFuelOverrides[key], 'final:', value);
+    // Key reading debug removed to reduce console spam
     
     // For reserve fuel, use calculated value from stop cards instead of raw settings
     if (fuelType === 'reserveFuel') {
@@ -386,6 +561,13 @@ const CleanDetailedFuelBreakdown = ({
   if (!visible) return null;
   
   return (
+    <>
+    <style>{`
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+      }
+    `}</style>
     <div style={{
       position: 'fixed',
       top: 0,
@@ -415,8 +597,31 @@ const CleanDetailedFuelBreakdown = ({
       }} onClick={(e) => e.stopPropagation()}>
         <div className="fuel-modal-header">
           <h2>Detailed Fuel & Passenger Management</h2>
+          
+          {/* 🔍 BACKGROUND OPTIMIZATION INDICATOR */}
+          {fuelStopPopup && fuelStopPopup.type === 'background' && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.8rem',
+              color: '#4fc3f7',
+              cursor: 'pointer'
+            }} onClick={() => setFuelStopPopup({ ...fuelStopPopup, type: 'processing' })}>
+              <div style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#e74c3c',
+                animation: 'pulse 1s infinite'
+              }}></div>
+              Optimizing fuel stops...
+            </div>
+          )}
+          
           <button className="fuel-close-button" onClick={onClose}>×</button>
         </div>
+        
         
         <div className="fuel-modal-body">
           
@@ -726,16 +931,29 @@ const CleanDetailedFuelBreakdown = ({
                               fontWeight: '600',
                               marginBottom: '6px'
                             }}>{card.maxPassengers || 0}</div>
-                            <button style={{
-                              width: '100px',
-                              padding: '8px',
-                              background: '#404040',
-                              color: '#ccc',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '0.8rem',
-                              cursor: 'pointer'
-                            }}>requested</button>
+                            <input
+                              type="number"
+                              min="0"
+                              max={card.maxPassengers || 19}
+                              value={getPassengerRequest(card.name || card.stopName, 'passengerCount')}
+                              onChange={(e) => setPassengerRequest(card.name || card.stopName, 'passengerCount', parseInt(e.target.value) || 0)}
+                              placeholder="0"
+                              style={{
+                                width: '100px',
+                                padding: '8px',
+                                background: '#2a2a2a',
+                                color: '#fff',
+                                border: getPassengerRequest(card.name || card.stopName, 'passengerCount') > (card.maxPassengers || 0) 
+                                  ? '2px solid #e74c3c' 
+                                  : '1px solid #555',
+                                borderRadius: '4px',
+                                fontSize: '0.8rem',
+                                textAlign: 'center',
+                                boxShadow: getPassengerRequest(card.name || card.stopName, 'passengerCount') > (card.maxPassengers || 0)
+                                  ? '0 0 5px rgba(231, 76, 60, 0.3)'
+                                  : 'none'
+                              }}
+                            />
                           </div>
                         </div>
                         
@@ -760,16 +978,29 @@ const CleanDetailedFuelBreakdown = ({
                               fontWeight: '600',
                               marginBottom: '6px'
                             }}>{card.availableWeight || card.maxPassengersWeight || 0}</div>
-                            <button style={{
-                              width: '100px',
-                              padding: '8px',
-                              background: '#404040',
-                              color: '#ccc',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '0.8rem',
-                              cursor: 'pointer'
-                            }}>requested</button>
+                            <input
+                              type="number"
+                              min="0"
+                              max={card.availableWeight || card.maxPassengersWeight || 5000}
+                              value={getPassengerRequest(card.name || card.stopName, 'totalWeight')}
+                              onChange={(e) => setPassengerRequest(card.name || card.stopName, 'totalWeight', parseInt(e.target.value) || 0)}
+                              placeholder="0"
+                              style={{
+                                width: '100px',
+                                padding: '8px',
+                                background: '#2a2a2a',
+                                color: '#fff',
+                                border: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || card.maxPassengersWeight || 0)
+                                  ? '2px solid #e74c3c'
+                                  : '1px solid #555',
+                                borderRadius: '4px',
+                                fontSize: '0.8rem',
+                                textAlign: 'center',
+                                boxShadow: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || card.maxPassengersWeight || 0)
+                                  ? '0 0 5px rgba(231, 76, 60, 0.3)'
+                                  : 'none'
+                              }}
+                            />
                           </div>
                         </div>
                         
@@ -1214,6 +1445,237 @@ const CleanDetailedFuelBreakdown = ({
         
       </div>
     </div>
+    
+    {/* 🎯 FUEL STOP OPTIMIZATION POPUP - Independent overlay */}
+    {fuelStopPopup && fuelStopPopup.type !== 'background' && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000 // Higher than main modal
+      }} onClick={(e) => {
+        // Click background to minimize to background mode during processing
+        if (fuelStopPopup.type === 'processing') {
+          setFuelStopPopup({ type: 'background', data: fuelStopPopup.data });
+        } else {
+          setFuelStopPopup(null);
+        }
+      }}>
+        <div style={{
+          background: '#2a2a2a',
+          border: '2px solid #e74c3c',
+          borderRadius: '8px',
+          padding: '20px',
+          maxWidth: '400px',
+          width: '90%',
+          color: '#fff',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          pointerEvents: 'auto'
+        }} onClick={(e) => e.stopPropagation()}>
+          
+          {fuelStopPopup.type === 'processing' && (
+            <>
+              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '16px', textAlign: 'center' }}>
+                Passenger Capacity Exceeded
+              </div>
+              
+              {/* Show overload details */}
+              <div style={{ marginBottom: '16px' }}>
+                {overloadedStops.filter(card => {
+                  const requested = getPassengerRequest(card.name || card.stopName, 'passengerCount');
+                  return requested > (card.maxPassengers || 0);
+                }).map((card, index) => {
+                  const requestedPassengers = getPassengerRequest(card.name || card.stopName, 'passengerCount');
+                  const requestedWeight = getPassengerRequest(card.name || card.stopName, 'totalWeight');
+                  const availablePassengers = card.maxPassengers || 0;
+                  const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+                  return (
+                    <div key={index} style={{
+                      fontSize: '0.9rem',
+                      color: '#fff',
+                      marginBottom: '8px',
+                      padding: '8px',
+                      background: 'rgba(231, 76, 60, 0.2)',
+                      borderRadius: '4px'
+                    }}>
+                      <strong>{card.name || card.stopName}</strong><br/>
+                      Passengers: {requestedPassengers} requested vs {availablePassengers} available<br/>
+                      Weight: {requestedWeight} lbs requested vs {availableWeight} lbs available
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div style={{ 
+                fontSize: '0.9rem', 
+                color: '#4fc3f7', 
+                textAlign: 'center',
+                marginBottom: '16px'
+              }}>
+                Looking for route optimization and refuel stops...
+              </div>
+              
+              {/* Animated loader */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '4px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#e74c3c',
+                  animation: 'pulse 1.5s infinite'
+                }}></div>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#e74c3c',
+                  animation: 'pulse 1.5s infinite 0.3s'
+                }}></div>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#e74c3c',
+                  animation: 'pulse 1.5s infinite 0.6s'
+                }}></div>
+              </div>
+              
+              <div style={{
+                fontSize: '0.8rem',
+                color: '#999',
+                textAlign: 'center',
+                marginBottom: '16px'
+              }}>
+                Click away to continue working. Results will appear when ready.
+              </div>
+              
+              <button 
+                onClick={() => setFuelStopPopup({ type: 'background', data: fuelStopPopup.data })}
+                style={{
+                  background: '#666',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                Minimize to Background
+              </button>
+            </>
+          )}
+          
+          {fuelStopPopup.type === 'error' && (
+            <>
+              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '12px', color: '#e74c3c' }}>
+                Optimization Failed
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '16px' }}>
+                {fuelStopPopup.message}
+              </div>
+              <button 
+                onClick={() => setFuelStopPopup(null)}
+                style={{
+                  background: '#e74c3c',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                Close
+              </button>
+            </>
+          )}
+          
+          {fuelStopPopup.type === 'suggestions' && (
+            <>
+              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center' }}>
+                Fuel Stop Recommendations
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#ccc', marginBottom: '16px', textAlign: 'center' }}>
+                Found {fuelStopPopup.data.suggestions?.length || 0} options to increase passenger capacity
+              </div>
+              
+              {fuelStopPopup.data.suggestions?.length > 0 ? (
+                <div style={{ marginBottom: '16px' }}>
+                  {fuelStopPopup.data.suggestions.slice(0, 3).map((suggestion, index) => (
+                    <div key={index} style={{
+                      background: '#333',
+                      padding: '12px',
+                      marginBottom: '8px',
+                      borderRadius: '4px',
+                      border: '1px solid #555'
+                    }}>
+                      <div style={{ fontWeight: 'bold', color: '#4fc3f7', marginBottom: '4px' }}>
+                        {suggestion.platform?.name || `Option ${index + 1}`}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
+                        Distance: +{suggestion.analysis?.routeDeviation?.toFixed(1) || '0.0'}nm
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
+                        Passenger Gain: +{suggestion.analysis?.passengerGain || 0} passengers
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
+                        Score: {suggestion.score?.toFixed(1) || '0.0'}/100
+                      </div>
+                      <button style={{
+                        background: '#4fc3f7',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '4px 8px',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        marginTop: '8px'
+                      }}>
+                        Add Fuel Stop
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '16px', textAlign: 'center' }}>
+                  No suitable fuel stops found within 10nm of your route.
+                </div>
+              )}
+              
+              <button 
+                onClick={() => setFuelStopPopup(null)}
+                style={{
+                  background: '#666',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  width: '100%'
+                }}
+              >
+                Close
+              </button>
+            </>
+          )}
+          
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
