@@ -32,7 +32,9 @@ const StopCard = React.forwardRef(({
   onRefuelChange,
   // Alternate fuel requirements for IFR operations
   alternateRequirements = null,
-  shouldShowStrikethrough = false
+  shouldShowStrikethrough = false,
+  // Fuel capacity warning for aircraft limits
+  fuelCapacityWarning = null
 }, ref) => {
   // Function to format time as HH:MM
   const formatTime = (timeHours) => {
@@ -47,6 +49,7 @@ const StopCard = React.forwardRef(({
   
   // Get appropriate color based on index (cycle through colors if needed)
   const getBorderColor = () => {
+    if (fuelCapacityWarning?.exceedsCapacity) return '#dc2626'; // Red for over capacity
     if (isDeparture) return '#3498db'; // First stop always blue
     if (isDestination) return '#2ecc71'; // Last stop always green
     if (isAlternate) return '#f39c12'; // Alternate card always orange
@@ -114,6 +117,19 @@ const StopCard = React.forwardRef(({
                 whiteSpace: 'nowrap'
               }}>
                 ALT FUEL REQUIRED
+              </span>
+            )}
+            
+            {/* Fuel capacity warning display beside name */}
+            {isDeparture && fuelCapacityWarning?.exceedsCapacity && (
+              <span style={{ 
+                fontSize: '0.6em', 
+                color: '#dc2626', 
+                marginLeft: '8px',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap'
+              }}>
+                REFUEL REQUIRED
               </span>
             )}
           </div>
@@ -184,8 +200,21 @@ const StopCard = React.forwardRef(({
         {/* Total Fuel */}
         <div className="stop-metric">
           <span className="icon"><FuelIcon /></span>
-          <div className="metric-value" style={alternateRequirements ? { color: '#f39c12' } : {}}>
+          <div className="metric-value" style={
+            fuelCapacityWarning?.exceedsCapacity ? { color: '#dc2626', fontWeight: 'bold' } :
+            alternateRequirements ? { color: '#f39c12' } : {}
+          }>
             {totalFuel || '0'} lbs
+            {fuelCapacityWarning?.exceedsCapacity && (
+              <div style={{ 
+                fontSize: '0.7em', 
+                color: '#dc2626', 
+                fontWeight: 'bold',
+                lineHeight: '1.1'
+              }}>
+                (+{fuelCapacityWarning.excessAmount} over)
+              </div>
+            )}
           </div>
         </div>
         
