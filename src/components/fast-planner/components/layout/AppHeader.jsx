@@ -206,7 +206,7 @@ const AppHeader = ({
   let totalDistance = '0.0';
   let flightTime = '00:00';  // Flight time only
   let totalTime = '00:00';   // Total time including flight time + deck stops
-  let totalFuel = 0;         // Total fuel including trip + deck + contingency + taxi + reserve
+  let departureFuel = 0;     // Departure fuel from first stop card (was totalFuel)
   let tripFuel = 0;
   let deckFuel = 0;
   let passengers = [];
@@ -224,7 +224,7 @@ const AppHeader = ({
   if (stopCards && stopCards.length > 0) {
     const departureCard = stopCards.find(card => card.isDeparture);
     const destinationCard = stopCards.find(card => card.isDestination);
-    console.log('🔍 AppHeader - departure card fuel:', departureCard?.totalFuel || 'none');
+    console.log('🔍 AppHeader - departure card fuel (will be shown as departure fuel):', departureCard?.totalFuel || 'none');
     console.log('🔍 AppHeader - destination card time:', destinationCard?.totalTime || 'none');
     console.log('🔍 AppHeader - wind info in departure card:', departureCard?.windInfo || 'none');
     console.log('🔍 AppHeader - wind data in departure card:', departureCard?.windData || 'none');
@@ -252,9 +252,9 @@ const AppHeader = ({
       flightTime = formatTime(flightTimeHours);
     }
     
-    // Get fuel data from departure card
+    // Get fuel data from departure card - use departure fuel instead of total fuel
     if (departureCard) {
-      totalFuel = safeNumber(departureCard.totalFuel);
+      departureFuel = safeNumber(departureCard.totalFuel); // This is the fuel at departure
       deckFuel = safeNumber(departureCard.deckFuel);
       
       // 🛩️ DETECT ALTERNATE REQUIREMENTS: Check if departure card has alternate fuel restrictions
@@ -268,7 +268,7 @@ const AppHeader = ({
       
       // 🔍 DETAILED HEADER FUEL LOGGING from Stop Cards
       console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from Stop Cards:');
-      console.log('📊 AppHeader: Total Fuel:', totalFuel);
+      console.log('📊 AppHeader: Departure Fuel (from first stop card):', departureFuel);
       console.log('📊 AppHeader: Departure Card Full Object:', departureCard);
       
       // Get fuel components if available
@@ -315,13 +315,14 @@ const AppHeader = ({
       }
     }
     
-    // Extract passenger data from pre-calculated stop cards (no calculations here!)
+    // Extract passenger data from pre-calculated stop cards based on departure fuel
+    // Passenger calculations should be based on departure fuel, not full capacity
     passengers = stopCards
       .filter(card => !card.isDestination && card.maxPassengers !== undefined)
       .map(card => ({
         id: card.id,
         isDeparture: card.isDeparture,
-        maxPassengers: safeNumber(card.maxPassengers),
+        maxPassengers: safeNumber(card.maxPassengers), // This comes from StopCardCalculator and should already be based on departure fuel
         hasAlternateRequirements: card.alternateRequirements && card.alternateRequirements.isRequired // 🛩️ Track per-card alternate requirements
       }));
   }
@@ -389,9 +390,9 @@ const AppHeader = ({
             <span className="detail-value">{totalTime}</span>
           </span>
           <span className="flight-detail">
-            <span className="detail-label">Total Fuel:</span>
+            <span className="detail-label">Departure Fuel:</span>
             <span className="detail-value" style={hasAlternateRequirements ? { color: '#f39c12' } : {}}>
-              {totalFuel.toFixed(0)} lbs
+              {departureFuel.toFixed(0)} lbs
             </span>
           </span>
           <span className="flight-detail">

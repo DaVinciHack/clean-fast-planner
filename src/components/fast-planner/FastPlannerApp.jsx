@@ -575,7 +575,7 @@ const FastPlannerCore = ({
     } else {
       setStopCards([]);
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel, locationFuelOverrides]);
+  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({
@@ -3072,12 +3072,19 @@ const FastPlannerCore = ({
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
   const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
+    console.log('🔄 HEADER SYNC: handleStopCardsCalculated called with', calculatedStopCards?.length, 'cards');
+    
+    if (calculatedStopCards && calculatedStopCards.length > 0) {
+      const departureCard = calculatedStopCards.find(card => card.isDeparture);
+      console.log('🔄 HEADER SYNC: Departure card fuel =', departureCard?.totalFuel);
+    }
     
     if (options.forceVfrRecalc) {
       // Force a complete recalculation by updating forceUpdate state
       setForceUpdate(prev => prev + 1);
     } else {
       setStopCards(calculatedStopCards);
+      console.log('🔄 HEADER SYNC: Updated stopCards state for header');
     }
   }, []);
   
