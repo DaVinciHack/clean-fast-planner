@@ -353,8 +353,8 @@ const EnhancedStopCardsContainer = ({
   const handleRefuelChange = (cardIndex, isRefuel) => {
     console.log(`🔄 REFUEL CHANGE: cardIndex=${cardIndex}, isRefuel=${isRefuel}`);
     
-    // Only allow refuel on intermediate stops (not D=departure, F=final)
-    if (cardIndex === 'D' || cardIndex === 'F') {
+    // Only allow refuel on intermediate stops (not departure=1, final=last)
+    if (cardIndex === 1 || cardIndex === displayStopCards.length) {
       return;
     }
     

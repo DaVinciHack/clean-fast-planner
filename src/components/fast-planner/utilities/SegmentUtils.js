@@ -66,7 +66,7 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   let segment = 1;
   for (const refuelStopIndex of sortedRefuelStops) {
     // 🔧 PHASE 3 FIX: RefuelStops now uses 1-based card indices, no conversion needed
-    // RefuelStops array and card.index both use 1-based indices: [1, 2, 3, 'F']
+    // RefuelStops array and card.index both use 1-based indices: [1, 2, 3, 4]
     const refuelStopCardIndex = refuelStopIndex; // Direct comparison, no +1 needed
     console.log(`🔍 PHASE 3 FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex}`);
     if (cardIndex < refuelStopCardIndex) {
