@@ -405,12 +405,10 @@ const FastPlannerCore = ({
     } else {
     }
     
-    // Detect which segment this location belongs to using CURRENT refuel stops from main UI
-    const activeRefuelStops = currentRefuelStops || [];
-    const segment = detectLocationSegment(fuelData.stopName, waypoints, activeRefuelStops, 'requirements');
-    
-    // Create segment-aware key
-    const key = createSegmentFuelKey(fuelData.stopName, fuelData.fuelType, segment);
+    // 🔧 UNIQUE KEYS: Create cardIndex-based key to handle duplicate location names
+    const key = fuelData.cardIndex ? 
+      `${fuelData.stopName}_${fuelData.cardIndex}_${fuelData.fuelType}` : 
+      `${fuelData.stopName}_${fuelData.fuelType}`; // Fallback to old format if no cardIndex
     
     setLocationFuelOverrides(prev => ({
       ...prev,
@@ -420,7 +418,7 @@ const FastPlannerCore = ({
         fuelType: fuelData.fuelType,
         value: fuelData.value,
         isRig: fuelData.isRig,
-        segment: segment
+        cardIndex: fuelData.cardIndex
       }
     }));
   }, [waypoints]);
