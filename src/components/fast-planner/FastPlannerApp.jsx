@@ -3307,6 +3307,7 @@ const FastPlannerCore = ({
         waiveAlternates={waiveAlternates}
         alternateStopCard={alternateStopCard}
         alternateRouteData={alternateRouteData}
+        currentRefuelStops={currentRefuelStops}
         onFuelDataChanged={handleLocationFuelChange}
       />
       

@@ -44,6 +44,7 @@ const CleanDetailedFuelBreakdown = ({
   waiveAlternates = false,
   alternateStopCard = null,
   alternateRouteData = null,
+  currentRefuelStops = [],
   // Main callback to update parent
   onFuelDataChanged = () => {}
 }) => {
@@ -60,27 +61,17 @@ const CleanDetailedFuelBreakdown = ({
     return stopCard?.alternateRequirements || false;
   }, []);
   
-  // Read refuel stops from stopCards EVERY time component opens to stay in sync
+  // 🔧 ROCK-SOLID REFUEL SYNC: Use direct currentRefuelStops prop instead of scanning stopCards
   useEffect(() => {
     if (!visible) {
       return;
     }
     
-    let stops = [];
-    
-    // Try to read from stopCards if available
-    if (stopCards && stopCards.length > 0) {
-      stopCards.forEach((card, index) => {
-        if (card.refuelMode === true || card.isRefuelStop === true) {
-          stops.push(card.index || index);
-        }
-      });
-    }
-    
-    // Always update refuel stops to stay in sync with stop cards
-    refuelStopsRef.current = stops;
+    // ✅ ROCK-SOLID: Use direct refuel stops from parent state (no reconstruction needed)
+    console.log('🔧 ROCK-SOLID REFUEL: Using direct currentRefuelStops:', currentRefuelStops);
+    refuelStopsRef.current = currentRefuelStops || [];
     setIsInitialized(true);
-  }, [visible]); // Only read when component opens, not on every stopCards change
+  }, [visible, currentRefuelStops]); // React to both visibility and direct refuel state changes
   
   const refuelStops = refuelStopsRef.current;
 
@@ -552,7 +543,7 @@ const CleanDetailedFuelBreakdown = ({
                   marginBottom: 'clamp(16px, 3vw, 24px)',
                   border: '1px solid #333',
                   borderRadius: '8px',
-                  background: '#2c2c2c',
+                  background: 'linear-gradient(to bottom, rgba(25, 25, 30, 0.95), rgba(15, 15, 20, 0.98))',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
@@ -564,7 +555,7 @@ const CleanDetailedFuelBreakdown = ({
                     alignItems: 'center',
                     padding: '12px 16px',
                     borderBottom: '1px solid #404040',
-                    background: '#353535',
+                    background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
                     position: 'relative',
                     borderTopLeftRadius: '8px',
                     borderTopRightRadius: '8px'
@@ -655,7 +646,7 @@ const CleanDetailedFuelBreakdown = ({
                       
                       {/* LEFT: Passenger Section */}
                       <div style={{
-                        background: '#363636',
+                        background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
                         borderRadius: '6px',
                         padding: '12px 16px 12px 16px'
                       }}>
@@ -751,7 +742,7 @@ const CleanDetailedFuelBreakdown = ({
                       
                       {/* RIGHT: Fuel Section */}
                       <div style={{
-                        background: '#363636',
+                        background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
                         borderRadius: '6px',
                         padding: '12px 16px 12px 16px'
                       }}>
@@ -869,7 +860,11 @@ const CleanDetailedFuelBreakdown = ({
                                 padding: '4px 6px',
                                 backgroundColor: !showExtraFuelInput ? '#1a1a1a' : '#2c2c2c', // Dark for disabled
                                 color: !showExtraFuelInput ? '#666' : '#fff', // Dimmed text for disabled
-                                border: '1px solid #4A9EFF', // Keep border consistent
+                                border: `2px solid ${
+                                  !showExtraFuelInput ? '#666' : 
+                                  (getFuelValue(stopName, 'extraFuel', card.index) && getFuelValue(stopName, 'extraFuel', card.index) !== '') ? '#22c55e' : // Green for user-entered
+                                  '#4A9EFF' // Default blue
+                                }`,
                                 borderRadius: '4px',
                                 textAlign: 'center',
                                 fontSize: 'clamp(12px, 2.5vw, 14px)',
