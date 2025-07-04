@@ -69,9 +69,9 @@ const StopCard = React.forwardRef(({
   // Determine the display text for the stop number
   let stopNumberDisplay = index;
   if (isDeparture) {
-    stopNumberDisplay = 'D';
+    stopNumberDisplay = index; // Show numeric index for departure too
   } else if (isDestination) {
-    stopNumberDisplay = 'F';
+    stopNumberDisplay = index; // Show numeric index for destination too
   } else if (isAlternate) {
     stopNumberDisplay = 'A';
   }

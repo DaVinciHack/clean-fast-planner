@@ -60,13 +60,11 @@ const CleanDetailedFuelBreakdown = ({
     return stopCard?.alternateRequirements || false;
   }, []);
   
-  // Read refuel stops from stopCards ONLY when component first opens (not on every stopCards change)
+  // Read refuel stops from stopCards EVERY time component opens to stay in sync
   useEffect(() => {
-    if (!visible || isInitialized) {
+    if (!visible) {
       return;
     }
-    
-    console.log('🔄 INITIAL: Reading refuel stops from stopCards on component open');
     
     let stops = [];
     
@@ -74,17 +72,15 @@ const CleanDetailedFuelBreakdown = ({
     if (stopCards && stopCards.length > 0) {
       stopCards.forEach((card, index) => {
         if (card.refuelMode === true || card.isRefuelStop === true) {
-          stops.push(card.index || index); // Use card.index like EnhancedStopCardsContainer
+          stops.push(card.index || index);
         }
       });
     }
     
-    // Only update refuel stops on first initialization, not on every change
+    // Always update refuel stops to stay in sync with stop cards
     refuelStopsRef.current = stops;
     setIsInitialized(true);
-    
-    console.log('🔄 INITIAL: Set refuel stops to:', stops);
-  }, [visible, isInitialized, stopCards]); // Include stopCards but only for initial read
+  }, [visible]); // Only read when component opens, not on every stopCards change
   
   const refuelStops = refuelStopsRef.current;
 
@@ -1015,15 +1011,6 @@ const CleanDetailedFuelBreakdown = ({
                         letterSpacing: '0.5px'
                       }}>FUEL BREAKDOWN SUMMARY</div>
                       
-                      {/* 🧪 DEBUG: Show current overrides for this card */}
-                      <div style={{
-                        fontSize: '0.7rem',
-                        color: '#FFA726',
-                        textAlign: 'center',
-                        marginBottom: '6px'
-                      }}>
-                        Overrides: Extra={getFuelValue(stopName, 'extraFuel', card.index)} ARA={getFuelValue(stopName, 'araFuel', card.index)} Approach={getFuelValue(stopName, 'approachFuel', card.index)}
-                      </div>
                       
                       <div style={{
                         color: '#fff',
@@ -1046,7 +1033,7 @@ const CleanDetailedFuelBreakdown = ({
                           // Approach fuel: Use CALCULATED remaining amount, not user override for this airport
                           // The user override is what this airport CONSUMES, not what it carries forward
                           const app = card.fuelComponentsObject?.approachFuel || 0;
-                          const extra = getFuelValue(stopName, 'extraFuel', card.index) || card.fuelComponentsObject?.extraFuel || 0;
+                          const extra = card.fuelComponentsObject?.extraFuel || 0;
                           const res = getFuelValue(stopName, 'reserveFuel', card.index) || card.fuelComponentsObject?.reserveFuel || 0;
                           
                           if (taxi > 0) parts.push(`Taxi:${taxi}`);
@@ -1058,8 +1045,13 @@ const CleanDetailedFuelBreakdown = ({
                           if (extra > 0) parts.push(`Extra:${extra}`);
                           if (res > 0) parts.push(`Res:${res}`);
                           
-                          return parts.join(' ') + ' = ';
-                        })()}<span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>{card.totalFuel || 0} lbs</span>
+                          const summary = parts.join(' ') + ' = ';
+                          const isFinalDestination = card.isDestination || card.maxPassengersDisplay === 'Final Stop';
+                          return isFinalDestination ? `${parts.join(' ')} = Potential Landing fuel ` : summary;
+                        })()}{(() => {
+                          const isFinalDestination = card.isDestination || card.maxPassengersDisplay === 'Final Stop';
+                          return isFinalDestination ? <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>({card.totalFuel || 0})</span> : <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>{card.totalFuel || 0} lbs</span>;
+                        })()}
                       </div>
                     </div>
                     

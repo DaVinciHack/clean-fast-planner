@@ -3462,7 +3462,6 @@ const FastPlannerCore = ({
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
-          locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to stop cards
           currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to components
           onSegmentExtraFuelChange={handleSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler
           getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter
