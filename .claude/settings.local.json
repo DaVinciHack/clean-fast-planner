@@ -25,7 +25,8 @@
       "Bash(cat:*)",
       "Bash(export PS1='$ ')",
       "Bash(bash -c \"grep -n 'const handleFuelDataChanged\\|handleFuelDataChanged.*=\\|function handleFuelDataChanged' /Users/duncanburbury/FastPlannerMaster/FastPlannerV5/src/components/fast-planner/FastPlannerApp.jsx\")",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }
