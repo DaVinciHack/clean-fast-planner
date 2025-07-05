@@ -88,14 +88,17 @@ export class PlatformEvaluator {
   hasFuelCapability(platform) {
     // 🛢️ PRIMARY CHECK: fuelAvailable string field (OSDK data)
     if (platform.fuelAvailable) {
-      const fuelAvailableStr = String(platform.fuelAvailable).toLowerCase().trim();
+      const originalValue = String(platform.fuelAvailable).trim();
+      const lowerValue = originalValue.toLowerCase();
       
       // Debug: Log first few fuel availability checks
       if (Math.random() < 0.05) { // Only log 5% to avoid spam
-        console.log(`🔍 FUEL CHECK: ${platform.name} - fuelAvailable: "${platform.fuelAvailable}" -> "${fuelAvailableStr}"`);
+        console.log(`🔍 FUEL CHECK: ${platform.name} - fuelAvailable: "${originalValue}" -> "${lowerValue}"`);
       }
       
-      if (fuelAvailableStr === 'yes' || fuelAvailableStr === 'y') {
+      // Check for all valid fuel availability indicators
+      const validFuelValues = ['yes', 'y', 'YES', 'Y', 'Yes'];
+      if (validFuelValues.includes(originalValue) || lowerValue === 'yes' || lowerValue === 'y') {
         return true;
       }
     }

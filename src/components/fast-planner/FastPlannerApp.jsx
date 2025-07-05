@@ -1023,13 +1023,26 @@ const FastPlannerCore = ({
   }, [activeRegionFromContext, setWaypoints, setRouteStats, setStopCards]);
 
   // 🔄 REFUEL SYNC: Handle refuel stops changes from main cards
+  // 🚨 RACE CONDITION FIX: Add loop prevention for refuel stops
+  const lastRefuelStopsRef = useRef([]);
   const handleRefuelStopsChanged = useCallback((newRefuelStops) => {
-    setCurrentRefuelStops(newRefuelStops); // This was missing!
-    setStopCards(prev => prev.map(card => ({
-      ...card,
-      refuelMode: newRefuelStops.includes(card.index),
-      isRefuelStop: newRefuelStops.includes(card.index)
-    })));
+    // Prevent unnecessary updates if refuel stops haven't actually changed
+    const newStopsString = JSON.stringify(newRefuelStops.sort());
+    const lastStopsString = JSON.stringify(lastRefuelStopsRef.current.sort());
+    
+    if (newStopsString !== lastStopsString) {
+      console.log('🔄 REFUEL SYNC: Updating refuel stops:', newRefuelStops);
+      lastRefuelStopsRef.current = [...newRefuelStops];
+      
+      setCurrentRefuelStops(newRefuelStops);
+      setStopCards(prev => prev.map(card => ({
+        ...card,
+        refuelMode: newRefuelStops.includes(card.index),
+        isRefuelStop: newRefuelStops.includes(card.index)
+      })));
+    } else {
+      console.log('🔄 REFUEL SYNC: No change in refuel stops, skipping update');
+    }
   }, []);
 
   const handleAddFavoriteLocation = (location) => {
@@ -3094,8 +3107,18 @@ const FastPlannerCore = ({
   }, [handleFlightLoad]);
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
+  // 🚨 RACE CONDITION FIX: Add loop prevention and proper memoization
+  const lastProcessedCardsRef = useRef(null);
   const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
     console.log('🔄 HEADER SYNC: handleStopCardsCalculated called with', calculatedStopCards?.length, 'cards');
+    
+    // 🚨 LOOP PREVENTION: Check if we've already processed these exact cards
+    const cardsString = JSON.stringify(calculatedStopCards);
+    if (lastProcessedCardsRef.current === cardsString) {
+      console.log('🔄 HEADER SYNC: Skipping duplicate update to prevent infinite loop');
+      return;
+    }
+    lastProcessedCardsRef.current = cardsString;
     
     if (calculatedStopCards && calculatedStopCards.length > 0) {
       const departureCard = calculatedStopCards.find(card => card.isDeparture);
@@ -3106,8 +3129,16 @@ const FastPlannerCore = ({
       // Force a complete recalculation by updating forceUpdate state
       setForceUpdate(prev => prev + 1);
     } else {
-      setStopCards(calculatedStopCards);
-      console.log('🔄 HEADER SYNC: Updated stopCards state for header');
+      // 🚨 RACE CONDITION FIX: Only update if cards actually changed
+      setStopCards(prev => {
+        const prevString = JSON.stringify(prev);
+        if (prevString !== cardsString) {
+          console.log('🔄 HEADER SYNC: Updated stopCards state for header');
+          return calculatedStopCards;
+        }
+        console.log('🔄 HEADER SYNC: No change in stopCards, skipping update');
+        return prev;
+      });
     }
   }, []);
   

@@ -15,13 +15,94 @@ class FlightSequenceController {
     this.mapMode = 'dark'; // dark, satellite
     this.isEditMode = false;
     this.flightLoaded = false;
+    
+    // ✨ OPTION C: Animation state management for smooth performance
+    this.isAnimating = false;
+    this.deferredOperations = [];
+  }
+
+  /**
+   * ✨ OPTION C: Animation state management methods
+   */
+  startAnimation() {
+    this.isAnimating = true;
+    window.STARLIGHT_ANIMATION_IN_PROGRESS = true;
+    
+    // ✨ PAUSE DEBUG LOGGING during animation for smooth performance
+    this.originalConsoleLog = console.log;
+    this.originalConsoleWarn = console.warn;
+    this.originalConsoleError = console.error;
+    
+    // Create minimal logging during animation (only critical errors)
+    console.log = (...args) => {
+      // Only allow critical animation logs (with ✨ prefix)
+      if (args[0] && args[0].includes('✨')) {
+        this.originalConsoleLog(...args);
+      }
+    };
+    console.warn = (...args) => {
+      // Allow warnings but prefix them
+      this.originalConsoleWarn('⚠️ [ANIMATION]', ...args);
+    };
+    // Keep console.error unchanged for debugging
+    
+    this.originalConsoleLog('✨ Animation started - background processes and debug logging paused');
+  }
+
+  endAnimation() {
+    this.isAnimating = false;
+    window.STARLIGHT_ANIMATION_IN_PROGRESS = false;
+    
+    // ✨ RESTORE DEBUG LOGGING after animation
+    if (this.originalConsoleLog) {
+      console.log = this.originalConsoleLog;
+      console.warn = this.originalConsoleWarn;
+      console.error = this.originalConsoleError;
+      
+      // Clear references
+      this.originalConsoleLog = null;
+      this.originalConsoleWarn = null;
+      this.originalConsoleError = null;
+    }
+    
+    console.log('✨ Animation complete - debug logging restored, executing deferred operations');
+    
+    // Execute any deferred operations
+    setTimeout(() => {
+      this.deferredOperations.forEach(operation => {
+        try {
+          operation();
+        } catch (error) {
+          console.warn('✨ Deferred operation failed:', error);
+        }
+      });
+      this.deferredOperations = [];
+    }, 500); // Small buffer after animation
+  }
+
+  deferOperation(operation) {
+    if (this.isAnimating) {
+      this.deferredOperations.push(operation);
+      return true; // Operation was deferred
+    }
+    return false; // Operation should run immediately
+  }
+
+  /**
+   * ✨ OPTION C: Global animation state check for other components
+   */
+  static isStarlightAnimationInProgress() {
+    return window.STARLIGHT_ANIMATION_IN_PROGRESS === true;
   }
 
   /**
    * Main sequence: Detect current state and choose appropriate animation
    */
   async startFlightLoadSequence(currentMapMode) {
-    console.log('🎬 FlightSequenceController: Starting sequence - current mode:', currentMapMode);
+    console.log('🎬 ✨ OPTION C: Starting luxurious starlight sequence - current mode:', currentMapMode);
+    
+    // ✨ OPTION C: Start animation state management
+    this.startAnimation();
     
     try {
       // Detect current state
@@ -30,13 +111,13 @@ class FlightSequenceController {
       console.log(`🎬 SEQUENCE DEBUG: Detected starlight mode: ${isInStarlightMode} (currentMapMode: "${currentMapMode}")`);
       
       if (isInStarlightMode) {
-        console.log('🌪️ STARLIGHT MODE DETECTED - executing 360° spin sequence (will NOT apply tilt)');
+        console.log('🌪️ STARLIGHT MODE DETECTED - executing extended 360° spin sequence');
         this.currentStep = 'spinning-360';
         await this.execute360Spin();
         this.needsTiltAfterData = false; // Don't tilt - stay in starlight mode
         console.log('🌪️ STARLIGHT MODE: needsTiltAfterData set to FALSE - will stay in starlight mode');
       } else {
-        console.log('📐 EDIT MODE DETECTED - executing satellite + vertical sequence (will apply tilt)');
+        console.log('📐 EDIT MODE DETECTED - executing luxurious satellite + vertical sequence');
         this.currentStep = 'switching-to-satellite';
         await this.switchToSatelliteAndSetZoom();
         this.needsTiltAfterData = true; // Flag to tilt after data loads
@@ -44,7 +125,7 @@ class FlightSequenceController {
       }
       
       this.currentStep = 'ready-for-data';
-      console.log('🎬 Animation complete - proceeding with flight data loading');
+      console.log('🎬 ✨ Initial animation phase complete - proceeding with flight data loading');
       console.log(`🎬 SEQUENCE SUMMARY: needsTiltAfterData = ${this.needsTiltAfterData}`);
       
       return true;
@@ -80,21 +161,19 @@ class FlightSequenceController {
       
       map.flyTo({
         bearing: targetBearing,
-        duration: 3000, // 3 seconds for full rotation
+        duration: 3500, // Extended for Option C: Luxurious timing
         easing: (t) => {
-          // Super smooth easing - ease in-out with extra smoothness
-          return t < 0.5 
-            ? 2 * t * t * t * t
-            : 1 - Math.pow(-2 * t + 2, 4) / 2;
+          // ✨ OPTION C: Ultra-smooth sine-based easing (lighter computation)
+          return 0.5 * (1 - Math.cos(Math.PI * t));
         },
         essential: true
       });
       
-      // Resolve when spin is mostly complete
+      // Resolve when spin is completely finished (Option C: No overlap)
       setTimeout(() => {
         console.log('🌪️ 360° spin complete');
         resolve();
-      }, 3100);
+      }, 3600);
     });
   }
 
@@ -237,24 +316,70 @@ class FlightSequenceController {
         return;
       }
 
-      console.log('🎭 Applying 60° tilt with smooth easing');
-      map.flyTo({
-        pitch: 60,
-        duration: 1500,  // Slower for smoother feel (was 1000)
-        easing: (t) => {
-          // Custom smooth easing - ease out cubic
-          return 1 - Math.pow(1 - t, 3);
-        },
-        essential: true
-      });
+      console.log('🎭 ✨ VERSION CHECK: Mobile-optimized tilt v2.0 - CHANGES LOADED!');
       
-      this.isTilted = true;
+      // ✨ MOBILE FIX: Check if we're on a mobile device
+      const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+      const currentPitch = map.getPitch();
       
-      // Resolve earlier so zoom can start overlapping with end of tilt
-      setTimeout(() => {
-        console.log('🎭 Tilt ready for zoom overlap');
-        resolve();
-      }, 1000); // Start zoom while tilt is finishing (was 1100)
+      console.log(`🎭 Device: ${isMobile ? 'Mobile/Tablet' : 'Desktop'}, Current pitch: ${currentPitch}°`);
+      
+      if (isMobile) {
+        // ✨ MOBILE OPTIMIZED: Use shorter duration and simpler easing for mobile
+        console.log('🎭 Starting mobile tilt animation...');
+        
+        try {
+          map.flyTo({
+            pitch: 60,
+            duration: 1200,  // Shorter for mobile performance
+            easing: (t) => {
+              // Simple ease-out for mobile compatibility
+              return 1 - (1 - t) * (1 - t);
+            },
+            essential: true
+          });
+          
+          this.isTilted = true;
+          
+          // ✨ MOBILE DEBUG: Check pitch during animation
+          const checkPitchInterval = setInterval(() => {
+            const currentPitch = map.getPitch();
+            console.log(`🎭 Mobile tilt progress: ${currentPitch.toFixed(1)}°`);
+          }, 300);
+          
+          setTimeout(() => {
+            clearInterval(checkPitchInterval);
+            const finalPitch = map.getPitch();
+            console.log(`🎭 ✨ Mobile tilt complete - Final pitch: ${finalPitch.toFixed(1)}°`);
+            resolve();
+          }, 1300);
+          
+        } catch (error) {
+          console.error('🎭 Mobile tilt animation failed:', error);
+          // ✨ FALLBACK: Direct pitch set if animation fails
+          map.setPitch(60);
+          this.isTilted = true;
+          resolve();
+        }
+        
+      } else {
+        // ✨ DESKTOP: Use luxurious timing
+        map.flyTo({
+          pitch: 60,
+          duration: 2000,
+          easing: (t) => {
+            return t * t * (3 - 2 * t);
+          },
+          essential: true
+        });
+        
+        this.isTilted = true;
+        
+        setTimeout(() => {
+          console.log('🎭 ✨ Desktop tilt complete');
+          resolve();
+        }, 2100);
+      }
     });
   }
 
@@ -300,12 +425,12 @@ class FlightSequenceController {
     const zoomSuccess = this.mapManagerRef.current.autoZoomToFlight(allCoordinates, {
       padding: 80,      // Slightly more padding to accommodate alternates
       maxZoom: 10,      // Slightly less close to fit everything
-      duration: 2500,   // Slightly slower for smoother flow
+      duration: 3000,   // ✨ OPTION C: Extended duration for luxurious feel
       animate: true,
       pitch: currentPitch, // Preserve current pitch (60° for starlight mode, or current tilt)
       easing: (t) => {
-        // Custom smooth easing - ease in-out cubic
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        // ✨ OPTION C: Optimized smooth step (lighter computation than cubic)
+        return t * t * (3 - 2 * t);
       }
     });
 
@@ -327,10 +452,13 @@ class FlightSequenceController {
     this.currentStep = 'complete';
     this.flightLoaded = true;
     
+    // ✨ OPTION C: End animation state - allow background processes to resume
+    this.endAnimation();
+    
     // Update app state to show we're in starlight mode (3d = satellite + tilt)
     if (this.setCurrentMapMode) {
       this.setCurrentMapMode('3d');
-      console.log('🎬 Updated app state to 3d mode (starlight)');
+      console.log('🎬 ✨ Updated app state to 3d mode (starlight) - animation sequence complete');
     }
     
     console.log('🎬 Flight sequence complete - ready for weather/alternates');

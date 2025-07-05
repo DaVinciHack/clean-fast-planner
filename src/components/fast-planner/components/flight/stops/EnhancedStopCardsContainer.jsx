@@ -99,11 +99,22 @@ const EnhancedStopCardsContainer = ({
   
   // 🔄 REFUEL SYNC: Sync refuel stops to parent when they change (but not during parent sync)
   const isUpdatingFromParentRef = useRef(false);
+  const lastRefuelStopsRef = useRef([]);
   
   useEffect(() => {
     if (onRefuelStopsChanged && !isUpdatingFromParentRef.current) {
-      console.log('🔄 SYNC TO PARENT: Refuel stops changed locally:', refuelStops);
-      onRefuelStopsChanged(refuelStops);
+      // 🚨 RACE CONDITION FIX: Only sync if refuel stops actually changed
+      const refuelStopsString = JSON.stringify(refuelStops.sort());
+      const lastRefuelStopsString = JSON.stringify(lastRefuelStopsRef.current.sort());
+      
+      if (refuelStopsString !== lastRefuelStopsString) {
+        console.log('🔄 SYNC TO PARENT: Refuel stops changed locally:', refuelStops);
+        lastRefuelStopsRef.current = [...refuelStops];
+        // Use setTimeout to debounce and prevent immediate callback loops
+        setTimeout(() => {
+          onRefuelStopsChanged(refuelStops);
+        }, 0);
+      }
     }
   }, [refuelStops, onRefuelStopsChanged]);
   
@@ -194,9 +205,13 @@ const EnhancedStopCardsContainer = ({
             setDisplayStopCards(cardsWithRefuel);
             
             // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
+            // 🚨 RACE CONDITION FIX: Add timeout to prevent rapid successive calls
             if (onStopCardsCalculated && newCardsString !== lastNotifiedCardsRef.current) {
               lastNotifiedCardsRef.current = newCardsString;
-              onStopCardsCalculated(cardsWithRefuel);
+              // Use setTimeout to debounce the callback and break any synchronous update chains
+              setTimeout(() => {
+                onStopCardsCalculated(cardsWithRefuel);
+              }, 0);
             }
           } else {
           }
@@ -208,7 +223,7 @@ const EnhancedStopCardsContainer = ({
     } else {
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, localFuelOverrides, waiveAlternates, locationFuelOverrides]);
+  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, localFuelOverrides, waiveAlternates, locationFuelOverrides]); // 🚨 RACE CONDITION FIX: Removed onStopCardsCalculated from dependencies
   
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount

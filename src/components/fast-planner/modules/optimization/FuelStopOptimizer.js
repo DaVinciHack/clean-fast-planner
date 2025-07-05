@@ -57,7 +57,24 @@ export class FuelStopOptimizer {
       // Step 4: Find fuel-capable platforms in corridor
       console.log('🔍 STEP 4: Searching for fuel-capable platforms...');
       console.log('🔍 AVAILABLE PLATFORMS COUNT:', flightData.availablePlatforms?.length || 0);
-      console.log('🔍 FIRST FEW PLATFORMS:', flightData.availablePlatforms?.slice(0, 3).map(p => ({ name: p.name, hasFuel: p.hasFuel, fuelAvailable: p.fuelAvailable })));
+      console.log('🔍 FIRST FEW PLATFORMS:', flightData.availablePlatforms?.slice(0, 5).map(p => ({ 
+        name: p.name, 
+        fuelAvailable: p.fuelAvailable,
+        coords: p.coordinates,
+        hasFuelCapability: this.platformEvaluator.hasFuelCapability(p)
+      })));
+      
+      // Test fuel capability detection on all platforms
+      const fuelCapablePlatformsTotal = flightData.availablePlatforms?.filter(p => 
+        this.platformEvaluator.hasFuelCapability(p)
+      ) || [];
+      console.log('🔍 TOTAL FUEL-CAPABLE PLATFORMS:', fuelCapablePlatformsTotal.length);
+      if (fuelCapablePlatformsTotal.length > 0) {
+        console.log('🔍 FUEL-CAPABLE EXAMPLES:', fuelCapablePlatformsTotal.slice(0, 3).map(p => ({ 
+          name: p.name, 
+          fuelAvailable: p.fuelAvailable 
+        })));
+      }
       
       const candidatePlatforms = await this.findFuelStopsInCorridor(
         searchCorridor,
@@ -65,7 +82,7 @@ export class FuelStopOptimizer {
       );
       
       console.log('🔍 CANDIDATE PLATFORMS FOUND:', candidatePlatforms.length);
-      console.log('🔍 CANDIDATES:', candidatePlatforms.map(p => ({ name: p.name, hasFuel: p.hasFuel })));
+      console.log('🔍 CANDIDATES:', candidatePlatforms.map(p => ({ name: p.name, fuelAvailable: p.fuelAvailable })));
 
       if (candidatePlatforms.length === 0) {
         console.log('❌ NO CANDIDATES: No fuel-capable platforms found in corridor');
@@ -164,26 +181,41 @@ export class FuelStopOptimizer {
    * @returns {Array} Candidate fuel stops
    */
   async findFuelStopsInCorridor(corridor, platforms) {
+    console.log('🔍 CORRIDOR SEARCH: Starting with', platforms?.length || 0, 'platforms');
+    
     if (!platforms || platforms.length === 0) {
-      console.warn('No platforms provided for corridor search');
+      console.warn('❌ CORRIDOR SEARCH: No platforms provided');
       return [];
     }
 
-    // Filter platforms within corridor that have fuel capability
+    // First, filter for fuel capability
+    console.log('🔍 CORRIDOR SEARCH: Filtering for fuel capability...');
     const fuelCapablePlatforms = platforms.filter(platform => {
-      // Check if platform has fuel capability
-      // Use PlatformEvaluator to properly check fuel capability
-      if (!this.platformEvaluator.hasFuelCapability(platform)) {
-        return false;
+      const hasFuel = this.platformEvaluator.hasFuelCapability(platform);
+      if (!hasFuel && Math.random() < 0.1) { // Log 10% of non-fuel platforms
+        console.log(`❌ NO FUEL: ${platform.name} - fuelAvailable: "${platform.fuelAvailable}"`);
       }
-
-      // Check if platform is within corridor
-      return this.corridorSearcher.isPlatformInCorridor(platform, corridor);
+      return hasFuel;
     });
-
-    console.log(`Found ${fuelCapablePlatforms.length} fuel-capable platforms in corridor`);
     
-    return fuelCapablePlatforms;
+    console.log('🔍 CORRIDOR SEARCH: Found', fuelCapablePlatforms.length, 'fuel-capable platforms');
+    
+    // Then filter for corridor proximity
+    console.log('🔍 CORRIDOR SEARCH: Checking corridor proximity...');
+    const finalCandidates = fuelCapablePlatforms.filter(platform => {
+      const inCorridor = this.corridorSearcher.isPlatformInCorridor(platform, corridor);
+      if (!inCorridor && Math.random() < 0.05) { // Log 5% of out-of-corridor platforms
+        console.log(`❌ OUT OF CORRIDOR: ${platform.name} at [${platform.coordinates?.[1]}, ${platform.coordinates?.[0]}]`);
+      }
+      return inCorridor;
+    });
+    
+    console.log('🔍 CORRIDOR SEARCH: Final candidates:', finalCandidates.length);
+    if (finalCandidates.length > 0) {
+      console.log('🔍 CORRIDOR SEARCH: Examples:', finalCandidates.slice(0, 3).map(p => p.name));
+    }
+    
+    return finalCandidates;
   }
 
   /**

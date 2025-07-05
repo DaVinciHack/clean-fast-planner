@@ -57,14 +57,23 @@ export class FuelStopOptimizationManager {
 
       // Extract passenger requirements
       this.notifyDebug('Analysis', '🔍 Analyzing passenger requirements...');
+      console.log('🔍 ANALYZING with config:', {
+        stopCards: flightConfiguration.stopCards?.length,
+        stopRequests: flightConfiguration.stopRequests?.length,
+        overloadedStops: flightConfiguration.overloadedStops?.length,
+        firstStopRequest: flightConfiguration.stopRequests?.[0]
+      });
+      
       const passengerAnalysis = this.analyzePassengerRequirements(flightConfiguration);
+      console.log('🔍 PASSENGER ANALYSIS RESULT:', passengerAnalysis);
+      
       if (!passengerAnalysis.hasOverload) {
-        this.notifyDebug('No Overload', '✅ No passenger overload detected');
+        this.notifyDebug('No Overload', '✅ No weight overload detected');
         console.log('FuelStopOptimizationManager: No passenger overload detected');
         return { success: false, reason: 'No passenger overload' };
       }
 
-      this.notifyDebug('Overload Found', `⚠️ ${passengerAnalysis.affectedStops} stops need ${passengerAnalysis.maxShortage} more passengers`);
+      this.notifyDebug('Overload Found', `⚠️ ${passengerAnalysis.affectedStops} stops need ${passengerAnalysis.maxWeightShortage} lbs more capacity`);
       console.log('FuelStopOptimizationManager: Passenger overload detected, finding solutions...');
 
       // Get all available platforms/locations for search
@@ -91,7 +100,16 @@ export class FuelStopOptimizationManager {
 
       // Run optimization
       this.notifyDebug('Route Analysis', '🛩️ Analyzing flight route for optimization...');
+      console.log('🔍 ABOUT TO CALL OPTIMIZER.suggestFuelStops with data:', {
+        waypoints: optimizationData.waypoints?.length,
+        availablePlatforms: optimizationData.availablePlatforms?.length,
+        stopCards: optimizationData.stopCards?.length,
+        hasSelectedAircraft: !!optimizationData.selectedAircraft
+      });
+      
       const optimizationResult = await this.optimizer.suggestFuelStops(optimizationData);
+      
+      console.log('🔍 OPTIMIZER RETURNED:', optimizationResult);
 
       if (optimizationResult.success && optimizationResult.suggestions.length > 0) {
         this.notifyDebug('Success', `🎉 Found ${optimizationResult.suggestions.length} optimization options!`);
