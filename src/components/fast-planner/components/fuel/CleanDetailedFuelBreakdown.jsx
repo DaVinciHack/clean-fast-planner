@@ -116,6 +116,7 @@ const CleanDetailedFuelBreakdown = ({
   // 🚨 FUEL STOP OPTIMIZATION POPUP STATE
   const [fuelStopPopup, setFuelStopPopup] = useState(null);
   const [hasTriggeredOptimization, setHasTriggeredOptimization] = useState(false);
+  const [optimizationDebugLog, setOptimizationDebugLog] = useState([]);
   
   // 🎯 OPTIMIZATION MANAGER: Initialize the fuel stop optimization system
   const optimizationManager = useMemo(() => {
@@ -123,27 +124,54 @@ const CleanDetailedFuelBreakdown = ({
     manager.setCallbacks({
       onSuggestionsReady: (suggestions) => {
         console.log('🎯 OPTIMIZATION: Suggestions ready:', suggestions);
+        setOptimizationDebugLog(prev => [...prev, {
+          step: 'Complete',
+          message: `✅ Found ${suggestions.suggestions?.length || 0} fuel stop options!`,
+          data: suggestions.suggestions?.map(s => `${s.platform.name} (+${s.passengerGain} pax)`),
+          timestamp: Date.now()
+        }]);
         setFuelStopPopup({
           type: 'suggestions',
           data: suggestions,
+          debugLog: optimizationDebugLog,
           timestamp: Date.now()
         });
       },
       onError: (error) => {
         console.log('🎯 OPTIMIZATION: Error:', error);
+        setOptimizationDebugLog(prev => [...prev, {
+          step: 'Error',
+          message: `❌ ${error}`,
+          timestamp: Date.now()
+        }]);
         setFuelStopPopup({
           type: 'error',
           message: error,
+          debugLog: optimizationDebugLog,
           timestamp: Date.now()
         });
       },
       onProcessingUpdate: (isProcessing) => {
         if (isProcessing) {
+          setOptimizationDebugLog([{
+            step: 'Starting',
+            message: '🔍 Analyzing passenger capacity...',
+            timestamp: Date.now()
+          }]);
           setFuelStopPopup({
             type: 'processing',
+            debugLog: optimizationDebugLog,
             timestamp: Date.now()
           });
         }
+      },
+      onDebugUpdate: (debugInfo) => {
+        setOptimizationDebugLog(prev => [...prev, debugInfo]);
+        // Update the popup with the latest debug info in real-time
+        setFuelStopPopup(prevPopup => ({
+          ...prevPopup,
+          debugLog: [...(prevPopup?.debugLog || []), debugInfo]
+        }));
       }
     });
     return manager;
@@ -219,8 +247,15 @@ const CleanDetailedFuelBreakdown = ({
         formattedOverrides[key] = { value: val };
       });
       
+      // 🔧 TAXI FUEL FIX: Check if departure taxi fuel has been overridden
+      const departureName = waypoints[0]?.name || waypoints[0]?.stopName;
+      const departureTaxiFuelOverride = departureName ? 
+        (fuelOverrides[`${departureName}_taxiFuel`] || fuelOverrides[`${departureName}_1_taxiFuel`]) : null;
+      
       const effectiveSettings = {
         ...flightSettings,
+        // 🔧 TAXI FUEL FIX: Use override if available, otherwise use original value
+        taxiFuel: departureTaxiFuelOverride !== null ? departureTaxiFuelOverride : flightSettings.taxiFuel,
         locationFuelOverrides: formattedOverrides,
         fuelPolicy: fuelPolicy?.currentPolicy  // 🚨 AVIATION SAFETY: Pass verified fuel policy
       };
@@ -264,7 +299,7 @@ const CleanDetailedFuelBreakdown = ({
     }
   }, [waypoints, selectedAircraft, routeStats, weather, flightSettings, weatherSegments, refuelStops, waiveAlternates, alternateStopCard, fuelOverrides, locationFuelOverrides]);
   
-  // 🚨 OVERLOADED STOPS: Calculate which stops exceed passenger capacity (after displayStopCards is defined)
+  // 🚨 WEIGHT OVERLOADED STOPS: Calculate which stops exceed WEIGHT capacity (aviation logic)
   const overloadedStops = useMemo(() => {
     if (!displayStopCards || displayStopCards.length === 0) return [];
     
@@ -275,15 +310,45 @@ const CleanDetailedFuelBreakdown = ({
         return false;
       }
       
-      const requested = getPassengerRequest(card.name || card.stopName, 'passengerCount');
-      const available = card.maxPassengers || 0;
-      const isOverloaded = requested > available;
+      const requestedWeight = getPassengerRequest(card.name || card.stopName, 'totalWeight');
+      const requestedCount = getPassengerRequest(card.name || card.stopName, 'passengerCount');
+      const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+      const aircraftMaxSeats = selectedAircraft?.maxPassengers || 19;
       
-      console.log(`🎯 OVERLOAD CHECK: ${card.name || card.stopName} - requested: ${requested}, available: ${available}, overloaded: ${isOverloaded}`);
+      // PRIMARY CHECK: Weight overload (fuel optimization can help)
+      const isWeightOverloaded = requestedWeight > availableWeight;
       
-      return isOverloaded;
+      // SECONDARY CHECK: Seating overload (fuel optimization CANNOT help)
+      const isSeatingOverloaded = requestedCount > aircraftMaxSeats;
+      
+      console.log(`🎯 WEIGHT CHECK: ${card.name || card.stopName}:`, {
+        requestedWeight,
+        availableWeight,
+        requestedCount,
+        aircraftMaxSeats,
+        isWeightOverloaded,
+        isSeatingOverloaded,
+        canOptimize: isWeightOverloaded && !isSeatingOverloaded
+      });
+      
+      // Only trigger fuel optimization for weight overload (not seating overload)
+      return isWeightOverloaded && !isSeatingOverloaded;
     });
-  }, [displayStopCards, getPassengerRequest, passengerRequests]);
+  }, [displayStopCards, getPassengerRequest, passengerRequests, selectedAircraft]);
+  
+  // 🚨 SEATING OVERLOADED STOPS: Separate check for seating capacity (cannot be optimized)
+  const seatingOverloadedStops = useMemo(() => {
+    if (!displayStopCards || displayStopCards.length === 0) return [];
+    
+    return displayStopCards.filter(card => {
+      if (card.isDestination || card.maxPassengers === null) return false;
+      
+      const requestedCount = getPassengerRequest(card.name || card.stopName, 'passengerCount');
+      const aircraftMaxSeats = selectedAircraft?.maxPassengers || 19;
+      
+      return requestedCount > aircraftMaxSeats;
+    });
+  }, [displayStopCards, getPassengerRequest, passengerRequests, selectedAircraft]);
   
   // 🛡️ RACE CONDITION FIX: Only allow updates after component is mounted
   const [isMounted, setIsMounted] = useState(false);
@@ -316,7 +381,7 @@ const CleanDetailedFuelBreakdown = ({
       
       // Optimization check (reduced logging)
       
-      // 🚨 RUN FUEL STOP OPTIMIZATION (only once per overload session)
+      // 🚨 RUN FUEL STOP OPTIMIZATION (only for weight overload, not seating overload)
       if (overloadedStops.length > 0 && !hasTriggeredOptimization) {
         console.log('🎯 RUNNING FUEL STOP OPTIMIZATION...');
         setHasTriggeredOptimization(true);
@@ -332,24 +397,85 @@ const CleanDetailedFuelBreakdown = ({
           alternateRouteData,
           maxPassengersRequested,
           overloadedStops: overloadedStops.map(card => card.name || card.stopName),
+          // Add passenger request data for weight analysis
+          stopRequests: displayStopCards.map(card => ({
+            stopName: card.name || card.stopName,
+            requestedPassengers: getPassengerRequest(card.name || card.stopName, 'passengerCount'),
+            requestedWeight: getPassengerRequest(card.name || card.stopName, 'totalWeight'),
+            availableWeight: card.availableWeight || card.maxPassengersWeight || 0,
+            isDestination: card.isDestination
+          })),
           // Get real platform data from platform manager - NO MOCK DATA
           availablePlatforms: platformManager?.getPlatforms ? platformManager.getPlatforms() : [],
           platformManager: platformManager
         };
         
         // Debug platform data before optimization
+        const platformData = platformManager?.getPlatforms ? platformManager.getPlatforms() : [];
         console.log('🎯 PLATFORM MANAGER DEBUG:', {
           hasManager: !!platformManager,
-          platformCount: platformManager?.getPlatforms ? platformManager.getPlatforms().length : 'getPlatforms not available',
+          platformCount: platformData.length,
           platforms: platformManager?.platforms ? platformManager.platforms.length : 'platforms property not available',
-          firstFewPlatforms: platformManager?.getPlatforms ? platformManager.getPlatforms().slice(0, 3).map(p => ({ name: p.name, hasFuel: p.hasFuel, fuelAvailable: p.fuelAvailable })) : 'none'
+          firstFewPlatforms: platformData.slice(0, 5).map(p => ({ 
+            name: p.name, 
+            hasFuel: p.hasFuel, 
+            fuelAvailable: p.fuelAvailable,
+            lat: p.coordinates?.[1],
+            lng: p.coordinates?.[0],
+            isPlatform: p.isPlatform
+          }))
         });
+        
+        // 🗺️ VISUAL DEBUG: Show search area and candidate platforms on console
+        if (platformData.length > 0) {
+          console.log('🗺️ VISUAL DEBUG: Route waypoints for corridor search:', 
+            waypoints.map(wp => ({ name: wp.name, lat: wp.lat, lng: wp.lng }))
+          );
+          
+          // Find platforms near route (simple distance check)
+          const routeStart = waypoints[0];
+          const routeEnd = waypoints[waypoints.length - 1];
+          if (routeStart && routeEnd && routeStart.lat && routeStart.lng) {
+            const nearbyPlatforms = platformData.filter(platform => {
+              if (!platform.coordinates || platform.coordinates.length !== 2) return false;
+              const [lng, lat] = platform.coordinates;
+              
+              // Simple bounding box check (±0.5 degrees ~30nm)
+              const latRange = Math.abs(routeEnd.lat - routeStart.lat) + 1;
+              const lngRange = Math.abs(routeEnd.lng - routeStart.lng) + 1;
+              const minLat = Math.min(routeStart.lat, routeEnd.lat) - 0.5;
+              const maxLat = Math.max(routeStart.lat, routeEnd.lat) + 0.5;
+              const minLng = Math.min(routeStart.lng, routeEnd.lng) - 0.5;
+              const maxLng = Math.max(routeStart.lng, routeEnd.lng) + 0.5;
+              
+              return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+            });
+            
+            console.log(`🗺️ CORRIDOR DEBUG: Found ${nearbyPlatforms.length} platforms in rough corridor:`,
+              nearbyPlatforms.slice(0, 10).map(p => ({ 
+                name: p.name, 
+                hasFuel: p.hasFuel || p.fuelAvailable,
+                lat: p.coordinates[1],
+                lng: p.coordinates[0]
+              }))
+            );
+          }
+        }
         
         // Run optimization with detailed logging
         console.log('🎯 FLIGHT CONFIGURATION:', flightConfiguration);
         optimizationManager.checkAndOptimize(flightConfiguration)
           .then(result => {
             console.log('🎯 OPTIMIZATION RESULT:', result);
+            if (result.success && result.suggestions) {
+              console.log('🎯 FUEL STOP SUGGESTIONS:', result.suggestions.map(s => ({
+                name: s.platform.name,
+                passengerGain: s.passengerGain,
+                fuelSavings: s.fuelSavings,
+                deviation: s.routeDeviation,
+                score: s.score
+              })));
+            }
           })
           .catch(error => {
             console.error('🎯 OPTIMIZATION ERROR:', error);
@@ -1505,22 +1631,30 @@ const CleanDetailedFuelBreakdown = ({
               {/* Show overload details */}
               <div style={{ marginBottom: '16px' }}>
                 {(() => {
-                  // 🔧 DEDUPLICATE: Group by location name and show most restrictive capacity
+                  // 🔧 SHOW BOTH TYPES OF OVERLOAD with different styling
+                  const allOverloadedStops = [...overloadedStops, ...seatingOverloadedStops];
                   const locationGroups = {};
-                  overloadedStops.forEach(card => {
+                  
+                  allOverloadedStops.forEach(card => {
                     const locationName = card.name || card.stopName;
                     const requestedPassengers = getPassengerRequest(locationName, 'passengerCount');
                     const requestedWeight = getPassengerRequest(locationName, 'totalWeight');
-                    const availablePassengers = card.maxPassengers || 0;
                     const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+                    const aircraftMaxSeats = selectedAircraft?.maxPassengers || 19;
                     
-                    if (!locationGroups[locationName] || availablePassengers < locationGroups[locationName].availablePassengers) {
+                    const isWeightOverload = requestedWeight > availableWeight;
+                    const isSeatingOverload = requestedPassengers > aircraftMaxSeats;
+                    
+                    if (!locationGroups[locationName]) {
                       locationGroups[locationName] = {
                         locationName,
                         requestedPassengers,
                         requestedWeight,
-                        availablePassengers,
-                        availableWeight
+                        availableWeight,
+                        aircraftMaxSeats,
+                        isWeightOverload,
+                        isSeatingOverload,
+                        canOptimize: isWeightOverload && !isSeatingOverload
                       };
                     }
                   });
@@ -1531,13 +1665,19 @@ const CleanDetailedFuelBreakdown = ({
                       color: '#fff',
                       marginBottom: '8px',
                       padding: '10px',
-                      background: 'rgba(231, 76, 60, 0.25)',
+                      background: location.canOptimize ? 'rgba(255, 193, 7, 0.25)' : 'rgba(231, 76, 60, 0.25)',
                       borderRadius: '8px',
-                      border: '1px solid #ff3333'
+                      border: location.canOptimize ? '1px solid #ffc107' : '1px solid #ff3333'
                     }}>
                       <strong>{location.locationName}</strong><br/>
-                      Passengers: {location.requestedPassengers} requested vs {location.availablePassengers} available<br/>
-                      Weight: {location.requestedWeight} lbs requested vs {location.availableWeight} lbs available
+                      {location.isSeatingOverload && (
+                        <>❌ <strong>SEATING LIMIT:</strong> {location.requestedPassengers} passengers &gt; {location.aircraftMaxSeats} aircraft seats<br/></>
+                      )}
+                      {location.isWeightOverload && (
+                        <>⚖️ <strong>WEIGHT OVERLOAD:</strong> {location.requestedWeight} lbs &gt; {location.availableWeight} lbs available<br/></>
+                      )}
+                      {location.canOptimize && <span style={{color: '#ffc107'}}>🛢️ Can optimize with fuel stops</span>}
+                      {location.isSeatingOverload && <span style={{color: '#ff6b6b'}}>🚫 Cannot fix - aircraft seating limit</span>}
                     </div>
                   ));
                 })()}
@@ -1549,7 +1689,34 @@ const CleanDetailedFuelBreakdown = ({
                 textAlign: 'center',
                 marginBottom: '16px'
               }}>
-                Looking for route optimization and refuel stops...
+                Optimizing fuel stops and passenger capacity...
+              </div>
+              
+              {/* Real-time debug log */}
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.3)',
+                borderRadius: '6px',
+                padding: '12px',
+                marginBottom: '16px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                fontSize: '0.75rem',
+                fontFamily: 'monospace'
+              }}>
+                {(fuelStopPopup.debugLog || optimizationDebugLog).map((log, index) => (
+                  <div key={index} style={{
+                    color: log.step === 'Error' ? '#ff6b6b' : 
+                           log.step === 'Success' ? '#51cf66' :
+                           log.step.includes('Found') ? '#ffd43b' : '#ccc',
+                    marginBottom: '4px',
+                    wordBreak: 'break-word'
+                  }}>
+                    <span style={{ color: '#888' }}>[{log.step}]</span> {log.message}
+                  </div>
+                ))}
+                {(fuelStopPopup.debugLog || optimizationDebugLog).length === 0 && (
+                  <div style={{ color: '#888', fontStyle: 'italic' }}>Starting analysis...</div>
+                )}
               </div>
               
               {/* Animated loader */}

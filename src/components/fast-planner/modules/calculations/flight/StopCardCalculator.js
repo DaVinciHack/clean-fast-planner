@@ -361,7 +361,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // Debug logging would go here
   
   // Convert all calculation parameters to proper numeric values
-  const taxiFuelValue = Number(taxiFuel);
+  // ✅ TAXI FUEL FIX: Check for departure taxi fuel override first (like ARA fuel does)
+  const departureTaxiFuelOverride = getLocationFuel(waypoints[0], 'taxiFuel', 1); // Departure is always card index 1
+  const taxiFuelValue = departureTaxiFuelOverride || Number(taxiFuel);
   const passengerWeightValue = Number(passengerWeight);
   const contingencyFuelPercentValue = Number(contingencyFuelPercent);
   const reserveFuelValue = Number(calculatedReserveFuel); // ✅ Use converted reserve fuel

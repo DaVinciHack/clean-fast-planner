@@ -24,6 +24,7 @@ interface AuthContextType {
   userDetails: UserDetails | null;
   userEmail: string | null;
   userName: string | null;
+  isLoading: boolean;
   login: () => void;
   logout: () => void;
 }
@@ -678,6 +679,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       userDetails, 
       userEmail,
       userName,
+      isLoading,
       login, 
       logout 
     }}>

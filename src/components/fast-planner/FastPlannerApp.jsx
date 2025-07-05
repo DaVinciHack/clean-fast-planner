@@ -85,7 +85,7 @@ const FastPlannerCore = ({
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
-  const { isAuthenticated, userName, login } = useAuth();
+  const { isAuthenticated, userName, userDetails, isLoading, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion();
   
   // Make region globally accessible for weather system
@@ -136,8 +136,8 @@ const FastPlannerCore = ({
       setShowInitialOverlay(false);
     };
     
-    // If not authenticated yet, keep overlay showing
-    if (!isAuthenticated) {
+    // If not authenticated yet OR still loading user data, keep overlay showing
+    if (!isAuthenticated || isLoading) {
       return;
     }
     
@@ -158,7 +158,7 @@ const FastPlannerCore = ({
       }, 800); // Shorter delay since no wizard needed
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoading]);
   
   // DEBUG: Track loadedFlightData state changes
   useEffect(() => {
@@ -2910,13 +2910,18 @@ const FastPlannerCore = ({
           }
         }
         
-        // Enable CONUS radar (test in all regions for now)
+        // TEMPORARILY DISABLED: CONUS radar (fixing radar URL issues)
+        // The radar overlay is causing image decoding errors in production
+        // Lightning and weather stations work fine, just radar needs fixing
+        console.warn('🚧 CONUS radar temporarily disabled - working on fixing radar URLs');
+        /*
         if (!hasConusRadar) {
           const radarSuccess = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
           if (radarSuccess) {
           } else {
           }
         }
+        */
         
         setLiveWeatherActive(true);
         
@@ -2936,11 +2941,13 @@ const FastPlannerCore = ({
           observedWeatherStationsRef.current.setVisible(false);
         }
         
-        // Remove CONUS radar
+        // TEMPORARILY DISABLED: Remove CONUS radar (disabled above)
+        /*
         if (hasConusRadar) {
           const { removeNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
           await removeNOAAWeatherOverlay(mapInstance, 'CONUS');
         }
+        */
         
         setLiveWeatherActive(false);
       }

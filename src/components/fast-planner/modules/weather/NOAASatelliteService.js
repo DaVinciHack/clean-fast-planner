@@ -8,10 +8,15 @@
 
 class NOAASatelliteService {
     constructor() {
-        // NOAA nowCOAST WMS endpoints - use proxy to avoid CORS issues
-        this.satelliteUrl = '/api/noaa/geoserver/observations/satellite/ows';
-        this.radarUrl = '/api/noaa/geoserver/observations/weather_radar/ows';
-        this.lightningUrl = '/api/noaa/geoserver/observations/lightning_detection/ows';
+        // NOAA nowCOAST WMS endpoints - use relative URLs for development (localhost or ngrok)
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('ngrok');
+        const baseUrl = isLocal ? '' : 'https://bristow.info/weather';
+        
+        this.satelliteUrl = `${baseUrl}/api/noaa/geoserver/observations/satellite/ows`;
+        this.radarUrl = `${baseUrl}/api/noaa/geoserver/observations/weather_radar/ows`;
+        this.lightningUrl = `${baseUrl}/api/noaa/geoserver/observations/lightning_detection/ows`;
+        
+        console.log(`🌐 Environment: ${window.location.hostname}, isLocal: ${isLocal}, baseUrl: "${baseUrl}"`);
         
         // Available satellite layers
         this.satelliteLayers = {
@@ -148,10 +153,17 @@ class NOAASatelliteService {
             FORMAT: options.format || 'image/png',
             TRANSPARENT: 'true',
             WIDTH: options.width || 512,
-            HEIGHT: options.height || 512,
-            BBOX: options.bbox || this.getDefaultBBox(isSatellite ? 'satellite' : isLightning ? 'lightning' : 'radar'),
-            TIME: options.time || this.getLatestTime()
+            HEIGHT: options.height || 512
         });
+        
+        // Only add BBOX if it's not null (for Mapbox tile templates, we add BBOX manually)
+        if (options.bbox !== null) {
+            params.set('BBOX', options.bbox || this.getDefaultBBox(isSatellite ? 'satellite' : isLightning ? 'lightning' : 'radar'));
+        }
+        
+        // Don't add TIME parameter - it causes most WMS services to return errors
+        // Lightning handles TIME separately in WeatherLoader.js
+        console.log(`🛰️ Building ${isSatellite ? 'satellite' : isLightning ? 'lightning' : 'radar'} WMS URL without TIME parameter`);
         
         return `${baseUrl}?${params.toString()}`;
     }
@@ -215,16 +227,28 @@ class NOAASatelliteService {
      * @returns {Object} Mapbox GL source configuration
      */
     createMapboxSource(layerName, options = {}) {
-        const tileUrl = this.getWMSUrl(layerName, {
+        // Build URL without bbox first, then add bbox placeholder manually to avoid encoding
+        const urlWithoutBbox = this.getWMSUrl(layerName, {
             ...options,
-            bbox: '{bbox-epsg-3857}',
             width: 512,
-            height: 512
+            height: 512,
+            bbox: null  // Don't include bbox in the URL generation
         });
+        
+        // Add bbox parameter manually to avoid URL encoding of the placeholder
+        const tileUrl = urlWithoutBbox + '&BBOX={bbox-epsg-3857}';
+        
+        // Debug the actual tile URL being created
+        console.log(`🛰️ Satellite tile URL template: ${tileUrl}`);
+        
+        // Test what a real tile URL looks like (handle URL-encoded bbox placeholder)
+        const testUrl = tileUrl.replace('{bbox-epsg-3857}', '-10000000,3000000,-9000000,4000000')
+                               .replace('%7Bbbox-epsg-3857%7D', '-10000000,3000000,-9000000,4000000');
+        console.log(`🧪 Test tile URL: ${testUrl}`);
         
         return {
             type: 'raster',
-            tiles: [tileUrl.replace('BBOX=', 'BBOX={bbox-epsg-3857}&')],
+            tiles: [tileUrl],
             tileSize: 512,
             attribution: '© NOAA nowCOAST Satellite Imagery'
         };

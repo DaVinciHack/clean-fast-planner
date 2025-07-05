@@ -15,7 +15,8 @@ class GulfCoastImageLayer {
     this._isInitialized = false;
     
     // Use SVG format which is guaranteed to work
-    this.imagePath = '/US_Gulf_Coast_Heli/gulf_coast_map.svg';
+    // Use proper base path for production deployment
+    this.imagePath = `${import.meta.env.BASE_URL}US_Gulf_Coast_Heli/gulf_coast_map.svg`;
     console.log('GulfCoastImageLayer initialized with path:', this.imagePath, 
                 'Full URL:', window.location.origin + this.imagePath);
     

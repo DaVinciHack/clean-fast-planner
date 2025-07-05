@@ -28,33 +28,50 @@ export class FuelStopOptimizer {
       console.log('FuelStopOptimizer: Starting passenger capacity optimization');
       
       // Step 1: Detect passenger overload
+      console.log('🔍 STEP 1: Analyzing passenger overload...');
       const overloadAnalysis = this.analyzePassengerOverload(flightData);
+      console.log('🔍 OVERLOAD ANALYSIS:', overloadAnalysis);
+      
       if (!overloadAnalysis.hasOverload) {
+        console.log('❌ NO OVERLOAD: Exiting optimization');
         return { success: false, reason: 'No passenger overload detected' };
       }
 
-      console.log('Passenger overload detected:', overloadAnalysis);
+      console.log('✅ OVERLOAD CONFIRMED: Proceeding with optimization');
 
       // Step 2: Find the problematic leg (usually first leg)
+      console.log('🔍 STEP 2: Identifying problematic leg...');
       const problematicLeg = this.identifyProblematicLeg(flightData.stopCards, overloadAnalysis);
+      console.log('🔍 PROBLEMATIC LEG:', problematicLeg);
       
       // Step 3: Create search corridor toward split point
+      console.log('🔍 STEP 3: Creating search corridor...');
+      console.log('🔍 WAYPOINTS FOR CORRIDOR:', flightData.waypoints?.map(wp => ({ name: wp.name, lat: wp.lat, lng: wp.lng })));
       const searchCorridor = this.corridorSearcher.createSearchCorridor(
         flightData.waypoints,
         flightData.alternateSplitPoint,
-        { maxOffTrack: 10, minFromStart: 20 }
+        { maxOffTrack: 100, minFromStart: 20 }
       );
+      console.log('🔍 SEARCH CORRIDOR:', searchCorridor);
 
       // Step 4: Find fuel-capable platforms in corridor
+      console.log('🔍 STEP 4: Searching for fuel-capable platforms...');
+      console.log('🔍 AVAILABLE PLATFORMS COUNT:', flightData.availablePlatforms?.length || 0);
+      console.log('🔍 FIRST FEW PLATFORMS:', flightData.availablePlatforms?.slice(0, 3).map(p => ({ name: p.name, hasFuel: p.hasFuel, fuelAvailable: p.fuelAvailable })));
+      
       const candidatePlatforms = await this.findFuelStopsInCorridor(
         searchCorridor,
         flightData.availablePlatforms
       );
+      
+      console.log('🔍 CANDIDATE PLATFORMS FOUND:', candidatePlatforms.length);
+      console.log('🔍 CANDIDATES:', candidatePlatforms.map(p => ({ name: p.name, hasFuel: p.hasFuel })));
 
       if (candidatePlatforms.length === 0) {
+        console.log('❌ NO CANDIDATES: No fuel-capable platforms found in corridor');
         return { 
           success: false, 
-          reason: 'No fuel-capable platforms found within 10nm corridor' 
+          reason: 'No fuel-capable platforms found within 100nm corridor' 
         };
       }
 
@@ -155,7 +172,8 @@ export class FuelStopOptimizer {
     // Filter platforms within corridor that have fuel capability
     const fuelCapablePlatforms = platforms.filter(platform => {
       // Check if platform has fuel capability
-      if (!platform.hasFuel && !platform.fuelAvailable) {
+      // Use PlatformEvaluator to properly check fuel capability
+      if (!this.platformEvaluator.hasFuelCapability(platform)) {
         return false;
       }
 

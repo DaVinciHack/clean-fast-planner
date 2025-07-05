@@ -67,9 +67,8 @@ class ObservedWeatherStationsLayer {
             { id: 'KHHV', name: 'Gulf Platform HHV', lat: 26.94, lon: -94.69, type: 'ASOS' },
             { id: 'KGYF', name: 'Gulf Platform GYF', lat: 25.63, lon: -94.86, type: 'ASOS' },
             
-            // Marine Buoys (exact coordinates from NOAA)
-            { id: 'DRYF1', name: 'Dry Tortugas Buoy', lat: 24.6280, lon: -82.9192, type: 'BUOY' },
-            { id: 'LONF1', name: 'Long Key Buoy', lat: 24.8361, lon: -80.8606, type: 'BUOY' },
+            // Marine Buoys (exact coordinates from NOAA) - only valid stations
+            // Note: DRYF1 and LONF1 removed - those stations don't exist on NOAA servers
             { id: '42001', name: 'East Gulf Buoy', lat: 25.8980, lon: -89.6680, type: 'BUOY' },
             { id: '42002', name: 'West Gulf Buoy', lat: 25.1930, lon: -93.7640, type: 'BUOY' },
             { id: '42019', name: 'Freeport Buoy', lat: 27.9070, lon: -95.3520, type: 'BUOY' },
@@ -453,11 +452,11 @@ class ObservedWeatherStationsLayer {
             let apiUrl;
             
             if (stationType === 'BUOY') {
-                // NOAA Buoy data via proxy to avoid CORS
-                apiUrl = `/api/buoy/data/realtime2/${stationId}.txt`;
+                // NOAA Buoy data via PHP proxy - original Vite-style URL
+                apiUrl = `https://bristow.info/weather/api/buoy/data/realtime2/${stationId}.txt`;
             } else {
-                // Aviation weather from NOAA Aviation Weather Center via proxy
-                apiUrl = `/api/awc/api/data/metar?ids=${stationId}&format=json&taf=false`;
+                // Aviation weather from NOAA Aviation Weather Center via PHP proxy - original Vite-style URL
+                apiUrl = `https://bristow.info/weather/api/awc/api/data/metar?ids=${stationId}&format=json&taf=false`;
             }
             
             console.log(`Fetching weather via proxy: ${apiUrl}`);

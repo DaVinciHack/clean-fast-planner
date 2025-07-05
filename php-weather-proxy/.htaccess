@@ -1,0 +1,16 @@
+RewriteEngine On
+
+# Route /api/noaa/* to /api/noaa/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/noaa/(.*)$ api/noaa/index.php [L,QSA]
+
+# Route /api/awc/* to /api/awc/index.php (for future)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/awc/(.*)$ api/awc/index.php [L,QSA]
+
+# Route /api/buoy/* to /api/buoy/index.php (for future)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/buoy/(.*)$ api/buoy/index.php [L,QSA]

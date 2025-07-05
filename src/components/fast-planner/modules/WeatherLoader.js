@@ -139,7 +139,7 @@ export const addSimpleLightningOverlay = async (mapInstance) => {
             return false;
         }
         
-        console.log('⚡ Adding simple lightning detection layer...');
+        console.log('⚡ Adding lightning detection layer with TIME parameter...');
         
         // Remove existing lightning layer if present
         if (mapInstance.getSource('simple-lightning')) {
@@ -147,10 +147,24 @@ export const addSimpleLightningOverlay = async (mapInstance) => {
             mapInstance.removeSource('simple-lightning');
         }
         
-        // Add lightning source with proxy URL to avoid CORS
+        // Get current time in ISO format for TIME parameter (NOAA requires this)
+        const now = new Date();
+        now.setMinutes(Math.floor(now.getMinutes() / 15) * 15); // Round to nearest 15 minutes
+        const timeParam = now.toISOString().slice(0, 19) + 'Z';
+        
+        console.log(`⚡ Using TIME parameter: ${timeParam}`);
+        
+        // Build the tile URL - use relative URLs for development (localhost or ngrok)
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('ngrok');
+        const baseUrl = isLocal ? '' : 'https://bristow.info/weather';
+        const tileUrl = `${baseUrl}/api/noaa/geoserver/observations/lightning_detection/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ldn_lightning_strike_density&CRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=true&WIDTH=512&HEIGHT=512&TIME=${encodeURIComponent(timeParam)}&BBOX={bbox-epsg-3857}`;
+        
+        console.log(`⚡ Lightning tile URL template: ${tileUrl}`);
+        
+        // Add lightning source with PHP proxy URL and TIME parameter
         mapInstance.addSource('simple-lightning', {
             type: 'raster',
-            tiles: ['/api/noaa/geoserver/observations/lightning_detection/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ldn_lightning_strike_density&CRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=true&WIDTH=512&HEIGHT=512&BBOX={bbox-epsg-3857}'],
+            tiles: [tileUrl],
             tileSize: 512,
             attribution: '© NOAA Global Lightning Detection Network'
         });
@@ -159,10 +173,13 @@ export const addSimpleLightningOverlay = async (mapInstance) => {
         mapInstance.addLayer({
             id: 'simple-lightning-layer',
             type: 'raster',
-            source: 'simple-lightning'
+            source: 'simple-lightning',
+            paint: {
+                'raster-opacity': 0.8
+            }
         });
         
-        console.log('⚡ Simple lightning detection layer added successfully');
+        console.log('⚡ Lightning detection layer added successfully with TIME parameter');
         console.log('🌍 Global coverage: Updates every 15 minutes');
         console.log('📡 Data from US NLDN + Global GLD360 networks');
         

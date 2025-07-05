@@ -17,7 +17,8 @@ export class FuelStopOptimizationManager {
     this.callbacks = {
       onSuggestionsReady: null,
       onError: null,
-      onProcessingUpdate: null
+      onProcessingUpdate: null,
+      onDebugUpdate: null
     };
   }
 
@@ -47,22 +48,37 @@ export class FuelStopOptimizationManager {
       console.log('FuelStopOptimizationManager: Starting optimization check...');
 
       // Validate flight configuration
+      this.notifyDebug('Validation', '🔍 Validating flight configuration...');
       const validationResult = this.validateFlightConfiguration(flightConfiguration);
       if (!validationResult.isValid) {
+        this.notifyDebug('Validation Failed', `❌ ${validationResult.reason}`);
         return { success: false, reason: validationResult.reason };
       }
 
       // Extract passenger requirements
+      this.notifyDebug('Analysis', '🔍 Analyzing passenger requirements...');
       const passengerAnalysis = this.analyzePassengerRequirements(flightConfiguration);
       if (!passengerAnalysis.hasOverload) {
+        this.notifyDebug('No Overload', '✅ No passenger overload detected');
         console.log('FuelStopOptimizationManager: No passenger overload detected');
         return { success: false, reason: 'No passenger overload' };
       }
 
+      this.notifyDebug('Overload Found', `⚠️ ${passengerAnalysis.affectedStops} stops need ${passengerAnalysis.maxShortage} more passengers`);
       console.log('FuelStopOptimizationManager: Passenger overload detected, finding solutions...');
 
       // Get all available platforms/locations for search
+      this.notifyDebug('Platform Search', '🗺️ Loading available fuel platforms...');
       const allLocations = this.extractAllLocations(flightConfiguration);
+      
+      // Count fuel-capable platforms using proper evaluation
+      const fuelPlatforms = allLocations.allManagerPlatforms?.filter(p => 
+        this.platformEvaluator.hasFuelCapability(p)
+      ) || [];
+      this.notifyDebug('Fuel Platforms', `🛢️ Found ${fuelPlatforms.length} fuel-capable platforms`);
+      if (fuelPlatforms.length > 0) {
+        this.notifyDebug('Platform List', `📋 Examples: ${fuelPlatforms.slice(0, 3).map(p => p.name).join(', ')}...`);
+      }
       
       // Prepare optimization data
       const optimizationData = {
@@ -74,17 +90,24 @@ export class FuelStopOptimizationManager {
       };
 
       // Run optimization
+      this.notifyDebug('Route Analysis', '🛩️ Analyzing flight route for optimization...');
       const optimizationResult = await this.optimizer.suggestFuelStops(optimizationData);
 
       if (optimizationResult.success && optimizationResult.suggestions.length > 0) {
+        this.notifyDebug('Success', `🎉 Found ${optimizationResult.suggestions.length} optimization options!`);
+        optimizationResult.suggestions.forEach((suggestion, i) => {
+          this.notifyDebug(`Option ${i + 1}`, `${suggestion.platform.name} (+${suggestion.passengerGain} passengers, ${suggestion.fuelSavings}lbs fuel saved)`);
+        });
+        
         this.lastSuggestions = optimizationResult;
         this.notifySuggestions(optimizationResult);
         
         console.log(`FuelStopOptimizationManager: Found ${optimizationResult.suggestions.length} fuel stop options`);
         return optimizationResult;
       } else {
+        this.notifyDebug('No Options', '❌ No viable fuel stops found within 100nm of route');
         console.log('FuelStopOptimizationManager: No viable fuel stop options found');
-        this.notifyError('No suitable fuel stops found within 10nm of route');
+        this.notifyError('No suitable fuel stops found within 100nm of route');
         return optimizationResult;
       }
 
@@ -124,39 +147,77 @@ export class FuelStopOptimizationManager {
   }
 
   /**
-   * Analyzes passenger requirements vs capacity
+   * Analyzes passenger WEIGHT requirements vs capacity (AVIATION LOGIC)
    * @param {Object} config - Flight configuration
-   * @returns {Object} Passenger analysis
+   * @returns {Object} Weight overload analysis
    */
   analyzePassengerRequirements(config) {
-    const requiredPassengers = config.requiredPassengers || 
-                              config.flightSettings?.requiredPassengers || 
-                              config.passengerCount || 0;
-
-    if (requiredPassengers === 0) {
-      return { hasOverload: false, reason: 'No passengers required' };
-    }
-
-    // Check each stop card for passenger capacity issues
-    const overloadedStops = config.stopCards.filter(card => 
-      requiredPassengers > (card.maxPassengers || 0)
-    );
-
+    // Get the overloaded stops that were passed from the UI (weight-based analysis)
+    const overloadedStops = config.overloadedStops || [];
+    
     if (overloadedStops.length === 0) {
-      return { hasOverload: false, reason: 'Sufficient passenger capacity' };
+      return { hasOverload: false, reason: 'No weight overload detected' };
     }
 
-    const maxShortage = Math.max(...overloadedStops.map(stop => 
-      requiredPassengers - (stop.maxPassengers || 0)
-    ));
+    // Calculate weight shortage from the stop cards
+    let maxWeightShortage = 0;
+    const detailedOverload = [];
+    
+    config.stopCards.forEach(card => {
+      if (card.isDestination) return; // Skip final destinations
+      
+      // Get passenger requests from the flight configuration  
+      const stopName = card.name || card.stopName;
+      const requestedWeight = this.getPassengerRequest(config, stopName, 'totalWeight');
+      const requestedCount = this.getPassengerRequest(config, stopName, 'passengerCount');
+      const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+      const aircraftMaxSeats = config.selectedAircraft?.maxPassengers || 19;
+      
+      const isWeightOverloaded = requestedWeight > availableWeight;
+      const isSeatingOverloaded = requestedCount > aircraftMaxSeats;
+      
+      if (isWeightOverloaded && !isSeatingOverloaded) {
+        const weightShortage = requestedWeight - availableWeight;
+        maxWeightShortage = Math.max(maxWeightShortage, weightShortage);
+        detailedOverload.push({
+          stopName,
+          requestedWeight,
+          availableWeight,
+          weightShortage,
+          canOptimize: true
+        });
+      }
+    });
+
+    if (detailedOverload.length === 0) {
+      return { hasOverload: false, reason: 'No optimizable weight overload found' };
+    }
 
     return {
       hasOverload: true,
-      requiredPassengers,
-      overloadedStops,
-      maxShortage,
-      affectedStops: overloadedStops.length
+      maxWeightShortage,
+      overloadedStops: detailedOverload,
+      affectedStops: detailedOverload.length,
+      overloadType: 'weight'
     };
+  }
+
+  /**
+   * Helper to get passenger request data from flight configuration
+   * @param {Object} config - Flight configuration
+   * @param {string} stopName - Stop name
+   * @param {string} requestType - Request type (passengerCount, totalWeight)
+   * @returns {number} Request value
+   */
+  getPassengerRequest(config, stopName, requestType) {
+    // Try to get from stopRequests if available
+    const stopRequest = config.stopRequests?.find(req => req.stopName === stopName);
+    if (stopRequest) {
+      return requestType === 'passengerCount' ? stopRequest.requestedPassengers : stopRequest.requestedWeight;
+    }
+    
+    // Fallback to flightConfiguration passenger data
+    return 0;
   }
 
   /**
@@ -177,9 +238,9 @@ export class FuelStopOptimizationManager {
     // Check for platform manager data
     if (config.platformManager) {
       if (config.platformManager.platforms) allLocations.managerPlatforms = config.platformManager.platforms;
-      if (config.platformManager.getAllPlatforms) {
+      if (config.platformManager.getPlatforms) {
         try {
-          allLocations.allManagerPlatforms = config.platformManager.getAllPlatforms();
+          allLocations.allManagerPlatforms = config.platformManager.getPlatforms();
         } catch (error) {
           console.warn('Failed to get platforms from manager:', error);
         }
@@ -288,6 +349,17 @@ export class FuelStopOptimizationManager {
   notifyError(errorMessage) {
     if (this.callbacks.onError) {
       this.callbacks.onError(errorMessage);
+    }
+  }
+
+  /**
+   * Notifies about debug updates
+   * @param {String} step - Debug step name
+   * @param {String} message - Debug message
+   */
+  notifyDebug(step, message) {
+    if (this.callbacks.onDebugUpdate) {
+      this.callbacks.onDebugUpdate({ step, message, timestamp: Date.now() });
     }
   }
 

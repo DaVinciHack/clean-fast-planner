@@ -15,7 +15,7 @@ export class CorridorSearcher {
    * @returns {Object} Search corridor geometry
    */
   createSearchCorridor(waypoints, alternateSplitPoint, options = {}) {
-    const { maxOffTrack = 10, minFromStart = 20 } = options;
+    const { maxOffTrack = 100, minFromStart = 20 } = options;
     
     if (!waypoints || waypoints.length < 2) {
       throw new Error('Insufficient waypoints for corridor creation');

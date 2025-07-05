@@ -9,6 +9,7 @@ export default defineConfig({
     port: 8080,
     strictPort: false, // 🛡️ Allow fallback ports in production
     host: true,
+    allowedHosts: ['localhost', '127.0.0.1', 'pleasantly-prime-walrus.ngrok-free.app'],
     proxy: {
       // Proxy NOAA nowCOAST weather services to avoid CORS issues
       '/api/noaa': {
@@ -73,7 +74,7 @@ export default defineConfig({
     include: ['@osdk/client', '@osdk/oauth', '@flight-app/sdk', '@osdk/foundry.admin']
   },
   build: {
-    sourcemap: true, // Enable source maps for easier debugging
+    sourcemap: false, // Disable source maps in production for security
     rollupOptions: {
       output: {
         manualChunks: {

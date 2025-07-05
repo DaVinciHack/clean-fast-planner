@@ -7,7 +7,8 @@
 class MapManager {
   constructor() {
     this.map = null;
-    this.mapboxToken = 'pk.eyJ1IjoiZGlya3N0ZXIxMDEiLCJhIjoiY204YW9mdm4yMTliMTJscXVnaXRqNmptNyJ9.VDLt_kE5BnAV8S4vXjFMlg';
+    // Use environment variable for Mapbox token - never hardcode in production
+    this.mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoiZGlya3N0ZXIxMDEiLCJhIjoiY204YW9mdm4yMTliMTJscXVnaXRqNmptNyJ9.VDLt_kE5BnAV8S4vXjFMlg';
     this._isLoaded = false; // Internal flag to track load state
     this._loadCallbacks = []; // Queue for callbacks added before load
   }
@@ -22,9 +23,24 @@ class MapManager {
   initializeMap(containerId, options = {}) {
     return new Promise((resolve, reject) => {
       try {
+        // Enhanced MapBox GL validation for production deployment
         if (!window.mapboxgl) {
-          reject(new Error('Mapbox GL JS not loaded'));
+          console.error('❌ MapBox GL JS not available globally');
+          console.error('Available global objects:', Object.keys(window).filter(k => k.includes('map')));
+          reject(new Error('Mapbox GL JS not loaded - check CDN connectivity'));
           return;
+        }
+        
+        // Check WebGL support (required for MapBox GL)
+        if (window.WEBGL_SUPPORTED === false) {
+          console.error('❌ WebGL not supported - MapBox GL requires WebGL');
+          reject(new Error('WebGL not supported - MapBox GL cannot initialize'));
+          return;
+        }
+        
+        // Validate MapBox GL version
+        if (window.mapboxgl.version) {
+          console.log('✅ MapBox GL version:', window.mapboxgl.version);
         }
         
         const mapContainer = document.getElementById(containerId);
@@ -35,12 +51,23 @@ class MapManager {
           return;
         }
         
-        // Set Mapbox access token
+        // Set Mapbox access token with validation
+        if (!this.mapboxToken || this.mapboxToken === 'your_mapbox_token_here') {
+          console.error('❌ Invalid MapBox token - check VITE_MAPBOX_TOKEN environment variable');
+          reject(new Error('Invalid MapBox token configuration'));
+          return;
+        }
+        
         window.mapboxgl.accessToken = this.mapboxToken;
         
         // 🛡️ PRODUCTION DEBUG: Log token status
-        console.log('MapBox token set, creating instance...');
+        console.log('✅ MapBox token set, creating instance...');
         console.log('Token starts with:', this.mapboxToken.substring(0, 20) + '...');
+        
+        // Validate token format (MapBox tokens start with 'pk.')
+        if (!this.mapboxToken.startsWith('pk.')) {
+          console.warn('⚠️ MapBox token format may be invalid (should start with pk.)');
+        }
         
         console.log('Creating MapBox instance...');
         

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test FastPlanner Weather Proxy</title>
+</head>
+<body>
+    <h1>FastPlanner Weather Proxy Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const baseUrl = 'https://pkm5jqs3bpnr43dm.anvil.app/_/api';
+        const resultsDiv = document.getElementById('results');
+        
+        // Test function
+        async function testEndpoint(name, url) {
+            try {
+                console.log(`Testing ${name}: ${url}`);
+                const response = await fetch(url);
+                const data = await response.text();
+                
+                resultsDiv.innerHTML += `
+                    <div style="margin: 10px; padding: 10px; border: 1px solid #ccc;">
+                        <h3>${name} - Status: ${response.status}</h3>
+                        <p><strong>URL:</strong> ${url}</p>
+                        <p><strong>Response:</strong> ${data.substring(0, 200)}...</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML += `
+                    <div style="margin: 10px; padding: 10px; border: 1px solid red;">
+                        <h3>${name} - ERROR</h3>
+                        <p><strong>URL:</strong> ${url}</p>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Test all endpoints
+        async function runTests() {
+            resultsDiv.innerHTML = '<p>Testing weather proxy endpoints...</p>';
+            
+            await testEndpoint('Health Check', `${baseUrl}/proxy-weather-health`);
+            
+            await testEndpoint('NOAA Weather', `${baseUrl}/proxy-noaa-weather?path=geoserver/observations/satellite/ows&service=WMS&version=1.1.1&request=GetCapabilities`);
+            
+            await testEndpoint('Aviation Weather', `${baseUrl}/proxy-aviation-weather?path=api/data/metar&ids=KHOU&format=json&taf=false`);
+            
+            await testEndpoint('Marine Buoy', `${baseUrl}/proxy-buoy-weather?path=data/realtime2/42001.txt`);
+            
+            resultsDiv.innerHTML += '<p><strong>Testing complete!</strong></p>';
+        }
+        
+        // Run tests when page loads
+        runTests();
+    </script>
+</body>
+</html>

@@ -206,7 +206,7 @@ class SARRangeCircleLayer {
 
       // Create helicopter element
       const helicopterEl = document.createElement('img');
-      helicopterEl.src = '/plan/assets/icons/helicopter-spinning.gif';
+      helicopterEl.src = `${import.meta.env.BASE_URL}assets/icons/helicopter-spinning.gif`;
       helicopterEl.style.width = '48px';
       helicopterEl.style.height = '48px';
       helicopterEl.style.pointerEvents = 'none';

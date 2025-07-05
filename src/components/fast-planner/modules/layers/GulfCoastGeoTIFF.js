@@ -17,7 +17,8 @@ class GulfCoastImageOverlay {
     
     // Path to an image file that we can display with MapBox GL
     // Use PNG format which is more universally supported by browsers
-    this.imagePath = '/US_Gulf_Coast_Heli/gulf_coast_heli_map.png';
+    // Use proper base path for production deployment
+    this.imagePath = `${import.meta.env.BASE_URL}US_Gulf_Coast_Heli/gulf_coast_heli_map.png`;
     console.log('GulfCoastImageOverlay initialized with path:', this.imagePath);
     
     // Coordinates for the image overlay (Gulf of Mexico)

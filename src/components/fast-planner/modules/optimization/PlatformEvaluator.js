@@ -86,10 +86,23 @@ export class PlatformEvaluator {
    * @returns {Boolean} True if platform can provide fuel
    */
   hasFuelCapability(platform) {
-    // Check various fuel capability indicators
+    // 🛢️ PRIMARY CHECK: fuelAvailable string field (OSDK data)
+    if (platform.fuelAvailable) {
+      const fuelAvailableStr = String(platform.fuelAvailable).toLowerCase().trim();
+      
+      // Debug: Log first few fuel availability checks
+      if (Math.random() < 0.05) { // Only log 5% to avoid spam
+        console.log(`🔍 FUEL CHECK: ${platform.name} - fuelAvailable: "${platform.fuelAvailable}" -> "${fuelAvailableStr}"`);
+      }
+      
+      if (fuelAvailableStr === 'yes' || fuelAvailableStr === 'y') {
+        return true;
+      }
+    }
+
+    // Check various other fuel capability indicators (boolean)
     const fuelIndicators = [
       platform.hasFuel,
-      platform.fuelAvailable,
       platform.fuel_available,
       platform.canRefuel,
       platform.refuel_capability,
