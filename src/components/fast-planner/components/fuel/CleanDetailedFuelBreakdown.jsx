@@ -410,21 +410,21 @@ const CleanDetailedFuelBreakdown = ({
           platformManager: platformManager
         };
         
-        // Debug platform data before optimization
+        // 🚨 SIMPLE DEBUG: Check platform data
         const platformData = platformManager?.getPlatforms ? platformManager.getPlatforms() : [];
-        console.log('🎯 PLATFORM MANAGER DEBUG:', {
-          hasManager: !!platformManager,
-          platformCount: platformData.length,
-          platforms: platformManager?.platforms ? platformManager.platforms.length : 'platforms property not available',
-          firstFewPlatforms: platformData.slice(0, 5).map(p => ({ 
-            name: p.name, 
-            hasFuel: p.hasFuel, 
-            fuelAvailable: p.fuelAvailable,
-            lat: p.coordinates?.[1],
-            lng: p.coordinates?.[0],
-            isPlatform: p.isPlatform
-          }))
-        });
+        console.log(`🛢️ PLATFORMS: ${platformData.length} total, ${platformData.filter(p => p.hasFuel).length} with fuel`);
+        
+        if (platformData.length === 0) {
+          console.log('❌ NO PLATFORMS: PlatformManager has no data loaded');
+          // Check if platforms exist in the manager but getPlatforms is returning empty
+          console.log('🔍 DIRECT CHECK:', {
+            managerExists: !!platformManager,
+            platformsProperty: platformManager?.platforms?.length || 0,
+            getPlatformsMethod: typeof platformManager?.getPlatforms
+          });
+        } else {
+          console.log('✅ PLATFORMS LOADED - Optimization should work');
+        }
         
         // 🗺️ VISUAL DEBUG: Show search area and candidate platforms on console
         if (platformData.length > 0) {

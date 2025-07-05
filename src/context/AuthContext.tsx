@@ -117,7 +117,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null); // Removed hardcoded "Duncan Burbury" fallback
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // ✅ Start as true - we're loading user data initially
+  
+  // ✅ RACE CONDITION FIX: Prevent multiple simultaneous auth checks
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(false);
   
   // Log initial state
   console.log(`%cInitial auth state: ${initialAuthState ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'} - User: ${userName || 'None'}`, 
@@ -264,6 +267,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   // Define checkAuth function to use both now and later
   const checkAuth = async () => {
+    // ✅ RACE CONDITION FIX: Prevent multiple simultaneous auth checks
+    if (isCheckingAuth) {
+      console.log("🔍 AUTH DEBUG: Already checking auth, skipping duplicate call");
+      return;
+    }
+    
+    setIsCheckingAuth(true);
+    
     // Try the debug function first
     const adminUser = await debugAdminUser();
     if (adminUser) {
@@ -271,9 +282,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         ? `${adminUser.givenName} ${adminUser.familyName}` 
         : adminUser.givenName || "Name not found";
       console.log("🔍 DEBUG: Found user via admin API:", displayName);
+      
+      // ✅ CRITICAL FIX: If we got a valid user from admin API, don't run token check that would clear it
+      console.log("🔍 DEBUG: Admin API succeeded, skipping token check to preserve user state");
+      setIsLoading(false);
+      setIsCheckingAuth(false);
+      return;
     }
     
     setIsLoading(true);
+    console.log("🔍 AUTH DEBUG: Setting isLoading to TRUE - starting auth check");
     console.log("AuthProvider: Initializing authentication...");
     let initialUserDetails: UserDetails | null = null;
 
@@ -525,6 +543,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       localStorage.removeItem('userDetails');
     } finally {
       setIsLoading(false);
+      setIsCheckingAuth(false); // ✅ Reset the race condition guard
+      console.log("🔍 AUTH DEBUG: Setting isLoading to FALSE - auth check complete");
       console.log("AuthProvider: Finished auth initialization attempt.");
     }
   };
@@ -543,9 +563,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
             "color: #060; font-weight: bold;");
           
           // Try to get user details from the admin API
-          debugAdminUser().catch(err => {
-            console.warn("Failed to get user details from admin API:", err);
-          });
+          debugAdminUser()
+            .catch(err => {
+              console.warn("Failed to get user details from admin API:", err);
+            })
+            .finally(() => {
+              // ✅ CRITICAL FIX: Set loading to false after user details are fetched
+              setIsLoading(false);
+              console.log("🔍 AUTH DEBUG: Setting isLoading to FALSE - user details fetch complete");
+            });
         } else {
           // Not yet authenticated, run full check
           checkAuth();

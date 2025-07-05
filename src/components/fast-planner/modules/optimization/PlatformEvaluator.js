@@ -86,27 +86,24 @@ export class PlatformEvaluator {
    * @returns {Boolean} True if platform can provide fuel
    */
   hasFuelCapability(platform) {
-    // 🛢️ PRIMARY CHECK: fuelAvailable string field (OSDK data)
-    if (platform.fuelAvailable) {
-      const originalValue = String(platform.fuelAvailable).trim();
-      const lowerValue = originalValue.toLowerCase();
-      
-      // Debug: Log first few fuel availability checks
-      if (Math.random() < 0.05) { // Only log 5% to avoid spam
-        console.log(`🔍 FUEL CHECK: ${platform.name} - fuelAvailable: "${originalValue}" -> "${lowerValue}"`);
-      }
-      
-      // Check for all valid fuel availability indicators
-      const validFuelValues = ['yes', 'y', 'YES', 'Y', 'Yes'];
-      if (validFuelValues.includes(originalValue) || lowerValue === 'yes' || lowerValue === 'y') {
-        return true;
-      }
+    // 🛢️ USE SAME LOGIC AS PLATFORMMANAGER (lines 832-838)
+    // Check fuelAvailable string field exactly like PlatformManager does
+    if (platform.fuelAvailable === 'Y' || 
+        platform.fuelAvailable === 'Yes' || 
+        platform.fuelAvailable === 'YES' ||
+        platform.fuel_available === 'Y' ||
+        platform.fuel_available === 'Yes' ||
+        platform.fuel_available === 'YES') {
+      return true;
+    }
+
+    // Check if hasFuel property was already set by PlatformManager
+    if (platform.hasFuel === true) {
+      return true;
     }
 
     // Check various other fuel capability indicators (boolean)
     const fuelIndicators = [
-      platform.hasFuel,
-      platform.fuel_available,
       platform.canRefuel,
       platform.refuel_capability,
       platform.services?.includes('fuel'),

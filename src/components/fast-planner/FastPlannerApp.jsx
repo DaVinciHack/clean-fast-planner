@@ -85,6 +85,9 @@ const FastPlannerCore = ({
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
+  // 🔍 VERSION CHECK: Immediate console log to verify changes are loaded
+  console.log('🚀 FastPlannerApp v2.0 LOADED - Both user loading fix AND animation fix included!');
+  
   const { isAuthenticated, userName, userDetails, isLoading, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion();
   
@@ -136,10 +139,23 @@ const FastPlannerCore = ({
       setShowInitialOverlay(false);
     };
     
+    // 🔍 DEBUG: Log authentication states to see what's happening
+    console.log('🔍 WIZARD LOGIC CHECK:', {
+      isAuthenticated,
+      isLoading,
+      userName,
+      userDetails: !!userDetails,
+      wizardDisabled,
+      shouldWait: !isAuthenticated || isLoading
+    });
+    
     // If not authenticated yet OR still loading user data, keep overlay showing
     if (!isAuthenticated || isLoading) {
+      console.log('🔍 WAITING: Not proceeding to wizard yet (auth or loading)');
       return;
     }
+    
+    console.log('🔍 PROCEEDING: Authentication complete, proceeding with wizard logic');
     
     if (!wizardDisabled) {
       // Show wizard first, then fade out base overlay after wizard is visible
