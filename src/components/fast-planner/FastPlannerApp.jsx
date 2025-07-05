@@ -500,6 +500,7 @@ const FastPlannerCore = ({
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
+    console.log('🧮 AUTO-CALCULATION: useEffect triggered, refuel stops:', currentRefuelStops.length);
     
     // 🔍 DEBUG: Always log aircraft data to see what's available
     if (selectedAircraft) {
@@ -562,7 +563,14 @@ const FastPlannerCore = ({
           });
           
           if (newRouteStats) {
-            setRouteStats(newRouteStats);
+            // 🔧 CRITICAL FIX: Don't override route stats if refuel stops are active
+            // Let the fuel calculation system manage route optimization when refuel configured
+            if (currentRefuelStops.length === 0) {
+              setRouteStats(newRouteStats);
+              console.log('🗺️ AUTO-CALC: Updated route stats (no refuel stops)');
+            } else {
+              console.log('🗺️ AUTO-CALC: Skipping route stats update (refuel stops active - fuel system manages routing)');
+            }
           }
         }
       } else {
@@ -585,8 +593,19 @@ const FastPlannerCore = ({
       );
 
       if (newStopCards && newStopCards.length > 0) {
-        setStopCards(newStopCards);
+        // 🔧 CRITICAL FIX: Don't override stop cards if refuel stops are active
+        // Let the fuel calculation system manage stop cards when refuel configured
+        if (currentRefuelStops.length === 0) {
+          setStopCards(newStopCards);
+          console.log('🧮 AUTO-CALC: Updated stop cards (no refuel stops)');
+        } else {
+          console.log('🧮 AUTO-CALC: Skipping stop cards update (refuel stops active - fuel system manages cards)');
+        }
       } else {
+        // Only clear if no refuel stops
+        if (currentRefuelStops.length === 0) {
+          setStopCards([]);
+        }
       }
     } else {
       setStopCards([]);
@@ -3127,6 +3146,8 @@ const FastPlannerCore = ({
   const lastProcessedFuelSignatureRef = useRef(null);
   const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
     console.log('🔄 HEADER SYNC: handleStopCardsCalculated called with', calculatedStopCards?.length, 'cards');
+    console.log('🔄 HEADER SYNC: Current refuel stops:', currentRefuelStops);
+    console.log('🔄 HEADER SYNC: Call stack:', new Error().stack.split('\n').slice(1, 4));
     
     // 🎯 INTELLIGENT DUPLICATE PREVENTION: Compare only fuel-critical values, not entire objects
     if (calculatedStopCards && calculatedStopCards.length > 0) {

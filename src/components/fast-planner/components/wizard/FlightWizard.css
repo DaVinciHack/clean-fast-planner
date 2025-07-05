@@ -754,6 +754,15 @@
   color: white;
   font-size: 14px;
   transition: all 0.2s ease;
+  /* Force consistent height across all browsers and devices */
+  height: 46px;
+  box-sizing: border-box;
+  min-height: 46px;
+  /* Fix for iPad Safari date input rendering */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  line-height: 1.2;
 }
 
 .wizard-search-input:focus,

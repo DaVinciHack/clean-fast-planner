@@ -2433,21 +2433,59 @@ class WaypointManager {
           return null;
         }
         
-        // Check if mouse is directly over the route
-        const routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: ['route'] });
+        // 🚨 TOUCH FIX: Use the same comprehensive route detection as touch start
+        updateTouchDebug('🔍 Using comprehensive route detection...');
+        
+        // Debug available layers
+        const availableLayers = ['route', 'route-drag-detection-layer', 'route-visual'].filter(layerId => {
+          return map.getLayer(layerId);
+        });
+        updateTouchDebug(`Available route layers: ${availableLayers.join(', ')}`);
+        
+        // Try different layer combinations (same as touch start)
+        let routeFeatures = [];
+        let layerTested = '';
+        
+        const layerCombinations = [
+          ['route', 'route-drag-detection-layer'],
+          ['route'],
+          ['route-visual'],
+          ['route-drag-detection-layer']
+        ];
+        
+        for (const layers of layerCombinations) {
+          const existingLayers = layers.filter(layer => map.getLayer(layer));
+          if (existingLayers.length > 0) {
+            routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: existingLayers });
+            layerTested = existingLayers.join(', ');
+            updateTouchDebug(`Testing layers [${layerTested}]: found ${routeFeatures ? routeFeatures.length : 0} features`);
+            if (routeFeatures.length > 0) break;
+          }
+        }
+        
         const isMouseOverRoute = routeFeatures && routeFeatures.length > 0;
-        updateTouchDebug(`Route features found: ${routeFeatures ? routeFeatures.length : 0}`);
         
         // 🚨 TOUCH FIX: For touch devices, try a larger detection area if direct hit fails
         let routeFeaturesBuffered = [];
         if (!isMouseOverRoute && mousePoint) {
-          const buffer = 15; // 15 pixel buffer for touch targets
+          const buffer = 25; // 25 pixel buffer for touch targets (increased from 15)
           const bbox = [
             [mousePoint.x - buffer, mousePoint.y - buffer],
             [mousePoint.x + buffer, mousePoint.y + buffer]
           ];
-          routeFeaturesBuffered = map.queryRenderedFeatures(bbox, { layers: ['route'] });
-          updateTouchDebug(`Buffered route features found: ${routeFeaturesBuffered ? routeFeaturesBuffered.length : 0}`);
+          
+          // Try buffered detection with all layer combinations
+          for (const layers of layerCombinations) {
+            const existingLayers = layers.filter(layer => map.getLayer(layer));
+            if (existingLayers.length > 0) {
+              const bufferedFeatures = map.queryRenderedFeatures(bbox, { layers: existingLayers });
+              if (bufferedFeatures && bufferedFeatures.length > 0) {
+                routeFeaturesBuffered = bufferedFeatures;
+                updateTouchDebug(`Buffered detection on [${existingLayers.join(', ')}]: found ${bufferedFeatures.length} features`);
+                break;
+              }
+            }
+          }
         }
         
         // CRITICAL FIX: Use the drag detection source for insertion calculations
@@ -3010,6 +3048,7 @@ class WaypointManager {
         // 🚨 START DRAG ON FIRST MOVE: If we have a pending drag event, start it now
         if (window._pendingDragEvent && !isDragging) {
           updateTouchDebug('🚀 FIRST MOVE - Starting drag now!');
+          updateTouchDebug(`Pending event details: lngLat=${window._pendingDragEvent.lngLat ? window._pendingDragEvent.lngLat.lng + ',' + window._pendingDragEvent.lngLat.lat : 'null'}, point=${window._pendingDragEvent.point ? window._pendingDragEvent.point.x + ',' + window._pendingDragEvent.point.y : 'null'}`);
           handleMouseDown(window._pendingDragEvent);
           window._pendingDragEvent = null;
         }
