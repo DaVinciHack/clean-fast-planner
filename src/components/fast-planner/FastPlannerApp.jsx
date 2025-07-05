@@ -3123,38 +3123,46 @@ const FastPlannerCore = ({
   }, [handleFlightLoad]);
   
   // 🛩️ HEADER SYNC: Callback to update stopCards when EnhancedStopCardsContainer calculates new values
-  // 🚨 RACE CONDITION FIX: Add loop prevention and proper memoization
-  const lastProcessedCardsRef = useRef(null);
+  // 🚨 INTELLIGENT FUEL SYNC: Compare fuel values instead of entire objects to prevent sync breaks
+  const lastProcessedFuelSignatureRef = useRef(null);
   const handleStopCardsCalculated = useCallback((calculatedStopCards, options = {}) => {
     console.log('🔄 HEADER SYNC: handleStopCardsCalculated called with', calculatedStopCards?.length, 'cards');
     
-    // 🚨 LOOP PREVENTION: Check if we've already processed these exact cards
-    const cardsString = JSON.stringify(calculatedStopCards);
-    if (lastProcessedCardsRef.current === cardsString) {
-      console.log('🔄 HEADER SYNC: Skipping duplicate update to prevent infinite loop');
-      return;
-    }
-    lastProcessedCardsRef.current = cardsString;
-    
+    // 🎯 INTELLIGENT DUPLICATE PREVENTION: Compare only fuel-critical values, not entire objects
     if (calculatedStopCards && calculatedStopCards.length > 0) {
+      // Create a signature based on actual fuel values (not object references)
+      const fuelSignature = calculatedStopCards.map(card => ({
+        id: card.id || card.stopName || card.name,
+        totalFuel: Math.round((card.totalFuel || 0) * 100) / 100, // Round to prevent floating point issues
+        tripFuel: Math.round((card.fuelComponentsObject?.tripFuel || 0) * 100) / 100,
+        araFuel: Math.round((card.fuelComponentsObject?.araFuel || 0) * 100) / 100,
+        approachFuel: Math.round((card.fuelComponentsObject?.approachFuel || 0) * 100) / 100,
+        extraFuel: Math.round((card.fuelComponentsObject?.extraFuel || 0) * 100) / 100,
+        refuelMode: !!card.refuelMode || !!card.isRefuelStop
+      }));
+      
+      const currentSignature = JSON.stringify(fuelSignature);
+      
+      // Only block if fuel signature is EXACTLY the same (not just object references)
+      if (lastProcessedFuelSignatureRef.current === currentSignature) {
+        console.log('🔄 HEADER SYNC: Skipping - fuel values unchanged (smart duplicate prevention)');
+        return;
+      }
+      
+      lastProcessedFuelSignatureRef.current = currentSignature;
+      
       const departureCard = calculatedStopCards.find(card => card.isDeparture);
-      console.log('🔄 HEADER SYNC: Departure card fuel =', departureCard?.totalFuel);
+      console.log('🔄 HEADER SYNC: Departure card fuel =', departureCard?.totalFuel, '(fuel signature changed)');
     }
     
     if (options.forceVfrRecalc) {
       // Force a complete recalculation by updating forceUpdate state
       setForceUpdate(prev => prev + 1);
+      console.log('🔄 HEADER SYNC: Force VFR recalc - updating forceUpdate state');
     } else {
-      // 🚨 RACE CONDITION FIX: Only update if cards actually changed
-      setStopCards(prev => {
-        const prevString = JSON.stringify(prev);
-        if (prevString !== cardsString) {
-          console.log('🔄 HEADER SYNC: Updated stopCards state for header');
-          return calculatedStopCards;
-        }
-        console.log('🔄 HEADER SYNC: No change in stopCards, skipping update');
-        return prev;
-      });
+      // 🎯 FUEL-SMART UPDATE: Always update if we got here (fuel signature already verified as different)
+      setStopCards(calculatedStopCards);
+      console.log('🔄 HEADER SYNC: Updated stopCards state for header (smart fuel sync)');
     }
   }, []);
   

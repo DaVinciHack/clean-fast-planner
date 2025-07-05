@@ -1424,8 +1424,23 @@ const CleanDetailedFuelBreakdown = ({
                           const isFinalDestination = card.isDestination || card.maxPassengersDisplay === 'Final Stop';
                           return isFinalDestination ? `${parts.join(' ')} = Potential Landing fuel ` : summary;
                         })()}{(() => {
+                          // 🔧 TAXI FUEL SYNC FIX: Calculate total from actual breakdown components (including user overrides)
+                          const taxi = isDeparture ? (getFuelValue(stopName, 'taxiFuel', card.index) || card.fuelComponentsObject?.taxiFuel || 0) : 0;
+                          const trip = card.fuelComponentsObject?.tripFuel || card.tripFuel || 0;
+                          const cont = card.fuelComponentsObject?.contingencyFuel || 0;
+                          const deck = card.fuelComponentsObject?.deckFuel || 0;
+                          const ara = card.fuelComponentsObject?.araFuel || 0;
+                          const app = card.fuelComponentsObject?.approachFuel || 0;
+                          const extra = card.fuelComponentsObject?.extraFuel || 0;
+                          const res = getFuelValue(stopName, 'reserveFuel', card.index) || card.fuelComponentsObject?.reserveFuel || 0;
+                          
+                          // 🎯 ACCURATE TOTAL: Sum actual breakdown components instead of using potentially stale card.totalFuel
+                          const accurateTotal = taxi + trip + cont + deck + ara + app + extra + res;
+                          
                           const isFinalDestination = card.isDestination || card.maxPassengersDisplay === 'Final Stop';
-                          return isFinalDestination ? <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>({card.totalFuel || 0})</span> : <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>{card.totalFuel || 0} lbs</span>;
+                          return isFinalDestination ? 
+                            <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>({accurateTotal})</span> : 
+                            <span style={{ color: '#4A9EFF', fontWeight: 'bold' }}>{accurateTotal} lbs</span>;
                         })()}
                       </div>
                     </div>

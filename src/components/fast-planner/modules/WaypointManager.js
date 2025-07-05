@@ -2246,12 +2246,23 @@ class WaypointManager {
     
     // Clean up any existing handlers to prevent duplicates
     if (this._routeDragHandlers) {
+      // Remove MapBox mouse event handlers
       map.off('mousedown', this._routeDragHandlers.mousedown);
       map.off('mousemove', this._routeDragHandlers.mousemove);
       map.off('mouseup', this._routeDragHandlers.mouseup);
       map.off('mouseout', this._routeDragHandlers.mouseout);
+      
+      // 📱 IPAD SUPPORT: Remove touch event handlers from canvas
+      if (this._routeDragHandlers.canvas) {
+        const canvas = this._routeDragHandlers.canvas;
+        canvas.removeEventListener('touchstart', this._routeDragHandlers.touchstart);
+        canvas.removeEventListener('touchmove', this._routeDragHandlers.touchmove);
+        canvas.removeEventListener('touchend', this._routeDragHandlers.touchend);
+        canvas.removeEventListener('touchcancel', this._routeDragHandlers.touchcancel);
+      }
+      
       this._routeDragHandlers = null;
-      console.log('Removed existing route drag handlers');
+      console.log('Removed existing route drag handlers (mouse + touch)');
     }
     
     // Store original handler in global for debugging
@@ -2685,21 +2696,104 @@ class WaypointManager {
       window._routeDragJustFinished = false;
     };
     
-    // Set up the event handlers
+    // 📱 TOUCH EVENT HANDLERS: Convert touch events to mouse-like events for iPad support
+    const handleTouchStart = (e) => {
+      if (e.touches && e.touches.length === 1) {
+        // Prevent default to avoid scroll/zoom during route dragging
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        const rect = map.getCanvasContainer().getBoundingClientRect();
+        
+        // Create mouse-like event object
+        const syntheticEvent = {
+          lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
+          point: {x: touch.clientX - rect.left, y: touch.clientY - rect.top},
+          originalEvent: e,
+          preventDefault: () => e.preventDefault(),
+          stopPropagation: () => e.stopPropagation()
+        };
+        
+        console.log('📱 Touch start detected, converting to mouse down');
+        handleMouseDown(syntheticEvent);
+      }
+    };
+    
+    const handleTouchMove = (e) => {
+      if (e.touches && e.touches.length === 1) {
+        // Only prevent default if we're currently dragging
+        if (isDragging) {
+          e.preventDefault();
+        }
+        
+        const touch = e.touches[0];
+        const rect = map.getCanvasContainer().getBoundingClientRect();
+        
+        const syntheticEvent = {
+          lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
+          point: {x: touch.clientX - rect.left, y: touch.clientY - rect.top},
+          originalEvent: e
+        };
+        
+        handleMouseMove(syntheticEvent);
+      }
+    };
+    
+    const handleTouchEnd = (e) => {
+      // Prevent default to avoid ghost clicks
+      e.preventDefault();
+      
+      const syntheticEvent = {
+        lngLat: e.changedTouches && e.changedTouches[0] ? 
+          (() => {
+            const touch = e.changedTouches[0];
+            const rect = map.getCanvasContainer().getBoundingClientRect();
+            return map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]);
+          })() : null,
+        originalEvent: e,
+        preventDefault: () => e.preventDefault(),
+        stopPropagation: () => e.stopPropagation()
+      };
+      
+      console.log('📱 Touch end detected, converting to mouse up');
+      handleMouseUp(syntheticEvent);
+    };
+    
+    const handleTouchCancel = (e) => {
+      console.log('📱 Touch cancelled, ending drag operation');
+      handleMouseOut();
+    };
+
+    // Set up mouse event handlers (existing functionality)
     map.on('mousedown', handleMouseDown);
     map.on('mousemove', handleMouseMove);
     map.on('mouseup', handleMouseUp);
     map.on('mouseout', handleMouseOut);
     
-    // Store references to the handlers for later cleanup
+    // 📱 IPAD SUPPORT: Set up touch event handlers
+    const canvas = map.getCanvasContainer();
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+    
+    // Store references to ALL handlers for later cleanup
     this._routeDragHandlers = {
+      // Mouse handlers (MapBox events)
       mousedown: handleMouseDown,
       mousemove: handleMouseMove,
       mouseup: handleMouseUp,
-      mouseout: handleMouseOut
+      mouseout: handleMouseOut,
+      // Touch handlers (DOM events)
+      touchstart: handleTouchStart,
+      touchmove: handleTouchMove,
+      touchend: handleTouchEnd,
+      touchcancel: handleTouchCancel,
+      // Store canvas reference for cleanup
+      canvas: canvas
     };
     
-    console.log('Route dragging functionality set up successfully');
+    console.log('📱 Route dragging functionality set up successfully (mouse + touch support for iPad)');
   }
 
   /**
