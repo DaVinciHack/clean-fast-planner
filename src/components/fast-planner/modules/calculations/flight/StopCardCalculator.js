@@ -706,21 +706,29 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     let departureComponentsCalculation;
     
     if (hasRefuelStops && refuelStops.length > 0) {
-      // Find the first refuel stop index (1-based)
-      const firstRefuelStopIndex = Math.min(...refuelStops);
+      // Find the first refuel stop index (1-based card index)
+      const firstRefuelStopCardIndex = Math.min(...refuelStops);
+      
+      // 🔧 CRITICAL INDEX FIX: Convert card index to leg index for proper fuel calculation
+      // Card index 2 means refuel at 2nd stop, so we need fuel for legs 0 to 1 (2 legs total)
+      // But we want legs up to the refuel stop, which is firstRefuelStopCardIndex - 1
+      const firstRefuelStopLegIndex = firstRefuelStopCardIndex - 1;
+      
+      console.log(`🔧 REFUEL INDEX FIX: Card ${firstRefuelStopCardIndex} → Leg index ${firstRefuelStopLegIndex}`);
       
       // Calculate fuel only to first refuel stop
       let tripFuelToFirstRefuel = 0;
       let deckFuelToFirstRefuel = 0;
       
-      // Sum fuel for legs up to first refuel stop
-      for (let i = 0; i < legDetails.length && i < firstRefuelStopIndex; i++) {
+      // Sum fuel for legs up to first refuel stop (using correct leg indexing)
+      for (let i = 0; i < legDetails.length && i < firstRefuelStopLegIndex; i++) {
         tripFuelToFirstRefuel += legDetails[i].fuel;
+        console.log(`🔧 REFUEL FUEL: Adding leg ${i} fuel: ${legDetails[i].fuel} lbs`);
       }
       
       // 🔧 DECK TIME FIX: Calculate deck fuel for stops before first refuel using individual overrides
       let deckTimeMinutesToFirstRefuel = 0;
-      for (let i = 1; i < firstRefuelStopIndex; i++) { // Skip departure (0), count intermediate stops
+      for (let i = 1; i < firstRefuelStopCardIndex; i++) { // Skip departure (0), count intermediate stops up to refuel card
         if (i < stopsToProcess.length) {
           const stop = stopsToProcess[i];
           const cardIndex = i + 1; // Convert to 1-based card index
@@ -2172,14 +2180,54 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     }
   }
   
-  // ✅ AVIATION: Get departure extra fuel for alternate route (use location-specific fuel only)
+  // ✅ CRITICAL FIX: Use segment-aware fuel logic for alternate card (same as main route)
   const departureWaypoint = landingStopsOnly[0];
-  const departureKey = departureWaypoint ? `${departureWaypoint.name || departureWaypoint.stopName}_1_extraFuel` : null;
-  const alternateExtraFuel = (departureKey && options.locationFuelOverrides && options.locationFuelOverrides[departureKey]) ? 
-    Number(options.locationFuelOverrides[departureKey]) : 0;
   
-  // Calculate total fuel required for alternate route (AFTER ARA fuel calculation)
-  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + alternateAraFuel + alternateDeckFuel + approachFuel + reserveFuelValue + alternateExtraFuel;
+  // 🔧 SEGMENT 1 → ALTERNATE CARD FLOW: Use proper getLocationFuel function
+  const alternateExtraFuel = departureWaypoint ? 
+    (getLocationFuel(departureWaypoint, 'extraFuel', 1) || 0) : 0;
+    
+  console.log(`🔧 ALTERNATE CARD: ${departureWaypoint?.name} extraFuel = ${alternateExtraFuel} lbs (segment-aware)`);
+  
+  // 🔧 CRITICAL ARA FIX: Check for current key format ARA fuel overrides in segment 1
+  let totalUserAraFuel = 0;
+  
+  // Check all segment 1 locations for ARA fuel overrides using current key format
+  if (departureWaypoint && landingStopsOnly.length > 0) {
+    // Determine segment 1 boundary (up to first refuel stop)
+    const firstRefuelCardIndex = options.refuelStops && options.refuelStops.length > 0 ? Math.min(...options.refuelStops) : landingStopsOnly.length;
+    const segment1EndIndex = Math.min(firstRefuelCardIndex, landingStopsOnly.length);
+    
+    console.log(`🔧 ALTERNATE CARD: Checking segment 1 (cards 1 to ${segment1EndIndex}) for ARA fuel`);
+    
+    // Check all stops in segment 1 for ARA fuel overrides
+    for (let i = 0; i < segment1EndIndex; i++) {
+      const waypoint = landingStopsOnly[i];
+      const cardIndex = i + 1; // Convert to 1-based card index
+      
+      // Use current key format: stopName_cardIndex_araFuel
+      const currentFormatKey = `${waypoint.name || waypoint.stopName}_${cardIndex}_araFuel`;
+      const currentOverride = options.locationFuelOverrides?.[currentFormatKey];
+      
+      if (currentOverride) {
+        const araValue = typeof currentOverride === 'object' ? 
+          (currentOverride.value || 0) : (currentOverride || 0);
+        totalUserAraFuel += Number(araValue) || 0;
+        console.log(`🔧 ALTERNATE CARD ARA: Found ${currentFormatKey} = ${araValue} lbs (card ${cardIndex})`);
+      }
+    }
+  }
+  
+  console.log(`🔧 ALTERNATE CARD: Total user ARA fuel in segment 1 = ${totalUserAraFuel} lbs`);
+  console.log(`🔧 ALTERNATE CARD: Existing alternateAraFuel = ${alternateAraFuel} lbs`);
+  
+  // 🔧 SEGMENT 1 → ALTERNATE CARD: Use higher of calculated ARA or user ARA overrides
+  const finalAlternateAraFuel = Math.max(alternateAraFuel, totalUserAraFuel);
+  
+  console.log(`🔧 ALTERNATE CARD: Final ARA fuel = ${finalAlternateAraFuel} lbs (max of calculated vs user)`);
+  
+  // Calculate total fuel required for alternate route (using corrected ARA fuel)
+  const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + finalAlternateAraFuel + alternateDeckFuel + approachFuel + reserveFuelValue + alternateExtraFuel;
   
   // Calculate max passengers using same logic as normal stop cards
   let maxPassengers = 0;
@@ -2192,25 +2240,33 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     );
   }
 
-  // Create fuel components text - PALANTIR MATCH: Show Trip and Alt separately
-  let alternateParts = [
-    `Taxi:${taxiFuelValue}`,
-    `Trip:${legsToSplitPointFuel}`,
-    `Alt:${alternateLegFuel}`,
-    `Cont:${alternateContingencyFuel}`
-  ];
+  // Create fuel components text - CONSISTENT: Only show components > 0 (match main cards)
+  let alternateParts = [];
   
-  if (alternateAraFuel > 0) {
-    alternateParts.push(`ARA:${alternateAraFuel}`);
+  if (taxiFuelValue > 0) {
+    alternateParts.push(`Taxi:${taxiFuelValue}`);
   }
-  
-  alternateParts.push(`Deck:${alternateDeckFuel}`);
-  
+  if (legsToSplitPointFuel > 0) {
+    alternateParts.push(`Trip:${legsToSplitPointFuel}`);
+  }
+  if (alternateLegFuel > 0) {
+    alternateParts.push(`Alt:${alternateLegFuel}`);
+  }
+  if (alternateContingencyFuel > 0) {
+    alternateParts.push(`Cont:${alternateContingencyFuel}`);
+  }
+  if (finalAlternateAraFuel > 0) {
+    alternateParts.push(`ARA:${finalAlternateAraFuel}`);
+  }
+  if (alternateDeckFuel > 0) {
+    alternateParts.push(`Deck:${alternateDeckFuel}`);
+  }
   if (approachFuel > 0) {
     alternateParts.push(`Approach:${approachFuel}`);
   }
-  
-  alternateParts.push(`Res:${reserveFuelValue}`);
+  if (reserveFuelValue > 0) {
+    alternateParts.push(`Res:${reserveFuelValue}`);
+  }
   
   if (alternateExtraFuel > 0) {
     alternateParts.push(`Extra:${alternateExtraFuel}`);
@@ -2254,10 +2310,11 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       totalTripFuel: totalAlternateTripFuel,  // Keep total for calculations
       contingencyFuel: alternateContingencyFuel,
       taxiFuel: taxiFuelValue,
-      araFuel: araFuel,  // Include weather fuel for alternate
+      araFuel: finalAlternateAraFuel,  // 🔧 FIXED: Use corrected ARA fuel including user overrides
       deckFuel: alternateDeckFuel,
       approachFuel: approachFuel,  // Include weather fuel for alternate
-      reserveFuel: reserveFuelValue
+      reserveFuel: reserveFuelValue,
+      extraFuel: alternateExtraFuel  // 🔧 ADDED: Include extra fuel in components
     },
     isDeparture: false,
     isDestination: false,

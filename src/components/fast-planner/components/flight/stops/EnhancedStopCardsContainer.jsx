@@ -292,6 +292,13 @@ const EnhancedStopCardsContainer = ({
           }
         };
         
+        console.log('🔧 ALTERNATE CARD: Attempting calculation with params:', {
+          waypoints: waypoints?.length,
+          alternateRouteData: !!alternateRouteData,
+          routeStats: !!routeStats,
+          selectedAircraft: !!selectedAircraft
+        });
+        
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
           waypoints,
           alternateRouteData,
@@ -300,6 +307,8 @@ const EnhancedStopCardsContainer = ({
           safeWeather,
           numericParams
         );
+        
+        console.log('🔧 ALTERNATE CARD: Calculation result:', alternateCard ? `SUCCESS - Total: ${alternateCard.totalFuel} lbs` : 'NULL/UNDEFINED');
         
         if (alternateCard) {
           
@@ -357,7 +366,7 @@ const EnhancedStopCardsContainer = ({
         }
       }
     }
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates]);
+  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates, locationFuelOverrides]);
   
   // Handle card click
   const handleCardClick = (index) => {

@@ -2293,12 +2293,84 @@ class WaypointManager {
     let dragStartPoint = null;
     let closestPointIndex = -1;
     let dragLineSource = null;
+    let dragStartTime = 0;
+    let touchStarted = false;
+    
+    // 📱 VISUAL TOUCH DEBUG: Create on-screen debug display for iPad testing
+    let touchDebugElement = document.getElementById('touch-debug-display');
+    if (!touchDebugElement) {
+      touchDebugElement = document.createElement('div');
+      touchDebugElement.id = 'touch-debug-display';
+      touchDebugElement.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 13px;
+        z-index: 10000;
+        max-width: 400px;
+        max-height: 50vh;
+        overflow-y: auto;
+        word-wrap: break-word;
+        pointer-events: none;
+        border: 2px solid orange;
+      `;
+      document.body.appendChild(touchDebugElement);
+    }
+    
+    const updateTouchDebug = (message) => {
+      if (touchDebugElement) {
+        const timestamp = new Date().toLocaleTimeString();
+        touchDebugElement.innerHTML = `[${timestamp}] ${message}<br>` + touchDebugElement.innerHTML;
+        // Keep only last 15 messages and make them stay longer
+        const lines = touchDebugElement.innerHTML.split('<br>');
+        if (lines.length > 15) {
+          touchDebugElement.innerHTML = lines.slice(0, 15).join('<br>');
+        }
+      }
+    };
+    
+    // 📱 VISUAL TOUCH INDICATORS: Show touch points on screen
+    const createTouchIndicator = (x, y, type) => {
+      const indicator = document.createElement('div');
+      indicator.style.cssText = `
+        position: fixed;
+        left: ${x - 15}px;
+        top: ${y - 15}px;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: ${type === 'start' ? 'red' : type === 'move' ? 'blue' : 'green'};
+        opacity: 0.7;
+        z-index: 9999;
+        pointer-events: none;
+        border: 2px solid white;
+      `;
+      document.body.appendChild(indicator);
+      
+      // Remove after 1 second
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator);
+        }
+      }, 1000);
+    };
+    
+    // Initialize debug system
+    updateTouchDebug('Route drag setup starting...');
     
     // Helper to add the drag line visualization
     const addDragLine = (coordinates) => {
       try {
+        updateTouchDebug(`🎨 Adding drag line with ${coordinates.length} points`);
+        
         // Remove existing line if present
         if (map.getSource('drag-line')) { 
+          updateTouchDebug('🗑️ Removing existing drag line');
           map.removeLayer('drag-line'); 
           map.removeSource('drag-line'); 
         }
@@ -2316,6 +2388,8 @@ class WaypointManager {
           }
         });
         
+        updateTouchDebug('✅ Drag line source added');
+        
         // Use different styling based on current mode
         const isWaypointMode = window.isWaypointModeActive === true;
         
@@ -2330,14 +2404,19 @@ class WaypointManager {
           }, 
           paint: { 
             'line-color': isWaypointMode ? '#BA55D3' : '#FF4136', // Medium purple for waypoints, red for stops
-            'line-width': 4,
-            'line-dasharray': [2, 1] // Dashed line
+            'line-width': 6, // Make it thicker for iPad visibility
+            'line-dasharray': [4, 2], // Bigger dashes for iPad
+            'line-opacity': 0.8
           }
         });
         
+        updateTouchDebug('✅ Drag line layer added and visible');
+        
         // Store a reference to the line source for updating
         dragLineSource = map.getSource('drag-line');
+        updateTouchDebug(`✅ dragLineSource stored: ${dragLineSource ? 'SUCCESS' : 'FAILED'}`);
       } catch (error) { 
+        updateTouchDebug(`❌ Error adding drag line: ${error.message}`);
         console.error('Error adding drag line:', error); 
       }
     };
@@ -2345,12 +2424,31 @@ class WaypointManager {
     // Helper to find the closest point on the route line
     const findClosestPointOnLine = (mouseLngLat, mousePoint) => {
       try {
+        updateTouchDebug('🔍 Finding closest point...');
+        updateTouchDebug(`Input coordinates: lngLat=${mouseLngLat ? mouseLngLat.lng + ',' + mouseLngLat.lat : 'null'}, point=${mousePoint ? mousePoint.x + ',' + mousePoint.y : 'null'}`);
+        
         // Check if we have a route to work with
-        if (!map.getSource('route')) return null;
+        if (!map.getSource('route')) {
+          updateTouchDebug('❌ No route source');
+          return null;
+        }
         
         // Check if mouse is directly over the route
         const routeFeatures = map.queryRenderedFeatures(mousePoint, { layers: ['route'] });
         const isMouseOverRoute = routeFeatures && routeFeatures.length > 0;
+        updateTouchDebug(`Route features found: ${routeFeatures ? routeFeatures.length : 0}`);
+        
+        // 🚨 TOUCH FIX: For touch devices, try a larger detection area if direct hit fails
+        let routeFeaturesBuffered = [];
+        if (!isMouseOverRoute && mousePoint) {
+          const buffer = 15; // 15 pixel buffer for touch targets
+          const bbox = [
+            [mousePoint.x - buffer, mousePoint.y - buffer],
+            [mousePoint.x + buffer, mousePoint.y + buffer]
+          ];
+          routeFeaturesBuffered = map.queryRenderedFeatures(bbox, { layers: ['route'] });
+          updateTouchDebug(`Buffered route features found: ${routeFeaturesBuffered ? routeFeaturesBuffered.length : 0}`);
+        }
         
         // CRITICAL FIX: Use the drag detection source for insertion calculations
         // This source contains the original straight-line waypoint coordinates,
@@ -2391,16 +2489,22 @@ class WaypointManager {
           { units: 'nauticalmiles' }
         );
         
-        // Return result if close enough or directly over the route
-        if (isMouseOverRoute || distanceNM < 0.5) {
+        const isOverRouteBuffered = routeFeaturesBuffered && routeFeaturesBuffered.length > 0;
+        const isOverRouteAny = isMouseOverRoute || isOverRouteBuffered;
+        updateTouchDebug(`Distance: ${distanceNM.toFixed(2)}nm, Over route: direct=${isMouseOverRoute}, buffered=${isOverRouteBuffered}`);
+        
+        // Return result if close enough or directly over the route (including buffered area for touch)
+        if (isOverRouteAny || distanceNM < 0.5) {
+          updateTouchDebug('✅ Close enough to route!');
           return { 
             point: closestPoint, 
             index: segmentIndex, 
             distance: distanceNM, 
-            isDirectlyOver: isMouseOverRoute 
+            isDirectlyOver: isOverRouteAny 
           };
         }
         
+        updateTouchDebug('❌ Too far from route');
         return null;
       } catch (error) { 
         console.error('Error finding closest point on line:', error); 
@@ -2410,14 +2514,22 @@ class WaypointManager {
     
     // Mouse down handler - start the drag operation
     const handleMouseDown = (e) => {
+      updateTouchDebug('handleMouseDown called!');
+      
       // LOCK CHECK: Prevent route dragging when editing is locked
       if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
+        updateTouchDebug('Route dragging LOCKED');
         console.log('🔒 WaypointManager: Ignoring mousedown - waypoint dragging is locked');
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
         }
         return;
       }
+      
+      updateTouchDebug('Route dragging unlocked');
+      
+      // 🚨 TOUCH DEBUG: Log the event details
+      updateTouchDebug(`Event type: ${e.type || 'unknown'}, synthetic: ${e.synthetic || false}`);
       
       // ALTERNATE MODE CHECK: Allow route clicks but prevent dragging
       if (window.isAlternateModeActive === true) {
@@ -2447,26 +2559,50 @@ class WaypointManager {
       }
       
       // Skip if no route or if right-click (context menu)
-      if (!this.isMapReadyForOperations() || !map.getSource('route') || e.originalEvent.button === 2) return;
+      const hasRoute = this.isMapReadyForOperations() && map.getSource('route');
+      updateTouchDebug(`Route check: ready=${this.isMapReadyForOperations()}, hasRoute=${!!map.getSource('route')}`);
+      
+      if (!hasRoute || (e.originalEvent && e.originalEvent.button === 2)) {
+        updateTouchDebug('❌ No route or right-click');
+        return;
+      }
+      
+      // 🚨 TOUCH DEBUG: Log we passed route check
+      updateTouchDebug('✅ Route check passed');
       
       // Skip if clicking on a platform
       const platformLayerIds = ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'].filter(id => map.getLayer && map.getLayer(id));
       if (platformLayerIds.length > 0) {
         const platformFeatures = map.queryRenderedFeatures(e.point, { layers: platformLayerIds });
-        if (platformFeatures.length > 0) return;
+        if (platformFeatures.length > 0) {
+          updateTouchDebug('❌ Clicked on platform');
+          return;
+        }
       }
+      
+      // 🚨 TOUCH DEBUG: Log we passed platform check
+      updateTouchDebug('✅ Platform check passed');
+      
+      updateTouchDebug('🎯 Checking route proximity...');
       
       // Find the closest point on the route
       const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+      updateTouchDebug(`Route proximity result: ${closestInfo ? 'FOUND' : 'NOT FOUND'}`);
       
       if (closestInfo) {
+        updateTouchDebug('🚀 STARTING DRAG OPERATION!');
         // Set global flag for other components to check
         window._isRouteDragging = true;
         console.log('Starting route drag operation at segment:', closestInfo.index);
         
         // Get the route source
         const routeSource = map.getSource('route');
-        if (!routeSource || !routeSource._data) return;
+        if (!routeSource || !routeSource._data) {
+          updateTouchDebug('❌ No route source data');
+          return;
+        }
+        
+        updateTouchDebug('✅ Route source data found');
         
         // Start the drag operation
         const originalWaypointCoords = this.waypoints.map(wp => wp.coords);
@@ -2474,6 +2610,8 @@ class WaypointManager {
         isDragging = true;
         dragStartPoint = closestInfo.point;
         closestPointIndex = closestInfo.index;
+        
+        updateTouchDebug(`✅ Drag started! isDragging=${isDragging}, segment=${closestInfo.index}`);
         
         // ENHANCED: Create initial straight-line drag visualization
         // Show: departure -> drag start point -> destination
@@ -2488,10 +2626,22 @@ class WaypointManager {
         
         draggedLineCoordinates = initialDragCoords;
         
+        updateTouchDebug(`🎯 About to call addDragLine with ${initialDragCoords.length} coordinates`);
+        
         // Add the visualization with straight lines
         addDragLine(draggedLineCoordinates);
         
+        updateTouchDebug('🎯 addDragLine call completed');
+        
         console.log(`Started drag at segment ${closestInfo.index}, showing ${initialDragCoords.length} point preview`);
+        
+        // 🚨 CRITICAL: DISABLE MAP INTERACTIONS DURING DRAG
+        updateTouchDebug('🔒 Disabling map interactions');
+        map.dragPan.disable();
+        map.scrollZoom.disable();
+        map.touchZoomRotate.disable();
+        map.doubleClickZoom.disable();
+        map.keyboard.disable();
         
         // Hide the original route during dragging
         map.setLayoutProperty('route', 'visibility', 'none');
@@ -2504,12 +2654,15 @@ class WaypointManager {
         
         // Prevent default handling
         e.preventDefault();
+      } else {
+        updateTouchDebug('❌ No closest point found on route - drag cancelled');
       }
     };
     
     // Mouse move handler - update the drag line
     const handleMouseMove = (e) => {
       if (isDragging) {
+        updateTouchDebug('🎯 handleMouseMove called during drag');
         // ENHANCED DRAG VISUALIZATION: Show straight lines during drag
         // This makes it crystal clear where the insertion will happen
         const currentMousePos = [e.lngLat.lng, e.lngLat.lat];
@@ -2549,7 +2702,10 @@ class WaypointManager {
         }
         
         // Update the visualization with straight lines
+        updateTouchDebug(`🎯 handleMouseMove: dragLineSource=${dragLineSource ? 'EXISTS' : 'NULL'}, coordsLength=${straightLineDragCoords.length}`);
+        
         if (dragLineSource && straightLineDragCoords.length >= 2) {
+          updateTouchDebug('🎨 Updating drag line coordinates');
           dragLineSource.setData({
             type: 'Feature',
             properties: {},
@@ -2558,6 +2714,14 @@ class WaypointManager {
               coordinates: straightLineDragCoords
             }
           });
+          updateTouchDebug('✅ Drag line updated successfully');
+        } else {
+          if (!dragLineSource) {
+            updateTouchDebug('❌ dragLineSource is NULL - cannot update line');
+          }
+          if (straightLineDragCoords.length < 2) {
+            updateTouchDebug(`❌ Not enough coordinates: ${straightLineDragCoords.length}`);
+          }
         }
         
         console.log(`Drag preview: ${straightLineDragCoords.length} points, inserting at index ${closestPointIndex + 1}`);
@@ -2602,6 +2766,14 @@ class WaypointManager {
       
       // End the drag operation
       isDragging = false;
+      
+      // 🔓 CRITICAL: RE-ENABLE MAP INTERACTIONS AFTER DRAG
+      updateTouchDebug('🔓 Re-enabling map interactions');
+      map.dragPan.enable();
+      map.scrollZoom.enable();
+      map.touchZoomRotate.enable();
+      map.doubleClickZoom.enable();
+      map.keyboard.enable();
       
       // Clean up the visualization
       if (this.isMapReadyForOperations() && map.getSource('drag-line')) {
@@ -2698,36 +2870,162 @@ class WaypointManager {
     
     // 📱 TOUCH EVENT HANDLERS: Convert touch events to mouse-like events for iPad support
     const handleTouchStart = (e) => {
+      updateTouchDebug('🔥 TOUCH START!');
+      
       if (e.touches && e.touches.length === 1) {
-        // Prevent default to avoid scroll/zoom during route dragging
-        e.preventDefault();
-        
         const touch = e.touches[0];
         const rect = map.getCanvasContainer().getBoundingClientRect();
         
+        const clientX = touch.clientX - rect.left;
+        const clientY = touch.clientY - rect.top;
+        
+        updateTouchDebug(`Touch at: ${Math.round(clientX)},${Math.round(clientY)}`);
+        
         // Create mouse-like event object
         const syntheticEvent = {
-          lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
-          point: {x: touch.clientX - rect.left, y: touch.clientY - rect.top},
+          lngLat: map.unproject([clientX, clientY]),
+          point: {x: clientX, y: clientY},
           originalEvent: e,
           preventDefault: () => e.preventDefault(),
           stopPropagation: () => e.stopPropagation()
         };
         
-        console.log('📱 Touch start detected, converting to mouse down');
-        handleMouseDown(syntheticEvent);
+        // 📱 CRITICAL FIX: Check if this touch is over a route BEFORE preventing default
+        // This allows other map interactions (weather popups, etc.) to work normally
+        updateTouchDebug('🎯 Checking if touch is over route...');
+        
+        // Debug available layers
+        const availableLayers = ['route', 'route-drag-detection-layer', 'route-visual'].filter(layerId => {
+          return map.getLayer(layerId);
+        });
+        updateTouchDebug(`Available route layers: ${availableLayers.join(', ')}`);
+        
+        // Quick route proximity check with multiple layer attempts
+        let routeFeatures = [];
+        let layerTested = '';
+        
+        // Try different layer combinations
+        const layerCombinations = [
+          ['route', 'route-drag-detection-layer'],
+          ['route'],
+          ['route-visual'],
+          ['route-drag-detection-layer']
+        ];
+        
+        for (const layers of layerCombinations) {
+          const existingLayers = layers.filter(layer => map.getLayer(layer));
+          if (existingLayers.length > 0) {
+            routeFeatures = map.queryRenderedFeatures([clientX, clientY], { layers: existingLayers });
+            layerTested = existingLayers.join(', ');
+            if (routeFeatures.length > 0) break;
+          }
+        }
+        
+        const isOverRoute = routeFeatures && routeFeatures.length > 0;
+        updateTouchDebug(`Tested layers: ${layerTested}, Over route: ${isOverRoute}, features: ${routeFeatures ? routeFeatures.length : 0}`);
+        
+        if (isOverRoute) {
+          updateTouchDebug('✅ Touch over route - preventing default and handling drag');
+          // Only prevent default if we're actually touching the route
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // 🚨 CRITICAL: Set touch started flag and start time
+          touchStarted = true;
+          dragStartTime = Date.now();
+          updateTouchDebug(`🕐 Touch started at ${dragStartTime}`);
+          
+          // 🚨 CRITICAL: Disable ALL map interactions during route drag
+          updateTouchDebug('🔒 Disabling map interactions for route drag');
+          
+          // Try multiple methods to disable map movement
+          try {
+            map.dragPan.disable();
+            map.scrollZoom.disable();
+            map.boxZoom.disable();
+            map.doubleClickZoom.disable();
+            map.touchZoomRotate.disable();
+            map.touchPitch.disable();
+            map.keyboard.disable();
+            
+            // Additional method: Set map to not interactive
+            map.getCanvas().style.cursor = 'grabbing';
+            
+            // Store original touch-action and disable it
+            const canvas = map.getCanvasContainer();
+            window._originalTouchAction = canvas.style.touchAction;
+            canvas.style.touchAction = 'none';
+            canvas.style.pointerEvents = 'none';
+            
+            updateTouchDebug('✅ All map interactions disabled');
+          } catch (error) {
+            updateTouchDebug(`❌ Error disabling interactions: ${error.message}`);
+          }
+          
+          // Store that we disabled interactions
+          window._mapInteractionsDisabled = true;
+          
+          // BIG visual feedback for route drag start
+          const bigIndicator = document.createElement('div');
+          bigIndicator.style.cssText = `
+            position: fixed;
+            left: ${touch.clientX - 25}px;
+            top: ${touch.clientY - 25}px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: orange;
+            opacity: 0.8;
+            z-index: 9999;
+            pointer-events: none;
+            border: 3px solid red;
+          `;
+          document.body.appendChild(bigIndicator);
+          setTimeout(() => {
+            if (bigIndicator.parentNode) {
+              bigIndicator.parentNode.removeChild(bigIndicator);
+            }
+          }, 2000);
+          
+          // 🚨 DELAY DRAG START: Don't call handleMouseDown immediately
+          // Store the synthetic event for when touch moves
+          window._pendingDragEvent = syntheticEvent;
+          updateTouchDebug('🎯 Touch ready - waiting for movement to start drag');
+        } else {
+          updateTouchDebug('🌐 Touch not over route - allowing normal map interaction');
+          // Don't prevent default - let MapBox handle weather popups, etc.
+        }
+      } else {
+        updateTouchDebug('❌ Multi-touch detected');
       }
     };
     
     const handleTouchMove = (e) => {
+      updateTouchDebug('🔄 TouchMove event');
+      
       if (e.touches && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const rect = map.getCanvasContainer().getBoundingClientRect();
+        
+        // 🚨 START DRAG ON FIRST MOVE: If we have a pending drag event, start it now
+        if (window._pendingDragEvent && !isDragging) {
+          updateTouchDebug('🚀 FIRST MOVE - Starting drag now!');
+          handleMouseDown(window._pendingDragEvent);
+          window._pendingDragEvent = null;
+        }
+        
         // Only prevent default if we're currently dragging
         if (isDragging) {
           e.preventDefault();
+          updateTouchDebug('🎯 DRAGGING! Preventing default');
+          
+          // Visual feedback for route drag move
+          createTouchIndicator(touch.clientX, touch.clientY, 'move');
+        } else if (window._pendingDragEvent) {
+          updateTouchDebug('📋 Pending drag event - waiting...');
+        } else {
+          updateTouchDebug('❌ TouchMove but not dragging');
         }
-        
-        const touch = e.touches[0];
-        const rect = map.getCanvasContainer().getBoundingClientRect();
         
         const syntheticEvent = {
           lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
@@ -2735,13 +3033,58 @@ class WaypointManager {
           originalEvent: e
         };
         
+        updateTouchDebug('🎯 Calling handleMouseMove');
         handleMouseMove(syntheticEvent);
       }
     };
     
     const handleTouchEnd = (e) => {
+      const touchEndTime = Date.now();
+      const touchDuration = touchEndTime - dragStartTime;
+      updateTouchDebug(`handleTouchEnd called - duration: ${touchDuration}ms`);
+      
+      // 🚨 CRITICAL: Prevent immediate touch end if it's too quick (< 100ms)
+      if (touchStarted && touchDuration < 100) {
+        updateTouchDebug(`⏰ Touch too quick (${touchDuration}ms) - ignoring end`);
+        return; // Don't end the drag yet
+      }
+      
+      // Reset touch flags and cleanup
+      touchStarted = false;
+      window._pendingDragEvent = null;
+      
+      // 🔓 CRITICAL: Re-enable map interactions when touch ends
+      if (window._mapInteractionsDisabled) {
+        updateTouchDebug('🔓 Re-enabling map interactions');
+        try {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.boxZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
+          map.touchPitch.enable();
+          map.keyboard.enable();
+          
+          // Restore canvas properties
+          const canvas = map.getCanvasContainer();
+          canvas.style.touchAction = window._originalTouchAction || 'none';
+          canvas.style.pointerEvents = 'auto';
+          map.getCanvas().style.cursor = '';
+          
+          updateTouchDebug('✅ All map interactions re-enabled');
+        } catch (error) {
+          updateTouchDebug(`❌ Error re-enabling interactions: ${error.message}`);
+        }
+        window._mapInteractionsDisabled = false;
+      }
+      
       // Prevent default to avoid ghost clicks
       e.preventDefault();
+      
+      if (e.changedTouches && e.changedTouches[0]) {
+        const touch = e.changedTouches[0];
+        createTouchIndicator(touch.clientX, touch.clientY, 'end');
+      }
       
       const syntheticEvent = {
         lngLat: e.changedTouches && e.changedTouches[0] ? 
@@ -2755,12 +3098,38 @@ class WaypointManager {
         stopPropagation: () => e.stopPropagation()
       };
       
-      console.log('📱 Touch end detected, converting to mouse up');
+      updateTouchDebug('Calling handleMouseUp');
       handleMouseUp(syntheticEvent);
     };
     
     const handleTouchCancel = (e) => {
-      console.log('📱 Touch cancelled, ending drag operation');
+      updateTouchDebug('Touch cancelled!');
+      
+      // 🔓 CRITICAL: Re-enable map interactions if touch is cancelled
+      if (window._mapInteractionsDisabled) {
+        updateTouchDebug('🔓 Re-enabling map interactions (touch cancelled)');
+        try {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.boxZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
+          map.touchPitch.enable();
+          map.keyboard.enable();
+          
+          // Restore canvas properties
+          const canvas = map.getCanvasContainer();
+          canvas.style.touchAction = window._originalTouchAction || 'none';
+          canvas.style.pointerEvents = 'auto';
+          map.getCanvas().style.cursor = '';
+          
+          updateTouchDebug('✅ All map interactions re-enabled (cancelled)');
+        } catch (error) {
+          updateTouchDebug(`❌ Error re-enabling interactions: ${error.message}`);
+        }
+        window._mapInteractionsDisabled = false;
+      }
+      
       handleMouseOut();
     };
 
@@ -2772,10 +3141,62 @@ class WaypointManager {
     
     // 📱 IPAD SUPPORT: Set up touch event handlers
     const canvas = map.getCanvasContainer();
+    console.log('📱 TOUCH DEBUG: Registering touch events on canvas:', canvas);
+    console.log('📱 TOUCH DEBUG: Canvas element details:', { 
+      tagName: canvas.tagName, 
+      className: canvas.className,
+      id: canvas.id,
+      clientWidth: canvas.clientWidth,
+      clientHeight: canvas.clientHeight,
+      touchAction: getComputedStyle(canvas).touchAction,
+      pointerEvents: getComputedStyle(canvas).pointerEvents
+    });
+    
+    // 📱 ENHANCED DEBUGGING: Test different registration methods
+    console.log('📱 TOUCH DEBUG: About to register touch events...');
+    
+    // 📱 CRITICAL FIX: Try registering on multiple elements to ensure touch events reach us
+    const mapContainer = map.getContainer();
+    const canvasContainer = map.getCanvasContainer();
+    
+    console.log('📱 TOUCH DEBUG: Map container:', mapContainer);
+    console.log('📱 TOUCH DEBUG: Canvas container:', canvasContainer);
+    
+    // 📱 SELECTIVE TOUCH REGISTRATION: Only register on canvas, not containers
+    // This prevents blocking other map interactions like weather popups
+    console.log('📱 TOUCH DEBUG: Registering SELECTIVE touch events on canvas only');
+    
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+    
+    updateTouchDebug('Touch event listeners registered on multiple elements');
+    
+    // Enhanced test handlers with visual feedback
+    const testTouchHandler = (e) => {
+      const message = `GLOBAL ${e.type} on ${e.target.tagName}`;
+      updateTouchDebug(message);
+      
+      if (e.touches && e.touches.length > 0) {
+        const touch = e.touches[0];
+        createTouchIndicator(touch.clientX, touch.clientY, 
+          e.type === 'touchstart' ? 'start' : 'move');
+      } else if (e.changedTouches && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        createTouchIndicator(touch.clientX, touch.clientY, 'end');
+      }
+    };
+    
+    // Add test handlers to document to catch ANY touch events
+    document.addEventListener('touchstart', testTouchHandler, { passive: true });
+    document.addEventListener('touchmove', testTouchHandler, { passive: true });
+    document.addEventListener('touchend', testTouchHandler, { passive: true });
+    
+    updateTouchDebug('Touch debug system initialized!');
+    
+    // 📱 MINIMAL CSS: Only set what's absolutely necessary for route dragging
+    console.log('📱 TOUCH DEBUG: Applying minimal CSS for route dragging only');
     
     // Store references to ALL handlers for later cleanup
     this._routeDragHandlers = {

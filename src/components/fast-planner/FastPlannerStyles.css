@@ -32,6 +32,16 @@
 /* Route line and label styling enhancements */
 .mapboxgl-canvas {
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4)) drop-shadow(0 2px 6px rgba(30, 143, 254, 0.2)); /* Heavy shadow with blue accent */
+  /* 📱 IPAD TOUCH FIX: Ensure touch events work on map canvas */
+  touch-action: none !important; /* Allow all touch gestures to be handled by JavaScript */
+  pointer-events: auto !important; /* Ensure pointer events are enabled */
+  -webkit-touch-callout: none; /* Disable iOS callout on long press */
+  -webkit-user-select: none; /* Disable text selection */
+}
+
+/* 📱 SELECTIVE TOUCH SUPPORT: Only affect canvas for route dragging */
+.mapboxgl-canvas {
+  /* Keep existing canvas styles but don't force touch-action on all elements */
 }
 
 /* Custom pill styling for route labels */
