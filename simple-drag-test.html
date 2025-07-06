@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>iPad Drag Test</title>
+    <style>
+        body { margin: 0; padding: 20px; background: #1a1a1a; color: white; font-family: Arial; }
+        .test-area { 
+            width: 100%; 
+            height: 300px; 
+            background: #333; 
+            border: 2px solid #666; 
+            position: relative;
+            margin: 20px 0;
+            touch-action: none;
+        }
+        .draggable { 
+            width: 50px; 
+            height: 50px; 
+            background: #4CAF50; 
+            border-radius: 50%; 
+            position: absolute; 
+            cursor: pointer;
+            touch-action: none;
+        }
+        .info { 
+            background: #2a2a2a; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 iPad Touch Drag Test</h1>
+    
+    <div class="info">
+        <strong>Test Instructions:</strong><br>
+        1. Try to drag the green circle with your finger<br>
+        2. Check if touch events are working<br>
+        3. Test on both iPad and iPhone
+    </div>
+    
+    <div class="test-area" id="testArea">
+        <div class="draggable" id="circle"></div>
+    </div>
+    
+    <div class="info" id="status">Ready to test...</div>
+    
+    <script>
+        const circle = document.getElementById('circle');
+        const testArea = document.getElementById('testArea');
+        const status = document.getElementById('status');
+        
+        let isDragging = false;
+        let startX, startY, initialX = 50, initialY = 50;
+        
+        // Set initial position
+        circle.style.left = initialX + 'px';
+        circle.style.top = initialY + 'px';
+        
+        // Mouse events (for desktop testing)
+        circle.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+        
+        // Touch events (for iPad/iPhone)
+        circle.addEventListener('touchstart', handleTouchStart, {passive: false});
+        document.addEventListener('touchmove', handleTouchMove, {passive: false});
+        document.addEventListener('touchend', handleTouchEnd, {passive: false});
+        
+        function startDrag(e) {
+            isDragging = true;
+            startX = e.clientX - circle.offsetLeft;
+            startY = e.clientY - circle.offsetTop;
+            status.textContent = '🖱️ Mouse drag started';
+        }
+        
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const x = e.clientX - startX;
+            const y = e.clientY - startY;
+            
+            // Keep within bounds
+            const maxX = testArea.clientWidth - circle.clientWidth;
+            const maxY = testArea.clientHeight - circle.clientHeight;
+            
+            circle.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+            circle.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+            
+            status.textContent = `🖱️ Mouse dragging: ${Math.round(x)}, ${Math.round(y)}`;
+        }
+        
+        function endDrag() {
+            if (isDragging) {
+                isDragging = false;
+                status.textContent = '✅ Mouse drag completed';
+            }
+        }
+        
+        function handleTouchStart(e) {
+            e.preventDefault();
+            isDragging = true;
+            const touch = e.touches[0];
+            startX = touch.clientX - circle.offsetLeft;
+            startY = touch.clientY - circle.offsetTop;
+            status.textContent = '📱 Touch drag started';
+        }
+        
+        function handleTouchMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const x = touch.clientX - startX;
+            const y = touch.clientY - startY;
+            
+            // Keep within bounds
+            const maxX = testArea.clientWidth - circle.clientWidth;
+            const maxY = testArea.clientHeight - circle.clientHeight;
+            
+            circle.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+            circle.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+            
+            status.textContent = `📱 Touch dragging: ${Math.round(x)}, ${Math.round(y)}`;
+        }
+        
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            if (isDragging) {
+                isDragging = false;
+                status.textContent = '✅ Touch drag completed';
+            }
+        }
+        
+        // Device detection
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        status.innerHTML = `Device: ${isMobile ? '📱 Mobile' : '🖥️ Desktop'} | Ready to test...`;
+    </script>
+</body>
+</html>
