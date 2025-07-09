@@ -2501,7 +2501,9 @@ const FastPlannerCore = ({
           });
           
           if (matchingAircraft) {
-            setSelectedAircraft(matchingAircraft);
+            // 🚁 CRITICAL FIX: Use changeAircraftRegistration instead of setSelectedAircraft
+            // This triggers the complete aircraft selection workflow including fuel policies
+            changeAircraftRegistration(matchingAircraft.registration);
             
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator(
