@@ -55,18 +55,15 @@ class PassengerCalculator {
     if (aircraft.usableLoad !== undefined) {
       // Ensure we're properly subtracting fuel when using usableLoad
       usableLoadWithoutFuel = Number(aircraft.usableLoad) - fuelWeightNum;
-      console.log('PassengerCalculator: Using aircraft.usableLoad directly:', aircraft.usableLoad, 'minus fuel:', fuelWeightNum, '=', usableLoadWithoutFuel);
     }
     // Then, try to use aircraft.usefulLoad property if it exists (from OSDK data)
     else if (aircraft.usefulLoad !== undefined) {
       // Ensure we're properly subtracting fuel and cargo when using usefulLoad
       usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum - (cargoWeight || 0);
-      // console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, 'minus cargo:', (cargoWeight || 0), '=', usableLoadWithoutFuel);
     }
     // If not available, calculate it from maxTakeoffWeight and emptyWeight
     else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
       usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum - (cargoWeight || 0);
-      console.log('PassengerCalculator: Calculated usableLoad from weight data, minus fuel and cargo:', usableLoadWithoutFuel);
     } 
     // If neither option is available, return 0
     else {
@@ -86,12 +83,6 @@ class PassengerCalculator {
     // Return the lower value (can't exceed aircraft capacity)
     const result = Math.min(maxByWeight, aircraftMaxPax);
     
-    // console.log('PassengerCalculator result:', {
-    //   usableLoadWithoutFuel,
-    //   maxByWeight,
-    //   aircraftMaxPax,
-    //   result
-    // });
     
     return result;
   }
@@ -121,7 +112,6 @@ class PassengerCalculator {
         passengerWeight
       );
       
-      console.log(`PassengerCalculator: Leg ${index + 1} can carry ${maxPassengers} passengers`);
       
       return maxPassengers;
     });
@@ -198,7 +188,6 @@ class PassengerCalculator {
         card.maxPassengersDisplay = card.isDestination ? "Final Stop" : (isNaN(maxPassengers) ? "0" : maxPassengers.toString());
         card.maxPassengersWeight = isNaN(maxPassengers) ? 0 : (maxPassengers * passengerWeight);
         
-        console.log(`PassengerCalculator: Stop ${index + 1} (${card.stopName || 'Unknown'}) can carry ${maxPassengers} passengers with ${fuelRequired} lbs fuel`);
       } catch (error) {
         console.error(`PassengerCalculator: Error calculating passengers for card ${index}`, error);
         // Set safe defaults

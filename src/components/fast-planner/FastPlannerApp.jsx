@@ -1603,12 +1603,27 @@ const FastPlannerCore = ({
           // Create actual coordinates array
           const coordinates = [fromCoords, toCoords];
           
+          // 🚨 AVIATION CRITICAL: Calculate alternate route statistics
+          const alternateRouteStats = appManagers?.routeCalculatorRef?.current?.calculateRouteStats(
+            coordinates, 
+            {
+              selectedAircraft,
+              weather,
+              payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
+              reserveFuel: flightSettings.reserveFuel || 0
+            }
+          );
+
           const newAlternateRouteData = {
             coordinates: coordinates,
             splitPoint: currentSplitPoint,
             name: `${currentSplitPoint} ${destination} (Alternate)`, // Correct format: FROM TO (Alternate)
             geoPoint: `${toCoords[1]},${toCoords[0]}`, // lat,lng format
-            legIds: []
+            legIds: [],
+            // ✅ CRITICAL FIX: Add missing calculated route statistics
+            totalDistance: alternateRouteStats?.totalDistance || 0,
+            estimatedTime: alternateRouteStats?.estimatedTime || '00:00',
+            timeHours: alternateRouteStats?.timeHours || 0
           };
           
           setAlternateRouteData(newAlternateRouteData);
@@ -1634,12 +1649,27 @@ const FastPlannerCore = ({
           // Create actual coordinates array
           const coordinates = [fromCoords, toCoords];
           
+          // 🚨 AVIATION CRITICAL: Calculate alternate route statistics
+          const alternateRouteStats = appManagers?.routeCalculatorRef?.current?.calculateRouteStats(
+            coordinates, 
+            {
+              selectedAircraft,
+              weather,
+              payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
+              reserveFuel: flightSettings.reserveFuel || 0
+            }
+          );
+
           const newAlternateRouteData = {
             coordinates: coordinates,
             splitPoint: from,
             name: `${from} ${to} (Alternate)`,
             geoPoint: `${toCoords[1]},${toCoords[0]}`, // lat,lng format
-            legIds: []
+            legIds: [],
+            // ✅ CRITICAL FIX: Add missing calculated route statistics
+            totalDistance: alternateRouteStats?.totalDistance || 0,
+            estimatedTime: alternateRouteStats?.estimatedTime || '00:00',
+            timeHours: alternateRouteStats?.timeHours || 0
           };
           
           setAlternateRouteData(newAlternateRouteData);

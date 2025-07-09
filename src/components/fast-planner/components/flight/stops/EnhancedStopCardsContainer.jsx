@@ -108,7 +108,6 @@ const EnhancedStopCardsContainer = ({
       const lastRefuelStopsString = JSON.stringify(lastRefuelStopsRef.current.sort());
       
       if (refuelStopsString !== lastRefuelStopsString) {
-        console.log('🔄 SYNC TO PARENT: Refuel stops changed locally:', refuelStops);
         lastRefuelStopsRef.current = [...refuelStops];
         // Use setTimeout to debounce and prevent immediate callback loops
         setTimeout(() => {
@@ -126,7 +125,6 @@ const EnhancedStopCardsContainer = ({
       const localStopsStr = JSON.stringify(refuelStops.sort());
       
       if (currentStopsStr !== localStopsStr) {
-        console.log('🔄 SYNC FROM PARENT: Updating local refuel stops:', currentRefuelStops);
         isUpdatingFromParentRef.current = true;
         setRefuelStops(currentRefuelStops);
         
@@ -332,12 +330,6 @@ const EnhancedStopCardsContainer = ({
           }
         };
         
-        console.log('🔧 ALTERNATE CARD: Attempting calculation with params:', {
-          waypoints: waypoints?.length,
-          alternateRouteData: !!alternateRouteData,
-          routeStats: !!routeStats,
-          selectedAircraft: !!selectedAircraft
-        });
         
         const alternateCard = StopCardCalculator.calculateAlternateStopCard(
           waypoints,
@@ -348,7 +340,6 @@ const EnhancedStopCardsContainer = ({
           numericParams
         );
         
-        console.log('🔧 ALTERNATE CARD: Calculation result:', alternateCard ? `SUCCESS - Total: ${alternateCard.totalFuel} lbs` : 'NULL/UNDEFINED');
         
         if (alternateCard) {
           
@@ -415,7 +406,6 @@ const EnhancedStopCardsContainer = ({
   
   // Handle refuel checkbox changes
   const handleRefuelChange = (cardIndex, isRefuel) => {
-    console.log(`🔄 REFUEL CHANGE: cardIndex=${cardIndex}, isRefuel=${isRefuel}`);
     
     // Only allow refuel on intermediate stops (not departure=1, final=last)
     if (cardIndex === 1 || cardIndex === displayStopCards.length) {

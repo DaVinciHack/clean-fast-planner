@@ -28,17 +28,12 @@ class SegmentFuelManager {
   setExternalData(weatherSegments = [], fuelPolicy = null) {
     this.weatherSegments = weatherSegments;
     this.fuelPolicy = fuelPolicy;
-    // console.log('🔥 SEGMENT: Updated external data', { 
-    //   weatherSegments: weatherSegments.length, 
-    //   hasFuelPolicy: !!fuelPolicy 
-    // });
   }
   
   /**
    * Analyze flight and create segments based on refuel stops
    */
   analyzeFlightSegments(stopCards = [], refuelStops = [], weatherSegments = [], fuelPolicy = null) {
-    // console.log('🔥 SEGMENT: Analyzing flight segments', { stopCards: stopCards.length, refuelStops });
     
     // Update external data
     this.setExternalData(weatherSegments, fuelPolicy);
@@ -65,7 +60,6 @@ class SegmentFuelManager {
       if (segmentStops.length > 0) {
         const segment = this.createSegment(segmentStops, segmentStart, true);
         this.segments.push(segment);
-        // console.log(`🔥 SEGMENT ${i + 1}: ${segment.startLocation} → ${segment.endLocation} (${segment.stops.length} stops)`);
       }
       
       // Next segment starts from this refuel stop
@@ -78,7 +72,6 @@ class SegmentFuelManager {
       const isRefuelSegment = segmentStart > 0; // Only if we had previous refuels
       const finalSegment = this.createSegment(finalSegmentStops, segmentStart, isRefuelSegment);
       this.segments.push(finalSegment);
-      // console.log(`🔥 SEGMENT FINAL: ${finalSegment.startLocation} → ${finalSegment.endLocation} (${finalSegment.stops.length} stops)`);
     }
     
     return this.segments;
@@ -120,7 +113,6 @@ class SegmentFuelManager {
    * Calculate fuel requirements for a specific segment
    */
   calculateSegmentFuelRequirements(segment) {
-    // console.log(`🔥 SEGMENT FUEL: Calculating requirements for ${segment.startLocation} → ${segment.endLocation}`);
     
     // Reset requirements
     segment.fuelRequirements.araFuel = 0;
@@ -149,14 +141,12 @@ class SegmentFuelManager {
             index: actualIndex,
             amount: araAmount
           });
-          console.log(`🔥 ARA: ${stop.name} needs ${araAmount} lbs`);
         }
         
         // Calculate deck fuel for this rig
         const deckFuel = this.calculateDeckFuel(stop);
         if (deckFuel > 0) {
           segment.fuelRequirements.deckFuelByLocation[stop.name] = deckFuel;
-          // console.log(`🔥 DECK: ${stop.name} needs ${deckFuel} lbs deck fuel`);
         }
       } else {
         // Airport - check if needs approach fuel
@@ -169,12 +159,10 @@ class SegmentFuelManager {
             index: actualIndex,
             amount: approachAmount
           });
-          // console.log(`🔥 APPROACH: ${stop.name} needs ${approachAmount} lbs`);
         }
       }
     });
     
-    // console.log(`🔥 SEGMENT TOTAL: ARA=${segment.fuelRequirements.araFuel}, Approach=${segment.fuelRequirements.approachFuel}`);
   }
   
   /**
@@ -182,12 +170,10 @@ class SegmentFuelManager {
    * This shows "fuel needed to complete flight from HERE"
    */
   getFuelSummaryForStop(stopIndex) {
-    console.log(`🔥 SUMMARY: Getting fuel summary for stop ${stopIndex}`);
     
     // Find which segment this stop belongs to
     const segment = this.findSegmentForStop(stopIndex);
     if (!segment) {
-      console.log(`🔥 SUMMARY: No segment found for stop ${stopIndex}`);
       return null;
     }
     
@@ -237,7 +223,6 @@ class SegmentFuelManager {
     
     // Check if this is a refuel stop - if so, start fresh calculations
     if (this.refuelStops.includes(stopIndex)) {
-      console.log(`🔥 REFUEL: Stop ${stopIndex} is refuel - starting fresh segment calculations`);
       
       // Find all segments AFTER this refuel
       const futureSegments = this.segments.filter(seg => seg.startIndex >= stopIndex);
@@ -279,7 +264,6 @@ class SegmentFuelManager {
     // Calculate total remaining fuel needed
     remaining.totalRemaining = remaining.araFuel + remaining.approachFuel + remaining.extraFuel + remaining.deckFuel + 200; // +200 for reserve
     
-    console.log(`🔥 REMAINING: Stop ${stopIndex} needs ARA=${remaining.araFuel}, Approach=${remaining.approachFuel}, Total=${remaining.totalRemaining}`);
     return remaining;
   }
   
@@ -302,7 +286,6 @@ class SegmentFuelManager {
     
     // If this is a refuel stop, we start fresh with fuel for remaining segments
     if (this.refuelStops.includes(stopIndex)) {
-      console.log(`🔥 DEPARTURE: Stop ${stopIndex} is refuel - calculating fresh fuel load`);
       
       // Find all segments AFTER this refuel
       const futureSegments = this.segments.filter(seg => seg.startIndex >= stopIndex);
@@ -320,7 +303,6 @@ class SegmentFuelManager {
       });
     } else if (stopIndex === 0) {
       // Initial departure - need fuel for all segments
-      console.log(`🔥 DEPARTURE: Stop ${stopIndex} is initial departure - calculating full fuel load`);
       
       this.segments.forEach(seg => {
         departure.araFuel += seg.fuelRequirements.araFuel;
@@ -335,7 +317,6 @@ class SegmentFuelManager {
       });
     } else {
       // Intermediate stop - carrying forward remaining fuel
-      console.log(`🔥 DEPARTURE: Stop ${stopIndex} is intermediate - calculating remaining fuel`);
       
       // Current segment remaining + all future segments
       segment.fuelRequirements.araLocations.forEach(araLoc => {
@@ -370,7 +351,6 @@ class SegmentFuelManager {
     departure.totalFuel = departure.tripFuel + departure.araFuel + departure.approachFuel + 
                          departure.extraFuel + departure.reserveFuel;
     
-    console.log(`🔥 DEPARTURE: Stop ${stopIndex} departure fuel = ${departure.totalFuel} lbs`);
     return departure;
   }
   

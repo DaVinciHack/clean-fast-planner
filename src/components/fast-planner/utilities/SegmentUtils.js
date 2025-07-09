@@ -36,7 +36,6 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   if (cardIndex !== null) {
     // 🔧 DUPLICATE NAME FIX: Use specific card index if provided
     locationIndex = cardIndex - 1; // Convert from 1-based to 0-based
-    // console.log(`🔧 DUPLICATE FIX: Using provided cardIndex ${cardIndex} for ${locationName}`);
   } else {
     // Find by name (may have duplicate name issues)
     locationIndex = landingStopsOnly.findIndex(wp => 
@@ -47,7 +46,6 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   }
   
   if (locationIndex === -1) {
-    console.warn(`🚨 SegmentUtils: Location "${locationName}" not found in waypoints`);
     return 1; // Default to segment 1
   }
   
@@ -68,21 +66,14 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
     // 🔧 PHASE 3 FIX: RefuelStops now uses 1-based card indices, no conversion needed
     // RefuelStops array and card.index both use 1-based indices: [1, 2, 3, 4]
     const refuelStopCardIndex = refuelStopIndex; // Direct comparison, no +1 needed
-    console.log(`🔍 PHASE 3 FIX: ${locationName} cardIndex=${cardIndex} vs refuelStopCardIndex=${refuelStopCardIndex}`);
     if (cardIndex < refuelStopCardIndex) {
-      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment} (before refuel stop)`);
       break; // Location is before refuel stop - fuel carried from current segment
     } else if (cardIndex === refuelStopCardIndex) {
-      console.log(`✅ MAIN LOGIC: ${locationName} assigned to segment ${segment} (IS the refuel stop)`);
       break; // Location IS the refuel stop - end of current segment
     }
     segment++; // Location is after this refuel stop
-    console.log(`➡️ MAIN LOGIC: ${locationName} moving to segment ${segment}`);
   }
   
-  console.log(`🛩️ SegmentUtils: Location "${locationName}" (card ${cardIndex}) is in segment ${segment}`);
-  console.log(`🛩️ SegmentUtils: Refuel stops:`, sortedRefuelStops);
-  console.log(`🛩️ SegmentUtils: All waypoints:`, landingStopsOnly.map((wp, i) => `${i+1}:${wp.name || wp.stopName}`));
   
   return segment;
 }
@@ -208,7 +199,6 @@ export function getSegmentBoundaries(waypoints, refuelStops = []) {
     });
   }
   
-  console.log('🛩️ SegmentUtils: Generated segments:', segments);
   return segments;
 }
 
