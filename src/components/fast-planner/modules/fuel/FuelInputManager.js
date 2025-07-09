@@ -73,7 +73,7 @@ class FuelInputManager {
    * Notify all listeners of changes
    */
   notifyListeners() {
-    console.log('🧰 FuelInputManager: Notifying', this.listeners.length, 'listeners of changes');
+    // console.log('🧰 FuelInputManager: Notifying', this.listeners.length, 'listeners of changes');
     this.listeners.forEach(listener => {
       try {
         listener(this.getEffectiveSettings());
@@ -233,12 +233,12 @@ class FuelInputManager {
     // Ensure weatherSegments is always an array to prevent null errors
     const safeWeatherSegments = weatherSegments || [];
     
-    console.log('🧰 FuelInputManager: Updating flight data', { 
-      stops: stopCards.length, 
-      refuels: refuelStops.length,
-      weather: safeWeatherSegments.length,
-      hasFuelPolicy: !!fuelPolicy
-    });
+    // console.log('🧰 FuelInputManager: Updating flight data', { 
+    //   stops: stopCards.length, 
+    //   refuels: refuelStops.length,
+    //   weather: safeWeatherSegments.length,
+    //   hasFuelPolicy: !!fuelPolicy
+    // });
     
     this.currentStopCards = [...stopCards];
     this.currentRefuelStops = [...refuelStops];

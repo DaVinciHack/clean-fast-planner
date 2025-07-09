@@ -28,17 +28,17 @@ class SegmentFuelManager {
   setExternalData(weatherSegments = [], fuelPolicy = null) {
     this.weatherSegments = weatherSegments;
     this.fuelPolicy = fuelPolicy;
-    console.log('🔥 SEGMENT: Updated external data', { 
-      weatherSegments: weatherSegments.length, 
-      hasFuelPolicy: !!fuelPolicy 
-    });
+    // console.log('🔥 SEGMENT: Updated external data', { 
+    //   weatherSegments: weatherSegments.length, 
+    //   hasFuelPolicy: !!fuelPolicy 
+    // });
   }
   
   /**
    * Analyze flight and create segments based on refuel stops
    */
   analyzeFlightSegments(stopCards = [], refuelStops = [], weatherSegments = [], fuelPolicy = null) {
-    console.log('🔥 SEGMENT: Analyzing flight segments', { stopCards: stopCards.length, refuelStops });
+    // console.log('🔥 SEGMENT: Analyzing flight segments', { stopCards: stopCards.length, refuelStops });
     
     // Update external data
     this.setExternalData(weatherSegments, fuelPolicy);
@@ -65,7 +65,7 @@ class SegmentFuelManager {
       if (segmentStops.length > 0) {
         const segment = this.createSegment(segmentStops, segmentStart, true);
         this.segments.push(segment);
-        console.log(`🔥 SEGMENT ${i + 1}: ${segment.startLocation} → ${segment.endLocation} (${segment.stops.length} stops)`);
+        // console.log(`🔥 SEGMENT ${i + 1}: ${segment.startLocation} → ${segment.endLocation} (${segment.stops.length} stops)`);
       }
       
       // Next segment starts from this refuel stop
@@ -78,7 +78,7 @@ class SegmentFuelManager {
       const isRefuelSegment = segmentStart > 0; // Only if we had previous refuels
       const finalSegment = this.createSegment(finalSegmentStops, segmentStart, isRefuelSegment);
       this.segments.push(finalSegment);
-      console.log(`🔥 SEGMENT FINAL: ${finalSegment.startLocation} → ${finalSegment.endLocation} (${finalSegment.stops.length} stops)`);
+      // console.log(`🔥 SEGMENT FINAL: ${finalSegment.startLocation} → ${finalSegment.endLocation} (${finalSegment.stops.length} stops)`);
     }
     
     return this.segments;
@@ -120,7 +120,7 @@ class SegmentFuelManager {
    * Calculate fuel requirements for a specific segment
    */
   calculateSegmentFuelRequirements(segment) {
-    console.log(`🔥 SEGMENT FUEL: Calculating requirements for ${segment.startLocation} → ${segment.endLocation}`);
+    // console.log(`🔥 SEGMENT FUEL: Calculating requirements for ${segment.startLocation} → ${segment.endLocation}`);
     
     // Reset requirements
     segment.fuelRequirements.araFuel = 0;
@@ -174,7 +174,7 @@ class SegmentFuelManager {
       }
     });
     
-    console.log(`🔥 SEGMENT TOTAL: ARA=${segment.fuelRequirements.araFuel}, Approach=${segment.fuelRequirements.approachFuel}`);
+    // console.log(`🔥 SEGMENT TOTAL: ARA=${segment.fuelRequirements.araFuel}, Approach=${segment.fuelRequirements.approachFuel}`);
   }
   
   /**
