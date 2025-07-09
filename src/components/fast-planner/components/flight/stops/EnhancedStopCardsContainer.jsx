@@ -257,8 +257,26 @@ const EnhancedStopCardsContainer = ({
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
-    // Only calculate if we have the necessary data AND complete aircraft data
-    if (alternateRouteData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
+    // ✈️ AVIATION SAFETY: Validate alternateRouteData has valid flight data
+    const hasValidAlternateData = alternateRouteData && 
+      alternateRouteData.totalDistance && 
+      parseFloat(alternateRouteData.totalDistance) > 0.5 && // Must be > 0.5nm minimum
+      alternateRouteData.estimatedTime && 
+      alternateRouteData.estimatedTime !== '00:00' &&
+      alternateRouteData.timeHours && 
+      alternateRouteData.timeHours > 0.01; // Must be > 0.01 hours minimum
+
+    // ✈️ AVIATION SAFETY: Log when we reject invalid alternate data
+    if (!hasValidAlternateData && alternateRouteData) {
+      console.warn('🚨 AVIATION SAFETY: Rejecting invalid alternateRouteData:', {
+        totalDistance: alternateRouteData.totalDistance,
+        estimatedTime: alternateRouteData.estimatedTime,
+        timeHours: alternateRouteData.timeHours
+      });
+    }
+
+    // Only calculate if we have the necessary data AND complete aircraft data AND valid alternate data
+    if (hasValidAlternateData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
       
       try {
         // Prepare parameters for StopCardCalculator (same as StopCardsContainer)

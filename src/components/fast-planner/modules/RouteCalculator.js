@@ -120,7 +120,7 @@ class RouteCalculator {
       
       // Attempt to fix the calculation if we have valid inputs
       if (coordinates.length >= 2 && selectedAircraft.cruiseSpeed > 0) {
-        console.log('⭐ RouteCalculator: Attempting to manually recalculate time...');
+        // console.log('⭐ RouteCalculator: Attempting to manually recalculate time...');
         
         // Calculate the total distance
         let totalDistance = 0;
