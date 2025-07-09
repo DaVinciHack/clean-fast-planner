@@ -156,7 +156,7 @@ class SegmentFuelManager {
         const deckFuel = this.calculateDeckFuel(stop);
         if (deckFuel > 0) {
           segment.fuelRequirements.deckFuelByLocation[stop.name] = deckFuel;
-          console.log(`🔥 DECK: ${stop.name} needs ${deckFuel} lbs deck fuel`);
+          // console.log(`🔥 DECK: ${stop.name} needs ${deckFuel} lbs deck fuel`);
         }
       } else {
         // Airport - check if needs approach fuel
@@ -169,7 +169,7 @@ class SegmentFuelManager {
             index: actualIndex,
             amount: approachAmount
           });
-          console.log(`🔥 APPROACH: ${stop.name} needs ${approachAmount} lbs`);
+          // console.log(`🔥 APPROACH: ${stop.name} needs ${approachAmount} lbs`);
         }
       }
     });

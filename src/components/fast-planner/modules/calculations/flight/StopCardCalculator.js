@@ -1237,12 +1237,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       const currentCardIndex = (i + 2); // 🔧 INDEXING FIX: Use consistent numeric indexing
       const araFuelNeededHere = currentLocationConsumesAra ? getLocationFuel(toWaypoint, 'araFuel', currentCardIndex) : 0;
       
-      console.log(`🔍 ARA FUEL LOOKUP: ${toWaypoint.name}`, {
-        currentLocationConsumesAra,
-        currentCardIndex,
-        araFuelNeededHere,
-        lookupKey: `${toWaypoint.name}_${currentCardIndex}_araFuel`
-      });
+      // console.log(`🔍 ARA FUEL LOOKUP: ${toWaypoint.name}`, {
+      //   currentLocationConsumesAra,
+      //   currentCardIndex,
+      //   araFuelNeededHere,
+      //   lookupKey: `${toWaypoint.name}_${currentCardIndex}_araFuel`
+      // });
       
       
       
@@ -1266,12 +1266,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // Get approach fuel needed at this specific location
       const approachFuelNeededHere = getLocationFuel(toWaypoint, 'approachFuel', cardIndex);
       
-      console.log(`🔍 APPROACH FUEL LOOKUP: ${toWaypoint.name}`, {
-        currentLocationConsumesApproach,
-        cardIndex,
-        approachFuelNeededHere,
-        lookupKey: `${toWaypoint.name}_${cardIndex}_approachFuel`
-      });
+      // console.log(`🔍 APPROACH FUEL LOOKUP: ${toWaypoint.name}`, {
+      //   currentLocationConsumesApproach,
+      //   cardIndex,
+      //   approachFuelNeededHere,
+      //   lookupKey: `${toWaypoint.name}_${cardIndex}_approachFuel`
+      // });
       
       // 🔧 REFUEL FIX: Don't add approach consumption at refuel stops to new segment's cumulative count
       if (currentLocationConsumesApproach && approachFuelNeededHere > 0 && !isRefuelStop) {
