@@ -49,15 +49,15 @@ class RouteCalculator {
     }
     
     // Log call with a distinct marker for tracking in console
-    console.log('⭐ RouteCalculator.calculateRouteStats called with:', {
-      coordinates: coordinates.length,
-      options: options.selectedAircraft ? 
-        `Aircraft: ${options.selectedAircraft.registration || 'Unknown'}` : 'No aircraft',
-      weather: options.weather ? 
-        `Wind ${options.weather.windSpeed}kts from ${options.weather.windDirection}°` : 'No weather',
-      // CRITICAL FIX: Log the forceTimeCalculation flag
-      forceTime: options.forceTimeCalculation ? 'true' : 'false'
-    });
+    // console.log('⭐ RouteCalculator.calculateRouteStats called with:', {
+    //   coordinates: coordinates.length,
+    //   options: options.selectedAircraft ? 
+    //     `Aircraft: ${options.selectedAircraft.registration || 'Unknown'}` : 'No aircraft',
+    //   weather: options.weather ? 
+    //     `Wind ${options.weather.windSpeed}kts from ${options.weather.windDirection}°` : 'No weather',
+    //   // CRITICAL FIX: Log the forceTimeCalculation flag
+    //   forceTime: options.forceTimeCalculation ? 'true' : 'false'
+    // });
     
     // Get options with defaults for non-aircraft values only
     const {

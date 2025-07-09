@@ -152,7 +152,7 @@ const calculateGroundSpeedAndTrack = (
   // Normalize to -180..180
   driftAngle = ((driftAngle + 180) % 360) - 180;
 
-  console.log(`🔧 PALANTIR MATCH: Track: ${trackBearing}°, Wind: ${windDirection}°@${windSpeed}kts, GS: ${groundSpeed.toFixed(1)}, Drift: ${driftAngle.toFixed(1)}°`);
+  // console.log(`🔧 PALANTIR MATCH: Track: ${trackBearing}°, Wind: ${windDirection}°@${windSpeed}kts, GS: ${groundSpeed.toFixed(1)}, Drift: ${driftAngle.toFixed(1)}°`);
 
   return { groundSpeed, driftAngle };
 };

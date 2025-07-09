@@ -36,7 +36,7 @@ export function detectLocationSegment(locationName, waypoints, refuelStops = [],
   if (cardIndex !== null) {
     // 🔧 DUPLICATE NAME FIX: Use specific card index if provided
     locationIndex = cardIndex - 1; // Convert from 1-based to 0-based
-    console.log(`🔧 DUPLICATE FIX: Using provided cardIndex ${cardIndex} for ${locationName}`);
+    // console.log(`🔧 DUPLICATE FIX: Using provided cardIndex ${cardIndex} for ${locationName}`);
   } else {
     // Find by name (may have duplicate name issues)
     locationIndex = landingStopsOnly.findIndex(wp => 
