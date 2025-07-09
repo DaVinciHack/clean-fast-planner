@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js" onload="console.log('✅ Turf.js loaded')" onerror="console.error('❌ Turf.js failed to load')"></script>
     
     <title>Fast Flight Planner (Clean)</title>
-    <script type="module" crossorigin src="/plan/assets/index-D0kz0sik.js"></script>
+    <script type="module" crossorigin src="/plan/assets/index-K-cakukR.js"></script>
     <link rel="modulepreload" crossorigin href="/plan/assets/osdk-vendors-Bhbwzvvx.js">
     <link rel="modulepreload" crossorigin href="/plan/assets/react-vendors-IA-6mGt_.js">
     <link rel="stylesheet" crossorigin href="/plan/assets/index-D_FVRgw4.css">
@@ -120,51 +120,6 @@
           
           console.log('Aircraft dropdown reset function available globally');
         }, 1500);
-      });
-    </script>
-    
-    <!-- Auto-load platforms fix -->
-    <script>
-      window.addEventListener('load', function() {
-        // Wait for React app to initialize
-        setTimeout(function() {
-          console.log('🛩️ AUTO-PLATFORM LOADING: Starting...');
-          
-          const checkAndLoadPlatforms = () => {
-            const currentRegion = window.activeRegionFromContext;
-            const client = window.client;
-            const platformManagerRef = window.platformManagerRef;
-            
-            if (currentRegion && client && platformManagerRef?.current) {
-              console.log('🛩️ AUTO-PLATFORM LOADING: All conditions met, loading platforms...');
-              
-              platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
-                .then(() => {
-                  console.log('✅ AUTO-PLATFORM LOADING: Success! Platforms loaded:', window.platformManager?.allPlatforms?.length || 0);
-                })
-                .catch(error => {
-                  console.error('❌ AUTO-PLATFORM LOADING: Failed:', error);
-                  // Retry once after 2 seconds
-                  setTimeout(checkAndLoadPlatforms, 2000);
-                });
-            } else {
-              console.log('🛩️ AUTO-PLATFORM LOADING: Waiting for conditions...', {
-                hasRegion: !!currentRegion,
-                hasClient: !!client,
-                hasPlatformManager: !!platformManagerRef?.current
-              });
-              // Retry every 2 seconds for up to 10 seconds
-              if (Date.now() - window.platformLoadingStartTime < 10000) {
-                setTimeout(checkAndLoadPlatforms, 2000);
-              } else {
-                console.error('❌ AUTO-PLATFORM LOADING: Timeout - conditions never met');
-              }
-            }
-          };
-          
-          window.platformLoadingStartTime = Date.now();
-          checkAndLoadPlatforms();
-        }, 3000); // Wait 3 seconds for app to initialize
       });
     </script>
   </body>

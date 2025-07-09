@@ -85,15 +85,7 @@ const FastPlannerCore = ({
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
-  // 🚨 CRITICAL FIX: AuthContext broken online, use working OSDK client directly
-  const authFromContext = useAuth();
-  const { isAuthenticated: authContextAuth, userName: authContextName, userDetails: authContextDetails, isLoading: authContextLoading, login } = authFromContext || {};
-  
-  // Use OSDK client directly since it works online (AuthContext is broken)
-  const isAuthenticated = authContextAuth || !!client;
-  const userName = authContextName || window.userName || 'User';
-  const userDetails = authContextDetails || (client ? { authenticated: true } : null);
-  const isLoading = authContextLoading || false;
+  const { isAuthenticated, userName, userDetails, isLoading, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion();
   
   // Make region globally accessible for weather system
@@ -2658,6 +2650,42 @@ const FastPlannerCore = ({
           3000
         );
       }
+      
+      // 🚨 FLIGHT LOADING WORKAROUND: Ensure left panel gets populated even if callbacks fail online
+      // This is a temporary fix while we investigate the root cause of callback system failures
+      setTimeout(() => {
+        if (appManagers.waypointManagerRef?.current) {
+          const waypointManagerWaypoints = appManagers.waypointManagerRef.current.waypoints || [];
+          const currentReactWaypoints = waypoints || [];
+          
+          // Check if callback system worked by comparing waypoint counts
+          if (waypointManagerWaypoints.length > 0 && currentReactWaypoints.length === 0) {
+            console.log('🔧 FLIGHT LOADING WORKAROUND: Callback system failed online, forcing React state sync');
+            console.log(`WaypointManager has ${waypointManagerWaypoints.length} waypoints, React state has ${currentReactWaypoints.length}`);
+            
+            // Force React state update with waypoint manager's current waypoints
+            if (typeof setWaypoints === 'function') {
+              setWaypoints([...waypointManagerWaypoints]);
+              console.log('✅ FLIGHT LOADING WORKAROUND: Successfully synced React state with waypoint manager');
+              
+              if (window.LoadingIndicator) {
+                window.LoadingIndicator.updateStatusIndicator(
+                  'Flight loading callback system repaired automatically', 
+                  'info',
+                  2000
+                );
+              }
+            } else {
+              console.error('❌ FLIGHT LOADING WORKAROUND: setWaypoints function not available');
+            }
+          } else if (waypointManagerWaypoints.length > 0 && currentReactWaypoints.length > 0) {
+            console.log('✅ FLIGHT LOADING: Callback system worked correctly');
+            console.log(`WaypointManager: ${waypointManagerWaypoints.length} waypoints, React state: ${currentReactWaypoints.length} waypoints`);
+          } else {
+            console.log('⚠️ FLIGHT LOADING: No waypoints in waypoint manager - flight may not have loaded correctly');
+          }
+        }
+      }, 1000); // Give callbacks time to fire naturally first
       
     } catch (error) {
       console.error('Error loading flight:', error);
