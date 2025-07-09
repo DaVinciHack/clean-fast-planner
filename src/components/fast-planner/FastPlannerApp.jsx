@@ -2934,6 +2934,22 @@ const FastPlannerCore = ({
         if (window.flightSequenceController) {
           window.flightSequenceController.reset();
         }
+        
+        // 🎯 CRITICAL FIX: Initialize ALL interaction handlers for edit mode
+        // This was missing - explains why click/drag/hover didn't work in edit mode
+        setTimeout(() => {
+          if (mapInteractionHandlerRef.current) {
+            console.log('🎯 EDIT MODE: Re-initializing ALL interaction handlers');
+            mapInteractionHandlerRef.current.initialize();
+          }
+          
+          // ⛽ AUTO-LOAD REFUEL RIGS: 99% of edit mode usage is for adding refuel stops
+          if (platformManagerRef.current) {
+            console.log('🎯 EDIT MODE: Auto-loading rigs with fuel for editing');
+            // Show rigs with fuel capability specifically
+            platformManagerRef.current.toggleFuelAvailableVisibility(true);
+          }
+        }, 100); // Small delay to ensure map style is loaded
       } else {
         setIsEditLocked(true);
         window.isEditLocked = true;
