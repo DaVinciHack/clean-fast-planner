@@ -312,6 +312,14 @@ class FuelPolicyService {
   getCachedRegions() {
     return Array.from(this.policies.keys());
   }
+
+  /**
+   * Get current region from current policy
+   * @returns {string|null} Current region or null if no policy selected
+   */
+  getCurrentRegion() {
+    return this.currentPolicy?.region || null;
+  }
 }
 
 // Export singleton instance

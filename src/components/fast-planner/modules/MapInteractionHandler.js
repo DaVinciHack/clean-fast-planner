@@ -1,8 +1,9 @@
 /**
  * MapInteractionHandler.js
  * 
- * Handles map click events and route interactions
- * Separates these concerns from the main FastPlannerApp component
+ * Unified map interaction handler with iPad touch support
+ * Consolidates all competing click handlers into one robust system
+ * Based on working drag-test implementation
  */
 
 class MapInteractionHandler {
@@ -19,6 +20,16 @@ class MapInteractionHandler {
       onPlatformClick: null,
       onError: null
     };
+    
+    // 📱 iPad drag functionality - based on working drag-test
+    this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isIPad = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    this.isDragging = false;
+    this.dragStartCoord = null;
+    this.activeApproach = null; // 'mapbox' or 'dom-touch'
+    
+    console.log(`🚀 MapInteractionHandler: Device detection - ${this.isIPad ? 'iPad' : this.isTouchDevice ? 'Touch Device' : 'Desktop'}`);
   }
 
   setCallback(type, callback) {
@@ -95,6 +106,11 @@ class MapInteractionHandler {
         return;
       }
 
+      // 📱 iPad Touch Events - Based on working drag-test
+      if (this.isTouchDevice) {
+        this.setupTouchEvents(map);
+      }
+
       // 4. Setup route dragging (assuming WaypointManager handles its own listener idempotency)
       console.log('MapInteractionHandler: Setting up route dragging.');
       if (this.waypointManager && typeof this.waypointManager.setupRouteDragging === 'function') {
@@ -120,6 +136,108 @@ class MapInteractionHandler {
     // The initial call to initialize() still returns true to indicate it's queued.
     console.log('MapInteractionHandler: Initialization queued with onMapLoaded.');
     return true;
+  }
+
+  /**
+   * Setup iPad touch events - Based on working drag-test implementation
+   */
+  setupTouchEvents(map) {
+    console.log('📱 MapInteractionHandler: Setting up iPad touch events...');
+    
+    // APPROACH 1: Mapbox Native Touch Events
+    try {
+      // Check if the map has route layers for touch handling
+      if (map.getLayer('route')) {
+        map.on('touchstart', 'route', this.handleTouchStart.bind(this));
+        console.log('✅ Mapbox native touch events attached to route layer');
+      }
+    } catch (e) {
+      console.warn('⚠️ Mapbox native touch events failed:', e.message);
+    }
+    
+    // APPROACH 2: DOM Touch Events (Fallback)
+    try {
+      const canvas = map.getCanvasContainer();
+      if (canvas) {
+        // Remove any existing touch handlers
+        canvas.removeEventListener('touchstart', this._boundTouchHandler);
+        
+        // Create and store bound touch handler
+        this._boundTouchHandler = this.handleDOMTouchStart.bind(this);
+        
+        // Add DOM touch events with proper configuration
+        canvas.addEventListener('touchstart', this._boundTouchHandler, { 
+          passive: false, 
+          capture: true 
+        });
+        
+        console.log('✅ DOM touch events attached with passive:false');
+      }
+    } catch (e) {
+      console.error('❌ DOM touch events failed:', e.message);
+    }
+  }
+
+  /**
+   * Handle Mapbox native touch events
+   */
+  handleTouchStart(e) {
+    console.log('📱 Mapbox touch event:', e.lngLat);
+    this.activeApproach = 'mapbox-touch';
+    
+    try {
+      e.preventDefault();
+      console.log('✅ e.preventDefault() called on Mapbox touch');
+    } catch (error) {
+      console.warn('⚠️ e.preventDefault() failed on Mapbox touch:', error.message);
+    }
+    
+    // Delegate to main click handler
+    this.handleMapClick(e);
+  }
+
+  /**
+   * Handle DOM touch events - fallback for iPad
+   */
+  handleDOMTouchStart(e) {
+    console.log('📱 DOM touch event:', e.touches.length, 'touches');
+    this.activeApproach = 'dom-touch';
+    
+    if (e.touches.length !== 1) {
+      console.log('❌ Multi-touch detected, ignoring');
+      return;
+    }
+    
+    try {
+      e.preventDefault();
+      console.log('✅ e.preventDefault() called on DOM touch');
+    } catch (error) {
+      console.warn('⚠️ e.preventDefault() failed on DOM touch:', error.message);
+    }
+    
+    // Convert touch coordinates to map coordinates
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    const rect = e.target.getBoundingClientRect();
+    const point = {
+      x: e.touches[0].clientX - rect.left,
+      y: e.touches[0].clientY - rect.top
+    };
+    
+    const lngLat = map.unproject(point);
+    
+    // Create a synthetic event object similar to Mapbox events
+    const syntheticEvent = {
+      lngLat: lngLat,
+      point: point,
+      originalEvent: e,
+      preventDefault: () => e.preventDefault(),
+      type: 'touch'
+    };
+    
+    // Delegate to main click handler
+    this.handleMapClick(syntheticEvent);
   }
 
   handleMapClick(e) {

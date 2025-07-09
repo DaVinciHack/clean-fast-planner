@@ -566,21 +566,11 @@ export const RegionProvider = ({
             try {
               const map = mapManagerRef.current.getMap();
               if (map && typeof map.getZoom === 'function') {
-                console.log(`🔍 OSDK DEBUG: Map is now ready after delay, proceeding with platform loading`);
-                // Retry platform loading with map ready
-                if (platformManagerRef && platformManagerRef.current) {
-                  platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
-                    .then(() => {
-                      console.log(`RegionContext: Platforms loaded for ${currentRegion.name} (delayed)`);
-                      window.regionState.isChangingRegion = false;
-                      setRegionLoading(false);
-                    })
-                    .catch(error => {
-                      console.error(`RegionContext: Error loading platforms (delayed):`, error);
-                      window.regionState.isChangingRegion = false;
-                      setRegionLoading(false);
-                    });
-                }
+                console.log(`🔍 OSDK DEBUG: Map is now ready after delay, but skipping duplicate platform loading`);
+                // 🚨 CONSOLIDATION FIX: Skip delayed platform loading to prevent race condition
+                // Platform loading will be handled by the main region effect
+                window.regionState.isChangingRegion = false;
+                setRegionLoading(false);
               } else {
                 console.error(`🔍 OSDK DEBUG: Map still not ready after 2 second delay`);
                 window.regionState.isChangingRegion = false;
@@ -606,12 +596,22 @@ export const RegionProvider = ({
           console.log(`🔍 OSDK DEBUG: loadPlatforms called (attempt ${attempts + 1}/${maxAttempts})`);
           try {
             if (typeof platformManagerRef.current.loadPlatformsFromFoundry === 'function') {
+              // 🚨 CONSOLIDATION FIX: Add loading guard to prevent duplicate calls
+              const loadingKey = `platform_loading_${currentRegion.osdkRegion}`;
+              if (window[loadingKey]) {
+                console.log(`🔍 OSDK DEBUG: Platform loading already in progress for ${currentRegion.osdkRegion}, skipping duplicate call`);
+                return;
+              }
+              
               console.log(`🔍 OSDK DEBUG: About to call loadPlatformsFromFoundry for region: ${currentRegion.osdkRegion}`);
               console.log(`🔍 OSDK DEBUG: Client available:`, !!client);
               console.log(`🔍 OSDK DEBUG: Current URL:`, window.location.href);
+              
+              window[loadingKey] = true; // Set loading flag
               platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
                 .then(() => {
                   console.log(`RegionContext: Platforms loaded for ${currentRegion.name}`);
+                  window[loadingKey] = false; // Clear loading flag
                   window.regionState.isChangingRegion = false;
                   if (typeof platformManagerRef.current.loadOsdkWaypointsFromFoundry === 'function') {
                     let regionQueryTerm = currentRegion.osdkRegion || currentRegion.name;
@@ -640,6 +640,7 @@ export const RegionProvider = ({
                 })
                 .catch(error => {
                   console.error(`RegionContext: Error loading platforms:`, error);
+                  window[loadingKey] = false; // Clear loading flag on error
                   window.regionState.isChangingRegion = false;
                   if (attempts < maxAttempts) {
                     console.log(`RegionContext: Retrying platform load (${attempts+1}/${maxAttempts})...`);
@@ -655,6 +656,8 @@ export const RegionProvider = ({
                 });
             } else {
               console.error('RegionContext: PlatformManager.loadPlatformsFromFoundry is not a function');
+              const loadingKey = `platform_loading_${currentRegion.osdkRegion}`;
+              window[loadingKey] = false; // Clear loading flag
               window.regionState.isChangingRegion = false;
               setRegionLoading(false);
               if (mapInteractionHandlerRef && mapInteractionHandlerRef.current) {
