@@ -196,7 +196,7 @@ const EnhancedStopCardsContainer = ({
           weatherSegments,
           refuelStops,     // 🛩️ REFUEL: Pass refuel stops array
           waiveAlternates, // 🛩️ VFR: Pass waive alternates flag
-          null // 🛩️ REMOVED: No local alternateStopCard (handled by parent)
+          alternateStopCard // 🛩️ IFR: Pass alternate card data for minimum fuel comparison
         );
         
         
@@ -252,7 +252,7 @@ const EnhancedStopCardsContainer = ({
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [waypoints, routeStats, selectedAircraft, weather, stopCardOptions, weatherSegments, refuelStops, forceRecalculation, waiveAlternates]); // 🚨 CRITICAL FIX: Removed alternateStopCard from dependencies (using parent callback only)
+  }, [waypoints, routeStats, selectedAircraft, weather, stopCardOptions, weatherSegments, refuelStops, forceRecalculation, waiveAlternates, alternateStopCard]); // 🚨 CRITICAL FIX: Added alternateStopCard back so departure card updates when alternate changes
   
   
   // 🟠 REMOVED: Local alternate card storage (using parent callback only)
