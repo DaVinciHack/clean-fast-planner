@@ -33,12 +33,6 @@ import { detectLocationSegment, createSegmentFuelKey, parseSegmentFuelKey } from
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false, alternateStopCard = null) => {
   
-  // console.log('🚨 STOPCARDCALCULATOR CALLED:', {
-  //   waypoints: waypoints?.length,
-  //   selectedAircraft: !!selectedAircraft,
-  //   fuelPolicy: !!options?.fuelPolicy,
-  //   reserveFuel: options?.reserveFuel
-  // });
   
   // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END - MOVED TO AFTER CALCULATION
   
@@ -117,25 +111,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
     if (!waypointName) return 0;
     
-    // console.log('🔍 getLocationFuel CALLED:', {
-    //   waypointName,
-    //   fuelType,
-    //   cardIndex,
-    //   hasWeatherSegments: !!weatherSegments && weatherSegments.length > 0,
-    //   hasFuelPolicy: !!fuelPolicy,
-    //   availableKeys: Object.keys(locationFuelOverrides || {})
-    // });
     
-    // 🔍 SPECIAL ARA DEBUG: Extra logging for ARA fuel lookups
-    // if (fuelType === 'araFuel') {
-    //   console.log('🔍 ARA FUEL SPECIAL DEBUG:', {
-    //     waypointName,
-    //     cardIndex,
-    //     expectedKey: cardIndex ? `${waypointName}_${cardIndex}_araFuel` : `${waypointName}_araFuel`,
-    //     allOverrides: locationFuelOverrides,
-    //     araKeys: Object.keys(locationFuelOverrides || {}).filter(k => k.includes('araFuel'))
-    //   });
-    // }
     
     
     // 🔧 EXACT MATCH ONLY: Use unique card-based naming system
@@ -148,11 +124,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         ? Number(cardIndexOverride.value) || 0
         : Number(cardIndexOverride) || 0;
       
-      // console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = ${overrideValue} (found override)`);
       return overrideValue;
     }
     
-    // console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = not found, checking weather...`);
     
     
     // 🚨 FIX: Check weather conditions for THIS SPECIFIC location
@@ -186,16 +160,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           araAmount = fuelPolicy.araFuelDefault;
         }
         
-        console.log('🚨 ARA FUEL DEBUG:', {
-          fuelPolicy: !!fuelPolicy,
-          araFuelDefault: fuelPolicy?.araFuelDefault,
-          fuelTypesPath: fuelPolicy?.fuelTypes?.araFuel?.default,
-          currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.araFuel?.default,
-          finalAmount: araAmount,
-          waypointName,
-          ranking,
-          isRig
-        });
         return araAmount; // Only return OSDK value
       }
       return 0;
@@ -210,16 +174,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           approachAmount = fuelPolicy.approachFuelDefault;
         }
         
-        // console.log('🚨 APPROACH FUEL DEBUG:', {
-        //   fuelPolicy: !!fuelPolicy,
-        //   approachFuelDefault: fuelPolicy?.approachFuelDefault,
-        //   fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
-        //   currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.approachFuel?.default,
-        //   finalAmount: approachAmount,
-        //   waypointName,
-        //   ranking,
-        //   isRig
-        // });
         return approachAmount; // Only return OSDK value
       }
       return 0;
@@ -257,9 +211,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       }
     });
     
-    if (fuelType === 'approachFuel') {
-      console.log(`🔍 calculateSegmentLocationFuel(${fuelType}, ${segmentNumber}):`, debugInfo.join(', '), `= ${total}`);
-    }
     
     return total;
   };
@@ -283,7 +234,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const finalSegmentNumber = refuelStops.length + 1; // Last segment number
     dynamicApproachFuel = calculateSegmentLocationFuel('approachFuel', finalSegmentNumber);
     approachFuelSource = dynamicApproachFuel > 0 ? 'final_segment' : 'none';
-    console.log(`🛩️ APPROACH FUEL: Final segment ${finalSegmentNumber} needs ${dynamicApproachFuel} lbs approach fuel`);
   } else {
     // No refuel stops: calculate approach fuel for destination normally
     const destinationWaypoint = stopsToProcess[stopsToProcess.length - 1];
@@ -299,21 +249,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // ✅ AVIATION SAFETY: NO FALLBACKS - Either convert properly or FAIL SAFELY
   let calculatedReserveFuel = null; // Start with null - no dangerous defaults
   
-  // ✅ ENHANCED DEBUG: Reserve fuel conversion with detailed logging
-  console.log('🔍 RESERVE FUEL DEBUG:', {
-    hasFuelPolicy: !!fuelPolicy,
-    hasFuelTypes: !!fuelPolicy?.fuelTypes,
-    hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
-    reserveType: fuelPolicy?.fuelTypes?.reserveFuel?.type,
-    reserveDefault: fuelPolicy?.fuelTypes?.reserveFuel?.default,
-    hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn,
-    aircraftFuelBurn: selectedAircraft?.fuelBurn,
-    rawReserveFuel: reserveFuel
-  });
-  
-  console.log('🚨 FUEL POLICY FULL OBJECT:', fuelPolicy);
-  console.log('🚨 AIRCRAFT FULL OBJECT:', selectedAircraft);
-  console.log('🚨 AIRCRAFT FUEL BURN:', selectedAircraft?.fuelBurn);
   
   if (fuelPolicy && fuelPolicy.fuelTypes?.reserveFuel && selectedAircraft?.fuelBurn) {
     const reserveType = fuelPolicy.fuelTypes.reserveFuel.type || 'fixed';
@@ -330,23 +265,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       calculatedReserveFuel = reservePolicyValue;
     }
   } else {
-    // 🛡️ FALLBACK: Use provided reserve fuel value if policy conversion fails
-    console.warn('🟡 WARNING: Reserve fuel policy conversion failed, using provided value');
-    console.warn('🟡 DETAILS:', {
-      hasFuelPolicy: !!fuelPolicy,
-      hasFuelTypes: !!fuelPolicy?.fuelTypes,
-      hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
-      hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn
-    });
-    
-    // 🚨 TEMPORARY: Allow calculation without fuel policy for debugging
-    console.warn('🟡 WARNING: Reserve fuel policy conversion failed, using provided value');
-    console.warn('🟡 DETAILS:', {
-      hasFuelPolicy: !!fuelPolicy,
-      hasFuelTypes: !!fuelPolicy?.fuelTypes,
-      hasReserveFuel: !!fuelPolicy?.fuelTypes?.reserveFuel,
-      hasAircraftFuelBurn: !!selectedAircraft?.fuelBurn
-    });
     
     // 🚨 AVIATION SAFETY: NO FALLBACKS - FAIL PROPERLY
     throw new Error('CRITICAL: No fuel policy data available from OSDK. Cannot calculate fuel requirements without verified policy data.');
@@ -368,13 +286,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const contingencyFuelPercentValue = Number(contingencyFuelPercent);
   const reserveFuelValue = Number(calculatedReserveFuel); // ✅ Use converted reserve fuel
   
-  // 🔍 LOG THE CALCULATED RESERVE FUEL RESULT
-  console.log('🚨 CALCULATED RESERVE FUEL RESULT:', calculatedReserveFuel);
   const deckTimePerStopValue = Number(deckTimePerStop);
   const deckFuelFlowValue = Number(deckFuelFlow);
   
-  // Log converted values for debugging
-  // Debug logging would go here
 
   // Validate inputs
   if (!stopsToProcess || stopsToProcess.length < 2 || !selectedAircraft) {
@@ -394,30 +308,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     throw new Error(`CRITICAL: Aircraft ${selectedAircraft.registration} missing useful load. OSDK aircraft data required for safe passenger calculations.`);
   }
   
-  // Validate calculation parameters - Log warnings but don't fail
-  if (isNaN(passengerWeightValue) || passengerWeightValue <= 0) {
-    console.warn('StopCardCalculator: Invalid passengerWeight:', passengerWeight);
-  }
-  
-  if (isNaN(taxiFuelValue)) {
-    console.warn('StopCardCalculator: Invalid taxiFuel:', taxiFuel);
-  }
-  
-  if (isNaN(contingencyFuelPercentValue) || contingencyFuelPercentValue < 0) {
-    console.warn('StopCardCalculator: Invalid contingencyFuelPercent:', contingencyFuelPercent);
-  }
-  
-  if (isNaN(reserveFuelValue)) {
-    console.warn('StopCardCalculator: Invalid reserveFuel:', reserveFuel);
-  }
-  
-  if (isNaN(deckTimePerStopValue) || deckTimePerStopValue < 0) {
-    console.warn('StopCardCalculator: Invalid deckTimePerStop:', deckTimePerStop);
-  }
-  
-  if (isNaN(deckFuelFlowValue) || deckFuelFlowValue < 0) {
-    console.warn('StopCardCalculator: Invalid deckFuelFlow:', deckFuelFlow);
-  }
 
 
   // Create data for each stop
@@ -426,8 +316,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // Get aircraft data for calculations
   const aircraft = selectedAircraft;
   
-  // 🔍 DEBUG: Log complete aircraft object to see all available fields
-  // Debug logging would go here
 
   // Calculate total trip values
   let totalDistance = 0;
@@ -462,7 +350,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       
       // Ensure we have valid waypoints
       if (fromIndex >= stopsToProcess.length || toIndex >= stopsToProcess.length) {
-        console.warn(`StopCardCalculator: Leg ${i} indices (${fromIndex}, ${toIndex}) out of range for stopsToProcess (${stopsToProcess.length})`);
         continue;
       }
       
@@ -642,8 +529,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   // Calculate auxiliary fuel values
   // Using our converted numeric values
   
-  // Log the numeric values being used
-  // Debug logging would go here
 
   // Calculate intermediate stops (for deck fuel)
   // Only count landing stops that are not departure or destination
@@ -651,8 +536,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const intermediateStops = Math.max(0, landingStopsCount - 2);
   
   
-  // 🔍 DEBUG: Check what fuel flow data we have from aircraft
-  // Debug logging would go here
   
   // Calculate deck time and fuel using individual stop overrides
   let totalDeckTimeMinutes = 0;
@@ -669,11 +552,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     
     totalDeckTimeMinutes += deckTimeForThisStop;
     
-    console.log(`🔧 DECK TIME: ${stopName} (card ${cardIndex}) = ${deckTimeForThisStop} minutes (override: ${individualDeckTime})`);
   }
   
   const deckTimeHours = totalDeckTimeMinutes / 60; // Convert from minutes to hours
-  console.log(`🔧 TOTAL DECK TIME: ${totalDeckTimeMinutes} minutes = ${deckTimeHours} hours`);
   
   // 🚨 AVIATION SAFETY: REQUIRE OSDK aircraft data - NO FALLBACKS ALLOWED
   if (!aircraft?.flatPitchFuelBurnDeckFuel) {
@@ -682,17 +563,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const actualDeckFuelFlow = aircraft.flatPitchFuelBurnDeckFuel;
   const deckFuelValue = Math.round(deckTimeHours * actualDeckFuelFlow);
   
-  // 🔍 DEBUG: Show what deck fuel flow is actually being used
-  // Debug logging would go here
   
-  // 🔍 DEBUG: Show the deck fuel calculation
-  // Debug logging would go here
 
   // Calculate contingency fuel
   const contingencyFuelValue = Math.round((totalTripFuel * contingencyFuelPercentValue) / 100);
   
-  // Log the calculated values with more detail
-  // Debug logging would go here
 
   // Calculate total fuel required for the entire trip
   const totalFuelRequired = taxiFuelValue + totalTripFuel + contingencyFuelValue + dynamicAraFuel + deckFuelValue + dynamicApproachFuel + reserveFuelValue;

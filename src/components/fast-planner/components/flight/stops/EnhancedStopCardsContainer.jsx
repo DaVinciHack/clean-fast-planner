@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import StopCard from './StopCard';
 import StopCardCalculator from '../../../modules/calculations/flight/StopCardCalculator.js';
 import { detectLocationSegment, createSegmentFuelKey } from '../../../utilities/SegmentUtils.js';
@@ -138,8 +138,35 @@ const EnhancedStopCardsContainer = ({
     }
   }, [currentRefuelStops]); // Remove refuelStops dependency to prevent loop
   
+  // 🚨 CRITICAL FIX: Add debouncing to prevent infinite calculation loops
+  const debounceTimeoutRef = useRef(null);
+  
+  // 🚨 CRITICAL FIX: Memoize stopCardOptions to reduce dependency count
+  const stopCardOptions = useMemo(() => ({
+    passengerWeight: Number(passengerWeight) || 0,
+    cargoWeight: Number(cargoWeight) || 0,
+    contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
+    reserveFuel: Number(reserveFuel) || 0,
+    deckTimePerStop: Number(deckTimePerStop) || 0,
+    deckFuelFlow: Number(deckFuelFlow) || 0,
+    taxiFuel: Number(taxiFuel) || 0,
+    extraFuel: Number(extraFuel) || 0,
+    araFuel: Number(araFuel) || 0,
+    approachFuel: Number(approachFuel) || 0,
+    fuelPolicy: fuelPolicy?.currentPolicy,
+    locationFuelOverrides: locationFuelOverrides
+  }), [passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, locationFuelOverrides]);
+  
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
+    
+    // 🚨 DEBOUNCE: Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // 🚨 DEBOUNCE: Only calculate after 100ms of stability
+    debounceTimeoutRef.current = setTimeout(() => {
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
     const hasRequiredAircraftData = selectedAircraft && 
       selectedAircraft.fuelBurn &&
@@ -151,20 +178,6 @@ const EnhancedStopCardsContainer = ({
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData) {
       
       try {
-        const stopCardOptions = {
-          passengerWeight: Number(passengerWeight) || 0,
-          cargoWeight: Number(cargoWeight) || 0,
-          contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
-          reserveFuel: Number(reserveFuel) || 0,
-          deckTimePerStop: Number(deckTimePerStop) || 0,
-          deckFuelFlow: Number(deckFuelFlow) || 0,
-          taxiFuel: Number(taxiFuel) || 0,
-          extraFuel: Number(extraFuel) || 0,
-          araFuel: Number(araFuel) || 0,      // 🔧 Weather fuel
-          approachFuel: Number(approachFuel) || 0,  // 🔧 Weather fuel
-          fuelPolicy: fuelPolicy?.currentPolicy,  // 🔧 FIXED: Use currentPolicy like FlightUtilities
-          locationFuelOverrides: locationFuelOverrides  // ✅ SEGMENT-AWARE: Use props locationFuelOverrides for segment keys
-        };
         
         
         const calculatedStopCards = StopCardCalculator.calculateStopCards(
@@ -223,7 +236,16 @@ const EnhancedStopCardsContainer = ({
     } else {
       setDisplayStopCards([]);
     }
-  }, [waypoints, routeStats, selectedAircraft, weather, fuelPolicy, passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, refuelStops, forceRecalculation, alternateStopCard, localFuelOverrides, waiveAlternates, locationFuelOverrides]); // 🚨 RACE CONDITION FIX: Removed onStopCardsCalculated from dependencies
+    
+    }, 100); // 🚨 DEBOUNCE: 100ms delay
+    
+    // 🚨 CLEANUP: Clear timeout on unmount or dependency change
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [waypoints, routeStats, selectedAircraft, weather, stopCardOptions, weatherSegments, refuelStops, forceRecalculation, alternateStopCard, waiveAlternates]); // 🚨 CRITICAL FIX: Reduced from 21 to 10 dependencies using memoized stopCardOptions
   
   
   // 🟠 ADDED: Restore alternate card from persistent storage on mount
