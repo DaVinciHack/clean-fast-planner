@@ -33,12 +33,12 @@ import { detectLocationSegment, createSegmentFuelKey, parseSegmentFuelKey } from
  */
 const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, options = {}, weatherSegments = null, refuelStops = [], waiveAlternates = false, alternateStopCard = null) => {
   
-  console.log('🚨 STOPCARDCALCULATOR CALLED:', {
-    waypoints: waypoints?.length,
-    selectedAircraft: !!selectedAircraft,
-    fuelPolicy: !!options?.fuelPolicy,
-    reserveFuel: options?.reserveFuel
-  });
+  // console.log('🚨 STOPCARDCALCULATOR CALLED:', {
+  //   waypoints: waypoints?.length,
+  //   selectedAircraft: !!selectedAircraft,
+  //   fuelPolicy: !!options?.fuelPolicy,
+  //   reserveFuel: options?.reserveFuel
+  // });
   
   // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END - MOVED TO AFTER CALCULATION
   
@@ -117,25 +117,25 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
     if (!waypointName) return 0;
     
-    console.log('🔍 getLocationFuel CALLED:', {
-      waypointName,
-      fuelType,
-      cardIndex,
-      hasWeatherSegments: !!weatherSegments && weatherSegments.length > 0,
-      hasFuelPolicy: !!fuelPolicy,
-      availableKeys: Object.keys(locationFuelOverrides || {})
-    });
+    // console.log('🔍 getLocationFuel CALLED:', {
+    //   waypointName,
+    //   fuelType,
+    //   cardIndex,
+    //   hasWeatherSegments: !!weatherSegments && weatherSegments.length > 0,
+    //   hasFuelPolicy: !!fuelPolicy,
+    //   availableKeys: Object.keys(locationFuelOverrides || {})
+    // });
     
     // 🔍 SPECIAL ARA DEBUG: Extra logging for ARA fuel lookups
-    if (fuelType === 'araFuel') {
-      console.log('🔍 ARA FUEL SPECIAL DEBUG:', {
-        waypointName,
-        cardIndex,
-        expectedKey: cardIndex ? `${waypointName}_${cardIndex}_araFuel` : `${waypointName}_araFuel`,
-        allOverrides: locationFuelOverrides,
-        araKeys: Object.keys(locationFuelOverrides || {}).filter(k => k.includes('araFuel'))
-      });
-    }
+    // if (fuelType === 'araFuel') {
+    //   console.log('🔍 ARA FUEL SPECIAL DEBUG:', {
+    //     waypointName,
+    //     cardIndex,
+    //     expectedKey: cardIndex ? `${waypointName}_${cardIndex}_araFuel` : `${waypointName}_araFuel`,
+    //     allOverrides: locationFuelOverrides,
+    //     araKeys: Object.keys(locationFuelOverrides || {}).filter(k => k.includes('araFuel'))
+    //   });
+    // }
     
     
     // 🔧 EXACT MATCH ONLY: Use unique card-based naming system
@@ -148,11 +148,11 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         ? Number(cardIndexOverride.value) || 0
         : Number(cardIndexOverride) || 0;
       
-      console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = ${overrideValue} (found override)`);
+      // console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = ${overrideValue} (found override)`);
       return overrideValue;
     }
     
-    console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = not found, checking weather...`);
+    // console.log(`🔍 FUEL LOOKUP: ${cardIndexKey} = not found, checking weather...`);
     
     
     // 🚨 FIX: Check weather conditions for THIS SPECIFIC location
