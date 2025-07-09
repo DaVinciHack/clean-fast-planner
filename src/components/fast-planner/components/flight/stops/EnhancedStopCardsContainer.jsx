@@ -281,6 +281,15 @@ const EnhancedStopCardsContainer = ({
     // 🔍 MINIMAL DEBUG: Just check if we get here
     console.log('🔍 ALTERNATE CARD USEEFFECT RUNNING', { hasAlternateRouteData: !!alternateRouteData });
     
+    // 🔍 DEBUG: Check the actual alternateRouteData values
+    if (alternateRouteData) {
+      console.log('🔍 ALTERNATE ROUTE DATA VALUES:', {
+        totalDistance: alternateRouteData.totalDistance,
+        estimatedTime: alternateRouteData.estimatedTime,
+        timeHours: alternateRouteData.timeHours
+      });
+    }
+    
     // 🛩️ VFR MODE: Continue alternate calculations for fuel dependencies (hide visually only)
     if (waiveAlternates) {
       // Don't return - let alternate calculations continue for fuel dependency
@@ -299,6 +308,9 @@ const EnhancedStopCardsContainer = ({
       alternateRouteData.estimatedTime !== '00:00' &&
       alternateRouteData.timeHours && 
       alternateRouteData.timeHours > 0.01; // Must be > 0.01 hours minimum
+    
+    // 🔍 DEBUG: Show validation result
+    console.log('🔍 ALTERNATE VALIDATION RESULT:', { hasValidAlternateData });
 
 
     // Only calculate if we have the necessary data AND complete aircraft data AND valid alternate data

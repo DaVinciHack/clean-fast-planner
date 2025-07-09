@@ -617,6 +617,38 @@ const FastPlannerCore = ({
     }
   }, [waypoints, selectedAircraft, stopCardOptions, weather]);
 
+  // 🚨 AVIATION CRITICAL: Recalculate alternate route stats when aircraft becomes available
+  useEffect(() => {
+    if (alternateRouteData && selectedAircraft && alternateRouteData.coordinates && 
+        (!alternateRouteData.totalDistance || alternateRouteData.totalDistance === 0)) {
+      
+      console.log('🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
+      
+      // Recalculate route statistics with current aircraft
+      const alternateRouteStats = appManagers?.routeCalculatorRef?.current?.calculateRouteStats(
+        alternateRouteData.coordinates,
+        {
+          selectedAircraft,
+          weather,
+          payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
+          reserveFuel: flightSettings.reserveFuel || 0
+        }
+      );
+      
+      if (alternateRouteStats) {
+        const updatedAlternateRouteData = {
+          ...alternateRouteData,
+          totalDistance: alternateRouteStats.totalDistance,
+          estimatedTime: alternateRouteStats.estimatedTime,
+          timeHours: alternateRouteStats.timeHours
+        };
+        
+        console.log('🔍 UPDATED ALTERNATE ROUTE DATA:', updatedAlternateRouteData);
+        setAlternateRouteData(updatedAlternateRouteData);
+      }
+    }
+  }, [alternateRouteData, selectedAircraft, appManagers, weather, flightSettings]);
+
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({
     flightId: currentFlightId, // Pass current flight ID to enable weather loading
@@ -1616,6 +1648,11 @@ const FastPlannerCore = ({
           
           // 🔍 DEBUG: Log alternate route stats to see what we're getting
           console.log('🔍 ALTERNATE ROUTE STATS:', alternateRouteStats);
+          console.log('🔍 AIRCRAFT DATA FOR ALTERNATE:', { 
+            hasSelectedAircraft: !!selectedAircraft,
+            aircraftId: selectedAircraft?.assetId,
+            fuelBurn: selectedAircraft?.fuelBurn 
+          });
 
           const newAlternateRouteData = {
             coordinates: coordinates,
@@ -1668,6 +1705,11 @@ const FastPlannerCore = ({
           
           // 🔍 DEBUG: Log alternate route stats to see what we're getting
           console.log('🔍 ALTERNATE ROUTE STATS:', alternateRouteStats);
+          console.log('🔍 AIRCRAFT DATA FOR ALTERNATE:', { 
+            hasSelectedAircraft: !!selectedAircraft,
+            aircraftId: selectedAircraft?.assetId,
+            fuelBurn: selectedAircraft?.fuelBurn 
+          });
 
           const newAlternateRouteData = {
             coordinates: coordinates,
