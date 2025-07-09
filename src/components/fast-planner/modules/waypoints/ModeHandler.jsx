@@ -12,8 +12,6 @@ const ModeHandler = ({
   platformManagerRef, 
   initialMode = 'normal'
 }) => {
-  console.log('🧹 ModeHandler: No-op - waypoint mode now handled by clean PlatformManager calls');
-  
   // Return null since all waypoint mode functionality is now handled 
   // directly by useWaypoints → PlatformManager
   return null;

@@ -2296,31 +2296,8 @@ class WaypointManager {
     let dragStartTime = 0;
     let touchStarted = false;
     
-    // 📱 VISUAL TOUCH DEBUG: Create on-screen debug display for iPad testing
-    let touchDebugElement = document.getElementById('touch-debug-display');
-    if (!touchDebugElement) {
-      touchDebugElement = document.createElement('div');
-      touchDebugElement.id = 'touch-debug-display';
-      touchDebugElement.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 15px;
-        border-radius: 8px;
-        font-family: monospace;
-        font-size: 13px;
-        z-index: 10000;
-        max-width: 400px;
-        max-height: 50vh;
-        overflow-y: auto;
-        word-wrap: break-word;
-        pointer-events: none;
-        border: 2px solid orange;
-      `;
-      document.body.appendChild(touchDebugElement);
-    }
+    // 📱 TOUCH DEBUG DISABLED FOR PRODUCTION
+    let touchDebugElement = null; // Disabled for production
     
     const updateTouchDebug = (message) => {
       if (touchDebugElement) {
@@ -2334,30 +2311,9 @@ class WaypointManager {
       }
     };
     
-    // 📱 VISUAL TOUCH INDICATORS: Show touch points on screen
+    // 📱 TOUCH INDICATORS DISABLED FOR PRODUCTION
     const createTouchIndicator = (x, y, type) => {
-      const indicator = document.createElement('div');
-      indicator.style.cssText = `
-        position: fixed;
-        left: ${x - 15}px;
-        top: ${y - 15}px;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background: ${type === 'start' ? 'red' : type === 'move' ? 'blue' : 'green'};
-        opacity: 0.7;
-        z-index: 9999;
-        pointer-events: none;
-        border: 2px solid white;
-      `;
-      document.body.appendChild(indicator);
-      
-      // Remove after 1 second
-      setTimeout(() => {
-        if (indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator);
-        }
-      }, 1000);
+      // Disabled for production - no visual indicators
     };
     
     // Initialize debug system

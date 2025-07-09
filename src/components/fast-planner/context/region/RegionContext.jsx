@@ -28,11 +28,32 @@ export const RegionProvider = ({
   mapInteractionHandlerRef, // Added mapInteractionHandlerRef
   waypointManagerRef // Explicitly add waypointManagerRef to the props
 }) => {
+  // 🔍 GUARANTEED LOG: This should appear in ANY build
+  console.log('🚨 DUNCAN DEBUG TEST: RegionProvider function called!');
+  console.log('🚨 DUNCAN DEBUG TEST: URL is:', window.location.href);
+
+  // 🔍 CRITICAL DEBUG: Log RegionProvider initialization
+  console.log('🔍 OSDK DEBUG: RegionProvider initializing', {
+    clientExists: !!client,
+    platformManagerRef: !!platformManagerRef,
+    url: window.location.href,
+    timestamp: new Date().toISOString()
+  });
+
   // Core region state
   const [regions, setRegions] = useState(regionsData);
   const [currentRegion, setCurrentRegion] = useState(null);
   const [regionLoading, setRegionLoading] = useState(false);
   const [regionChangeInProgress, setRegionChangeInProgress] = useState(false);
+  
+  // 🔍 CRITICAL DEBUG: Log state changes
+  console.log('🔍 OSDK DEBUG: RegionProvider state', {
+    regionsCount: regions?.length,
+    regionsData: regionsData?.length,
+    currentRegionName: currentRegion?.name,
+    clientExists: !!client,
+    url: window.location.href
+  });
   
   // Add a flag to track if initial region setup is complete
   const initialRegionSetupDone = useRef(false);
@@ -57,25 +78,28 @@ export const RegionProvider = ({
    */
   const mapReadyLastState = useRef(false);
   const checkMapReady = useCallback(() => {
-    // More thorough check for map availability
+    // 🚨 SIMPLIFIED MAP CHECK: Just check if map exists, don't be too strict
+    console.log('🔍 OSDK DEBUG: checkMapReady called - using simplified check', {
+      mapManagerRef: !!mapManagerRef,
+      mapManagerRefCurrent: !!mapManagerRef?.current,
+      url: window.location.href
+    });
+    
     try {
-      if (!mapManagerRef || !mapManagerRef.current) {
-        console.warn("RegionContext: MapManager ref is not available");
-        return false;
-      }
-
-      const map = mapManagerRef.current.getMap();
-      if (!map) {
-        console.warn("RegionContext: Map instance not available");
-        return false;
+      // If we have any kind of map, consider it ready
+      if (mapManagerRef && mapManagerRef.current) {
+        console.log("🔍 OSDK DEBUG: MapManager ref is available - considering ready");
+        return true;
       }
       
-      // Check for multiple critical map functions
-      const isReady = (
-        typeof map.on === 'function' && 
-        typeof map.fitBounds === 'function' && 
-        typeof map.getZoom === 'function'
-      );
+      // Check for global map instances as backup
+      if (window.mapManager || window.mapInstance) {
+        console.log("🔍 OSDK DEBUG: Global map found - considering ready");
+        return true;
+      }
+      
+      console.log("🔍 OSDK DEBUG: No map found");
+      return false;
       
       if (isReady) {
         // Test a real map operation to confirm it's ready
@@ -255,22 +279,33 @@ export const RegionProvider = ({
    * Initialize regions
    */
   useEffect(() => {
+    console.log('🔍 OSDK DEBUG: Region initialization effect triggered', {
+      regionsCount: regions?.length,
+      currentRegion: currentRegion?.name,
+      initialSetupDone: initialRegionSetupDone.current,
+      url: window.location.href
+    });
+
     // Skip if regions aren't loaded yet
     if (!regions || regions.length === 0) {
+      console.log('🔍 OSDK DEBUG: No regions loaded, setting regionsData');
       setRegions(regionsData);
       return;
     }
 
     // Skip if we already have a current region
     if (currentRegion) {
+      console.log('🔍 OSDK DEBUG: Current region already set:', currentRegion.name);
       return;
     }
     
     // Skip if we're done with initial setup and this is a subsequent region change
     if (initialRegionSetupDone.current) {
+      console.log('🔍 OSDK DEBUG: Initial setup already done, skipping');
       return;
     }
 
+    console.log('🔍 OSDK DEBUG: Starting region initialization...');
     console.log('RegionContext: Initializing default region');
     
     // Determine default region - either saved or Gulf of Mexico
@@ -486,10 +521,23 @@ export const RegionProvider = ({
    * Load region-specific data when region changes
    */
   useEffect(() => {
-    if (!currentRegion || !client) return;
+    console.log(`🔍 OSDK DEBUG: Region effect triggered`, {
+      currentRegion: currentRegion?.name,
+      clientExists: !!client,
+      url: window.location.href
+    });
+
+    if (!currentRegion || !client) {
+      console.log(`🔍 OSDK DEBUG: Skipping region load`, {
+        currentRegion: !!currentRegion,
+        client: !!client
+      });
+      return;
+    }
 
     const delayMs = 250; 
     const timerId = setTimeout(() => {
+      console.log(`🔍 OSDK DEBUG: Starting delayed region load for: ${currentRegion.name}`);
       console.log(`RegionContext: Delayed loading data for region: ${currentRegion.name}`);
       setRegionLoading(true);
       
@@ -509,20 +557,58 @@ export const RegionProvider = ({
       window.regionSafetyTimeoutId = safetyTimeoutId;
       
       if (!mapReady) {
-        console.warn(`RegionContext: Map not ready, deferring platform loading for ${currentRegion.name}`);
+        console.log(`🔍 OSDK DEBUG: Map not ready, waiting longer for map initialization for ${currentRegion.name}`);
+        console.warn(`RegionContext: Map not ready, waiting 2 seconds for map to initialize before loading platforms`);
+        
+        // Wait longer for map to be ready, then retry
         setTimeout(() => {
-          window.regionState.isChangingRegion = false;
-          setRegionLoading(false);
-        }, 1000); 
+          if (mapManagerRef && mapManagerRef.current) {
+            try {
+              const map = mapManagerRef.current.getMap();
+              if (map && typeof map.getZoom === 'function') {
+                console.log(`🔍 OSDK DEBUG: Map is now ready after delay, proceeding with platform loading`);
+                // Retry platform loading with map ready
+                if (platformManagerRef && platformManagerRef.current) {
+                  platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
+                    .then(() => {
+                      console.log(`RegionContext: Platforms loaded for ${currentRegion.name} (delayed)`);
+                      window.regionState.isChangingRegion = false;
+                      setRegionLoading(false);
+                    })
+                    .catch(error => {
+                      console.error(`RegionContext: Error loading platforms (delayed):`, error);
+                      window.regionState.isChangingRegion = false;
+                      setRegionLoading(false);
+                    });
+                }
+              } else {
+                console.error(`🔍 OSDK DEBUG: Map still not ready after 2 second delay`);
+                window.regionState.isChangingRegion = false;
+                setRegionLoading(false);
+              }
+            } catch (error) {
+              console.error(`🔍 OSDK DEBUG: Error checking map readiness after delay:`, error);
+              window.regionState.isChangingRegion = false;
+              setRegionLoading(false);
+            }
+          }
+        }, 2000); // Wait 2 seconds for map to be ready
         return; 
       }
       
+      console.log(`🔍 OSDK DEBUG: Map is ready, proceeding with platform loading for ${currentRegion.name}`);
+      
       if (platformManagerRef && platformManagerRef.current) {
+        console.log(`🔍 OSDK DEBUG: Platform loading section reached for ${currentRegion.name}`);
         console.log(`RegionContext: Loading platforms for ${currentRegion.name}`);
         const loadPlatforms = (attempts = 0) => {
           const maxAttempts = 3;
+          console.log(`🔍 OSDK DEBUG: loadPlatforms called (attempt ${attempts + 1}/${maxAttempts})`);
           try {
             if (typeof platformManagerRef.current.loadPlatformsFromFoundry === 'function') {
+              console.log(`🔍 OSDK DEBUG: About to call loadPlatformsFromFoundry for region: ${currentRegion.osdkRegion}`);
+              console.log(`🔍 OSDK DEBUG: Client available:`, !!client);
+              console.log(`🔍 OSDK DEBUG: Current URL:`, window.location.href);
               platformManagerRef.current.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
                 .then(() => {
                   console.log(`RegionContext: Platforms loaded for ${currentRegion.name}`);
@@ -601,9 +687,42 @@ export const RegionProvider = ({
         }
       }
       
+      // 🚨 AIRCRAFT LOADING: Load from OSDK FIRST, then filter
       if (aircraftManagerRef && aircraftManagerRef.current) {
-        console.log(`RegionContext: Filtering aircraft for ${currentRegion.name}`);
-        aircraftManagerRef.current.filterAircraft(currentRegion.id);
+        console.log(`🚨 IMMEDIATE: Loading aircraft from OSDK first for ${currentRegion.name}`);
+        
+        // Load aircraft from OSDK immediately, BEFORE filtering
+        aircraftManagerRef.current.loadAircraftFromOSDK(client)
+          .then(() => {
+            console.log(`🚨 IMMEDIATE: Aircraft loaded from OSDK, now filtering for ${currentRegion.name}`);
+            
+            // Add a small delay to ensure useAircraft callbacks are established
+            setTimeout(() => {
+              try {
+                console.log(`RegionContext: Executing delayed aircraft filter for ${currentRegion.name}`);
+                
+                // Check if aircraft manager has the onAircraftFiltered callback set up
+                if (aircraftManagerRef.current.callbacks && aircraftManagerRef.current.callbacks.onAircraftFiltered) {
+                  console.log(`RegionContext: Aircraft callbacks are ready, proceeding with filter`);
+                  aircraftManagerRef.current.filterAircraft(currentRegion.id);
+                } else {
+                  console.warn(`RegionContext: Aircraft callbacks not ready yet, retrying in 500ms`);
+                  // Retry once more if callbacks aren't ready
+                  setTimeout(() => {
+                    if (aircraftManagerRef.current) {
+                      console.log(`RegionContext: Retry aircraft filter for ${currentRegion.name}`);
+                      aircraftManagerRef.current.filterAircraft(currentRegion.id);
+                    }
+                  }, 500);
+                }
+              } catch (error) {
+                console.error(`RegionContext: Error filtering aircraft:`, error);
+              }
+            }, 500); // Increased delay to ensure callback setup completes
+          })
+          .catch(error => {
+            console.error(`🚨 IMMEDIATE: Error loading aircraft from OSDK:`, error);
+          });
       }
       
       if (favoriteLocationsManagerRef && favoriteLocationsManagerRef.current && setFavoriteLocations) {

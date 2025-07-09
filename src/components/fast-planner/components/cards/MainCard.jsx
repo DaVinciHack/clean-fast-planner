@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import RegionSelector from '../controls/RegionSelector';
 import '../../FastPlannerStyles.css';
 import LoadingIndicator from '../../modules/LoadingIndicator';
-import { useAircraft } from '../../context/AircraftContext';
+// FIXED: Use the correct useAircraft hook from hooks, not context
+// import { useAircraft } from '../../context/AircraftContext';
 
 /**
  * MainCard Component
@@ -29,17 +30,15 @@ const MainCard = ({
   onLogin,
   rigsLoading,
   fuelPolicy = null,
+  // Aircraft props passed from RightPanel
+  aircraftType,
+  aircraftRegistration,
+  onAircraftTypeChange,
+  onAircraftRegistrationChange,
+  aircraftsByType,
+  aircraftLoading,
 }) => {
-  // Get aircraft context for accessing aircraft data
-  const { 
-    aircraftType, 
-    aircraftRegistration, 
-    changeAircraftType, 
-    changeAircraftRegistration,
-    aircraftsByType,
-    aircraftLoading,
-    forceUpdate
-  } = useAircraft();
+  // REMOVED: useAircraft() call - using props instead
   
   // Calculate actual reserve fuel amount from policy
   const calculatedReserveFuel = React.useMemo(() => {
@@ -91,18 +90,17 @@ const MainCard = ({
     }
   }, [fuelPolicy?.currentPolicy, selectedAircraft?.fuelBurn, reserveFuel]);
   
-  // Debug aircraft data
+  // Aircraft props handling
   useEffect(() => {
-    console.log("MainCard Aircraft Data:", {
+    
+    // Store for global debugging
+    window.debugMainCardProps = {
       aircraftType,
       aircraftRegistration,
-      selectedAircraft,
-      aircraftsByTypeKeys: Object.keys(aircraftsByType || {}),
-      aircraftsByTypeCount: Object.keys(aircraftsByType || {}).reduce((acc, type) => {
-        acc[type] = (aircraftsByType[type] || []).length;
-        return acc;
-      }, {})
-    });
+      aircraftsByType,
+      aircraftLoading,
+      timestamp: new Date().toISOString()
+    };
     
     // Check if dropdown has options
     setTimeout(() => {
@@ -129,9 +127,9 @@ const MainCard = ({
       console.log('MainCard: Selected aircraft changed, rebuilding dropdowns');
       
       // Force immediate state update for type dropdown
-      if (changeAircraftType) {
+      if (onAircraftTypeChange) {
         console.log('Forcing type reset to empty string');
-        changeAircraftType('');
+        onAircraftTypeChange('');
       }
       
       // Wait briefly for state to update, then force DOM update
@@ -195,7 +193,7 @@ const MainCard = ({
         window.dispatchEvent(rebuildEvent);
       }, 500);
     }
-  }, [selectedAircraft, changeAircraftType]);
+  }, [selectedAircraft, onAircraftTypeChange]);
   
   // Initial mount effect
   useEffect(() => {
@@ -297,10 +295,19 @@ const MainCard = ({
             
             if (value) {
               // Selecting a specific type
-              console.log('Selecting specific aircraft type:', value);
+              console.log('🎯 DROPDOWN CASCADE: Selected aircraft type:', value);
+              console.log('🎯 DROPDOWN CASCADE: aircraftsByType keys:', Object.keys(aircraftsByType || {}));
+              console.log('🎯 DROPDOWN CASCADE: aircraftsByType[' + value + ']:', aircraftsByType[value] ? aircraftsByType[value].length + ' aircraft' : 'undefined');
               
               // Call handler to update the type filter
-              changeAircraftType(value);
+              onAircraftTypeChange(value);
+              
+              // Debug what happens after state change
+              setTimeout(() => {
+                console.log('🎯 DROPDOWN CASCADE: After state update - aircraftType prop:', aircraftType);
+                console.log('🎯 DROPDOWN CASCADE: Registration dropdown should show:', 
+                  aircraftsByType[value] ? aircraftsByType[value].length + ' options' : 'none');
+              }, 100);
               
               // Clear the registration dropdown
               const regDropdown = document.getElementById('aircraft-registration');
@@ -309,15 +316,15 @@ const MainCard = ({
               }
               
               // Clear the selected aircraft when choosing a new type
-              if (changeAircraftRegistration) {
-                changeAircraftRegistration('');
+              if (onAircraftRegistrationChange) {
+                onAircraftRegistrationChange('');
               }
             } else {
               // "-- Change Aircraft Type --" selected
               console.log('Change Aircraft Type selected (empty value)');
               
               // Show all aircraft types
-              changeAircraftType('');
+              onAircraftTypeChange('');
               
               // If we had a selected aircraft, keep it selected
               if (selectedAircraft && aircraftRegistration) {
@@ -350,10 +357,14 @@ const MainCard = ({
               Loading...
             </option>
           ) : (
-            aircraftsByType && Object.keys(aircraftsByType).length > 0 ? (
-              Object.keys(aircraftsByType)
-                .sort()
-                .map(type => {
+            (() => {
+              console.log(`🎯 DROPDOWN RENDER: aircraftsByType keys = [${Object.keys(aircraftsByType || {})}]`);
+              console.log(`🎯 DROPDOWN RENDER: aircraftsByType length = ${Object.keys(aircraftsByType || {}).length}`);
+              
+              return aircraftsByType && Object.keys(aircraftsByType).length > 0 ? (
+                Object.keys(aircraftsByType)
+                  .sort()
+                  .map(type => {
                   // Create friendly display names
                   let displayName;
                   switch(type) {
@@ -405,7 +416,7 @@ const MainCard = ({
               console.log('Specific aircraft selected, will reset both dropdowns');
               
               // Call the handler to select the aircraft
-              changeAircraftRegistration(newReg);
+              onAircraftRegistrationChange(newReg);
               
               // Add a slight delay to show a message that aircraft was selected
               setTimeout(() => {
@@ -435,7 +446,7 @@ const MainCard = ({
               }, 100);
             } else {
               // Just call the handler for empty selection
-              changeAircraftRegistration(newReg);
+              onAircraftRegistrationChange(newReg);
             }
           }}
           disabled={aircraftLoading || 
@@ -486,7 +497,14 @@ const MainCard = ({
                 )
               ) : (
                 // Type filter: check if we have aircraft of this type
-                aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0 ? (
+                (() => {
+                  console.log('🎯 REGISTRATION RENDER: aircraftType =', aircraftType);
+                  console.log('🎯 REGISTRATION RENDER: aircraftsByType keys =', Object.keys(aircraftsByType || {}));
+                  console.log('🎯 REGISTRATION RENDER: aircraftsByType[' + aircraftType + '] =', 
+                    aircraftsByType[aircraftType] ? aircraftsByType[aircraftType].length + ' aircraft' : 'undefined');
+                  
+                  return aircraftsByType[aircraftType] && aircraftsByType[aircraftType].length > 0;
+                })() ? (
                   // Show aircraft for the selected type
                   // Always show selected aircraft at the top if it's of this type
                   selectedAircraft && selectedAircraft.modelType === aircraftType ? (

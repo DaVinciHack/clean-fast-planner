@@ -281,7 +281,7 @@ const useUIControls = ({
       
       // Close panels if clicking elsewhere
       if (leftPanelVisible) {
-        console.log('👆 Click outside - closing left panel');
+        // console.log('👆 Click outside - closing left panel');
         setLeftPanelVisible(false);
         
         if (appSettingsManagerRef?.current) {
@@ -297,7 +297,7 @@ const useUIControls = ({
       }
       
       if (rightPanelVisible) {
-        console.log('👆 Click outside - closing right panel');
+        // console.log('👆 Click outside - closing right panel');
         setRightPanelVisible(false);
         
         if (appSettingsManagerRef?.current) {

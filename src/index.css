@@ -1,3 +1,6 @@
+/* MapBox GL CSS */
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
 /* FAA Submission Module Styles */
 @import './components/fast-planner/FAASubmissionButton.css';
 @import './components/fast-planner/FAASubmissionModal.css';

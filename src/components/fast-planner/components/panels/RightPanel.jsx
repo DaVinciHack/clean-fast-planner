@@ -1218,10 +1218,7 @@ const RightPanel = React.forwardRef(({
         onStopCardsCalculated={onStopCardsCalculated} // 🛩️ HEADER SYNC: Pass callback to MainCard
         onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to MainCard
         onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback to MainCard
-        locationFuelOverrides={(() => {
-          console.log('🔍 RIGHTPANEL: Passing locationFuelOverrides to MainCard:', locationFuelOverrides);
-          return locationFuelOverrides;
-        })()} // ✅ SYNC FIX: Pass location fuel overrides to MainCard
+        locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to MainCard
         currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to MainCard
         onSegmentExtraFuelChange={onSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler to MainCard
         getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter to MainCard

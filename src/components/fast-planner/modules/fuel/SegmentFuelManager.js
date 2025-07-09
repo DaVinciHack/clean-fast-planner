@@ -20,8 +20,6 @@ class SegmentFuelManager {
     // External data needed for fuel calculations
     this.weatherSegments = [];
     this.fuelPolicy = null;
-    
-    console.log('🔥 SEGMENT: SegmentFuelManager initialized');
   }
   
   /**

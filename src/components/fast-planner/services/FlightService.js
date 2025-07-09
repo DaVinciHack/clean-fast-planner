@@ -472,10 +472,8 @@ class FlightService {
         console.warn(`FlightService: WARNING - Hit page limit of ${limit}. There are more flights available. Consider increasing limit or implementing pagination.`);
       }
       
-      // Debug: Check what region we're filtering for vs what exists
+      // Check what region we're filtering for vs what exists
       const regionsFound = [...new Set(response.data.map(flight => flight.region).filter(Boolean))];
-      console.log(`FlightService: REGION DEBUG - Filtering for: "${region}"`);
-      console.log(`FlightService: REGION DEBUG - Regions found in data:`, regionsFound);
       
       // Debug: Show all flights from today to see their region codes (fix timezone issue)
       const now = new Date();
@@ -487,18 +485,7 @@ class FlightService {
         return flightDate >= todayStart && flightDate < tomorrowStart;
       });
       
-      console.log(`FlightService: TODAY'S FLIGHTS (${todaysFlights.length}) - between ${todayStart.toISOString()} and ${tomorrowStart.toISOString()}:`, 
-        todaysFlights.map(f => ({
-          flightNumber: f.flightNumber,
-          region: f.region,
-          createdAt: f.createdAt
-        }))
-      );
-      
       let flights = response.data;
-      
-      // Server-side filtering should handle it, but keep client-side as backup
-      console.log(`FlightService: Server-side query returned ${flights.length} flights`);
       
       // Client-side sorting by creation date (newest first) since server-side sorting failed
       flights.sort((a, b) => {
@@ -506,10 +493,6 @@ class FlightService {
         const dateB = new Date(b.createdAt || 0);
         return dateB - dateA; // Newest first
       });
-      
-      console.log(`FlightService: Sorted ${flights.length} flights by creation date. Newest flight: ${flights[0]?.flightNumber} (${flights[0]?.createdAt})`);
-      
-      console.log(`FlightService: Returning ${flights.length} flights for region: ${region || 'ALL'}`);
       
       // Process flights into a simplified format for the UI
       const processedFlights = flights.map(flight => {
@@ -540,26 +523,8 @@ class FlightService {
           }
         }
         
-        console.log(`FlightService: Using flight name: "${flightName}" (flightNumber: "${flight.flightNumber}")`);
-        
-        // Only log detailed flight info in development or for specific debugging
-        if (process.env.NODE_ENV === 'development' && Math.random() < 0.1) { // Only 10% of flights in dev
-          console.log(`FlightService: Sample flight - ID: ${flight.flightId}, DisplayWaypoints: ${flight.displayWaypoints?.length || 0}, CombinedWaypoints: ${flight.combinedWaypoints?.length || 0}`);
-          console.log(`FlightService: Wind data - avgWindSpeed: ${flight.avgWindSpeed}, avgWindDirection: ${flight.avgWindDirection}, windSpeed: ${flight.windSpeed}, windDirection: ${flight.windDirection}`);
-        }
-        
         const extractedDisplayWaypoints = this.extractDisplayWaypoints(flight);
-        console.log(`FlightService: Extracted displayWaypoints for flight ${flight.flightId}:`, extractedDisplayWaypoints);
         
-        // CRITICAL DEBUG: Always log wind data extraction for debugging
-        console.log(`🌬️ FlightService: Wind data extraction for flight ${flight.flightId}:`, {
-          avgWindSpeed: flight.avgWindSpeed,
-          avgWindDirection: flight.avgWindDirection,
-          windSpeed: flight.windSpeed,
-          windDirection: flight.windDirection,
-          finalWindSpeed: flight.avgWindSpeed || flight.windSpeed || 0,
-          finalWindDirection: flight.avgWindDirection || flight.windDirection || 0
-        });
         
         return {
           id: flight.flightId,

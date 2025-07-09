@@ -24,16 +24,6 @@ const AppHeader = ({
   loadedFlightData = null,  // ADD THIS
   weatherSegments = null   // NEW: Weather segments for age calculation
 }) => {
-  // DEBUG: Log props received
-  console.log('🔍 AppHeader PROPS DEBUG: loadedFlightData =', loadedFlightData);
-  console.log('🔍 AppHeader PROPS DEBUG: All props =', {
-    selectedAircraft: !!selectedAircraft,
-    stopCards: stopCards?.length,
-    loadedFlightData: !!loadedFlightData,
-    weather: !!weather,
-    waypoints: waypoints?.length
-  });
-  
   // Get authentication state and user details
   const { isAuthenticated, userName } = useAuth();
   
@@ -213,10 +203,7 @@ const AppHeader = ({
   let hasAlternateRequirements = false; // 🛩️ Track if alternate fuel requirements are active
   
   // CRITICAL DEBUG: Log what data AppHeader is actually using
-  console.log('🔍 AppHeader render - stopCards received:', stopCards?.length || 0, 'cards');
-  console.log('🔍 AppHeader render - loadedFlightData received:', !!loadedFlightData);
-  console.log('🔍 AppHeader render - weather received:', weather);
-  console.log('🔍 AppHeader render - DETAILED stopCards:', stopCards);
+  // Removed excessive debug logging to prevent performance issues
   
   // CRITICAL: Handle case where weather is undefined
   const safeWeather = weather || { windSpeed: 0, windDirection: 0 };
@@ -224,10 +211,7 @@ const AppHeader = ({
   if (stopCards && stopCards.length > 0) {
     const departureCard = stopCards.find(card => card.isDeparture);
     const destinationCard = stopCards.find(card => card.isDestination);
-    console.log('🔍 AppHeader - departure card fuel (will be shown as departure fuel):', departureCard?.totalFuel || 'none');
-    console.log('🔍 AppHeader - destination card time:', destinationCard?.totalTime || 'none');
-    console.log('🔍 AppHeader - wind info in departure card:', departureCard?.windInfo || 'none');
-    console.log('🔍 AppHeader - wind data in departure card:', departureCard?.windData || 'none');
+    // Removed debug logging for performance
   }
   
   // Find departure and destination cards
@@ -260,41 +244,18 @@ const AppHeader = ({
       // 🛩️ DETECT ALTERNATE REQUIREMENTS: Check if departure card has alternate fuel restrictions
       hasAlternateRequirements = departureCard.alternateRequirements && departureCard.alternateRequirements.isRequired;
       
-      console.log('🛩️ AppHeader: Alternate requirements check:', {
-        hasAlternateRequirements,
-        alternateRequirements: departureCard.alternateRequirements,
-        departureCardKeys: Object.keys(departureCard)
-      });
-      
-      // 🔍 DETAILED HEADER FUEL LOGGING from Stop Cards
-      console.log('📊 AppHeader: DETAILED FUEL BREAKDOWN from Stop Cards:');
-      console.log('📊 AppHeader: Departure Fuel (from first stop card):', departureFuel);
-      console.log('📊 AppHeader: Departure Card Full Object:', departureCard);
+      // Removed excessive debug logging
       
       // Get fuel components if available
       if (departureCard.fuelComponentsObject) {
         const components = departureCard.fuelComponentsObject;
         tripFuel = safeNumber(components.tripFuel);
         
-        console.log('📊 AppHeader: Fuel Components Breakdown:');
-        console.log('📊 AppHeader:   Trip Fuel:', safeNumber(components.tripFuel));
-        console.log('📊 AppHeader:   Contingency:', safeNumber(components.contingency));
-        console.log('📊 AppHeader:   Reserve:', safeNumber(components.reserve));
-        console.log('📊 AppHeader:   Taxi:', safeNumber(components.taxi));
-        console.log('📊 AppHeader:   Deck Time:', safeNumber(components.deckTime));
-        console.log('📊 AppHeader:   Extra Fuel:', safeNumber(components.extraFuel));
-        console.log('📊 AppHeader:   TOTAL CALCULATED:', 
-          safeNumber(components.tripFuel) + 
-          safeNumber(components.contingency) + 
-          safeNumber(components.reserve) + 
-          safeNumber(components.taxi) + 
-          safeNumber(components.deckTime) + 
-          safeNumber(components.extraFuel)
-        );
+        // Removed excessive fuel component logging
         
         tripFuel = safeNumber(components.tripFuel);
       } else {
-        console.log('📊 AppHeader: No fuelComponentsObject available in departure card');
+        // No fuel components available
       }
     }
     
@@ -345,9 +306,7 @@ const AppHeader = ({
         {/* Flight info section - loaded flight display */}
         <div className="AppHeader-flight-info">
           {/* ALWAYS LOG - DEBUG */}
-          {console.log('🔍 AppHeader ALWAYS: loadedFlightData =', loadedFlightData)}
-          {console.log('🔍 AppHeader ALWAYS: loadedFlightData is null?', loadedFlightData === null)}
-          {console.log('🔍 AppHeader ALWAYS: loadedFlightData is undefined?', loadedFlightData === undefined)}
+          {/* Removed excessive debug logging */}
           
           {(() => {
             // Use centralized state for immediate header updates
@@ -355,7 +314,7 @@ const AppHeader = ({
             const centralizedFlightData = appState?.loadedFlightData;
             const flightData = centralizedFlightData || loadedFlightData;
             
-            console.log('🎯 AppHeader CENTRALIZED: Using flight data from:', centralizedFlightData ? 'AppStateManager' : 'props');
+            // Using centralized flight data when available
             
             return flightData ? (
               <>

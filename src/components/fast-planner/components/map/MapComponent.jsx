@@ -45,7 +45,8 @@ const MapComponent = ({
     const initMap = async () => {
       try {
         // CRITICAL FIX: Do not reinitialize map during region changes
-        if (window.REGION_CHANGE_IN_PROGRESS) {
+        // BUT allow initial map initialization even if region change flag is set
+        if (window.REGION_CHANGE_IN_PROGRESS && mapInitializedRef.current) {
           console.log(`%c MAP COMPONENT DIAGNOSTIC: ⚠️ Skipping map reinitialization during region change!`, 
                       'background: green; color: white; font-weight: bold');
           
@@ -63,6 +64,9 @@ const MapComponent = ({
           } else {
             return;
           }
+        } else if (window.REGION_CHANGE_IN_PROGRESS && !mapInitializedRef.current) {
+          console.log(`%c MAP COMPONENT DIAGNOSTIC: ✅ Allowing INITIAL map initialization despite region change flag`, 
+                      'background: orange; color: white; font-weight: bold');
         }
         
         setLoading(true);
@@ -161,7 +165,7 @@ const MapComponent = ({
       // Set a flag to indicate map is no longer ready
       window.mapIsReady = false;
     };
-  }, [mapManagerRef]); // Only depends on mapManagerRef, not currentRegion
+  }, [mapManagerRef, mapManagerRef && mapManagerRef.current]); // Depend on both ref and its current value
   
   // Effect to handle region changes via the mapManagerRef
   useEffect(() => {

@@ -346,6 +346,7 @@
   }
 }
 
+
 /* Edit button entrance with bounce effect */
 @keyframes editButtonSlideIn {
   0% {
@@ -364,8 +365,12 @@
 
 /* Responsive adjustments */
 
-/* iPad and larger tablets */
+/* iPad and larger tablets - HIDE GLASS MENU */
 @media (max-width: 1024px) and (min-width: 769px) {
+  .glass-dock-container {
+    display: none !important; /* Hide glass menu completely on iPad */
+  }
+  
   .glass-dock.expanded {
     max-width: 95vw;
     gap: 4px;

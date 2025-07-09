@@ -74,8 +74,10 @@ export default defineConfig({
     include: ['@osdk/client', '@osdk/oauth', '@flight-app/sdk', '@osdk/foundry.admin']
   },
   build: {
-    sourcemap: false, // Disable source maps in production for security
+    sourcemap: true, // Enable source maps for debugging
+    minify: false, // 🚨 DISABLE MINIFICATION
     rollupOptions: {
+      treeshake: false, // 🚨 DISABLE TREE-SHAKING
       output: {
         manualChunks: {
           // Explicitly include OSDK packages in a dedicated chunk

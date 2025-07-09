@@ -111,17 +111,6 @@ const AutoPlanButton = ({
 
   const buttonState = getButtonState();
   
-  // Debug the button state
-  console.log('🎯 AUTO PLAN BUTTON: State debug', {
-    selectedAircraft: !!selectedAircraft,
-    aircraftReg: selectedAircraft?.registration,
-    isProcessing,
-    buttonText: buttonState.text,
-    buttonDisabled: buttonState.disabled,
-    waypointCount: waypoints.length,
-    flightId
-  });
-  
   // Define flight state variables for use in title
   const isNewFlight = !flightId;
   const hasWaypoints = waypoints && waypoints.length > 0;

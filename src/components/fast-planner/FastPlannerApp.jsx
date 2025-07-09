@@ -85,9 +85,6 @@ const FastPlannerCore = ({
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
-  // 🔍 VERSION CHECK: Immediate console log to verify changes are loaded
-  console.log('🚀 FastPlannerApp v2.0 LOADED - Both user loading fix AND animation fix included!');
-  
   const { isAuthenticated, userName, userDetails, isLoading, login } = useAuth();
   const { currentRegion: activeRegionFromContext } = useRegion();
   
@@ -1666,31 +1663,38 @@ const FastPlannerCore = ({
 
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
+    // RESET LOADING STATE: Always reset to false first, then set to true
+    setIsActuallyLoading(false);
     
-    // 🎯 VISUAL FIX: Hide ALL map elements immediately to prevent flash during satellite switch
-    console.log('🎯 HIDING ALL ELEMENTS: Preventing flash during satellite switch');
+    // Small delay to ensure state update
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
+    // Now set to true for this load
+    setIsActuallyLoading(true);
+    
     try {
-      if (appManagers.platformManagerRef?.current) {
-        appManagers.platformManagerRef.current.toggleFixedPlatformsVisibility(false);
-        appManagers.platformManagerRef.current.toggleMovablePlatformsVisibility(false);
-        appManagers.platformManagerRef.current.toggleBlocksVisibility(false);
-        appManagers.platformManagerRef.current.toggleBasesVisibility(false);
-        // Hide airports/airfields too
-        appManagers.platformManagerRef.current.toggleAirfieldsVisibility(false);
+      // 🎯 VISUAL FIX: Hide ALL map elements immediately to prevent flash during satellite switch
+      console.log('🎯 HIDING ALL ELEMENTS: Preventing flash during satellite switch');
+      try {
+        if (appManagers.platformManagerRef?.current) {
+          appManagers.platformManagerRef.current.toggleFixedPlatformsVisibility(false);
+          appManagers.platformManagerRef.current.toggleMovablePlatformsVisibility(false);
+          appManagers.platformManagerRef.current.toggleBlocksVisibility(false);
+          appManagers.platformManagerRef.current.toggleBasesVisibility(false);
+          // Hide airports/airfields too
+          appManagers.platformManagerRef.current.toggleAirfieldsVisibility(false);
+        }
+      } catch (error) {
+        console.warn('🎯 Warning: Could not hide map elements:', error);
+        // Continue with flight loading even if hiding fails
       }
-    } catch (error) {
-      console.warn('🎯 Warning: Could not hide map elements:', error);
-      // Continue with flight loading even if hiding fails
-    }
-    
-    // 🎬 CRITICAL: Store flight data globally for FlightSequenceController
-    window.currentFlightData = flightData;
-    window.appManagers = appManagers;
-    window.currentRouteStats = routeStats;
-    
-    try {
       
-      // 🚁 CRITICAL: Set aircraft FIRST before anything else
+      // 🎬 CRITICAL: Store flight data globally for FlightSequenceController
+      window.currentFlightData = flightData;
+      window.appManagers = appManagers;
+      window.currentRouteStats = routeStats;
+      
+      // 🚁 CRITICAL: Set aircraft FIRST before anything else - RACE CONDITION FIX
       // This ensures stop cards have aircraft data for speed calculations
       if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
         try {
@@ -1710,15 +1714,17 @@ const FastPlannerCore = ({
           if (matchingAircraft) {
             console.log('🛩️ FLIGHT LOAD: Found matching aircraft:', matchingAircraft.registration, 'type:', matchingAircraft.modelType);
             
-            // CRITICAL FIX: Set TYPE first, then registration AND selectedAircraft directly
-            changeAircraftType(matchingAircraft.modelType);
+            // ROBUST AIRCRAFT SELECTION: Set all aircraft state directly
+            setAircraftType(matchingAircraft.modelType);
+            setAircraftRegistration(matchingAircraft.registration);
+            setSelectedAircraft(matchingAircraft);
             
-            // Small delay to let type selection complete, then set everything
-            setTimeout(() => {
-              changeAircraftRegistration(matchingAircraft.registration);
-              // FORCE the selectedAircraft to be set directly
-              setSelectedAircraft(matchingAircraft);
-            }, 100);
+            console.log('🛩️ FLIGHT LOAD: Aircraft state set directly:', {
+              type: matchingAircraft.modelType,
+              registration: matchingAircraft.registration,
+              cruiseSpeed: matchingAircraft.cruiseSpeed,
+              fuelBurn: matchingAircraft.fuelBurn
+            });
             
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator(
@@ -2551,6 +2557,9 @@ const FastPlannerCore = ({
           'error'
         );
       }
+    } finally {
+      // CRITICAL: Always clear the loading flag, even if there's an error
+      setIsActuallyLoading(false);
     }
   };
 

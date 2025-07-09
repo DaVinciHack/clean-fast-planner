@@ -43,14 +43,6 @@ const GlassMenuDock = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!isVisible) return null;
-  
-  // Debug logging for LIVE weather button
-  console.log('🔍 GlassMenuDock render:', {
-    isExpanded,
-    hasLiveWeatherToggle: !!onLiveWeatherToggle,
-    liveWeatherActive,
-    shouldShowLiveButton: !isExpanded && !!onLiveWeatherToggle
-  });
 
   // Toggle expanded state when menu button is clicked
   const handleMenuClick = () => {
@@ -212,6 +204,23 @@ const GlassMenuDock = ({
               </svg>
             </div>
             <span className="button-label">Route</span>
+          </button>
+        </div>
+
+        {/* Always visible: Main button */}
+        <div className="glass-button-container">
+          <button 
+            className="glass-button icon-above-text main-button"
+            onClick={onMainCard || (() => console.log('Main clicked'))}
+            title="Main card"
+          >
+            <div className="glass-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9,22 9,12 15,12 15,22"/>
+              </svg>
+            </div>
+            <span className="button-label">Main</span>
           </button>
         </div>
 

@@ -89,13 +89,6 @@ const MainCard = ({
   // Use shared reserve fuel calculation hook
   const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
   
-  // 🔍 DEBUG: Log weather fuel values received by MainCard
-  console.log('🔍 MainCard: Weather fuel values received:', {
-    araFuel,
-    approachFuel,
-    araFuelType: typeof araFuel,
-    approachFuelType: typeof approachFuel
-  });
 
   // Calculate weather age from weather segments
   const getWeatherAge = () => {
@@ -856,11 +849,7 @@ const MainCard = ({
             onShowFuelBreakdown={onShowFuelBreakdown} // 📊 FUEL BREAKDOWN: Pass callback to show modal at app level
             onAlternateCardCalculated={onAlternateCardCalculated} // 🔧 NEW: Pass alternate card callback
             currentFlightId={currentFlightId} // 🔧 NEW: Pass current flight ID for fuel save functionality
-            locationFuelOverrides={(() => {
-              console.log('🔍 MAINCARD: locationFuelOverrides JSON:', JSON.stringify(locationFuelOverrides));
-              console.log('🔍 MAINCARD: locationFuelOverrides keys:', Object.keys(locationFuelOverrides));
-              return locationFuelOverrides;
-            })()} // ✅ SYNC FIX: Pass location fuel overrides to container
+            locationFuelOverrides={locationFuelOverrides} // ✅ SYNC FIX: Pass location fuel overrides to container
             currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to container
             onSegmentExtraFuelChange={onSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler to container
             getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter to container

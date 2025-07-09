@@ -50,9 +50,6 @@ class FuelInputManager {
     
     // Listener functions for UI updates
     this.listeners = [];
-    
-    console.log('🧰 FuelInputManager: Initialized with settings:', this.settings);
-    console.log('🧰 FuelInputManager: Location overrides:', Object.keys(this.locationOverrides).length);
   }
   
   /**

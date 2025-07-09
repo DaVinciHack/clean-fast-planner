@@ -681,7 +681,6 @@ const SaveFlightButton = ({
       </button>
       
       {/* Professional Flight Automation Loader */}
-      {console.log('🚀 RENDER CHECK: showAutomationLoader=', showAutomationLoader, 'automationFlightData=', automationFlightData)}
       <FlightAutomationLoader
         isVisible={showAutomationLoader}
         flightNumber={automationFlightData?.flightNumber}

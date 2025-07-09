@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, touch-action=manipulation" />
+    
+    <!-- 🛡️ PRODUCTION CONSISTENCY: Pre-load external scripts with fallbacks -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" onerror="console.error('MapBox CSS failed to load')">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" onload="console.log('✅ MapBox GL loaded')" onerror="console.error('❌ MapBox GL failed to load')"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js" onload="console.log('✅ Turf.js loaded')" onerror="console.error('❌ Turf.js failed to load')"></script>
+    
+    <title>Fast Flight Planner (Clean)</title>
+    <script type="module" crossorigin src="/plan/assets/index-DnI6v05R.js"></script>
+    <link rel="modulepreload" crossorigin href="/plan/assets/osdk-vendors-Bhbwzvvx.js">
+    <link rel="modulepreload" crossorigin href="/plan/assets/react-vendors-IA-6mGt_.js">
+    <link rel="stylesheet" crossorigin href="/plan/assets/index-D8LOWw1D.css">
+  </head>
+  <body>
+    <!-- Initial loading overlay to prevent flash -->
+    <div id="initial-loading-overlay" style="
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      background-color: #1a1a1a !important;
+      z-index: 10001 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: white !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+      font-size: 16px !important;
+      pointer-events: none !important;
+      opacity: 1 !important;
+      transition: opacity 0.5s ease !important;
+    ">
+      Loading Flight Planner...
+    </div>
+    
+    <div id="root"></div>
+    
+    <!-- Add Three.js for 3D rig models with fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onload="console.log('✅ Three.js CDN loaded')" onerror="console.error('❌ Three.js CDN failed, app will continue without 3D features')"></script>
+    <script>
+      // Enhanced Three.js loading with WebGL detection
+      window.addEventListener('load', function() {
+        // Check WebGL support first
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) {
+          console.warn('⚠️ WebGL not supported - 3D features disabled');
+          window.WEBGL_SUPPORTED = false;
+        } else {
+          console.log('✅ WebGL supported');
+          window.WEBGL_SUPPORTED = true;
+        }
+        
+        // Check Three.js availability
+        if (typeof THREE !== 'undefined') {
+          console.log('✅ Three.js loaded successfully:', THREE.REVISION);
+          window.THREE = THREE; // Ensure global access
+        } else {
+          console.error('❌ Three.js failed to load - 3D features disabled');
+          window.THREE_AVAILABLE = false;
+        }
+      });
+    </script>
+    
+    
+    <!-- Failsafe to hide overlay if React takes too long -->
+    <script>
+      // Hide overlay after 5 seconds as a failsafe
+      setTimeout(function() {
+        const overlay = document.getElementById('initial-loading-overlay');
+        if (overlay) {
+          console.log('Failsafe: Hiding overlay after 5 seconds');
+          overlay.style.display = 'none';
+        }
+      }, 5000);
+    </script>
+    
+    <!-- Comprehensive aircraft dropdown and selection fix -->
+    <script>
+      // Global variables to store aircraft data
+      window.aircraftByType = {};
+      window.availableTypes = [];
+      window.aircraftSelectionFixed = false;
+      
+      // Force fix the aircraft callback issue by overriding at runtime
+      window.addEventListener('load', function() {
+        
+        // Function to populate registration dropdown based on selected type
+        const populateRegistrationDropdown = (selectedType) => {
+          console.log('🔧 POPULATING REGISTRATION DROPDOWN for type:', selectedType);
+          const regDropdown = document.getElementById('aircraft-registration');
+          
+          if (regDropdown && window.aircraftByType[selectedType]) {
+            // Clear existing options except placeholder
+            while (regDropdown.children.length > 1) {
+              regDropdown.removeChild(regDropdown.lastChild);
+            }
+            
+            // Add aircraft registrations for selected type (matching local behavior)
+            window.aircraftByType[selectedType].forEach(aircraft => {
+              const option = document.createElement('option');
+              option.value = aircraft.registration;
+              option.textContent = aircraft.registration;
+              regDropdown.appendChild(option);
+            });
+            
+            console.log(`🔧 REGISTRATION DROPDOWN POPULATED WITH ${window.aircraftByType[selectedType].length} AIRCRAFT`);
+            return true;
+          }
+          return false;
+        };
+        
+        // Function to trigger aircraft selection and all necessary updates
+        const triggerAircraftSelection = (registration) => {
+          console.log('🔧 TRIGGERING AIRCRAFT SELECTION:', registration);
+          
+          // Find the aircraft object
+          let selectedAircraft = null;
+          for (const type in window.aircraftByType) {
+            const aircraft = window.aircraftByType[type].find(a => a.registration === registration);
+            if (aircraft) {
+              selectedAircraft = aircraft;
+              break;
+            }
+          }
+          
+          if (selectedAircraft) {
+            console.log('🔧 FOUND AIRCRAFT:', selectedAircraft);
+            
+            // Store globally for other components to access
+            window.currentSelectedAircraft = selectedAircraft;
+            
+            // Try to find React components and trigger their change handlers
+            const typeDropdown = document.getElementById('aircraft-type');
+            const regDropdown = document.getElementById('aircraft-registration');
+            
+            // Simulate React onChange events for both dropdowns
+            if (typeDropdown) {
+              const changeEvent = new Event('change', { bubbles: true });
+              typeDropdown.dispatchEvent(changeEvent);
+            }
+            
+            if (regDropdown) {
+              const changeEvent = new Event('change', { bubbles: true });
+              regDropdown.dispatchEvent(changeEvent);
+            }
+            
+            // Try to trigger various React state updates
+            if (window.aircraftManager && window.aircraftManager.callbacks) {
+              // Try all callbacks that might be relevant
+              Object.keys(window.aircraftManager.callbacks).forEach(callbackName => {
+                try {
+                  console.log(`🔧 TRYING CALLBACK: ${callbackName}`);
+                  if (callbackName.includes('aircraft') || callbackName.includes('change') || callbackName.includes('selection') || callbackName.includes('update')) {
+                    window.aircraftManager.callbacks[callbackName](selectedAircraft, selectedAircraft.modelType);
+                  }
+                } catch (e) {
+                  console.log(`🔧 Callback ${callbackName} failed:`, e.message);
+                }
+              });
+            }
+            
+            // Try to trigger useAircraft hook functions if they exist globally
+            if (window.changeAircraftType) {
+              try {
+                console.log('🔧 CALLING changeAircraftType');
+                window.changeAircraftType(selectedAircraft.modelType);
+              } catch (e) {
+                console.log('🔧 changeAircraftType failed:', e.message);
+              }
+            }
+            
+            if (window.changeAircraftRegistration) {
+              try {
+                console.log('🔧 CALLING changeAircraftRegistration');
+                window.changeAircraftRegistration(registration);
+              } catch (e) {
+                console.log('🔧 changeAircraftRegistration failed:', e.message);
+              }
+            }
+            
+            // Dispatch multiple events to cover all possible listeners
+            const events = [
+              new CustomEvent('aircraftSelected', { detail: { aircraft: selectedAircraft, registration, type: selectedAircraft.modelType } }),
+              new CustomEvent('aircraftChanged', { detail: { aircraft: selectedAircraft, registration, type: selectedAircraft.modelType } }),
+              new CustomEvent('flightSettingsUpdate', { detail: { selectedAircraft } }),
+              new CustomEvent('stopCardsUpdate', { detail: { selectedAircraft } })
+            ];
+            
+            events.forEach(event => {
+              document.dispatchEvent(event);
+              window.dispatchEvent(event);
+            });
+            
+            // Force a window resize to trigger React re-renders
+            setTimeout(() => {
+              window.dispatchEvent(new Event('resize'));
+            }, 100);
+            
+            console.log('🔧 AIRCRAFT SELECTION COMPLETE - ALL TRIGGERS SENT');
+            return true;
+          }
+          
+          console.log('🔧 AIRCRAFT NOT FOUND:', registration);
+          return false;
+        };
+        
+        // Main function to set up aircraft dropdowns
+        const checkAndFixAircraftCallback = () => {
+          if (window.aircraftManager && window.aircraftManager.filteredAircraft && window.aircraftManager.filteredAircraft.length > 0) {
+            console.log('🔧 DIRECT CALLBACK OVERRIDE: Aircraft manager found with data');
+            console.log(`🔧 Aircraft count: ${window.aircraftManager.filteredAircraft.length}`);
+            
+            // Organize aircraft by type
+            const byType = {};
+            const availableTypes = [];
+            window.aircraftManager.filteredAircraft.forEach(aircraft => {
+              const modelType = aircraft.modelType || 'Unknown';
+              if (!byType[modelType]) {
+                byType[modelType] = [];
+                availableTypes.push(modelType);
+              }
+              byType[modelType].push(aircraft);
+            });
+            
+            window.aircraftByType = byType;
+            window.availableTypes = availableTypes.sort();
+            
+            console.log('🔧 ORGANIZED TYPES:', window.availableTypes);
+            
+            // Populate type dropdown
+            const typeDropdown = document.getElementById('aircraft-type');
+            if (typeDropdown) {
+              console.log('🔧 POPULATING TYPE DROPDOWN');
+              
+              // Clear existing options except placeholder
+              while (typeDropdown.children.length > 1) {
+                typeDropdown.removeChild(typeDropdown.lastChild);
+              }
+              
+              // Add aircraft types with counts (matching local behavior)
+              window.availableTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                const count = window.aircraftByType[type].length;
+                option.textContent = `${type} (${count})`;
+                typeDropdown.appendChild(option);
+              });
+              
+              console.log(`🔧 TYPE DROPDOWN POPULATED WITH ${window.availableTypes.length} TYPES`);
+              
+              // Add event listener for type selection
+              typeDropdown.addEventListener('change', function(e) {
+                const selectedType = e.target.value;
+                console.log('🔧 TYPE SELECTED:', selectedType);
+                
+                if (selectedType && selectedType !== 'select') {
+                  populateRegistrationDropdown(selectedType);
+                }
+              });
+            }
+            
+            // Add event listener for registration selection
+            const regDropdown = document.getElementById('aircraft-registration');
+            if (regDropdown) {
+              regDropdown.addEventListener('change', function(e) {
+                const selectedRegistration = e.target.value;
+                console.log('🔧 REGISTRATION SELECTED:', selectedRegistration);
+                
+                if (selectedRegistration) {
+                  triggerAircraftSelection(selectedRegistration);
+                }
+              });
+            }
+            
+            // Override the callback for future use AND force React state update
+            const properCallback = (filteredAircraft, type) => {
+              console.log('🔧 PROPER CALLBACK TRIGGERED:', {aircraftCount: filteredAircraft.length, type: type});
+              
+              // FORCE React state update - this is what's missing online
+              if (!type) {
+                const byType = {};
+                const availableTypes = [];
+                filteredAircraft.forEach(aircraft => {
+                  const modelType = aircraft.modelType || 'Unknown';
+                  if (!byType[modelType]) {
+                    byType[modelType] = [];
+                    availableTypes.push(modelType);
+                  }
+                  byType[modelType].push(aircraft);
+                });
+                
+                // Try to directly access and update React state
+                if (window.debugUseAircraftReturn) {
+                  console.log('🔧 FORCING REACT STATE UPDATE via debugUseAircraftReturn');
+                  
+                  // Force the React state setters if we can access them
+                  try {
+                    // This is the critical missing piece - we need to force React state
+                    if (window.setAircraftTypes) {
+                      window.setAircraftTypes(availableTypes.sort());
+                      console.log('🔧 FORCED setAircraftTypes:', availableTypes.sort());
+                    }
+                    if (window.setAircraftsByType) {
+                      window.setAircraftsByType(byType);
+                      console.log('🔧 FORCED setAircraftsByType:', Object.keys(byType));
+                    }
+                  } catch (e) {
+                    console.log('🔧 Direct React state update failed:', e.message);
+                  }
+                }
+              }
+            };
+            
+            window.aircraftManager.setCallback('onAircraftFiltered', properCallback);
+            
+            // CRITICAL: Force the callback to run immediately with existing data
+            console.log('🔧 FORCING IMMEDIATE CALLBACK EXECUTION');
+            properCallback(window.aircraftManager.filteredAircraft, null);
+            
+            window.aircraftSelectionFixed = true;
+            return true;
+          }
+          
+          return false;
+        };
+        
+        // Function to handle flight loading scenarios
+        const handleFlightLoading = () => {
+          // Watch for flight loading events and auto-select aircraft
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              // Look for aircraft being loaded in flight data
+              if (mutation.type === 'childList') {
+                const nodes = Array.from(mutation.addedNodes);
+                nodes.forEach(node => {
+                  if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+                    // Check if this looks like an aircraft registration (e.g., N603PW)
+                    const aircraftMatch = node.textContent.match(/\b[A-Z0-9]{4,7}\b/);
+                    if (aircraftMatch && window.aircraftSelectionFixed) {
+                      const possibleReg = aircraftMatch[0];
+                      console.log('🔧 DETECTED POSSIBLE AIRCRAFT REG IN FLIGHT:', possibleReg);
+                      
+                      // Try to find and select this aircraft
+                      setTimeout(() => {
+                        for (const type in window.aircraftByType) {
+                          const aircraft = window.aircraftByType[type].find(a => a.registration === possibleReg);
+                          if (aircraft) {
+                            console.log('🔧 AUTO-SELECTING AIRCRAFT FROM FLIGHT:', possibleReg);
+                            
+                            // Set the dropdowns
+                            const typeDropdown = document.getElementById('aircraft-type');
+                            const regDropdown = document.getElementById('aircraft-registration');
+                            
+                            if (typeDropdown) {
+                              typeDropdown.value = type;
+                              populateRegistrationDropdown(type);
+                            }
+                            
+                            setTimeout(() => {
+                              if (regDropdown) {
+                                regDropdown.value = possibleReg;
+                                triggerAircraftSelection(possibleReg);
+                              }
+                            }, 100);
+                            
+                            break;
+                          }
+                        }
+                      }, 500);
+                    }
+                  }
+                });
+              }
+            });
+          });
+          
+          // Start observing the document for changes
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+          });
+          
+          console.log('🔧 FLIGHT LOADING OBSERVER ACTIVE');
+        };
+        
+        // AGGRESSIVE: Try to find React state setters by scanning the window object
+        const findReactStateFunctions = () => {
+          console.log('🔧 SCANNING FOR REACT STATE FUNCTIONS');
+          
+          // Look for global functions that might be React state setters
+          for (const key in window) {
+            if (key.includes('setAircraft') || key.includes('changeAircraft')) {
+              console.log(`🔧 FOUND POTENTIAL REACT FUNCTION: ${key}`);
+              if (typeof window[key] === 'function') {
+                console.log(`🔧 CONFIRMED FUNCTION: ${key}`);
+              }
+            }
+          }
+          
+          // Try to force React state update through any means necessary
+          if (window.aircraftManager && window.aircraftManager.filteredAircraft) {
+            const aircraft = window.aircraftManager.filteredAircraft;
+            
+            // Try to trigger the original useAircraft callback system
+            console.log('🔧 ATTEMPTING NUCLEAR OPTION: Force trigger all possible React updates');
+            
+            // Create the exact data structure that React expects
+            const byType = {};
+            const availableTypes = [];
+            aircraft.forEach(a => {
+              const type = a.modelType || 'Unknown';
+              if (!byType[type]) {
+                byType[type] = [];
+                availableTypes.push(type);
+              }
+              byType[type].push(a);
+            });
+            
+            // Store in multiple places for React to find
+            window.forceAircraftTypes = availableTypes.sort();
+            window.forceAircraftsByType = byType;
+            
+            console.log('🔧 STORED FORCE DATA:', {
+              types: window.forceAircraftTypes,
+              byTypeKeys: Object.keys(window.forceAircraftsByType)
+            });
+            
+            // Dispatch every possible event that React might be listening for
+            const allEvents = [
+              'aircraftDataLoaded',
+              'aircraftFiltered', 
+              'aircraftTypesUpdated',
+              'aircraftManagerReady',
+              'dataUpdate',
+              'stateChange'
+            ];
+            
+            allEvents.forEach(eventName => {
+              const event = new CustomEvent(eventName, {
+                detail: {
+                  aircraftTypes: availableTypes.sort(),
+                  aircraftsByType: byType,
+                  filteredAircraft: aircraft
+                }
+              });
+              document.dispatchEvent(event);
+              window.dispatchEvent(event);
+            });
+          }
+        };
+        
+        // Start the main fix
+        setTimeout(() => {
+          const interval = setInterval(() => {
+            if (checkAndFixAircraftCallback()) {
+              clearInterval(interval);
+              console.log('🔧 AIRCRAFT CALLBACK FIX COMPLETE');
+              
+              // Start watching for flight loading
+              handleFlightLoading();
+              
+              // Try the nuclear option
+              setTimeout(() => {
+                findReactStateFunctions();
+              }, 500);
+            }
+          }, 500);
+          
+          // Stop trying after 30 seconds
+          setTimeout(() => {
+            clearInterval(interval);
+            if (!window.aircraftSelectionFixed) {
+              console.log('🔧 AIRCRAFT CALLBACK FIX TIMEOUT');
+              // Try nuclear option even if main fix failed
+              findReactStateFunctions();
+            }
+          }, 30000);
+        }, 1000);
+      });
+    </script>
+  </body>
+</html>

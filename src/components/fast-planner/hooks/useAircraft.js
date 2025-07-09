@@ -35,7 +35,7 @@ const useAircraft = ({
     }
 
     const filteredAircraft = aircraftManagerInstanceRef.current.filteredAircraft;
-    console.log(`✅ PROCESSING: ${filteredAircraft.length} aircraft`);
+    // Processing aircraft data
     
     // Update aircraft list
     setAircraftList(filteredAircraft);
@@ -60,7 +60,7 @@ const useAircraft = ({
     setAircraftsByType(byType);
     setAircraftLoading(false);
     
-    console.log(`✅ UPDATED STATE: ${availableTypes.length} types`);
+    // Updated aircraft state
     return true;
   }, []);
 
@@ -408,7 +408,7 @@ const useAircraft = ({
     setCurrentAircraftRegion
   };
   
-  // Store globally for debugging
+  // Store globally for debugging AND make functions available globally
   window.debugUseAircraftReturn = {
     aircraftTypes: aircraftTypes,
     aircraftsByType: aircraftsByType,
@@ -419,12 +419,11 @@ const useAircraft = ({
     timestamp: new Date().toISOString()
   };
   
-  console.log(`✅ ARCHITECTURAL FIX RETURNING:`, {
-    aircraftTypesCount: aircraftTypes?.length || 0,
-    aircraftsByTypeKeys: Object.keys(aircraftsByType || {}),
-    aircraftLoading: aircraftLoading,
-    managerDataCount: aircraftManagerInstanceRef.current?.filteredAircraft?.length || 0
-  });
+  // CRITICAL: Make React functions globally available for flight loading
+  window.changeAircraftType = changeAircraftType;
+  window.changeAircraftRegistration = changeAircraftRegistration;
+  
+  // Returning aircraft state
   
   return returnObject;
 };

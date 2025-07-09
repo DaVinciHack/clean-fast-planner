@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover, touch-action=manipulation" />
+    
+    <!-- 🛡️ PRODUCTION CONSISTENCY: Pre-load external scripts with fallbacks -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" onerror="console.error('MapBox CSS failed to load')">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" onload="console.log('✅ MapBox GL loaded')" onerror="console.error('❌ MapBox GL failed to load')"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js" onload="console.log('✅ Turf.js loaded')" onerror="console.error('❌ Turf.js failed to load')"></script>
+    
+    <title>Fast Flight Planner (Clean)</title>
+    <script type="module" crossorigin src="/plan/assets/index-BN0A5ANK.js"></script>
+    <link rel="modulepreload" crossorigin href="/plan/assets/react-vendors-Bh7YcOHL.js">
+    <link rel="modulepreload" crossorigin href="/plan/assets/osdk-vendors-CasKN2Wv.js">
+    <link rel="stylesheet" crossorigin href="/plan/assets/index-DIQdl0_Q.css">
+  </head>
+  <body>
+    <!-- Initial loading overlay to prevent flash -->
+    <div id="initial-loading-overlay" style="
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      background-color: #1a1a1a !important;
+      z-index: 10001 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: white !important;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+      font-size: 16px !important;
+      pointer-events: none !important;
+      opacity: 1 !important;
+      transition: opacity 0.5s ease !important;
+    ">
+      Loading Flight Planner...
+    </div>
+    
+    <div id="root"></div>
+    
+    <!-- Add Three.js for 3D rig models with fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onload="console.log('✅ Three.js CDN loaded')" onerror="console.error('❌ Three.js CDN failed, app will continue without 3D features')"></script>
+    <script>
+      // Enhanced Three.js loading with WebGL detection
+      window.addEventListener('load', function() {
+        // Check WebGL support first
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        
+        if (!gl) {
+          console.warn('⚠️ WebGL not supported - 3D features disabled');
+          window.WEBGL_SUPPORTED = false;
+        } else {
+          console.log('✅ WebGL supported');
+          window.WEBGL_SUPPORTED = true;
+        }
+        
+        // Check Three.js availability
+        if (typeof THREE !== 'undefined') {
+          console.log('✅ Three.js loaded successfully:', THREE.REVISION);
+          window.THREE = THREE; // Ensure global access
+        } else {
+          console.error('❌ Three.js failed to load - 3D features disabled');
+          window.THREE_AVAILABLE = false;
+        }
+      });
+    </script>
+    
+    
+    <!-- Failsafe to hide overlay if React takes too long -->
+    <script>
+      // Hide overlay after 5 seconds as a failsafe
+      setTimeout(function() {
+        const overlay = document.getElementById('initial-loading-overlay');
+        if (overlay) {
+          console.log('Failsafe: Hiding overlay after 5 seconds');
+          overlay.style.display = 'none';
+        }
+      }, 5000);
+    </script>
+    
+    <!-- Simple one-time dropdown fix script -->
+    <script>
+      // Wait for the app to fully load
+      window.addEventListener('load', function() {
+        // Give the React app time to initialize
+        setTimeout(function() {
+          // Create a global reset function for the aircraft selection UI
+          window.resetAircraftDropdowns = function() {
+            // Only reset if we have a selected aircraft
+            const selectedDisplay = document.querySelector('.selected-aircraft-display');
+            if (selectedDisplay && selectedDisplay.textContent.trim() !== 'None Selected') {
+              console.log('Resetting dropdowns after aircraft selection');
+              
+              // Force type dropdown to reset to "-- Change Aircraft Type --"
+              const typeDropdown = document.getElementById('aircraft-type');
+              if (typeDropdown) {
+                typeDropdown.value = 'select';
+              }
+              
+              // Reset registration dropdown
+              const regDropdown = document.getElementById('aircraft-registration');
+              if (regDropdown) {
+                regDropdown.value = '';
+              }
+            }
+          };
+          
+          // Add a click handler to the selected aircraft display
+          document.addEventListener('click', function(e) {
+            // If clicking on the selected aircraft display, reset dropdowns
+            if (e.target.classList.contains('selected-aircraft-display') || 
+                e.target.closest('.selected-aircraft-display')) {
+              window.resetAircraftDropdowns();
+            }
+          });
+          
+          console.log('Aircraft dropdown reset function available globally');
+        }, 1500);
+      });
+    </script>
+  </body>
+</html>

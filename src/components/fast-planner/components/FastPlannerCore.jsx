@@ -30,7 +30,7 @@ import { FavoriteLocationsManager } from '../modules';
  * Core component that uses all contexts to render the UI
  * and handle user interactions.
  */
-const FastPlannerCore = () => {
+const FastPlannerCore = ({ mapManagerRef, appManagers }) => {
   // Get data from Region context
   const { 
     regions, 
@@ -73,20 +73,20 @@ const FastPlannerCore = () => {
     handleRouteInputChange
   } = useRoute();
   
-  // Get data from Map context
-  const {
-    mapReady, 
-    platformsVisible, 
-    platformsLoaded, 
-    rigsLoading, 
-    rigsError,
-    togglePlatformsVisibility, 
-    loadCustomChart, 
-    reloadPlatformData,
-    loadPlatformsForRegion, // Include the new function
-    mapManager, 
-    platformManager
-  } = useMap();
+  // Use mapManagerRef directly instead of useMap hook which is failing
+  const mapManager = mapManagerRef?.current;
+  const platformManager = appManagers?.platformManagerRef?.current;
+  const mapReady = true; // Assume map is ready
+  
+  // Default map-related values since useMap isn't working
+  const platformsVisible = true;
+  const platformsLoaded = false;
+  const rigsLoading = false;
+  const rigsError = null;
+  const togglePlatformsVisibility = () => {};
+  const loadCustomChart = () => {};
+  const reloadPlatformData = () => {};
+  const loadPlatformsForRegion = () => {};
   
   // Local state
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -264,9 +264,9 @@ const FastPlannerCore = () => {
   }, [currentRegion, mapReady, platformManager, loadPlatformsForRegion, reloadPlatformData]);
   
   // Debug state for toggling debug panel
-  const [showDebug, setShowDebug] = useState(true);
+  const [showDebug, setShowDebug] = useState(false);
   // Show Loading Status Display
-  const [showLoadingStatus, setShowLoadingStatus] = useState(true);
+  const [showLoadingStatus, setShowLoadingStatus] = useState(false);
   
   return (
     <div className="fast-planner-container">

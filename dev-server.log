@@ -1,0 +1,97 @@
+
+> fast-planner-clean@0.1.0 dev
+> vite --host
+
+Port 8080 is in use, trying another one...
+
+  VITE v6.3.5  ready in 102 ms
+
+  ➜  Local:   http://localhost:8081/plan/
+  ➜  Network: http://192.168.68.87:8081/plan/
+7:59:44 PM [vite] (client) page reload production-clean/index.html
+7:59:44 PM [vite] (client) page reload production-clean/auth/callback.html
+8:12:01 PM [vite] (client) hmr update /src/components/fast-planner/FastPlannerApp.jsx
+8:12:14 PM [vite] (client) hmr update /src/components/fast-planner/FastPlannerApp.jsx
+8:17:06 PM [vite] (client) hmr update /src/components/fast-planner/FastPlannerApp.jsx
+8:18:22 PM [vite] (client) page reload production-clean/auth/callback.html
+8:18:22 PM [vite] (client) page reload production-clean/index.html
+8:18:22 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+8:18:22 PM [vite] (client) page reload production-clean/test-map.html
+8:18:22 PM [vite] (client) page reload production-clean/waypoint-fix-injection.html
+8:21:01 PM [vite] (client) page reload production-clean/test-map.html
+8:21:01 PM [vite] (client) page reload production-clean/index.html
+8:21:01 PM [vite] (client) page reload production-clean/auth/callback.html
+8:21:01 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+8:21:01 PM [vite] (client) page reload production-clean/waypoint-fix-injection.html
+8:21:10 PM [vite] (client) page reload production-clean/index.html
+8:22:08 PM [vite] (client) page reload production-clean/index.html
+8:22:08 PM [vite] (client) page reload production-clean/auth/callback.html
+8:26:05 PM [vite] (client) page reload production-clean/index.html
+8:38:56 PM [vite] vite.config.ts changed, restarting server...
+8:38:56 PM [vite] server restarted.
+8:39:28 PM [vite] (client) page reload production-clean/index.html
+8:39:28 PM [vite] (client) page reload production-clean/auth/callback.html
+9:01:04 PM [vite] (client) page reload production-clean/index.html
+9:01:04 PM [vite] (client) page reload production-clean/auth/callback.html
+9:12:47 PM [vite] (client) page reload production-clean/index.html
+9:12:47 PM [vite] (client) page reload production-clean/auth/callback.html
+9:12:47 PM [vite] (client) page reload production-clean/index.html
+9:12:47 PM [vite] (client) page reload production-clean/auth/callback.html
+9:21:15 PM [vite] (client) page reload production-clean/index.html
+9:21:15 PM [vite] (client) page reload production-clean/auth/callback.html
+9:21:20 PM [vite] (client) page reload production-clean/auth/callback.html
+9:21:20 PM [vite] (client) page reload production-clean/index.html
+9:21:20 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:21:20 PM [vite] (client) page reload production-clean/test-map.html
+9:21:20 PM [vite] (client) page reload production-clean/waypoint-fix-injection.html
+9:21:47 PM [vite] (client) page reload production-clean/index.html
+9:25:19 PM [vite] (client) page reload production-clean/index.html
+9:25:19 PM [vite] (client) page reload production-clean/auth/callback.html
+9:25:19 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:28:11 PM [vite] (client) page reload production-clean/test-map.html
+9:28:11 PM [vite] (client) page reload production-clean/index.html
+9:28:11 PM [vite] (client) page reload production-clean/auth/callback.html
+9:28:11 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:28:11 PM [vite] (client) page reload production-clean/waypoint-fix-injection.html
+9:28:17 PM [vite] (client) page reload production-clean/index.html
+9:28:17 PM [vite] (client) page reload production-clean/auth/callback.html
+9:28:17 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:38:00 PM [vite] (client) page reload production-clean/index.html
+9:38:00 PM [vite] (client) page reload production-clean/auth/callback.html
+9:38:00 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:43:30 PM [vite] (client) page reload production-clean/index.html
+9:43:30 PM [vite] (client) page reload production-clean/auth/callback.html
+9:43:30 PM [vite] (client) page reload production-clean/planner/auth/callback.html
+9:55:05 PM [vite] (client) page reload production-architectural-fix/test-map.html
+9:55:05 PM [vite] (client) page reload production-architectural-fix/index.html
+9:55:05 PM [vite] (client) page reload production-architectural-fix/auth/callback.html
+9:55:05 PM [vite] (client) page reload production-architectural-fix/planner/auth/callback.html
+9:55:05 PM [vite] (client) page reload production-architectural-fix/waypoint-fix-injection.html
+10:05:31 PM [vite] (client) page reload production-hybrid-fix/test-map.html
+10:05:31 PM [vite] (client) page reload production-hybrid-fix/index.html
+10:05:31 PM [vite] (client) page reload production-hybrid-fix/auth/callback.html
+10:05:31 PM [vite] (client) page reload production-hybrid-fix/planner/auth/callback.html
+10:05:31 PM [vite] (client) page reload production-hybrid-fix/waypoint-fix-injection.html
+10:10:08 PM [vite] (client) page reload production-hybrid-fix/auth/callback.html
+10:10:08 PM [vite] (client) page reload production-hybrid-fix/planner/auth/callback.html
+10:10:21 PM [vite] (client) page reload production-hybrid-fix/test-map.html
+10:10:21 PM [vite] (client) page reload production-hybrid-fix/waypoint-fix-injection.html
+10:13:59 PM [vite] (client) page reload production-final/index.html
+10:14:40 AM [vite] (client) page reload production-victory/index.html
+11:05:07 AM [vite] (client) page reload public/callback.html
+11:05:07 AM [vite] (client) page reload public/callback.html
+11:05:07 AM [vite] vite.config.ts changed, restarting server...
+11:05:07 AM [vite] server restarted.
+
+  ➜  Local:   http://localhost:8081/plan/
+  ➜  Network: http://192.168.68.86:8081/plan/
+11:06:36 AM [vite] (client) page reload public/callback.html
+11:06:36 AM [vite] vite.config.ts changed, restarting server...
+11:06:36 AM [vite] server restarted.
+11:24:36 AM [vite] (client) page reload public/callback.html
+11:24:36 AM [vite] (client) page reload public/callback.html
+11:24:36 AM [vite] vite.config.ts changed, restarting server...
+11:24:36 AM [vite] server restarted.
+11:28:26 AM [vite] (client) page reload public/callback.html
+11:28:26 AM [vite] vite.config.ts changed, restarting server...
+11:28:26 AM [vite] server restarted.

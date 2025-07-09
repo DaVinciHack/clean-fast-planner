@@ -130,7 +130,6 @@ const FlightAutomationLoader = ({
   }, [isVisible]);
 
   if (!isVisible) {
-    console.log('🚀 FlightAutomationLoader: Render check - not visible, returning null');
     return null;
   }
   
