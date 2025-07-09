@@ -1,5 +1,5 @@
 // Import React and necessary hooks
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../client';
 import './FastPlannerStyles.css';
@@ -467,6 +467,11 @@ const FastPlannerCore = ({
   
   // ❌ REMOVED: Complex refuel stops handling - was causing refuel stops to jump around
   
+  // ✅ CRITICAL FIX: Stable callback for fuel overrides to prevent infinite loops
+  const handleFuelOverridesChanged = useCallback((callback) => {
+    window.fuelOverridesCallback = callback;
+  }, []);
+  
   // ✅ NEW: Reset user-entered flight settings to defaults (for new flights)
   const resetUserFlightSettings = useCallback(() => {
     
@@ -494,6 +499,15 @@ const FastPlannerCore = ({
       windDirection: Number(windDirection) || 0
     }));
   };
+  
+  // ✅ CRITICAL FIX: Memoize stop card options to prevent infinite loops
+  const stopCardOptions = useMemo(() => ({
+    ...flightSettings,
+    araFuel: weatherFuel.araFuel,
+    approachFuel: weatherFuel.approachFuel,
+    alternateRouteData: alternateRouteData,
+    locationFuelOverrides: locationFuelOverrides
+  }), [flightSettings, weatherFuel, alternateRouteData, locationFuelOverrides]);
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
   useEffect(() => {
@@ -580,13 +594,7 @@ const FastPlannerCore = ({
         routeStats, 
         selectedAircraft,
         weather,
-        {
-          ...flightSettings,
-          araFuel: weatherFuel.araFuel,
-          approachFuel: weatherFuel.approachFuel,
-          alternateRouteData: alternateRouteData,  // 🔧 SAR FIX: Add alternate route data for SAR alternate card
-          locationFuelOverrides: locationFuelOverrides  // ✅ NEW: Pass location-specific fuel overrides
-        }
+        stopCardOptions
       );
 
       if (newStopCards && newStopCards.length > 0) {
@@ -607,7 +615,7 @@ const FastPlannerCore = ({
     } else {
       setStopCards([]);
     }
-  }, [waypoints, selectedAircraft, flightSettings, weather, weatherFuel]);
+  }, [waypoints, selectedAircraft, stopCardOptions, weather]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({
@@ -3555,14 +3563,10 @@ const FastPlannerCore = ({
           onRefuelStopsChanged={handleRefuelStopsChanged} // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
           
           // ✅ FIX: Pass locationFuelOverrides from state to RightPanel
-          locationFuelOverrides={(() => {
-            return locationFuelOverrides || {};
-          })()}
+          locationFuelOverrides={locationFuelOverrides}
           
           // 🔥 DIRECT CALLBACK: Pass fuel overrides callback to enable direct communication
-          onFuelOverridesChanged={(callback) => {
-            window.fuelOverridesCallback = callback;
-          }}
+          onFuelOverridesChanged={handleFuelOverridesChanged}
           
           // Fuel policy props
           fuelPolicy={fuelPolicy}
