@@ -1613,6 +1613,9 @@ const FastPlannerCore = ({
               reserveFuel: flightSettings.reserveFuel || 0
             }
           );
+          
+          // 🔍 DEBUG: Log alternate route stats to see what we're getting
+          console.log('🔍 ALTERNATE ROUTE STATS:', alternateRouteStats);
 
           const newAlternateRouteData = {
             coordinates: coordinates,
@@ -1625,6 +1628,9 @@ const FastPlannerCore = ({
             estimatedTime: alternateRouteStats?.estimatedTime || '00:00',
             timeHours: alternateRouteStats?.timeHours || 0
           };
+          
+          // 🔍 DEBUG: Log final alternate route data
+          console.log('🔍 FINAL ALTERNATE ROUTE DATA:', newAlternateRouteData);
           
           setAlternateRouteData(newAlternateRouteData);
           
@@ -1659,6 +1665,9 @@ const FastPlannerCore = ({
               reserveFuel: flightSettings.reserveFuel || 0
             }
           );
+          
+          // 🔍 DEBUG: Log alternate route stats to see what we're getting
+          console.log('🔍 ALTERNATE ROUTE STATS:', alternateRouteStats);
 
           const newAlternateRouteData = {
             coordinates: coordinates,
@@ -1671,6 +1680,9 @@ const FastPlannerCore = ({
             estimatedTime: alternateRouteStats?.estimatedTime || '00:00',
             timeHours: alternateRouteStats?.timeHours || 0
           };
+          
+          // 🔍 DEBUG: Log final alternate route data
+          console.log('🔍 FINAL ALTERNATE ROUTE DATA:', newAlternateRouteData);
           
           setAlternateRouteData(newAlternateRouteData);
           

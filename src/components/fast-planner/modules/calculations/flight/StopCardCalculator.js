@@ -589,7 +589,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // But we want legs up to the refuel stop, which is firstRefuelStopCardIndex - 1
       const firstRefuelStopLegIndex = firstRefuelStopCardIndex - 1;
       
-      console.log(`🔧 REFUEL INDEX FIX: Card ${firstRefuelStopCardIndex} → Leg index ${firstRefuelStopLegIndex}`);
       
       // Calculate fuel only to first refuel stop
       let tripFuelToFirstRefuel = 0;
@@ -598,7 +597,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // Sum fuel for legs up to first refuel stop (using correct leg indexing)
       for (let i = 0; i < legDetails.length && i < firstRefuelStopLegIndex; i++) {
         tripFuelToFirstRefuel += legDetails[i].fuel;
-        console.log(`🔧 REFUEL FUEL: Adding leg ${i} fuel: ${legDetails[i].fuel} lbs`);
       }
       
       // 🔧 DECK TIME FIX: Calculate deck fuel for stops before first refuel using individual overrides
@@ -611,11 +609,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
           deckTimeMinutesToFirstRefuel += deckTimeForThisStop;
           
-          console.log(`🔧 REFUEL DECK TIME: ${stop?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
         }
       }
       deckFuelToFirstRefuel = Math.round((deckTimeMinutesToFirstRefuel / 60) * actualDeckFuelFlow);
-      console.log(`🔧 REFUEL TOTAL DECK: ${deckTimeMinutesToFirstRefuel} minutes = ${deckFuelToFirstRefuel} lbs`);
       
       // Calculate contingency based on trip fuel to first refuel
       const contingencyToFirstRefuel = Math.round((tripFuelToFirstRefuel * contingencyFuelPercentValue) / 100);
@@ -627,7 +623,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // 🔧 APPROACH FUEL FIX: Calculate approach fuel for segment 1 (like ARA fuel)
       // Approach fuel should be carried from departure and consumed at airports that need it
       const updatedSegment1ApproachFuel = calculateSegmentLocationFuel('approachFuel', 1);
-      console.log(`🔍 DEPARTURE APPROACH FUEL DEBUG: calculateSegmentLocationFuel('approachFuel', 1) = ${updatedSegment1ApproachFuel}`);
       const segment1ApproachFuel = updatedSegment1ApproachFuel;
       
       // 🛩️ VFR MODE: When alternates are waived, use minimal fuel for maximum passengers
@@ -637,10 +632,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       departureFuelNeeded = taxiFuelValue + tripFuelToFirstRefuel + contingencyToFirstRefuel + deckFuelToFirstRefuel + segmentReserveFuel + segment1ExtraFuel;
       
       // ✅ SEGMENT-AWARE: Recalculate ARA fuel including user overrides for segment 1
-      console.log(`🎯 DEBUG: Available fuel overrides:`, Object.keys(locationFuelOverrides));
-      console.log(`🎯 DEBUG: Current refuel stops for segment detection:`, refuelStops);
       const updatedSegment1AraFuel = calculateSegmentLocationFuel('araFuel', 1);
-      console.log(`🎯 DEBUG: calculateSegmentLocationFuel('araFuel', 1) returned:`, updatedSegment1AraFuel);
       
       // Add ARA fuel if needed for the route (always carried from departure)
       if (updatedSegment1AraFuel > 0) departureFuelNeeded += updatedSegment1AraFuel;
@@ -659,8 +651,6 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         extra: segment1ExtraFuel  // ✅ SEGMENT-AWARE: Use segment 1 extra fuel
       };
       
-      console.log(`🚨 DEPARTURE COMPONENTS CALCULATED:`, departureComponentsCalculation);
-      console.log(`🚨 DEPARTURE FUEL NEEDED:`, departureFuelNeeded);
       
     } else {
       // 🛩️ AVIATION LOGIC: Departure must carry extra fuel (will be consumed at refuel stops or destination)
@@ -916,9 +906,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         const nextRefuelStopCardIndex = nextRefuelStops[0]; // This is a 1-based card index
         calculationEndPoint = nextRefuelStopCardIndex - 1; // Convert to 0-based leg index
         
-        console.log(`🔧 CALCULATION ENDPOINT: Current position=${currentCardIndex}, Next refuel card=${nextRefuelStopCardIndex}, Using leg endpoint=${calculationEndPoint}`);
       } else {
-        console.log(`🔧 CALCULATION ENDPOINT: No more refuel stops, calculating to end of route`);
       }
     }
     
@@ -1175,11 +1163,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         
         // 🛩️ AVIATION LOGIC: At refuel stops, use the extra fuel calculated above (includes segment logic)
         // This could be from departure (segment 1) or from this refuel stop for next segment
-        console.log(`🚨 REFUEL EXTRA FUEL: ${toWaypoint.name} using remainingExtraFuel = ${remainingExtraFuel}`);
         
         fuelNeeded = remainingTripFuel + remainingContingencyFuel + remainingAraFuel + remainingDeckFuel + remainingApproachFuel + reserveFuelValue + remainingExtraFuel;
         
-        console.log(`🚨 REFUEL CALCULATION: ${toWaypoint.name} - Trip:${remainingTripFuel} + Cont:${remainingContingencyFuel} + ARA:${remainingAraFuel} + Deck:${remainingDeckFuel} + Approach:${remainingApproachFuel} + Res:${reserveFuelValue} + Extra:${remainingExtraFuel} = ${fuelNeeded}`);
         
         fuelComponents = {
           tripFuel: remainingTripFuel,

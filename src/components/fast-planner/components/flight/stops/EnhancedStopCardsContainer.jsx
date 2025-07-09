@@ -235,7 +235,7 @@ const EnhancedStopCardsContainer = ({
       setDisplayStopCards([]);
     }
     
-    }, 100); // 🚨 DEBOUNCE: 100ms delay
+    }, 1000); // 🚨 DEBOUNCE: 1000ms delay to stop infinite loops
     
     // 🚨 CLEANUP: Clear timeout on unmount or dependency change
     return () => {
@@ -264,8 +264,19 @@ const EnhancedStopCardsContainer = ({
     }
   }, [alternateStopCard]);
   
+  // 🚨 CRITICAL FIX: Add debouncing to alternate card calculation too
+  const alternateDebounceTimeoutRef = useRef(null);
+  
   // 🟠 ADDED: Calculate alternate stop card when alternate route data exists
   useEffect(() => {
+    
+    // 🚨 DEBOUNCE: Clear previous timeout
+    if (alternateDebounceTimeoutRef.current) {
+      clearTimeout(alternateDebounceTimeoutRef.current);
+    }
+    
+    // 🚨 DEBOUNCE: Only calculate after 1000ms of stability
+    alternateDebounceTimeoutRef.current = setTimeout(() => {
     
     // 🛩️ VFR MODE: Continue alternate calculations for fuel dependencies (hide visually only)
     if (waiveAlternates) {
@@ -286,14 +297,6 @@ const EnhancedStopCardsContainer = ({
       alternateRouteData.timeHours && 
       alternateRouteData.timeHours > 0.01; // Must be > 0.01 hours minimum
 
-    // ✈️ AVIATION SAFETY: Log when we reject invalid alternate data
-    if (!hasValidAlternateData && alternateRouteData) {
-      console.warn('🚨 AVIATION SAFETY: Rejecting invalid alternateRouteData:', {
-        totalDistance: alternateRouteData.totalDistance,
-        estimatedTime: alternateRouteData.estimatedTime,
-        timeHours: alternateRouteData.timeHours
-      });
-    }
 
     // Only calculate if we have the necessary data AND complete aircraft data AND valid alternate data
     if (hasValidAlternateData && selectedAircraft && waypoints.length >= 2 && weather && hasRequiredAircraftData) {
@@ -397,6 +400,15 @@ const EnhancedStopCardsContainer = ({
         }
       }
     }
+    
+    }, 1000); // 🚨 DEBOUNCE: 1000ms delay to stop infinite loops
+    
+    // 🚨 CLEANUP: Clear timeout on unmount or dependency change
+    return () => {
+      if (alternateDebounceTimeoutRef.current) {
+        clearTimeout(alternateDebounceTimeoutRef.current);
+      }
+    };
   }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates, locationFuelOverrides]);
   
   // Handle card click
