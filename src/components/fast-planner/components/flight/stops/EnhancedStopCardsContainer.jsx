@@ -267,7 +267,8 @@ const EnhancedStopCardsContainer = ({
   // 🚨 CRITICAL FIX: Add debouncing to alternate card calculation too
   const alternateDebounceTimeoutRef = useRef(null);
   
-  // 🟠 ADDED: Calculate alternate stop card when alternate route data exists
+  // 🚨 TEMPORARILY DISABLED: Calculate alternate stop card when alternate route data exists
+  /*
   useEffect(() => {
     
     // 🚨 DEBOUNCE: Clear previous timeout
@@ -278,17 +279,7 @@ const EnhancedStopCardsContainer = ({
     // 🚨 DEBOUNCE: Only calculate after 300ms of stability
     alternateDebounceTimeoutRef.current = setTimeout(() => {
     
-    // 🔍 MINIMAL DEBUG: Just check if we get here
-    console.log('🔍 ALTERNATE CARD USEEFFECT RUNNING', { hasAlternateRouteData: !!alternateRouteData });
-    
-    // 🔍 DEBUG: Check the actual alternateRouteData values
-    if (alternateRouteData) {
-      console.log('🔍 ALTERNATE ROUTE DATA VALUES:', {
-        totalDistance: alternateRouteData.totalDistance,
-        estimatedTime: alternateRouteData.estimatedTime,
-        timeHours: alternateRouteData.timeHours
-      });
-    }
+    // 🔍 DEBUG LOGS REMOVED TEMPORARILY
     
     // 🛩️ VFR MODE: Continue alternate calculations for fuel dependencies (hide visually only)
     if (waiveAlternates) {
@@ -309,8 +300,7 @@ const EnhancedStopCardsContainer = ({
       alternateRouteData.timeHours && 
       alternateRouteData.timeHours > 0.01; // Must be > 0.01 hours minimum
     
-    // 🔍 DEBUG: Show validation result
-    console.log('🔍 ALTERNATE VALIDATION RESULT:', { hasValidAlternateData });
+    // 🔍 DEBUG LOGS REMOVED TEMPORARILY
 
 
     // Only calculate if we have the necessary data AND complete aircraft data AND valid alternate data
@@ -425,6 +415,7 @@ const EnhancedStopCardsContainer = ({
       }
     };
   }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates, locationFuelOverrides]);
+  */
   
   // Handle card click
   const handleCardClick = (index) => {
