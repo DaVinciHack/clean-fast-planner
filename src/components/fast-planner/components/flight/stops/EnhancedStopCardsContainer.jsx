@@ -235,7 +235,7 @@ const EnhancedStopCardsContainer = ({
       setDisplayStopCards([]);
     }
     
-    }, 1000); // 🚨 DEBOUNCE: 1000ms delay to stop infinite loops
+    }, 300); // 🚨 DEBOUNCE: 300ms delay - responsive but prevents loops
     
     // 🚨 CLEANUP: Clear timeout on unmount or dependency change
     return () => {
@@ -275,8 +275,11 @@ const EnhancedStopCardsContainer = ({
       clearTimeout(alternateDebounceTimeoutRef.current);
     }
     
-    // 🚨 DEBOUNCE: Only calculate after 1000ms of stability
+    // 🚨 DEBOUNCE: Only calculate after 300ms of stability
     alternateDebounceTimeoutRef.current = setTimeout(() => {
+    
+    // 🔍 MINIMAL DEBUG: Just check if we get here
+    console.log('🔍 ALTERNATE CARD USEEFFECT RUNNING', { hasAlternateRouteData: !!alternateRouteData });
     
     // 🛩️ VFR MODE: Continue alternate calculations for fuel dependencies (hide visually only)
     if (waiveAlternates) {
@@ -401,7 +404,7 @@ const EnhancedStopCardsContainer = ({
       }
     }
     
-    }, 1000); // 🚨 DEBOUNCE: 1000ms delay to stop infinite loops
+    }, 300); // 🚨 DEBOUNCE: 300ms delay - responsive but prevents loops
     
     // 🚨 CLEANUP: Clear timeout on unmount or dependency change
     return () => {
