@@ -211,15 +211,15 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         }
         
         // console.log('🚨 APPROACH FUEL DEBUG:', {
-          fuelPolicy: !!fuelPolicy,
-          approachFuelDefault: fuelPolicy?.approachFuelDefault,
-          fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
-          currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.approachFuel?.default,
-          finalAmount: approachAmount,
-          waypointName,
-          ranking,
-          isRig
-        });
+        //   fuelPolicy: !!fuelPolicy,
+        //   approachFuelDefault: fuelPolicy?.approachFuelDefault,
+        //   fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
+        //   currentPolicyPath: fuelPolicy?.currentPolicy?.fuelTypes?.approachFuel?.default,
+        //   finalAmount: approachAmount,
+        //   waypointName,
+        //   ranking,
+        //   isRig
+        // });
         return approachAmount; // Only return OSDK value
       }
       return 0;
