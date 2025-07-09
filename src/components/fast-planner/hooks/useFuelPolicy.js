@@ -3,7 +3,7 @@
  * Handles loading, caching, and switching between fuel policies
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import fuelPolicyService from '../services/FuelPolicyService';
 
 export function useFuelPolicy() {
@@ -15,6 +15,7 @@ export function useFuelPolicy() {
 
   /**
    * Load fuel policies for a specific region
+   * STABILITY FIX: Remove volatile state from dependencies
    */
   const loadPoliciesForRegion = useCallback(async (region) => {
     if (!region) {
@@ -71,7 +72,7 @@ export function useFuelPolicy() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentRegion, isLoading, availablePolicies]); // Fixed dependencies
+  }, []); // STABILITY FIX: Empty dependency array makes callback stable
 
   /**
    * Set the active fuel policy
@@ -89,14 +90,19 @@ export function useFuelPolicy() {
 
   /**
    * Find and set default policy for an aircraft
+   * STABILITY FIX: Use service state instead of hook state
    */
   const selectDefaultPolicyForAircraft = useCallback((aircraft) => {
-    if (!currentRegion || availablePolicies.length === 0) {
+    // Use service state instead of hook state for stability
+    const currentServiceRegion = fuelPolicyService.getCurrentRegion();
+    const availableServicePolicies = fuelPolicyService.getCachedPoliciesForRegion(currentServiceRegion);
+    
+    if (!currentServiceRegion || availableServicePolicies.length === 0) {
       console.warn('Cannot select default policy: no region or policies loaded');
       return null;
     }
 
-    const defaultPolicy = fuelPolicyService.findDefaultPolicyForAircraft(currentRegion, aircraft);
+    const defaultPolicy = fuelPolicyService.findDefaultPolicyForAircraft(currentServiceRegion, aircraft);
     if (defaultPolicy) {
       selectPolicy(defaultPolicy);
       return defaultPolicy;
@@ -104,20 +110,22 @@ export function useFuelPolicy() {
 
     console.warn('No suitable default policy found for aircraft');
     return null;
-  }, [currentRegion, availablePolicies, selectPolicy]);
+  }, [selectPolicy]);
 
   /**
    * Refresh policies for current region
+   * STABILITY FIX: Remove volatile dependencies
    */
   const refreshPolicies = useCallback(async () => {
-    if (!currentRegion) {
+    const region = fuelPolicyService.getCurrentRegion();
+    if (!region) {
       return;
     }
 
-    console.log(`Refreshing policies for region: ${currentRegion}`);
+    console.log(`Refreshing policies for region: ${region}`);
     fuelPolicyService.clearCache();
-    await loadPoliciesForRegion(currentRegion);
-  }, [currentRegion, loadPoliciesForRegion]);
+    await loadPoliciesForRegion(region);
+  }, [loadPoliciesForRegion]);
 
   /**
    * Get fuel settings from current policy for display/editing
@@ -178,7 +186,7 @@ export function useFuelPolicy() {
     };
   }, []);
 
-  return {
+  return useMemo(() => ({
     // State
     availablePolicies,
     currentPolicy,
@@ -199,7 +207,19 @@ export function useFuelPolicy() {
     // Utilities
     hasPolicies: availablePolicies.length > 0,
     hasCurrentPolicy: !!currentPolicy
-  };
+  }), [
+    availablePolicies,
+    currentPolicy,
+    isLoading,
+    error,
+    currentRegion,
+    loadPoliciesForRegion,
+    selectPolicy,
+    selectDefaultPolicyForAircraft,
+    clearPolicies,
+    refreshPolicies,
+    getCurrentPolicySettings
+  ]);
 }
 
 export default useFuelPolicy;

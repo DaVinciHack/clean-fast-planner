@@ -170,8 +170,17 @@ const EnhancedStopCardsContainer = ({
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
-    // 🚨 RACE CONDITION FIX: Ensure fuel policy has actual current policy data
-    const hasValidFuelPolicy = fuelPolicy && fuelPolicy.currentPolicy && fuelPolicy.currentPolicy.uuid;
+    // 🚨 AVIATION SAFETY: Ensure fuel policy is fully loaded with all required data (like aircraft pattern)
+    const hasValidFuelPolicy = fuelPolicy && 
+      fuelPolicy.currentPolicy && 
+      fuelPolicy.currentPolicy.uuid &&
+      fuelPolicy.currentPolicy.fuelTypes &&
+      fuelPolicy.currentPolicy.fuelTypes.reserveFuel &&
+      fuelPolicy.currentPolicy.fuelTypes.reserveFuel.default !== undefined &&
+      fuelPolicy.currentPolicy.contingencyFuel &&
+      fuelPolicy.currentPolicy.contingencyFuel.flightLegs &&
+      fuelPolicy.currentPolicy.contingencyFuel.flightLegs.default !== undefined &&
+      !fuelPolicy.isLoading;
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData) {
       
@@ -187,7 +196,7 @@ const EnhancedStopCardsContainer = ({
           weatherSegments,
           refuelStops,     // 🛩️ REFUEL: Pass refuel stops array
           waiveAlternates, // 🛩️ VFR: Pass waive alternates flag
-          alternateStopCard // 🛩️ IFR: Pass alternate card data for fuel requirements
+          null // 🛩️ REMOVED: No local alternateStopCard (handled by parent)
         );
         
         
@@ -243,34 +252,21 @@ const EnhancedStopCardsContainer = ({
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [waypoints, routeStats, selectedAircraft, weather, stopCardOptions, weatherSegments, refuelStops, forceRecalculation, alternateStopCard, waiveAlternates]); // 🚨 CRITICAL FIX: Reduced from 21 to 10 dependencies using memoized stopCardOptions
+  }, [waypoints, routeStats, selectedAircraft, weather, stopCardOptions, weatherSegments, refuelStops, forceRecalculation, waiveAlternates]); // 🚨 CRITICAL FIX: Removed alternateStopCard from dependencies (using parent callback only)
   
   
-  // 🟠 ADDED: Restore alternate card from persistent storage on mount
-  useEffect(() => {
-    if (window.currentAlternateCard && !alternateStopCard) {
-      setAlternateStopCard(window.currentAlternateCard);
-    }
-  }, []);
+  // 🟠 REMOVED: Local alternate card storage (using parent callback only)
   
   // ❌ REMOVED: All complex global storage refuel syncing - was causing refuel stops to jump around
   
-  // 🟠 ADDED: Persist alternate card to survive component unmount/remount
-  useEffect(() => {
-    if (alternateStopCard) {
-      window.currentAlternateCard = alternateStopCard;
-    } else if (alternateStopCard === null) {
-      window.currentAlternateCard = null;
-    }
-  }, [alternateStopCard]);
+  // 🟠 REMOVED: Alternate card persistence (handled by parent callback now)
   
   // 🚨 CRITICAL FIX: Add debouncing to alternate card calculation too
   const alternateDebounceTimeoutRef = useRef(null);
+  const alternateEffectCounterRef = useRef(0);
   
-  // 🚨 TEMPORARILY DISABLED: Calculate alternate stop card when alternate route data exists
-  /*
+  // ✅ FIXED: Alternate card useEffect 
   useEffect(() => {
-    
     // 🚨 DEBOUNCE: Clear previous timeout
     if (alternateDebounceTimeoutRef.current) {
       clearTimeout(alternateDebounceTimeoutRef.current);
@@ -312,7 +308,9 @@ const EnhancedStopCardsContainer = ({
         // 🚨 AVIATION SAFETY: Ensure all required parameters are provided (no fallbacks)
         if (contingencyFuelPercent === undefined || contingencyFuelPercent === null) {
           console.error('🚨 Missing contingencyFuelPercent for alternate calculation');
-          setAlternateStopCard(null);
+          if (onAlternateCardCalculated) {
+            onAlternateCardCalculated(null);
+          }
           return;
         }
         
@@ -351,58 +349,32 @@ const EnhancedStopCardsContainer = ({
         
         if (alternateCard) {
           
-          // 🚨 RACE CONDITION FIX: Only update if alternate card has actually changed
-          const newAlternateString = JSON.stringify(alternateCard);
-          const currentAlternateString = JSON.stringify(alternateStopCard);
-          
-          if (newAlternateString !== currentAlternateString) {
-            setAlternateStopCard(alternateCard);
-            
-            // 🔧 NEW: Pass alternate card data up to parent
-            if (onAlternateCardCalculated) {
-              onAlternateCardCalculated(alternateCard);
-            }
-          } else {
+          // 🔧 FIXED: Update both local state and parent callback
+          setAlternateStopCard(alternateCard);
+          if (onAlternateCardCalculated) {
+            onAlternateCardCalculated(alternateCard);
           }
         } else {
-          
-          // 🚨 RACE CONDITION FIX: Only update if currently not null
-          if (alternateStopCard !== null) {
-            setAlternateStopCard(null);
-            
-            // 🔧 NEW: Clear alternate card data in parent
-            if (onAlternateCardCalculated) {
-              onAlternateCardCalculated(null);
-            }
-          } else {
+          // 🔧 FIXED: Clear both local state and parent callback
+          setAlternateStopCard(null);
+          if (onAlternateCardCalculated) {
+            onAlternateCardCalculated(null);
           }
         }
         
       } catch (error) {
         console.error('🟠 EnhancedStopCardsContainer: Error calculating alternate stop card:', error);
         
-        // 🚨 RACE CONDITION FIX: Only update if currently not null
-        if (alternateStopCard !== null) {
-          setAlternateStopCard(null);
-          
-          // 🔧 NEW: Clear alternate card data in parent on error
-          if (onAlternateCardCalculated) {
-            onAlternateCardCalculated(null);
-          }
+        // 🔧 FIXED: Clear alternate card data in parent on error (removed local state)
+        if (onAlternateCardCalculated) {
+          onAlternateCardCalculated(null);
         }
       }
       
     } else {
-      // Clear alternate card if conditions not met
-      
-      // 🚨 RACE CONDITION FIX: Only update if currently not null
-      if (alternateStopCard !== null) {
-        setAlternateStopCard(null);
-        
-        // 🔧 NEW: Clear alternate card data in parent when conditions not met
-        if (onAlternateCardCalculated) {
-          onAlternateCardCalculated(null);
-        }
+      // 🔧 FIXED: Clear alternate card if conditions not met (removed local state)
+      if (onAlternateCardCalculated) {
+        onAlternateCardCalculated(null);
       }
     }
     
@@ -414,8 +386,7 @@ const EnhancedStopCardsContainer = ({
         clearTimeout(alternateDebounceTimeoutRef.current);
       }
     };
-  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, forceRecalculation, waiveAlternates, locationFuelOverrides]);
-  */
+  }, [alternateRouteData, selectedAircraft, waypoints, weather, routeStats, passengerWeight, cargoWeight, reserveFuel, contingencyFuelPercent, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, refuelStops, waiveAlternates, locationFuelOverrides]);
   
   // Handle card click
   const handleCardClick = (index) => {
@@ -716,7 +687,7 @@ const EnhancedStopCardsContainer = ({
             );
           })}
           
-          {/* Render alternate stop card if available and alternates not waived (keep for calculations but hide in VFR) */}
+          {/* Render alternate stop card if available and alternates not waived */}
           {alternateStopCard && !waiveAlternates && (
             <StopCard
               key="alternate-stop-card"
