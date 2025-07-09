@@ -45,8 +45,11 @@ const GlassMenuDock = ({
   // State for expanded/compact mode
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Auto-hide menu when any panel is visible (mobile/iPad)
-  const shouldHideMenu = (leftPanelVisible || rightPanelVisible) && (isPhoneLayout || window.innerWidth <= 1024);
+  // State for force showing menu (overrides panel visibility)
+  const [forceShowMenu, setForceShowMenu] = useState(false);
+  
+  // Auto-hide menu when any panel is visible (mobile/iPad), unless forced to show
+  const shouldHideMenu = (leftPanelVisible || rightPanelVisible) && (isPhoneLayout || window.innerWidth <= 1024) && !forceShowMenu;
   
   // Debug logging to check state
   console.log('🎯 GLASS MENU DEBUG:', {
@@ -82,13 +85,12 @@ const GlassMenuDock = ({
   
   // Handle tab click to close panels and show menu
   const handleTabClick = () => {
-    console.log('🎯 TAB CLICKED - Current state:', {
-      leftPanelVisible,
-      rightPanelVisible,
-      shouldHideMenu
-    });
+    console.log('🎯 TAB CLICKED - Forcing menu to show and closing panels');
     
-    // Close any open panels - this will automatically trigger menu to show via shouldHideMenu
+    // FIRST: Force menu to show immediately
+    setForceShowMenu(true);
+    
+    // THEN: Close any open panels
     if (leftPanelVisible && onHideLeftPanel) {
       console.log('🎯 Closing left panel');
       onHideLeftPanel();
@@ -97,6 +99,11 @@ const GlassMenuDock = ({
       console.log('🎯 Closing right panel');
       onHideRightPanel();
     }
+    
+    // Reset force show after panels have had time to close
+    setTimeout(() => {
+      setForceShowMenu(false);
+    }, 500);
   };
 
   // All menu items for expanded state
@@ -289,6 +296,8 @@ const GlassMenuDock = ({
               if (rightPanelVisible && onHideRightPanel) {
                 onHideRightPanel();
               }
+              // Reset force show when opening panels
+              setForceShowMenu(false);
             }}
             title={leftPanelVisible ? 'Close route editor' : 'Open route editor'}
           >
@@ -330,6 +339,8 @@ const GlassMenuDock = ({
                 if (leftPanelVisible && onHideLeftPanel) {
                   onHideLeftPanel();
                 }
+                // Reset force show when opening panels
+                setForceShowMenu(false);
               }}
               title={rightPanelVisible ? 'Hide settings panel' : 'Show settings panel'}
             >

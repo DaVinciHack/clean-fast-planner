@@ -85,7 +85,15 @@ const FastPlannerCore = ({
   addWaypointDirectImplementation, // Pass the actual implementation function
   handleMapReadyImpl              // Pass the map ready implementation
 }) => {
-  const { isAuthenticated, userName, userDetails, isLoading, login } = useAuth();
+  // 🚨 CRITICAL FIX: AuthContext broken online, use working OSDK client directly
+  const authFromContext = useAuth();
+  const { isAuthenticated: authContextAuth, userName: authContextName, userDetails: authContextDetails, isLoading: authContextLoading, login } = authFromContext || {};
+  
+  // Use OSDK client directly since it works online (AuthContext is broken)
+  const isAuthenticated = authContextAuth || !!client;
+  const userName = authContextName || window.userName || 'User';
+  const userDetails = authContextDetails || (client ? { authenticated: true } : null);
+  const isLoading = authContextLoading || false;
   const { currentRegion: activeRegionFromContext } = useRegion();
   
   // Make region globally accessible for weather system
