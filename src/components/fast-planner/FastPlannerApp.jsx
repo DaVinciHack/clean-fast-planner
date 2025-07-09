@@ -1690,6 +1690,52 @@ const FastPlannerCore = ({
     
     try {
       
+      // 🚁 CRITICAL: Set aircraft FIRST before anything else
+      // This ensures stop cards have aircraft data for speed calculations
+      if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
+        try {
+          console.log('🛩️ FLIGHT LOAD: Setting aircraft FIRST:', flightData.aircraftId);
+          
+          // Get available aircraft using the correct method
+          const availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
+          
+          const matchingAircraft = availableAircraft.find(aircraft => {
+            return aircraft.aircraftId === flightData.aircraftId || 
+                   aircraft.id === flightData.aircraftId ||
+                   aircraft.rawRegistration === flightData.aircraftId ||  // Use rawRegistration!
+                   aircraft.registration === flightData.aircraftId ||
+                   aircraft.name === flightData.aircraftId;
+          });
+          
+          if (matchingAircraft) {
+            console.log('🛩️ FLIGHT LOAD: Found matching aircraft:', matchingAircraft.registration, 'type:', matchingAircraft.modelType);
+            
+            // CRITICAL FIX: Set TYPE first, then registration AND selectedAircraft directly
+            changeAircraftType(matchingAircraft.modelType);
+            
+            // Small delay to let type selection complete, then set everything
+            setTimeout(() => {
+              changeAircraftRegistration(matchingAircraft.registration);
+              // FORCE the selectedAircraft to be set directly
+              setSelectedAircraft(matchingAircraft);
+            }, 100);
+            
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Aircraft restored: ${matchingAircraft.name || matchingAircraft.registration}`, 
+                'success',
+                2000
+              );
+            }
+          } else {
+            console.warn(`❌ Aircraft ${flightData.aircraftId} not found. Available aircraft:`, 
+              availableAircraft.map(a => a.aircraftId || a.id || a.registration).join(', '));
+          }
+        } catch (error) {
+          console.error('🚁 Error setting aircraft FIRST:', error);
+        }
+      }
+      
       // 🎯 GLASS MENU: Activate glass menu when flight loads
       setIsFlightLoaded(true);
       setIsEditLocked(true); // Always start locked to prevent accidental edits
@@ -2485,42 +2531,7 @@ const FastPlannerCore = ({
         }
       }
       
-      // Set aircraft if available
-      
-      if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
-        try {
-          // Get available aircraft using the correct method
-          const availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
-          
-          const matchingAircraft = availableAircraft.find(aircraft => {
-            return aircraft.aircraftId === flightData.aircraftId || 
-                   aircraft.id === flightData.aircraftId ||
-                   aircraft.rawRegistration === flightData.aircraftId ||  // Use rawRegistration!
-                   aircraft.registration === flightData.aircraftId ||
-                   aircraft.name === flightData.aircraftId;
-          });
-          
-          if (matchingAircraft) {
-            // 🚁 CRITICAL FIX: Use changeAircraftRegistration instead of setSelectedAircraft
-            // This triggers the complete aircraft selection workflow including fuel policies
-            changeAircraftRegistration(matchingAircraft.registration);
-            
-            if (window.LoadingIndicator) {
-              window.LoadingIndicator.updateStatusIndicator(
-                `Aircraft restored: ${matchingAircraft.name || matchingAircraft.registration}`, 
-                'success',
-                2000
-              );
-            }
-          } else {
-            console.warn(`❌ Aircraft ${flightData.aircraftId} not found. Available aircraft:`, 
-              availableAircraft.map(a => a.aircraftId || a.id || a.registration).join(', '));
-          }
-        } catch (error) {
-          console.error('Error restoring aircraft:', error);
-        }
-      } else {
-      }
+      // Aircraft selection moved to beginning of function
       
       // Update status
       if (window.LoadingIndicator) {
