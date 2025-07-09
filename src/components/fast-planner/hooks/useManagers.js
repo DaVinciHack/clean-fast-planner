@@ -177,6 +177,9 @@ const useManagers = ({
     if (!aircraftManagerRef.current) {
       console.log("FastPlannerApp: Creating AircraftManager instance");
       aircraftManagerRef.current = new AircraftManager();
+      
+      // CRITICAL: Set global reference like other managers
+      window.aircraftManager = aircraftManagerRef.current;
 
       // Set up aircraft manager callbacks
       aircraftManagerRef.current.setCallback('onAircraftLoaded', (aircraftList) => {

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * Custom hook for managing aircraft selection and data
+ * ARCHITECTURAL FIX: Direct manager access instead of fragile callbacks
  */
 const useAircraft = ({
   aircraftManagerRef,
@@ -15,12 +16,6 @@ const useAircraft = ({
   const appSettingsManagerInstanceRef = useRef(null);
   const [currentAircraftHookRegion, setCurrentAircraftHookRegion] = useState(null);
   
-  // Ref to hold the latest version of currentAircraftHookRegion for stable callbacks
-  const latestRegionRef = useRef(currentAircraftHookRegion);
-  useEffect(() => {
-    latestRegionRef.current = currentAircraftHookRegion;
-  }, [currentAircraftHookRegion]);
-
   // State for aircraft selection and data
   const [aircraftType, setAircraftType] = useState('');
   const [aircraftRegistration, setAircraftRegistration] = useState('');
@@ -29,8 +24,47 @@ const useAircraft = ({
   const [aircraftTypes, setAircraftTypes] = useState([]);
   const [aircraftsByType, setAircraftsByType] = useState({});
   const [aircraftLoading, setAircraftLoading] = useState(false);
+  
+  // ARCHITECTURAL FIX: Direct data access interval instead of callbacks
+  const dataPollingRef = useRef(null);
 
-  // Memoized setupAircraftCallbacks
+  // HYBRID APPROACH: Callbacks for local, polling for production
+  const processAircraftData = useCallback(() => {
+    if (!aircraftManagerInstanceRef.current?.filteredAircraft) {
+      return false;
+    }
+
+    const filteredAircraft = aircraftManagerInstanceRef.current.filteredAircraft;
+    console.log(`✅ PROCESSING: ${filteredAircraft.length} aircraft`);
+    
+    // Update aircraft list
+    setAircraftList(filteredAircraft);
+    
+    // Organize by type
+    const byType = {};
+    const availableTypes = [];
+    filteredAircraft.forEach(aircraft => {
+      const modelType = aircraft.modelType || 'Unknown';
+      if (!byType[modelType]) {
+        byType[modelType] = [];
+        availableTypes.push(modelType);
+      }
+      byType[modelType].push(aircraft);
+    });
+    
+    // MINIFICATION PROTECTION: Force these setters to be preserved
+    window.setAircraftTypes = setAircraftTypes;
+    window.setAircraftsByType = setAircraftsByType;
+    
+    setAircraftTypes(availableTypes.sort());
+    setAircraftsByType(byType);
+    setAircraftLoading(false);
+    
+    console.log(`✅ UPDATED STATE: ${availableTypes.length} types`);
+    return true;
+  }, []);
+
+  // HYBRID: Setup callbacks for local dev compatibility
   const setupAircraftCallbacks = useCallback(() => {
     if (!aircraftManagerInstanceRef.current) {
       console.log('Cannot set up aircraft callbacks - manager not available');
@@ -42,8 +76,8 @@ const useAircraft = ({
     aircraftManagerInstanceRef.current.setCallback('onAircraftLoaded', (loadedAircraftList) => {
       console.log(`Loaded ${loadedAircraftList.length} total aircraft`);
       setAircraftList(loadedAircraftList);
-      if (latestRegionRef.current) { // Use ref for latest region
-        aircraftManagerInstanceRef.current.filterAircraft(latestRegionRef.current.id);
+      if (currentAircraftHookRegion) {
+        aircraftManagerInstanceRef.current.filterAircraft(currentAircraftHookRegion.id);
       }
     });
 
@@ -62,20 +96,61 @@ const useAircraft = ({
           }
           byType[modelType].push(aircraft);
         });
+        
+        // MINIFICATION PROTECTION: Force these setters to be preserved
+        window.setAircraftTypes = setAircraftTypes;
+        window.setAircraftsByType = setAircraftsByType;
+        
         setAircraftTypes(availableTypes.sort());
         setAircraftsByType(byType);
       }
       setAircraftLoading(false);
     });
-  }, []);
+  }, [currentAircraftHookRegion]);
 
-  // Update managers when refs change
+  // HYBRID APPROACH: Callbacks + polling fallback
   useEffect(() => {
     if (aircraftManagerRef && aircraftManagerRef.current) {
+      console.log('🔧 HYBRID: Setting up callbacks + polling fallback');
       aircraftManagerInstanceRef.current = aircraftManagerRef.current;
+      
+      // Setup callbacks for local development
       setupAircraftCallbacks();
+      
+      // Also start polling as fallback for production
+      const startPollingFallback = () => {
+        if (dataPollingRef.current) {
+          clearInterval(dataPollingRef.current);
+        }
+        
+        // Wait a bit to see if callbacks work first
+        setTimeout(() => {
+          if (aircraftTypes.length === 0) {
+            console.log('🔧 FALLBACK: Callbacks failed, starting polling');
+            dataPollingRef.current = setInterval(() => {
+              const hasData = processAircraftData();
+              if (hasData) {
+                clearInterval(dataPollingRef.current);
+                dataPollingRef.current = null;
+              }
+            }, 500);
+          }
+        }, 2000);
+      };
+      
+      startPollingFallback();
+      
+      // Try immediate processing
+      setTimeout(() => processAircraftData(), 100);
     }
-  }, [aircraftManagerRef, setupAircraftCallbacks]); // Removed currentAircraftHookRegion from here
+    
+    return () => {
+      if (dataPollingRef.current) {
+        clearInterval(dataPollingRef.current);
+        dataPollingRef.current = null;
+      }
+    };
+  }, [aircraftManagerRef, processAircraftData, setupAircraftCallbacks, aircraftTypes.length]);
 
   useEffect(() => {
     if (appSettingsManagerRef && appSettingsManagerRef.current) {
@@ -83,67 +158,47 @@ const useAircraft = ({
     }
   }, [appSettingsManagerRef]);
 
-  // Load aircraft data when region changes or aircraftType changes
+  // ARCHITECTURAL FIX: Region-based filtering with direct data access
   useEffect(() => {
-    // Skip effect if no manager or no region
     if (!aircraftManagerInstanceRef.current || !currentAircraftHookRegion?.id) {
       return;
     }
     
-    // Use a ref to track the last filter operation to prevent duplicates
     const regionId = currentAircraftHookRegion.id;
     const currentType = aircraftType || '';
     
-    // Generate a filter key to detect duplicate filter operations
-    const filterKey = `${regionId}:${currentType}`;
+    console.log(`✅ FILTERING: Region ${currentAircraftHookRegion.name}, type: ${currentType || 'all'}`);
     
-    // Skip if already loading with these params (prevents rapid re-filtering)
-    if (aircraftManagerInstanceRef.current.lastFilterKey === filterKey && 
-        aircraftManagerInstanceRef.current.isFiltering) {
-      console.log(`Skipping duplicate aircraft filter for ${filterKey}`);
-      return;
-    }
-    
-    console.log(`Loading aircraft for region ${currentAircraftHookRegion.name} and type ${aircraftType || 'any'}`);
-    
-    // Set loading state
     setAircraftLoading(true);
     
-    // Track this filter operation
-    aircraftManagerInstanceRef.current.lastFilterKey = filterKey;
-    aircraftManagerInstanceRef.current.isFiltering = true;
-    
-    // Execute the filter operation
     try {
-      const result = aircraftManagerInstanceRef.current.filterAircraft(regionId, currentType);
+      // Execute filter operation
+      aircraftManagerInstanceRef.current.filterAircraft(regionId, currentType);
       
-      // Handle the case where filterAircraft returns a promise
-      if (result && typeof result.finally === 'function') {
-        result.finally(() => {
-          // Clear filtering flag when done
-          if (aircraftManagerInstanceRef.current) {
-            aircraftManagerInstanceRef.current.isFiltering = false;
-          }
-        });
-      } else {
-        // Handle case where it doesn't return a promise
-        setTimeout(() => {
-          if (aircraftManagerInstanceRef.current) {
-            aircraftManagerInstanceRef.current.isFiltering = false;
-          }
-        }, 500);
+      // Start polling for updated data
+      if (dataPollingRef.current) {
+        clearInterval(dataPollingRef.current);
       }
+      
+      dataPollingRef.current = setInterval(() => {
+        const hasData = processAircraftData();
+        if (hasData) {
+          clearInterval(dataPollingRef.current);
+          dataPollingRef.current = null;
+        }
+      }, 200);
+      
+      // Try immediate processing
+      setTimeout(() => processAircraftData(), 100);
+      
     } catch (error) {
       console.error('Error filtering aircraft:', error);
-      // Clear filtering flag on error
-      if (aircraftManagerInstanceRef.current) {
-        aircraftManagerInstanceRef.current.isFiltering = false;
-      }
+      setAircraftLoading(false);
     }
-  }, [currentAircraftHookRegion, aircraftType]);
+  }, [currentAircraftHookRegion, aircraftType, processAircraftData]);
 
   const setAircraftManagers = useCallback((aircraftManager, appSettingsManager) => {
-    console.log('Setting aircraft managers:', { 
+    console.log('✅ SETTING MANAGERS:', { 
       aircraftManager: !!aircraftManager, 
       appSettingsManager: !!appSettingsManager
     });
@@ -151,38 +206,30 @@ const useAircraft = ({
     aircraftManagerInstanceRef.current = aircraftManager;
     appSettingsManagerInstanceRef.current = appSettingsManager;
     
-    // Call setupAircraftCallbacks if managers are now available
+    // Start direct data processing if manager is available
     if (aircraftManager) {
-        setupAircraftCallbacks();
+      setTimeout(() => processAircraftData(), 100);
     }
-  }, [setupAircraftCallbacks]); // Removed currentAircraftHookRegion from here
+  }, [processAircraftData]);
 
   const setCurrentAircraftRegion = useCallback((region) => {
-    // Enhanced region comparison logic
     const hasNewRegion = region && region.id;
     const hasDifferentRegion = !currentAircraftHookRegion || 
                               (currentAircraftHookRegion.id !== region?.id);
     
     if (hasNewRegion && hasDifferentRegion) {
-      console.log('Setting current aircraft region (useAircraft state):', region?.name);
-      
-      // Update local state for region
+      console.log('✅ REGION CHANGE:', region?.name);
       setCurrentAircraftHookRegion(region);
       
-      // Only trigger loading state if we have a manager and a valid region
       if (aircraftManagerInstanceRef.current && region.id) {
         setAircraftLoading(true);
       }
     } else if (!region && currentAircraftHookRegion) {
-      // Handle case where region is explicitly cleared
-      console.log('Clearing current aircraft region (useAircraft state)');
+      console.log('✅ CLEARING REGION');
       setCurrentAircraftHookRegion(null);
       setAircraftLoading(false);
-    } else {
-      // Skip update for same region to prevent unnecessary rerenders
-      // console.log('setCurrentAircraftRegion called with same or null region, no state change needed.');
     }
-  }, [currentAircraftHookRegion]); // Only depend on currentAircraftHookRegion
+  }, [currentAircraftHookRegion]);
 
 
   /**
@@ -342,7 +389,8 @@ const useAircraft = ({
     }
   }, [aircraftType, aircraftsByType]);
 
-  return {
+  // ARCHITECTURAL FIX: Clean return object
+  const returnObject = {
     aircraftType,
     setAircraftType,
     aircraftRegistration, 
@@ -359,6 +407,26 @@ const useAircraft = ({
     setAircraftManagers,
     setCurrentAircraftRegion
   };
+  
+  // Store globally for debugging
+  window.debugUseAircraftReturn = {
+    aircraftTypes: aircraftTypes,
+    aircraftsByType: aircraftsByType,
+    aircraftTypesLength: aircraftTypes?.length || 0,
+    aircraftsByTypeKeys: Object.keys(aircraftsByType || {}),
+    aircraftLoading: aircraftLoading,
+    managerHasData: !!aircraftManagerInstanceRef.current?.filteredAircraft?.length,
+    timestamp: new Date().toISOString()
+  };
+  
+  console.log(`✅ ARCHITECTURAL FIX RETURNING:`, {
+    aircraftTypesCount: aircraftTypes?.length || 0,
+    aircraftsByTypeKeys: Object.keys(aircraftsByType || {}),
+    aircraftLoading: aircraftLoading,
+    managerDataCount: aircraftManagerInstanceRef.current?.filteredAircraft?.length || 0
+  });
+  
+  return returnObject;
 };
 
 export default useAircraft;
