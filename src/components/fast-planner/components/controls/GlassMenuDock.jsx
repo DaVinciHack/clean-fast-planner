@@ -20,6 +20,9 @@ const GlassMenuDock = ({
   // Phone layout support
   isPhoneLayout = false,
   onToggleRightPanel, // New callback for toggling right panel on phones
+  // Mobile slide control
+  onHideLeftPanel, // Callback to hide left panel when menu slides up
+  onHideRightPanel, // Callback to hide right panel when menu slides up
   // Smart toggle button props
   showEditButton = false, // Shows when flight is loaded
   currentMapMode = 'dark', // Current map style (dark/3d)
@@ -41,6 +44,18 @@ const GlassMenuDock = ({
 
   // State for expanded/compact mode
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Auto-hide menu when any panel is visible (mobile/iPad)
+  const shouldHideMenu = (leftPanelVisible || rightPanelVisible) && (isPhoneLayout || window.innerWidth <= 1024);
+  
+  // Debug logging to check state
+  console.log('🎯 GLASS MENU DEBUG:', {
+    leftPanelVisible,
+    rightPanelVisible,
+    isPhoneLayout,
+    windowWidth: window.innerWidth,
+    shouldHideMenu
+  });
 
   if (!isVisible) return null;
 
@@ -52,9 +67,36 @@ const GlassMenuDock = ({
     } else {
       // If compact, expand it
       setIsExpanded(true);
+      
+      // On mobile/iPad, when menu opens, hide any open panels
+      if (leftPanelVisible && onHideLeftPanel) {
+        onHideLeftPanel();
+      }
+      if (rightPanelVisible && onHideRightPanel) {
+        onHideRightPanel();
+      }
     }
     // Also trigger the original menu action if needed
     onOpenMenu();
+  };
+  
+  // Handle tab click to close panels and show menu
+  const handleTabClick = () => {
+    console.log('🎯 TAB CLICKED - Current state:', {
+      leftPanelVisible,
+      rightPanelVisible,
+      shouldHideMenu
+    });
+    
+    // Close any open panels - this will automatically trigger menu to show via shouldHideMenu
+    if (leftPanelVisible && onHideLeftPanel) {
+      console.log('🎯 Closing left panel');
+      onHideLeftPanel();
+    }
+    if (rightPanelVisible && onHideRightPanel) {
+      console.log('🎯 Closing right panel');
+      onHideRightPanel();
+    }
   };
 
   // All menu items for expanded state
@@ -68,7 +110,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Main',
-      action: onMainCard || (() => console.log('Main clicked'))
+      action: () => {
+        if (onMainCard) onMainCard();
+        // Close any open panels when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'settings',
@@ -79,7 +125,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Settings',
-      action: onSettingsCard || (() => console.log('Settings clicked'))
+      action: () => {
+        if (onSettingsCard) onSettingsCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'performance',
@@ -89,7 +139,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Performance',
-      action: onPerformanceCard || (() => console.log('Performance clicked'))
+      action: () => {
+        if (onPerformanceCard) onPerformanceCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'weather',
@@ -99,7 +153,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Weather',
-      action: onWeatherCard || (() => console.log('Weather clicked'))
+      action: () => {
+        if (onWeatherCard) onWeatherCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'finance',
@@ -110,7 +168,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Finance',
-      action: onFinanceCard || (() => console.log('Finance clicked'))
+      action: () => {
+        if (onFinanceCard) onFinanceCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'sar',
@@ -123,7 +185,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'S.A.R',
-      action: onSARCard || (() => console.log('SAR clicked'))
+      action: () => {
+        if (onSARCard) onSARCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'save',
@@ -135,7 +201,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Save',
-      action: onSaveCard || (() => console.log('Save clicked'))
+      action: () => {
+        if (onSaveCard) onSaveCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'load',
@@ -149,7 +219,11 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Load',
-      action: onLoadCard || (() => console.log('Load clicked'))
+      action: () => {
+        if (onLoadCard) onLoadCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     },
     {
       id: 'layers',
@@ -161,13 +235,28 @@ const GlassMenuDock = ({
         </svg>
       ),
       label: 'Map Layers',
-      action: onLayersCard || (() => console.log('Map Layers clicked'))
+      action: () => {
+        if (onLayersCard) onLayersCard();
+        // Close left panel when opening right panel cards
+        if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+      }
     }
   ];
 
   return (
     <div className="glass-dock-container">
-      <div className={`glass-dock ${isExpanded ? 'expanded' : 'compact'}`}>
+      {/* Mobile/iPad slide-up tab - show when menu is hidden by panels */}
+      {shouldHideMenu && (
+        <div className="mobile-slide-tab" onClick={handleTabClick}>
+          <div className="slide-tab-indicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </div>
+        </div>
+      )}
+      
+      <div className={`glass-dock ${isExpanded ? 'expanded' : 'compact'} ${shouldHideMenu ? 'mobile-hidden' : ''}`}>
         
         {/* Always visible: Lock button - Round with no text */}
         <div className="glass-button-container">
@@ -194,7 +283,13 @@ const GlassMenuDock = ({
         <div className="glass-button-container">
           <button 
             className={`glass-button icon-above-text route-button ${leftPanelVisible ? 'active' : ''}`}
-            onClick={onOpenRoute}
+            onClick={() => {
+              onOpenRoute();
+              // When opening route panel, close right panel if open
+              if (rightPanelVisible && onHideRightPanel) {
+                onHideRightPanel();
+              }
+            }}
             title={leftPanelVisible ? 'Close route editor' : 'Open route editor'}
           >
             <div className="glass-icon">
@@ -229,7 +324,13 @@ const GlassMenuDock = ({
           <div className="glass-button-container">
             <button 
               className={`glass-button icon-above-text menu-button ${rightPanelVisible ? 'active' : ''}`}
-              onClick={onToggleRightPanel}
+              onClick={() => {
+                onToggleRightPanel();
+                // When opening right panel, close left panel if open
+                if (leftPanelVisible && onHideLeftPanel) {
+                  onHideLeftPanel();
+                }
+              }}
               title={rightPanelVisible ? 'Hide settings panel' : 'Show settings panel'}
             >
               <div className="glass-icon">
@@ -325,6 +426,7 @@ const GlassMenuDock = ({
             </button>
           </div>
         )}
+
 
         {/* Always visible: Menu/Close button - Round with no text */}
         <div className="glass-button-container">

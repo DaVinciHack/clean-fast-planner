@@ -86,56 +86,36 @@ export const RegionProvider = ({
     });
     
     try {
-      // If we have any kind of map, consider it ready
-      if (mapManagerRef && mapManagerRef.current) {
-        console.log("🔍 OSDK DEBUG: MapManager ref is available - considering ready");
-        return true;
+      // Check if map is actually loaded using the proper method
+      if (mapManagerRef && mapManagerRef.current && mapManagerRef.current.isMapLoaded) {
+        const isLoaded = mapManagerRef.current.isMapLoaded();
+        console.log("🔍 OSDK DEBUG: MapManager isMapLoaded():", isLoaded);
+        if (isLoaded) {
+          console.log("🔍 OSDK DEBUG: MapManager reports map is loaded - considering ready");
+          // Set the mapReady state to trigger useEffect that loads platforms
+          if (!mapReadyLastState.current || !mapReady) {
+            console.log("🔍 OSDK DEBUG: Setting mapReady state to true");
+            mapReadyLastState.current = true;
+            setMapReady(true);
+          }
+          return true;
+        }
       }
       
       // Check for global map instances as backup
-      if (window.mapManager || window.mapInstance) {
-        console.log("🔍 OSDK DEBUG: Global map found - considering ready");
-        return true;
-      }
-      
-      console.log("🔍 OSDK DEBUG: No map found");
-      return false;
-      
-      if (isReady) {
-        // Test a real map operation to confirm it's ready
-        try {
-          const currentZoom = map.getZoom();
-          console.log(`RegionContext: Map is ready with zoom level: ${currentZoom}`);
-        } catch (e) {
-          console.warn("RegionContext: Map operation test failed, not fully ready");
-          return false;
-        }
-        
-        // Only update state if there's a change to avoid unnecessary re-renders
+      if (window.mapManager && window.mapManager.isMapLoaded && window.mapManager.isMapLoaded()) {
+        console.log("🔍 OSDK DEBUG: Global map manager reports loaded - considering ready");
+        // Set the mapReady state to trigger useEffect that loads platforms
         if (!mapReadyLastState.current || !mapReady) {
-          console.log("RegionContext: Map is now ready for operations");
+          console.log("🔍 OSDK DEBUG: Setting mapReady state to true (global backup)");
           mapReadyLastState.current = true;
           setMapReady(true);
-          
-          // If we have a pending region, apply it now
-          if (pendingRegionChangeRef.current) {
-            console.log(`RegionContext: Applying pending region now that map is ready: ${pendingRegionChangeRef.current.name}`);
-            setCurrentRegion(pendingRegionChangeRef.current);
-            pendingRegionChangeRef.current = null;
-          }
         }
         return true;
-      } else {
-        // If we previously thought map was ready, but now it's not, update state
-        if (mapReadyLastState.current || mapReady) {
-          console.warn("RegionContext: Map is no longer ready for operations");
-          mapReadyLastState.current = false;
-          setMapReady(false);
-        } else {
-          console.warn("RegionContext: Map is not yet ready for operations");
-        }
-        return false;
       }
+      
+      console.log("🔍 OSDK DEBUG: Map not loaded or not available");
+      return false;
     } catch (error) {
       console.error("RegionContext: Error in checkMapReady:", error);
       return false;
@@ -526,6 +506,10 @@ export const RegionProvider = ({
       clientExists: !!client,
       url: window.location.href
     });
+    
+    // 🚨 FORCED DEBUG: Add global tracking
+    window.regionEffectRuns = (window.regionEffectRuns || 0) + 1;
+    console.log(`🚨 REGION EFFECT DEBUG: This useEffect has run ${window.regionEffectRuns} times`);
 
     if (!currentRegion || !client) {
       console.log(`🔍 OSDK DEBUG: Skipping region load`, {
@@ -587,6 +571,13 @@ export const RegionProvider = ({
       }
       
       console.log(`🔍 OSDK DEBUG: Map is ready, proceeding with platform loading for ${currentRegion.name}`);
+      
+      // 🚨 FORCED DEBUG: Check platform loading conditions
+      console.log(`🚨 PLATFORM LOADING DEBUG:`, {
+        platformManagerRef: !!platformManagerRef,
+        platformManagerRefCurrent: !!platformManagerRef?.current,
+        loadFunction: typeof platformManagerRef?.current?.loadPlatformsFromFoundry
+      });
       
       if (platformManagerRef && platformManagerRef.current) {
         console.log(`🔍 OSDK DEBUG: Platform loading section reached for ${currentRegion.name}`);

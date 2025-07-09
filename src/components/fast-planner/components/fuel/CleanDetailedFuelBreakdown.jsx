@@ -911,9 +911,9 @@ const CleanDetailedFuelBreakdown = ({
               return (
                 <div key={card.id || index} className={`stop-fuel-card ${isRefuelStop ? 'refuel-stop' : ''}`} style={{
                   marginBottom: 'clamp(16px, 3vw, 24px)',
-                  border: '1px solid #333',
+                  border: '1px solid #444',
                   borderRadius: '8px',
-                  background: 'linear-gradient(to bottom, rgba(50, 50, 50, 0.95), rgba(20, 20, 20, 0.98))',
+                  background: 'linear-gradient(to bottom, rgba(60, 60, 80, 0.95), rgba(30, 30, 40, 0.98))',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
@@ -925,7 +925,7 @@ const CleanDetailedFuelBreakdown = ({
                     alignItems: 'center',
                     padding: '12px 16px',
                     borderBottom: '1px solid #404040',
-                    background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
+                    background: 'linear-gradient(to right, rgba(64, 140, 235, 0.35), rgba(120, 40, 200, 0.35))',
                     position: 'relative',
                     borderTopLeftRadius: '8px',
                     borderTopRightRadius: '8px'
@@ -1032,7 +1032,7 @@ const CleanDetailedFuelBreakdown = ({
                       
                       {/* LEFT: Passenger Section */}
                       <div style={{
-                        background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
+                        background: 'linear-gradient(to bottom, rgba(74, 158, 255, 0.25), rgba(30, 80, 150, 0.35))',
                         borderRadius: '6px',
                         padding: '12px 16px 12px 16px'
                       }}>
@@ -1152,7 +1152,7 @@ const CleanDetailedFuelBreakdown = ({
                       
                       {/* RIGHT: Fuel Section */}
                       <div style={{
-                        background: 'linear-gradient(to bottom, rgba(45, 55, 65, 0.95), rgba(30, 40, 50, 0.95))',
+                        background: 'linear-gradient(to bottom, rgba(147, 51, 234, 0.25), rgba(100, 20, 180, 0.35))',
                         borderRadius: '6px',
                         padding: '12px 16px 12px 16px'
                       }}>
@@ -1565,9 +1565,13 @@ const CleanDetailedFuelBreakdown = ({
                     const approachWeather = getWeatherValue(stopName, 'approachFuel');
                     
                     if (araWeather > 0 || approachWeather > 0) {
+                      const suggestions = [];
+                      if (araWeather > 0) suggestions.push(`ARA: ${araWeather} lbs`);
+                      if (approachWeather > 0) suggestions.push(`Approach: ${approachWeather} lbs`);
+                      
                       return (
                         <div key={index} style={{ fontSize: '0.8em', marginBottom: '2px' }}>
-                          {stopName}: {araWeather > 0 ? `ARA: ${araWeather}` : ''} {approachWeather > 0 ? `Approach: ${approachWeather}` : ''}
+                          {stopName}: {suggestions.join(', ')}
                         </div>
                       );
                     }
@@ -1584,20 +1588,6 @@ const CleanDetailedFuelBreakdown = ({
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>
             Close
-          </button>
-          <button 
-            className="btn btn-primary"
-            onClick={handleApplyChanges}
-            style={{ backgroundColor: '#4CAF50', borderColor: '#4CAF50' }}
-          >
-            ✅ Apply Changes
-          </button>
-          <button 
-            className="btn btn-primary"
-            onClick={() => {
-            }}
-          >
-            🔧 Debug Info
           </button>
         </div>
         

@@ -541,6 +541,17 @@ const FastPlannerCore = ({
       usefulLoad: selectedAircraft?.usefulLoad,
       fuelBurn: selectedAircraft?.fuelBurn
     };
+    
+    // 🚨 AIRCRAFT DEBUG: Log when aircraft is missing required data
+    if (selectedAircraft && !hasRequiredAircraftData) {
+      console.warn('❌ AIRCRAFT MISSING DATA:', {
+        hasFuelBurn: !!selectedAircraft.fuelBurn,
+        fuelBurn: selectedAircraft.fuelBurn,
+        hasUsefulLoad: !!selectedAircraft.usefulLoad,
+        usefulLoad: selectedAircraft.usefulLoad,
+        allAircraftProps: Object.keys(selectedAircraft)
+      });
+    }
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
       
@@ -2269,10 +2280,10 @@ const FastPlannerCore = ({
           }
           
           // CRITICAL FIX: Force stop cards regeneration with new wind data
-          // 🚨 SAFETY: Check aircraft data before calculating
+          // 🚨 SAFETY: Check aircraft data before calculating (CONSISTENT WITH MAIN USEEFFECT)
           const hasRequiredAircraftData = selectedAircraft && 
-            selectedAircraft.dryWeight && 
-            selectedAircraft.fuelBurn;
+            selectedAircraft.fuelBurn &&
+            selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
             
           if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
             const currentRouteStats = routeStats || window.currentRouteStats;

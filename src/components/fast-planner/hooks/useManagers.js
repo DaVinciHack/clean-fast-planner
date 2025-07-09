@@ -80,6 +80,7 @@ const useManagers = ({
       
       // EMERGENCY FIX: Update global reference
       window.mapManager = mapManagerRef.current;
+      window.mapManagerRef = mapManagerRef;
 
       // Don't initialize the map here - let MapComponent handle that
       console.log("FastPlannerApp: MapManager created, initialization will be handled by MapComponent");
@@ -124,6 +125,7 @@ const useManagers = ({
       
       // ARCHITECTURE: Expose globally for weather circles management
       window.platformManager = platformManagerRef.current;
+      window.platformManagerRef = platformManagerRef;
     }
 
     // Create RegionManager 
