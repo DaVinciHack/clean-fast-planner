@@ -210,7 +210,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           approachAmount = fuelPolicy.approachFuelDefault;
         }
         
-        console.log('🚨 APPROACH FUEL DEBUG:', {
+        // console.log('🚨 APPROACH FUEL DEBUG:', {
           fuelPolicy: !!fuelPolicy,
           approachFuelDefault: fuelPolicy?.approachFuelDefault,
           fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
@@ -272,7 +272,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   const departureExtraFuelOverride = getLocationFuel(departureWaypoint, 'extraFuel', 1);
   let dynamicExtraFuel = departureExtraFuelOverride; // Only use location-specific extra fuel, no global fallback
   
-  console.log(`🔍 INITIAL EXTRA FUEL: departure override=${departureExtraFuelOverride}, dynamicExtraFuel=${dynamicExtraFuel} (no global fallback)`);
+  // console.log(`🔍 INITIAL EXTRA FUEL: departure override=${departureExtraFuelOverride}, dynamicExtraFuel=${dynamicExtraFuel} (no global fallback)`);
   
   // 🚨 APPROACH FUEL FIX: Calculate approach fuel for final segment
   let dynamicApproachFuel = 0;

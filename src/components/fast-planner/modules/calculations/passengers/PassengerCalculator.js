@@ -61,7 +61,7 @@ class PassengerCalculator {
     else if (aircraft.usefulLoad !== undefined) {
       // Ensure we're properly subtracting fuel and cargo when using usefulLoad
       usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum - (cargoWeight || 0);
-      console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, 'minus cargo:', (cargoWeight || 0), '=', usableLoadWithoutFuel);
+      // console.log('PassengerCalculator: Using aircraft.usefulLoad directly:', aircraft.usefulLoad, 'minus fuel:', fuelWeightNum, 'minus cargo:', (cargoWeight || 0), '=', usableLoadWithoutFuel);
     }
     // If not available, calculate it from maxTakeoffWeight and emptyWeight
     else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
@@ -86,12 +86,12 @@ class PassengerCalculator {
     // Return the lower value (can't exceed aircraft capacity)
     const result = Math.min(maxByWeight, aircraftMaxPax);
     
-    console.log('PassengerCalculator result:', {
-      usableLoadWithoutFuel,
-      maxByWeight,
-      aircraftMaxPax,
-      result
-    });
+    // console.log('PassengerCalculator result:', {
+    //   usableLoadWithoutFuel,
+    //   maxByWeight,
+    //   aircraftMaxPax,
+    //   result
+    // });
     
     return result;
   }
