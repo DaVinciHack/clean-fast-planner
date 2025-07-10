@@ -54,7 +54,10 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
   
   // 🚨 AVIATION SAFETY: If StopCardCalculator returns empty array, CLEAR ALL FUEL DATA
   if (!stopCards || stopCards.length === 0) {
-    console.error('🚨 CRITICAL SAFETY: StopCardCalculator returned no data - CLEARING ALL FUEL DISPLAYS');
+    // Silent during initialization - only log when we have waypoints but no stop cards
+    if (waypoints?.length >= 2 && selectedAircraft) {
+      console.warn('🚨 SAFETY: StopCardCalculator returned no data - clearing fuel displays');
+    }
     return [];
   }
   

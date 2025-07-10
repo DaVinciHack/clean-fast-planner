@@ -43,6 +43,12 @@ class RigWeatherGraphics {
      */
     addWeatherIcons() {
         try {
+            // Check if map is ready for image operations
+            if (!this.map.isStyleLoaded()) {
+                console.log('🚁 Map style not loaded yet, deferring wind arrow creation');
+                return;
+            }
+            
             // Create simple wind arrow
             const windArrow = this.createCompassRose(); // Keep method name for compatibility
             
@@ -50,13 +56,19 @@ class RigWeatherGraphics {
                 this.map.addImage('compass-rose', windArrow);
                 console.log('🚁 Simple wind arrow graphic added');
             } else if (!windArrow) {
-                console.error('🚁 ❌ createCompassRose() returned null/undefined - cannot create wind arrows');
+                // Silent during initialization - wind arrows aren't critical for startup
+                console.log('🚁 Wind arrow creation deferred - will retry when ready');
             } else {
                 console.log('🚁 Wind arrow image already exists');
             }
             
         } catch (error) {
-            console.error('🚁 Failed to add wind arrow:', error);
+            // Silent during initialization when map isn't ready
+            if (error.message?.includes('getImage')) {
+                console.log('🚁 Wind arrow creation deferred - map not ready');
+            } else {
+                console.error('🚁 Failed to add wind arrow:', error);
+            }
         }
     }
     

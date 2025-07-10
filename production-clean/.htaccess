@@ -1,5 +1,21 @@
+# Root .htaccess for bristow.info
+# Handles routing for multiple applications and prevents external redirects
+
+# Enable URL rewriting
 RewriteEngine On
-RewriteBase /plan/
-RewriteCond %{REQUEST_FILENAME} \!-f
-RewriteCond %{REQUEST_FILENAME} \!-d
-RewriteRule . /plan/index.html [L]
+
+# IMPORTANT: Prevent redirect to bristowgroup.com for flight planning tools
+# This must come BEFORE any other redirects
+RewriteRule ^plan/(.*)$ /plan/$1 [L]
+RewriteRule ^plan$ /plan/ [R=301,L]
+RewriteRule ^planner/(.*)$ /planner/$1 [L]
+RewriteRule ^planner$ /planner/ [R=301,L]
+
+# Stop processing if we're accessing flight planning directories
+RewriteCond %{REQUEST_URI} ^/(plan|planner)/ [NC]
+RewriteRule .* - [L]
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
