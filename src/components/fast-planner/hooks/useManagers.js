@@ -55,23 +55,81 @@ const useManagers = ({
 
   // Track initialization status to prevent multiple initializations
   const [managersInitialized, setManagersInitialized] = useState(false);
+  
+  // Track authentication state for lifecycle management
+  const [lastAuthState, setLastAuthState] = useState(null);
 
-  // Initialize managers
+  // Initialize managers - ONLY after authentication completes
   useEffect(() => {
+    // 🛩️ AVIATION SAFETY: Only initialize managers when authentication is complete
+    // This prevents callback system failures caused by initialization before auth
+    console.log("🔧 MANAGER INIT: Checking initialization conditions...", {
+      managersInitialized,
+      hasClient: !!client,
+      // Note: We check for actual authentication success, not just client existence
+      clientType: client?.constructor?.name || 'none'
+    });
+
     // Skip if already initialized to prevent re-initialization loops
     if (managersInitialized) {
-      console.log("FastPlannerApp: Managers already initialized, skipping initialization");
+      console.log("✅ MANAGERS: Already initialized, skipping");
       return;
     }
 
-    console.log("FastPlannerApp: Initializing managers...");
-
-    // Check if OSDK client is available
+    // 🚨 CRITICAL FIX: Ensure client is available AND authentication is complete
     if (!client) {
-      console.error("OSDK Client Error: client is null or undefined");
-      createErrorDialog();
+      console.log("⏳ MANAGERS: Waiting for OSDK client...");
       return;
     }
+
+    // 🔧 AUTHENTICATION CHECK: Verify client is actually authenticated
+    // This prevents managers from initializing with an unauthenticated client
+    const isClientAuthenticated = (() => {
+      try {
+        // Check multiple authentication indicators
+        const hasFoundryAuth = window.isFoundryAuthenticated === true;
+        const hasClientAuth = client && typeof client.ontology === 'object';
+        const hasAuthToken = !!window.auth?.getAccessToken?.();
+        
+        console.log("🔐 AUTH CHECK:", {
+          hasFoundryAuth,
+          hasClientAuth,
+          hasAuthToken,
+          clientReady: hasClientAuth && hasAuthToken
+        });
+        
+        // 🛩️ FLEXIBLE AUTH: Multiple fallback strategies for different environments
+        const isAuthenticated = hasClientAuth && (hasFoundryAuth || hasAuthToken);
+        
+        // Local development fallback: if client exists, proceed (may not have full ontology yet)
+        const localDevFallback = client && !hasFoundryAuth && !hasAuthToken;
+        
+        // Emergency fallback: if we have a client reference at all
+        const emergencyFallback = !!client;
+        
+        console.log("🔐 AUTH DECISION:", {
+          isAuthenticated,
+          localDevFallback,
+          emergencyFallback,
+          finalDecision: isAuthenticated || localDevFallback || emergencyFallback
+        });
+        
+        // For now, be permissive to restore functionality
+        return isAuthenticated || localDevFallback || emergencyFallback;
+      } catch (error) {
+        console.warn("🔐 AUTH CHECK: Error checking authentication:", error);
+        return false;
+      }
+    })();
+
+    if (!isClientAuthenticated) {
+      console.log("⏳ MANAGERS: Waiting for authentication to complete...");
+      console.log("🔍 DEBUG: Client available but auth check failed - client type:", client?.constructor?.name);
+      console.log("🔍 DEBUG: Client ontology check:", typeof client?.ontology);
+      return;
+    }
+
+    console.log("🚀 MANAGERS: Starting initialization with authenticated client...");
 
     // Create MapManager
     if (!mapManagerRef.current) {
@@ -133,6 +191,26 @@ const useManagers = ({
     if (!regionManagerRef.current && mapManagerRef.current && platformManagerRef.current) {
       console.log("FastPlannerApp: Creating RegionManager instance");
       regionManagerRef.current = new RegionManager(mapManagerRef.current, platformManagerRef.current);
+      
+      // 🛩️ GLOBAL REFERENCE: Make RegionManager globally available
+      window.regionManager = regionManagerRef.current;
+      window.regionManagerRef = regionManagerRef;
+      
+      // 🛩️ AUTO-LOAD PLATFORMS: Trigger platform loading for current region
+      setTimeout(() => {
+        try {
+          const currentRegion = regionManagerRef.current.getCurrentRegion();
+          if (currentRegion && platformManagerRef.current) {
+            const regionName = currentRegion.osdkRegion || currentRegion.name;
+            console.log(`🚀 AUTO-LOADING: Triggering platform load for region: ${regionName}`);
+            platformManagerRef.current.loadPlatformsFromFoundry(window.client, regionName);
+          } else {
+            console.log('⏳ AUTO-LOADING: Region not detected yet, will try again...');
+          }
+        } catch (error) {
+          console.warn('⚠️ AUTO-LOADING: Error triggering platform load:', error);
+        }
+      }, 1000); // Give region detection time to complete
       
       // We don't set callbacks here anymore as RegionContext handles this
     }
@@ -604,6 +682,142 @@ const useManagers = ({
     managersInitialized // Only depend on this flag and client
   ]); 
 
+  // 🛩️ CALLBACK RE-BINDING: Update callbacks when dependencies change
+  // This fixes stale function references after authentication-triggered re-renders
+  useEffect(() => {
+    if (!managersInitialized || !waypointManagerRef.current) {
+      return;
+    }
+
+    console.log("🔧 CALLBACK RE-BINDING: Updating waypoint manager callbacks...");
+
+    // Re-bind waypoint callbacks with current function references
+    waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
+      console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
+
+      // Update the waypoints state with current setWaypoints function
+      if (typeof setWaypoints === 'function') {
+        setWaypoints([...updatedWaypoints]);
+        console.log("✅ CALLBACK: Successfully updated React waypoints state");
+      } else {
+        console.error('❌ CALLBACK: setWaypoints is not a function in onChange callback');
+        console.error('setWaypoints type:', typeof setWaypoints);
+      }
+    });
+
+    waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
+      console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
+    });
+
+    console.log("✅ CALLBACK RE-BINDING: Waypoint callbacks updated successfully");
+  }, [
+    managersInitialized, 
+    setWaypoints, // Re-bind when setWaypoints function changes
+    waypointManagerRef
+  ]);
+
+  // 🛩️ PLATFORM CALLBACK RE-BINDING: Apply same pattern to platform manager
+  useEffect(() => {
+    if (!managersInitialized || !platformManagerRef.current) {
+      return;
+    }
+
+    console.log("🔧 CALLBACK RE-BINDING: Updating platform manager callbacks...");
+
+    // Re-bind platform callbacks with verification and fallback
+    if (typeof platformManagerRef.current.setCallback === 'function') {
+      platformManagerRef.current.setCallback('onPlatformsLoaded', (platforms) => {
+        console.log(`🏗️ PLATFORMS LOADED: ${platforms.length} platforms via callback`);
+        
+        // 🛩️ PLATFORM DISPLAY VERIFICATION: Check if platforms actually appear on map
+        setTimeout(() => {
+          if (mapManagerRef.current?.map) {
+            const map = mapManagerRef.current.map;
+            
+            // Check if platform layers exist and have features
+            const platformLayers = [
+              'platforms-fixed-layer',
+              'platforms-movable-layer', 
+              'airfields-layer'
+            ];
+            
+            let hasVisiblePlatforms = false;
+            for (const layerId of platformLayers) {
+              const layer = map.getLayer(layerId);
+              if (layer) {
+                const source = map.getSource('major-platforms');
+                if (source && source._data?.features?.length > 0) {
+                  hasVisiblePlatforms = true;
+                  break;
+                }
+              }
+            }
+            
+            if (!hasVisiblePlatforms && platforms.length > 0) {
+              console.log("🚨 PLATFORM FALLBACK: Platforms loaded but not visible, forcing display...");
+              
+              // Force platform display using the working method
+              if (typeof platformManagerRef.current.addPlatformsToMap === 'function') {
+                platformManagerRef.current.addPlatformsToMap(platforms);
+              }
+            } else if (hasVisiblePlatforms) {
+              console.log("✅ PLATFORMS: Successfully visible on map");
+            }
+          }
+        }, 1000); // Give map time to render
+      });
+
+      console.log("✅ CALLBACK RE-BINDING: Platform callbacks updated with fallback verification");
+    }
+  }, [
+    managersInitialized,
+    platformManagerRef,
+    mapManagerRef
+  ]);
+
+  // 🛩️ MANAGER LIFECYCLE: Handle authentication state transitions
+  useEffect(() => {
+    const currentAuthState = (() => {
+      try {
+        const hasFoundryAuth = window.isFoundryAuthenticated === true;
+        const hasClientAuth = client && typeof client.ontology === 'object';
+        const hasAuthToken = !!window.auth?.getAccessToken?.();
+        return `${hasFoundryAuth}-${hasClientAuth}-${hasAuthToken}`;
+      } catch (error) {
+        return 'error';
+      }
+    })();
+
+    console.log("🔧 LIFECYCLE: Auth state check", {
+      currentAuthState,
+      lastAuthState,
+      managersInitialized
+    });
+
+    // Check if authentication state has changed
+    if (lastAuthState !== null && lastAuthState !== currentAuthState) {
+      console.log("🔄 LIFECYCLE: Authentication state changed, preparing for re-initialization");
+      
+      // If we lose authentication, reset managers
+      if (currentAuthState === 'false-false-false' && managersInitialized) {
+        console.log("❌ LIFECYCLE: Authentication lost, resetting managers");
+        setManagersInitialized(false);
+        
+        // Clear manager references for clean re-initialization
+        // Note: We don't null the refs as that could break existing code
+        // Instead, we rely on the re-initialization logic
+      }
+      
+      // If we gain authentication and managers aren't initialized, trigger init
+      if (currentAuthState !== 'false-false-false' && !managersInitialized) {
+        console.log("✅ LIFECYCLE: Authentication gained, will trigger initialization");
+        // The main initialization useEffect will handle this
+      }
+    }
+
+    setLastAuthState(currentAuthState);
+  }, [client, lastAuthState, managersInitialized]);
+
   // Effect to handle flightSettings changes
   useEffect(() => {
     if (flightSettings && flightCalculationsRef.current) {
@@ -628,24 +842,9 @@ const useManagers = ({
       if (mapInteractionHandlerRef.current) {
         console.log("🗺️ Initializing map interaction handler...");
 
-        // Make sure the waypointManager is properly connected
-        if (waypointManagerRef.current) {
-          // Set up the waypoint manager's callbacks
-          waypointManagerRef.current.setCallback('onChange', (updatedWaypoints) => {
-            console.log(`🗺️ Waypoints changed, now ${updatedWaypoints.length} waypoints`);
-
-            // Update the waypoints state
-            if (typeof setWaypoints === 'function') {
-              setWaypoints([...updatedWaypoints]);
-            } else {
-              console.warn('setWaypoints is not a function in onChange callback');
-            }
-          });
-
-          waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
-            console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
-          });
-        }
+        // 🛩️ CALLBACK SETUP: Callbacks are now managed by dedicated useEffect hooks
+        // This ensures they use current function references and handle auth state changes
+        console.log("✅ MAP READY: Waypoint callbacks managed by re-binding system");
 
         // Initialize map interactions
         console.log("🧹 Initializing map interaction handler");

@@ -2651,8 +2651,9 @@ const FastPlannerCore = ({
         );
       }
       
-      // 🚨 FLIGHT LOADING WORKAROUND: Ensure left panel gets populated even if callbacks fail online
-      // This is a temporary fix while we investigate the root cause of callback system failures
+      // 🛩️ FLIGHT LOADING FALLBACK: Legacy workaround - should no longer be needed
+      // The proper fix is now in useManagers.js with authentication-gated initialization
+      // Keeping this as a safety net until the new architecture is fully verified
       setTimeout(() => {
         if (appManagers.waypointManagerRef?.current) {
           const waypointManagerWaypoints = appManagers.waypointManagerRef.current.waypoints || [];

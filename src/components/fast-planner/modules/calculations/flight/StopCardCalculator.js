@@ -36,9 +36,12 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
   
   // 🔍 LOG THE CALCULATED RESERVE FUEL AT THE END - MOVED TO AFTER CALCULATION
   
-  // First, verify we have the necessary input data
+  // First, verify we have the necessary input data - SILENT during initialization
   if (!waypoints || waypoints.length < 2 || !selectedAircraft) {
-    console.error('StopCardCalculator: Missing required input data');
+    // Only log during actual use, not during component initialization
+    if (waypoints?.length >= 2 && selectedAircraft) {
+      console.warn('StopCardCalculator: Incomplete data during calculation');
+    }
     return [];
   }
   

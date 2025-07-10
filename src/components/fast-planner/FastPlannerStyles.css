@@ -1491,14 +1491,28 @@
   }
 }
 
-/* Keep existing tablet layout untouched */
+/* iPad/Tablet layout - wider panel with smaller text */
 @media (max-width: 768px) and (min-width: 481px) {
   .route-editor-panel {
-    width: 220px;
+    width: 280px; /* Increased from 220px to 280px */
+    font-size: 0.9rem; /* Make text smaller to fit better */
+  }
+  
+  .route-editor-panel h3 {
+    font-size: 1.1em; /* Slightly smaller heading */
+  }
+  
+  .route-editor-panel .control-button {
+    font-size: 0.85rem; /* Smaller button text */
+    padding: 6px 10px; /* Adjust padding */
+  }
+  
+  .route-editor-panel .stop-entry {
+    font-size: 0.85rem; /* Smaller waypoint text */
   }
   
   .info-panel {
-    max-width: 220px;
+    max-width: 280px; /* Match the route panel width */
   }
 }
 

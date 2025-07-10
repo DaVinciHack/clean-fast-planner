@@ -420,17 +420,8 @@ const useAircraft = ({
   };
   
   // CRITICAL: Make React functions globally available for flight loading
-  console.log('🚁 AIRCRAFT DEBUG: Exposing global functions', {
-    changeAircraftType: typeof changeAircraftType,
-    changeAircraftRegistration: typeof changeAircraftRegistration,
-    timestamp: new Date().toISOString()
-  });
   window.changeAircraftType = changeAircraftType;
   window.changeAircraftRegistration = changeAircraftRegistration;
-  console.log('🚁 AIRCRAFT DEBUG: Global functions exposed', {
-    windowChangeAircraftType: typeof window.changeAircraftType,
-    windowChangeAircraftRegistration: typeof window.changeAircraftRegistration
-  });
   
   // Returning aircraft state
   

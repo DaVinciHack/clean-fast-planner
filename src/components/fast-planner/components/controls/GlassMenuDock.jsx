@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './GlassMenuDock.css';
 
 /**
@@ -48,17 +48,50 @@ const GlassMenuDock = ({
   // State for force showing menu (overrides panel visibility)
   const [forceShowMenu, setForceShowMenu] = useState(false);
   
+  // Ref for the tab element to add native event listeners
+  const tabRef = useRef(null);
+  
   // Auto-hide menu when any panel is visible (mobile/iPad), unless forced to show
   const shouldHideMenu = (leftPanelVisible || rightPanelVisible) && (isPhoneLayout || window.innerWidth <= 1024) && !forceShowMenu;
   
-  // Debug logging to check state
-  console.log('🎯 GLASS MENU DEBUG:', {
-    leftPanelVisible,
-    rightPanelVisible,
-    isPhoneLayout,
-    windowWidth: window.innerWidth,
-    shouldHideMenu
-  });
+  // State calculation for menu visibility
+  // (Debug logs removed for performance)
+
+  // Add native touch event listeners to capture events before map
+  useEffect(() => {
+    const tabElement = tabRef.current;
+    if (!tabElement) return;
+
+    const handleTouchStart = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    };
+
+    const handleTouchEnd = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      handleTabClick();
+    };
+
+    const handleTouchMove = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    };
+
+    // Add passive: false to allow preventDefault
+    tabElement.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+    tabElement.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+    tabElement.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+
+    return () => {
+      tabElement.removeEventListener('touchstart', handleTouchStart, { capture: true });
+      tabElement.removeEventListener('touchend', handleTouchEnd, { capture: true });
+      tabElement.removeEventListener('touchmove', handleTouchMove, { capture: true });
+    };
+  }, [shouldHideMenu]);
 
   if (!isVisible) return null;
 
@@ -85,25 +118,31 @@ const GlassMenuDock = ({
   
   // Handle tab click to close panels and show menu
   const handleTabClick = () => {
-    console.log('🎯 TAB CLICKED - Forcing menu to show and closing panels');
+    console.log('🎯 TAB CLICKED - Closing panels and showing menu');
     
-    // FIRST: Force menu to show immediately
-    setForceShowMenu(true);
+    // Close any open panels immediately
+    if (leftPanelVisible && onOpenRoute) {
+      onOpenRoute(); // Toggle route panel to close it
+    }
+    if (rightPanelVisible && onToggleRightPanel) {
+      onToggleRightPanel(); // Toggle right panel to close it
+    }
     
-    // THEN: Close any open panels
+    // Fallback: try the hide functions if they exist
     if (leftPanelVisible && onHideLeftPanel) {
-      console.log('🎯 Closing left panel');
       onHideLeftPanel();
     }
     if (rightPanelVisible && onHideRightPanel) {
-      console.log('🎯 Closing right panel');
       onHideRightPanel();
     }
+    
+    // Force menu to show and keep it shown longer to ensure panels close
+    setForceShowMenu(true);
     
     // Reset force show after panels have had time to close
     setTimeout(() => {
       setForceShowMenu(false);
-    }, 500);
+    }, 1000);
   };
 
   // All menu items for expanded state
@@ -254,7 +293,15 @@ const GlassMenuDock = ({
     <div className="glass-dock-container">
       {/* Mobile/iPad slide-up tab - show when menu is hidden by panels */}
       {shouldHideMenu && (
-        <div className="mobile-slide-tab" onClick={handleTabClick}>
+        <div 
+          ref={tabRef}
+          className="mobile-slide-tab" 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleTabClick();
+          }}
+        >
           <div className="slide-tab-indicator">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M18 15l-6-6-6 6"/>
