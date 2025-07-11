@@ -2359,9 +2359,9 @@ class WaypointManager {
             'line-cap': 'round' 
           }, 
           paint: { 
-            'line-color': isWaypointMode ? '#BA55D3' : '#FF4136', // Medium purple for waypoints, red for stops
-            'line-width': 6, // Make it thicker for iPad visibility
-            'line-dasharray': [4, 2], // Bigger dashes for iPad
+            'line-color': isWaypointMode ? '#BA55D3' : '#FF0000', // Keep purple for waypoints, red for stops
+            'line-width': 3, // 3px width as requested
+            'line-dasharray': [2, 1.5], // Small dashes with slightly more gap
             'line-opacity': 0.8
           }
         });
@@ -2488,7 +2488,7 @@ class WaypointManager {
         updateTouchDebug(`Distance: ${distanceNM.toFixed(2)}nm, Over route: direct=${isMouseOverRoute}, buffered=${isOverRouteBuffered}`);
         
         // Return result if close enough or directly over the route (including buffered area for touch)
-        if (isOverRouteAny || distanceNM < 0.5) {
+        if (isOverRouteAny || distanceNM < 0.05) {
           updateTouchDebug('✅ Close enough to route!');
           return { 
             point: closestPoint, 

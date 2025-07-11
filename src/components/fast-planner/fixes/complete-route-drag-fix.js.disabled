@@ -88,9 +88,9 @@
                 'line-cap': 'round'
               },
               'paint': {
-                'line-color': isWaypointMode ? '#FFCC00' : '#ff0000', // Yellow for waypoints, red for stops
-                'line-width': 4,
-                'line-dasharray': [2, 1] // Dashed line
+                'line-color': isWaypointMode ? '#FFCC00' : '#ff0000', // Keep original colors for different modes
+                'line-width': 2, // Much thinner
+                'line-dasharray': [0.5, 0.5] // Much smaller dashes
               }
             });
             

@@ -798,9 +798,9 @@ class MapManager {
             'line-cap': 'round'
           },
           'paint': {
-            'line-color': '#ff0000', // Red for the dragging line
-            'line-width': 4,
-            'line-dasharray': [2, 1] // Dashed line for the temp route
+            'line-color': '#FF0000', // Red color as requested
+            'line-width': 3, // 3px width as requested
+            'line-dasharray': [2, 1.5] // Small dashes with slightly more gap
           }
         });
 
@@ -851,8 +851,8 @@ class MapManager {
         );
         
         // If mouse is directly over the route (pixel-perfect), return regardless of distance
-        // Otherwise use a more generous distance threshold (0.5 nautical miles)
-        const maxDistanceThreshold = 0.5; // More generous distance in nautical miles
+        // Otherwise use a small distance threshold for easier clicking but not too far
+        const maxDistanceThreshold = 0.05; // Small distance in nautical miles (about 300 feet)
         
         if (isMouseOverRoute || distanceNM < maxDistanceThreshold) {
           return { 

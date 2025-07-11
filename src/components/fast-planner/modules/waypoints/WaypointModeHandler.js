@@ -378,8 +378,8 @@ class WaypointModeHandler {
           },
           'paint': {
             'line-color': '#BA55D3', // Medium purple for waypoint mode
-            'line-width': 4,
-            'line-dasharray': [2, 1] // Dashed line for visual distinction
+            'line-width': 3, // 3px width as requested
+            'line-dasharray': [2, 1.5] // Small dashes with slightly more gap
           }
         });
         
@@ -430,7 +430,7 @@ class WaypointModeHandler {
       );
       
       // Return if close enough or directly over the route
-      const maxDistanceThreshold = 0.5; // nautical miles
+      const maxDistanceThreshold = 0.05; // nautical miles - reduced for precise touch area
       if (isMouseOverRoute || distanceNM < maxDistanceThreshold) {
         return {
           point: closestPoint,

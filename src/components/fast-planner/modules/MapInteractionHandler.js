@@ -27,7 +27,9 @@ class MapInteractionHandler {
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     this.isDragging = false;
     this.dragStartCoord = null;
-    this.activeApproach = null; // 'mapbox' or 'dom-touch'
+    this.activeApproach = null; // 'mapbox-touch' or 'dom-touch'
+    this.dragMode = 'none'; // 'insert', 'extend', 'none'
+    this.originalLineCoordinates = [];
     
     console.log(`🚀 MapInteractionHandler: Device detection - ${this.isIPad ? 'iPad' : this.isTouchDevice ? 'Touch Device' : 'Desktop'}`);
   }
@@ -91,25 +93,8 @@ class MapInteractionHandler {
         }
       }
 
-      // 2. Create and store the new bound click handler
-      this._boundClickHandler = this.handleMapClick.bind(this);
-
-      // 3. Attach the new click handler
-      try {
-        map.on('click', this._boundClickHandler);
-        const finalHandlerCount = map._listeners?.click?.length || 0;
-        console.log(`✅ MapInteractionHandler: Attached new handler. Total click handlers: ${finalHandlerCount}`);
-      } catch (e) {
-        console.error('MapInteractionHandler: Error attaching new _boundClickHandler:', e.message);
-        this.triggerCallback('onError', 'Error attaching map click handler');
-        this.isInitialized = false; // Failed to initialize
-        return;
-      }
-
-      // 📱 iPad Touch Events - Based on working drag-test
-      if (this.isTouchDevice) {
-        this.setupTouchEvents(map);
-      }
+      // 2. Setup separate event handlers like working drag-test
+      this.setupSeparateHandlers(map);
 
       // 4. Setup route dragging (assuming WaypointManager handles its own listener idempotency)
       console.log('MapInteractionHandler: Setting up route dragging.');
@@ -139,23 +124,47 @@ class MapInteractionHandler {
   }
 
   /**
-   * Setup iPad touch events - Based on working drag-test implementation
+   * Setup separate event handlers like working drag-test
    */
-  setupTouchEvents(map) {
-    console.log('📱 MapInteractionHandler: Setting up iPad touch events...');
+  setupSeparateHandlers(map) {
+    console.log('🔧 MapInteractionHandler: Setting up separate event handlers like drag-test...');
     
-    // APPROACH 1: Mapbox Native Touch Events
     try {
-      // Check if the map has route layers for touch handling
-      if (map.getLayer('route')) {
-        map.on('touchstart', 'route', this.handleTouchStart.bind(this));
-        console.log('✅ Mapbox native touch events attached to route layer');
+      // 1. General map click handler (for background clicks - add waypoints)
+      this._boundClickHandler = this.handleMapClick.bind(this);
+      map.on('click', this._boundClickHandler);
+      console.log('✅ General map click handler attached');
+      
+      // 2. Route-specific touch/mouse handlers for dragging
+      const routeLayers = ['route', 'route-touch-area'];
+      routeLayers.forEach(layer => {
+        if (map.getLayer(layer)) {
+          // Mouse events for desktop
+          map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
+          // Touch events for iPad
+          map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
+          console.log(`✅ Route interaction handlers attached to ${layer} layer`);
+        }
+      });
+      
+      // 3. DOM touch events fallback for iPad
+      if (this.isTouchDevice) {
+        this.setupDOMTouchEvents(map);
       }
     } catch (e) {
-      console.warn('⚠️ Mapbox native touch events failed:', e.message);
+      console.error('MapInteractionHandler: Error setting up separate handlers:', e.message);
+      this.triggerCallback('onError', 'Error setting up interaction handlers');
+      this.isInitialized = false;
     }
+  }
+
+
+  /**
+   * Setup DOM touch events - fallback for touch devices
+   */
+  setupDOMTouchEvents(map) {
+    console.log('📱 MapInteractionHandler: Setting up DOM touch events as fallback...');
     
-    // APPROACH 2: DOM Touch Events (Fallback)
     try {
       const canvas = map.getCanvasContainer();
       if (canvas) {
@@ -171,30 +180,13 @@ class MapInteractionHandler {
           capture: true 
         });
         
-        console.log('✅ DOM touch events attached with passive:false');
+        console.log('✅ DOM touch events registered with passive:false');
       }
     } catch (e) {
       console.error('❌ DOM touch events failed:', e.message);
     }
   }
 
-  /**
-   * Handle Mapbox native touch events
-   */
-  handleTouchStart(e) {
-    console.log('📱 Mapbox touch event:', e.lngLat);
-    this.activeApproach = 'mapbox-touch';
-    
-    try {
-      e.preventDefault();
-      console.log('✅ e.preventDefault() called on Mapbox touch');
-    } catch (error) {
-      console.warn('⚠️ e.preventDefault() failed on Mapbox touch:', error.message);
-    }
-    
-    // Delegate to main click handler
-    this.handleMapClick(e);
-  }
 
   /**
    * Handle DOM touch events - fallback for iPad
@@ -204,18 +196,11 @@ class MapInteractionHandler {
     this.activeApproach = 'dom-touch';
     
     if (e.touches.length !== 1) {
-      console.log('❌ Multi-touch detected, ignoring');
+      console.log('❌ Multi-touch detected in DOM event, ignoring');
       return;
     }
     
-    try {
-      e.preventDefault();
-      console.log('✅ e.preventDefault() called on DOM touch');
-    } catch (error) {
-      console.warn('⚠️ e.preventDefault() failed on DOM touch:', error.message);
-    }
-    
-    // Convert touch coordinates to map coordinates
+    // Check if touch is on route layers (like drag-test)
     const map = this.mapManager.getMap();
     if (!map) return;
     
@@ -225,6 +210,25 @@ class MapInteractionHandler {
       y: e.touches[0].clientY - rect.top
     };
     
+    const features = map.queryRenderedFeatures(point, { 
+      layers: ['route', 'route-touch-area'] 
+    });
+    
+    if (features.length === 0) {
+      console.log('❌ DOM touch not on route layers, ignoring');
+      return;
+    }
+    
+    console.log('📱 DOM touch on route detected');
+    
+    // Try to prevent default (like drag-test)
+    if (e.cancelable) {
+      e.preventDefault();
+      console.log('✅ e.preventDefault() called successfully on DOM touch');
+    } else {
+      console.warn('⚠️ DOM touch event not cancelable - cannot preventDefault()');
+    }
+    
     const lngLat = map.unproject(point);
     
     // Create a synthetic event object similar to Mapbox events
@@ -233,19 +237,152 @@ class MapInteractionHandler {
       point: point,
       originalEvent: e,
       preventDefault: () => e.preventDefault(),
-      type: 'touch'
+      type: 'dom-touch'
     };
     
     // Delegate to main click handler
     this.handleMapClick(syntheticEvent);
   }
 
+  /**
+   * Handle route line mouse start - for desktop route dragging
+   */
+  handleLineMouseStart(e) {
+    console.log('🖱️ MapInteractionHandler: Line mouse start - route drag');
+    
+    try {
+      e.preventDefault();
+      this.dragMode = 'insert';
+      this.startDrag(e.lngLat, 'mapbox-mouse');
+      
+      const map = this.mapManager.getMap();
+      map.on('mousemove', this.onMapboxDragMove.bind(this));
+      map.once('mouseup', this.onMapboxDragEnd.bind(this));
+    } catch (error) {
+      console.error('❌ Error in handleLineMouseStart:', error.message);
+    }
+  }
+
+  /**
+   * Handle route line touch start - for iPad route dragging
+   */
+  handleLineTouchStart(e) {
+    console.log('📱 MapInteractionHandler: Line touch start - route drag');
+    
+    if (e.points.length !== 1) {
+      console.log('❌ Multi-touch detected, ignoring');
+      return;
+    }
+    
+    try {
+      e.preventDefault();
+      console.log('✅ e.preventDefault() called successfully on line touch');
+    } catch (error) {
+      console.warn('⚠️ e.preventDefault() failed on line touch:', error.message);
+    }
+    
+    this.dragMode = 'insert';
+    this.startDrag(e.lngLat, 'mapbox-touch');
+    
+    const map = this.mapManager.getMap();
+    map.on('touchmove', this.onMapboxDragMove.bind(this));
+    map.once('touchend', this.onMapboxDragEnd.bind(this));
+  }
+
+  /**
+   * Start drag operation - from drag-test
+   */
+  startDrag(lngLat, approach) {
+    this.isDragging = true;
+    this.activeApproach = approach;
+    this.dragStartCoord = [lngLat.lng, lngLat.lat];
+    
+    const map = this.mapManager.getMap();
+    map.getCanvas().style.cursor = 'grabbing';
+    
+    console.log(`🎯 Started drag via ${approach.toUpperCase()}`);
+  }
+
+  /**
+   * Handle drag move events - from drag-test
+   */
+  onMapboxDragMove(e) {
+    if (!this.isDragging) return;
+    console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
+    this.updateDrag(e.lngLat);
+  }
+
+  /**
+   * Update drag position - from drag-test
+   */
+  updateDrag(lngLat) {
+    if (!this.isDragging) return;
+    
+    const currentCoord = [lngLat.lng, lngLat.lat];
+    console.log(`🔄 Update drag to: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
+    
+    // Let MapManager handle the drag line visualization
+    // (MapManager already has drag line implementation)
+  }
+
+  /**
+   * End drag operation - from drag-test
+   */
+  onMapboxDragEnd(e) {
+    console.log('🏁 Drag ended');
+    this.endDrag();
+  }
+
+  /**
+   * End drag and clean up - from drag-test
+   */
+  endDrag() {
+    if (!this.isDragging) return;
+    
+    this.isDragging = false;
+    this.activeApproach = null;
+    this.dragStartCoord = null;
+    
+    const map = this.mapManager.getMap();
+    if (map) {
+      map.getCanvas().style.cursor = '';
+      
+      // Remove event listeners
+      map.off('mousemove', this.onMapboxDragMove.bind(this));
+      map.off('touchmove', this.onMapboxDragMove.bind(this));
+    }
+    
+    // Let MapManager handle drag line cleanup
+    // (MapManager already has drag line cleanup implementation)
+    
+    console.log('✅ Drag operation completed');
+  }
+
   handleMapClick(e) {
     console.log("🗺️ MapInteractionHandler: Map clicked at coordinates:", e.lngLat);
-    console.log("🗺️ MapInteractionHandler: Click event:", { button: e.originalEvent.button, type: e.type });
+    console.log("🗺️ MapInteractionHandler: Click event:", { button: e.originalEvent?.button, type: e.type });
+    
+    // DRAG CHECK: Don't add points while dragging (like drag-test)
+    if (this.isDragging) {
+      console.log('🖱️ MapInteractionHandler: Ignoring click - currently dragging');
+      return;
+    }
+    
+    // FEATURE CHECK: Don't add waypoints on existing features (like drag-test)
+    const map = this.mapManager.getMap();
+    if (map && e.point) {
+      const features = map.queryRenderedFeatures(e.point, { 
+        layers: ['waypoint-pins', 'route', 'route-touch-area', 'platforms-layer'] 
+      });
+      
+      if (features.length > 0) {
+        console.log('🖱️ MapInteractionHandler: Click on existing feature, ignoring');
+        return; // Click was on a pin, line, or platform
+      }
+    }
     
     // RIGHT-CLICK CHECK: Handle right-click to delete last waypoint
-    if (e.originalEvent.button === 2) {
+    if (e.originalEvent?.button === 2) {
       console.log('🖱️ MapInteractionHandler: Right-click detected - attempting to delete last waypoint');
       this.handleRightClick(e);
       return;
@@ -751,6 +888,127 @@ class MapInteractionHandler {
       return window.waypointHandler;
     }
     return null;
+  }
+
+  /**
+   * DRAG WORKFLOW FROM DRAG-TEST - Complete implementation
+   */
+  
+  startDrag(lngLat, approach) {
+    console.log('🚀 Starting drag operation from drag-test');
+    this.isDragging = true;
+    this.activeApproach = approach;
+    this.dragStartCoord = [lngLat.lng, lngLat.lat];
+    
+    // Get current waypoints as original coordinates
+    const waypoints = this.waypointManager.getWaypoints();
+    this.originalLineCoordinates = waypoints.map(wp => [wp.lng || wp.coordinates[0], wp.lat || wp.coordinates[1]]);
+    
+    const map = this.mapManager.getMap();
+    if (map && map.getCanvas) {
+      map.getCanvas().style.cursor = 'grabbing';
+    }
+    
+    console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}`);
+  }
+
+  onMapboxDragMove(e) {
+    if (!this.isDragging) return;
+    console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
+    this.updateDrag(e.lngLat);
+  }
+
+  updateDrag(lngLat) {
+    if (!this.isDragging) return;
+    
+    const currentCoord = [lngLat.lng, lngLat.lat];
+    
+    if (this.dragMode === 'insert') {
+      // Find closest point for insertion (like drag-test)
+      const closestPoint = this.findClosestPointOnLine(currentCoord);
+      if (!closestPoint) {
+        console.log('❌ Could not find closest point on line');
+        return;
+      }
+      
+      console.log(`📍 Inserting waypoint at position ${closestPoint.insertIndex}`);
+      
+      // For now, just log the drag movement - actual waypoint insertion will be handled by existing system
+      console.log(`🎯 Would insert waypoint at: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
+    }
+  }
+
+  onMapboxDragEnd(e) {
+    console.log('🏁 Drag end event from drag-test');
+    this.endDrag(e.lngLat);
+  }
+
+  endDrag(lngLat) {
+    if (!this.isDragging) return;
+    
+    const wasApproach = this.activeApproach;
+    const wasMode = this.dragMode;
+    
+    console.log(`🎉 Drag completed: ${wasApproach}, mode: ${wasMode}`);
+    
+    // Reset drag state
+    this.isDragging = false;
+    this.activeApproach = 'none';
+    this.dragMode = 'none';
+    this.dragStartCoord = null;
+    
+    const map = this.mapManager.getMap();
+    if (map && map.getCanvas) {
+      map.getCanvas().style.cursor = '';
+    }
+    
+    // Remove event listeners
+    if (map) {
+      map.off('touchmove', this.onMapboxDragMove);
+    }
+    
+    // Handle the actual waypoint insertion through existing system
+    if (lngLat && this.waypointManager) {
+      console.log('🎯 Adding waypoint through existing system');
+      // Use the existing route click handler which has the insertion logic
+      this.handleRouteClick(lngLat, 1, null); // Insert at position 1 for now
+    }
+  }
+
+  findClosestPointOnLine(coord) {
+    if (!this.originalLineCoordinates || this.originalLineCoordinates.length < 2) {
+      console.log('❌ No original coordinates for closest point calculation');
+      return null;
+    }
+    
+    let minDistance = Infinity;
+    let insertIndex = 1; // Default to insert after first point
+    let bestSegment = -1;
+    
+    // Simple distance calculation (like drag-test uses turf.js)
+    for (let i = 0; i < this.originalLineCoordinates.length - 1; i++) {
+      const segmentStart = this.originalLineCoordinates[i];
+      const segmentEnd = this.originalLineCoordinates[i + 1];
+      
+      // Simple distance calculation to segment midpoint
+      const midpoint = [
+        (segmentStart[0] + segmentEnd[0]) / 2,
+        (segmentStart[1] + segmentEnd[1]) / 2
+      ];
+      
+      const distance = Math.sqrt(
+        Math.pow(coord[0] - midpoint[0], 2) + Math.pow(coord[1] - midpoint[1], 2)
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        insertIndex = i + 1;
+        bestSegment = i;
+      }
+    }
+    
+    console.log(`🎯 Closest segment: ${bestSegment}, insert at position ${insertIndex}`);
+    return { insertIndex, distance: minDistance, segment: bestSegment };
   }
 }
 

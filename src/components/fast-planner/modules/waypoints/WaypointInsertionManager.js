@@ -273,8 +273,8 @@ class WaypointInsertionManager {
           },
           'paint': {
             'line-color': '#FFC107', // Yellow for waypoint mode
-            'line-width': 4,
-            'line-dasharray': [2, 1] // Dashed line for the temp route
+            'line-width': 3, // 3px width as requested
+            'line-dasharray': [2, 1.5] // Small dashes with slightly more gap
           }
         });
 
@@ -324,7 +324,7 @@ class WaypointInsertionManager {
         );
         
         // If mouse is directly over the route or within distance threshold
-        const maxDistanceThreshold = 0.5; // nautical miles
+        const maxDistanceThreshold = 0.05; // nautical miles - reduced for precise touch area
         
         if (isMouseOverRoute || distanceNM < maxDistanceThreshold) {
           return { 
