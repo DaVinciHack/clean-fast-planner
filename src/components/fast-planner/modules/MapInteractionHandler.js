@@ -237,10 +237,10 @@ class MapInteractionHandler {
         // Create and store bound touch handler
         this._boundTouchHandler = this.handleDOMTouchStart.bind(this);
         
-        // Add DOM touch events with proper configuration
+        // Add DOM touch events with optimized configuration for iPad responsiveness
         canvas.addEventListener('touchstart', this._boundTouchHandler, { 
-          passive: false, 
-          capture: true 
+          passive: false, // Allow preventDefault for better control
+          capture: true   // Capture early in event chain
         });
         
         console.log('✅ DOM touch events registered with passive:false');
@@ -290,15 +290,18 @@ class MapInteractionHandler {
     
     console.log('📱 DOM touch on route detected');
     
+    // IMMEDIATE VISUAL FEEDBACK for DOM touch
+    const lngLat = map.unproject(point);
+    this.showImmediateTouchFeedback(lngLat);
+    
     // Try to prevent default (like drag-test)
     if (e.cancelable) {
       e.preventDefault();
+      e.stopPropagation(); // Prevent event bubbling
       console.log('✅ e.preventDefault() called successfully on DOM touch');
     } else {
       console.warn('⚠️ DOM touch event not cancelable - cannot preventDefault()');
     }
-    
-    const lngLat = map.unproject(point);
     
     // Create a synthetic event object similar to Mapbox events
     const syntheticEvent = {
@@ -344,8 +347,12 @@ class MapInteractionHandler {
       return;
     }
     
+    // IMMEDIATE VISUAL FEEDBACK - Change route color instantly for iPad responsiveness
+    this.showImmediateTouchFeedback(e.lngLat);
+    
     try {
       e.preventDefault();
+      e.stopPropagation(); // Prevent event bubbling
       console.log('✅ e.preventDefault() called successfully on line touch');
     } catch (error) {
       console.warn('⚠️ e.preventDefault() failed on line touch:', error.message);
@@ -357,6 +364,33 @@ class MapInteractionHandler {
     const map = this.mapManager.getMap();
     map.on('touchmove', this.onMapboxDragMove.bind(this));
     map.once('touchend', this.onMapboxDragEnd.bind(this));
+  }
+
+  /**
+   * Show immediate visual feedback on touch - makes iPad feel more responsive
+   */
+  showImmediateTouchFeedback(lngLat) {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    try {
+      // Change route color immediately to show touch response
+      if (map.getLayer('route')) {
+        map.setPaintProperty('route', 'line-color', '#FF6B35'); // Orange to show active
+        map.setPaintProperty('route', 'line-width', 6); // Slightly thicker
+      }
+      
+      // Reset color after short delay if drag doesn't continue
+      setTimeout(() => {
+        if (!this.isDragging && map.getLayer('route')) {
+          map.setPaintProperty('route', 'line-color', '#1e8ffe'); // Back to blue
+          map.setPaintProperty('route', 'line-width', 5); // Back to normal
+        }
+      }, 200);
+      
+    } catch (error) {
+      console.warn('⚠️ Error showing immediate touch feedback:', error.message);
+    }
   }
 
   // REMOVED: Incomplete startDrag method - using complete implementation from drag-test below
@@ -1126,11 +1160,17 @@ class MapInteractionHandler {
       map.removeSource('drag-line');
     }
     
-    // Restore original route
+    // Restore original route and colors
     if (map) {
       map.setLayoutProperty('route', 'visibility', 'visible');
       if (map.getLayer('route-glow')) {
         map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      }
+      
+      // Restore original route color and width
+      if (map.getLayer('route')) {
+        map.setPaintProperty('route', 'line-color', '#1e8ffe'); // Back to blue
+        map.setPaintProperty('route', 'line-width', 5); // Back to normal
       }
     }
     
