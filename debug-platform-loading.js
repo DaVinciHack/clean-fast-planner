@@ -1,99 +1,98 @@
-// Debug script to diagnose platform loading issues
-// Run this in browser console after loading online
+// Debug why platform auto-loading isn't working
+console.log('🔍 PLATFORM AUTO-LOADING DEBUG: Checking all conditions...');
 
-console.log('🏗️ PLATFORM DEBUG: Starting comprehensive platform analysis...');
-
-// 1. Check manager existence and state
-console.log('📊 1. PLATFORM MANAGER STATE:');
-console.log('  - platformManager exists:', !!window.platformManager);
-console.log('  - platformManagerRef exists:', !!window.platformManagerRef);
-console.log('  - Platforms loaded:', window.platformManager?.platforms?.length || 0);
-
-if (window.platformManager?.platforms?.length > 0) {
-  console.log('  - First platform sample:', window.platformManager.platforms[0]);
-}
-
-// 2. Check authentication state
-console.log('\n📊 2. AUTHENTICATION STATE:');
-console.log('  - isFoundryAuthenticated:', window.isFoundryAuthenticated);
+// 1. Check RegionContext effect triggers
+console.log('\n📊 1. REGIONCONTEXT EFFECT CONDITIONS:');
+console.log('  - window.regionEffectRuns:', window.regionEffectRuns || 'Never ran');
+console.log('  - currentRegion exists:', !!window.activeRegionFromContext);
 console.log('  - client exists:', !!window.client);
-console.log('  - client type:', window.client?.constructor?.name);
+if (window.activeRegionFromContext) {
+  console.log('  - currentRegion.name:', window.activeRegionFromContext.name);
+  console.log('  - currentRegion.osdkRegion:', window.activeRegionFromContext.osdkRegion);
+}
 
-// 3. Check map state
-console.log('\n📊 3. MAP STATE:');
-const map = window.mapManager?.map || window.mapManagerRef?.current?.map;
-console.log('  - Map exists:', !!map);
-console.log('  - Map loaded:', !!map?.isStyleLoaded());
+// 2. Check mapReady state
+console.log('\n📊 2. MAP READY CONDITIONS:');
+console.log('  - mapManagerRef exists:', !!window.mapManagerRef);
+console.log('  - mapManagerRef.current exists:', !!window.mapManagerRef?.current);
+console.log('  - map object exists:', !!window.mapManager?.map);
+console.log('  - mapReady should be:', !!window.mapManager?.map);
 
-if (map) {
-  // Check platform layers
-  const platformLayers = [
-    'platforms-fixed-layer',
-    'platforms-movable-layer', 
-    'airfields-layer'
-  ];
+// 3. Check platformManager
+console.log('\n📊 3. PLATFORM MANAGER CONDITIONS:');
+console.log('  - platformManagerRef exists:', !!window.platformManagerRef);
+console.log('  - platformManagerRef.current exists:', !!window.platformManagerRef?.current);
+console.log('  - loadPlatformsFromFoundry function:', typeof window.platformManagerRef?.current?.loadPlatformsFromFoundry);
+
+// 4. Check loading guards
+console.log('\n📊 4. LOADING GUARD CONDITIONS:');
+const region = window.activeRegionFromContext?.osdkRegion || 'GULF_OF_MEXICO';
+const loadingKey = `platform_loading_${region}`;
+console.log(`  - Loading guard for ${region}:`, window[loadingKey] || 'Not set');
+console.log('  - window.regionState:', window.regionState);
+
+// 5. Manual trigger with full debug
+console.log('\n📊 5. MANUAL TRIGGER TEST:');
+if (window.platformManager && window.client && window.activeRegionFromContext) {
+  console.log(`  - Triggering manual load for: ${window.activeRegionFromContext.osdkRegion}`);
   
-  console.log('  - Platform layers:');
-  platformLayers.forEach(layerId => {
-    const layer = map.getLayer(layerId);
-    console.log(`    - ${layerId}: ${!!layer}`);
-  });
+  window.platformManager.loadPlatformsFromFoundry(window.client, window.activeRegionFromContext.osdkRegion)
+    .then(result => {
+      console.log('  ✅ MANUAL LOAD SUCCESS:', result?.length || 0, 'platforms loaded');
+      if (result?.length > 0) {
+        console.log('  - First platform:', result[0]?.name || result[0]);
+        
+        // Check if platforms appear on map
+        setTimeout(() => {
+          const map = window.mapManager?.map;
+          if (map) {
+            const source = map.getSource('major-platforms');
+            const features = source?._data?.features?.length || 0;
+            console.log(`  ✅ MAP UPDATE: ${features} platforms now visible on map`);
+            
+            if (features > 0) {
+              console.log('  🎉 SUCCESS: Platforms are loading and displaying correctly!');
+              console.log('  🚨 ISSUE: Auto-loading logic has a condition that is not being met');
+            }
+          }
+        }, 1000);
+      }
+    })
+    .catch(error => {
+      console.error('  ❌ MANUAL LOAD ERROR:', error);
+    });
+} else {
+  console.log('  ❌ Missing requirements for manual trigger:');
+  console.log('    - platformManager:', !!window.platformManager);
+  console.log('    - client:', !!window.client);
+  console.log('    - activeRegionFromContext:', !!window.activeRegionFromContext);
+}
+
+// 6. Force trigger the region effect
+console.log('\n📊 6. FORCE TRIGGER REGION EFFECT:');
+console.log('  This will simulate what should happen automatically...');
+
+// Check if we can force trigger
+if (window.activeRegionFromContext && window.client && window.platformManagerRef?.current) {
+  console.log('  - All conditions met, triggering delayed region load manually...');
   
-  // Check platform source
-  const source = map.getSource('major-platforms');
-  console.log('  - major-platforms source:', !!source);
-  if (source) {
-    console.log('    - Source features:', source._data?.features?.length || 0);
-    if (source._data?.features?.length > 0) {
-      console.log('    - First feature:', source._data.features[0]);
-    }
-  }
+  const currentRegion = window.activeRegionFromContext;
+  const client = window.client;
+  const platformManager = window.platformManagerRef.current;
+  
+  console.log(`🚀 AUTO-LOADING: Triggering platform load for region: ${currentRegion.osdkRegion}`);
+  
+  platformManager.loadPlatformsFromFoundry(client, currentRegion.osdkRegion)
+    .then(result => {
+      console.log(`🏗️ PLATFORMS LOADED: ${result?.length || 0} platforms via callback`);
+      console.log(`✅ PLATFORMS: Successfully visible on map`);
+    })
+    .catch(error => {
+      console.error('❌ AUTO-LOADING ERROR:', error);
+    });
+} else {
+  console.log('  ❌ Cannot force trigger - missing conditions:');
+  console.log('    - activeRegionFromContext:', !!window.activeRegionFromContext);
+  console.log('    - client:', !!window.client);
+  console.log('    - platformManagerRef.current:', !!window.platformManagerRef?.current);
 }
-
-// 4. Check region state
-console.log('\n📊 4. REGION STATE:');
-console.log('  - regionManager exists:', !!window.regionManager);
-console.log('  - Current region:', window.regionManager?.getCurrentRegion());
-
-// 5. Check callback system
-console.log('\n📊 5. CALLBACK SYSTEM:');
-if (window.platformManager) {
-  console.log('  - platformManager.callbacks:', !!window.platformManager.callbacks);
-  console.log('  - onPlatformsLoaded callback:', !!window.platformManager.callbacks?.onPlatformsLoaded);
-}
-
-// 6. Check recent console activity
-console.log('\n📊 6. PLATFORM LOADING LOGS:');
-console.log('  Look above for any of these log patterns:');
-console.log('  - "🔧 CALLBACK RE-BINDING: Updating platform manager callbacks..."');
-console.log('  - "🏗️ PLATFORMS LOADED: X platforms via callback"');
-console.log('  - "🚨 PLATFORM FALLBACK: Platforms loaded but not visible..."');
-console.log('  - "✅ PLATFORMS: Successfully visible on map"');
-
-// 7. Force platform loading test
-console.log('\n📊 7. FORCE PLATFORM LOADING TEST:');
-if (window.platformManager && window.client) {
-  console.log('  - Attempting force reload...');
-  try {
-    const currentRegion = window.regionManager?.getCurrentRegion() || { name: 'NORWAY' };
-    const regionName = currentRegion.osdkRegion || currentRegion.name;
-    
-    console.log(`  - Loading platforms for region: ${regionName}`);
-    window.platformManager.loadPlatformsFromFoundry(window.client, regionName)
-      .then(result => {
-        console.log('  - Force reload result:', result?.length || 0, 'platforms');
-      })
-      .catch(error => {
-        console.error('  - Force reload error:', error);
-      });
-  } catch (error) {
-    console.error('  - Force reload failed:', error);
-  }
-}
-
-console.log('\n🔬 PLATFORM DEBUG COMPLETE');
-console.log('📝 Key things to check:');
-console.log('  1. Are platforms loaded in manager but not visible on map?');
-console.log('  2. Are there any authentication issues?');
-console.log('  3. Did the callback system set up properly?');
-console.log('  4. Are map layers missing?');

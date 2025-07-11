@@ -199,13 +199,18 @@ const useManagers = ({
       // 🛩️ AUTO-LOAD PLATFORMS: Trigger platform loading for current region
       setTimeout(() => {
         try {
-          const currentRegion = regionManagerRef.current.getCurrentRegion();
-          if (currentRegion && platformManagerRef.current) {
+          // Use activeRegionFromContext instead of RegionManager.getCurrentRegion()
+          const currentRegion = window.activeRegionFromContext;
+          if (currentRegion && platformManagerRef.current && window.client) {
             const regionName = currentRegion.osdkRegion || currentRegion.name;
             console.log(`🚀 AUTO-LOADING: Triggering platform load for region: ${regionName}`);
             platformManagerRef.current.loadPlatformsFromFoundry(window.client, regionName);
           } else {
-            console.log('⏳ AUTO-LOADING: Region not detected yet, will try again...');
+            console.log('⏳ AUTO-LOADING: Region not detected yet, will try again...', {
+              currentRegion: !!currentRegion,
+              platformManager: !!platformManagerRef.current,
+              client: !!window.client
+            });
           }
         } catch (error) {
           console.warn('⚠️ AUTO-LOADING: Error triggering platform load:', error);
