@@ -96,21 +96,14 @@ class MapInteractionHandler {
       // 2. Setup separate event handlers like working drag-test
       this.setupSeparateHandlers(map);
 
-      // 4. Setup route dragging (assuming WaypointManager handles its own listener idempotency)
-      console.log('MapInteractionHandler: Setting up route dragging.');
-      if (this.waypointManager && typeof this.waypointManager.setupRouteDragging === 'function') {
-        const routeDragHandler = this.handleRouteDragComplete.bind(this);
-        this.waypointManager.setupRouteDragging(routeDragHandler);
-        window._mapInteractionRouteDragHandler = routeDragHandler; // Consider if this global is necessary
-        console.log('MapInteractionHandler: Route drag handler registered/updated.');
-        
-        // Setup style change listener for waypoint layer restoration
-        if (typeof this.waypointManager.setupStyleChangeListener === 'function') {
-          this.waypointManager.setupStyleChangeListener();
-          console.log('MapInteractionHandler: Waypoint style change listener set up.');
-        }
-      } else {
-        console.error('MapInteractionHandler: waypointManager.setupRouteDragging not available.');
+      // 4. CONSOLIDATION: Removed WaypointManager.setupRouteDragging call
+      // MapInteractionHandler now handles all route dragging via setupSeparateHandlers
+      console.log('MapInteractionHandler: Using consolidated drag system via setupSeparateHandlers.');
+      
+      // Keep style change listener for waypoint layer restoration
+      if (this.waypointManager && typeof this.waypointManager.setupStyleChangeListener === 'function') {
+        this.waypointManager.setupStyleChangeListener();
+        console.log('MapInteractionHandler: Waypoint style change listener set up.');
       }
 
       // 5. Mark as initialized
@@ -129,6 +122,9 @@ class MapInteractionHandler {
   setupSeparateHandlers(map) {
     console.log('🔧 MapInteractionHandler: Setting up separate event handlers like drag-test...');
     
+    // Create visual debug indicator
+    this.createDebugIndicator();
+    
     try {
       // 1. General map click handler (for background clicks - add waypoints)
       this._boundClickHandler = this.handleMapClick.bind(this);
@@ -136,9 +132,13 @@ class MapInteractionHandler {
       console.log('✅ General map click handler attached');
       
       // 2. Route-specific touch/mouse handlers for dragging
-      const routeLayers = ['route', 'route-touch-area'];
+      const routeLayers = ['route', 'route-drag-detection-layer'];
+      this.updateDebugIndicator('🔍 Checking for route layers...');
+      
+      let foundLayers = [];
       routeLayers.forEach(layer => {
         if (map.getLayer(layer)) {
+          foundLayers.push(layer);
           // Mouse events for desktop
           map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
           // Touch events for iPad
@@ -146,6 +146,25 @@ class MapInteractionHandler {
           console.log(`✅ Route interaction handlers attached to ${layer} layer`);
         }
       });
+      
+      // Also check what layers DO exist
+      const allLayers = map.getStyle().layers;
+      const layerNames = allLayers.map(l => l.id);
+      
+      // Find any route-related layers
+      const routeRelatedLayers = layerNames.filter(name => 
+        name.includes('route') || name.includes('waypoint') || name.includes('platform')
+      );
+      
+      this.updateDebugIndicator(`
+        Found route layers: ${foundLayers.join(', ') || 'NONE'}
+        Route-related layers: ${routeRelatedLayers.join(', ') || 'NONE'}
+        All layers (${layerNames.length}): ${layerNames.slice(0, 15).join(', ')}...
+        ${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}
+      `);
+      
+      // Start periodic check for route layers appearing
+      this.startRouteLayerMonitor(map);
       
       // 3. DOM touch events fallback for iPad
       if (this.isTouchDevice) {
@@ -158,6 +177,98 @@ class MapInteractionHandler {
     }
   }
 
+  createDebugIndicator() {
+    // Remove existing debug indicator
+    const existing = document.getElementById('drag-debug');
+    if (existing) existing.remove();
+    
+    // Create new debug indicator
+    const debugDiv = document.createElement('div');
+    debugDiv.id = 'drag-debug';
+    debugDiv.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 10000;
+      max-width: 300px;
+      white-space: pre-wrap;
+    `;
+    debugDiv.textContent = 'Debug: Starting...';
+    document.body.appendChild(debugDiv);
+    this.debugDiv = debugDiv;
+  }
+  
+  updateDebugIndicator(message) {
+    if (this.debugDiv) {
+      this.debugDiv.textContent = message;
+    }
+  }
+
+  startRouteLayerMonitor(map) {
+    // Clear any existing monitor
+    if (this.routeLayerMonitor) {
+      clearInterval(this.routeLayerMonitor);
+    }
+    
+    let checkCount = 0;
+    this.routeLayerMonitor = setInterval(() => {
+      checkCount++;
+      
+      const allLayers = map.getStyle().layers;
+      const layerNames = allLayers.map(l => l.id);
+      const routeRelatedLayers = layerNames.filter(name => 
+        name.includes('route') || name.includes('waypoint') || name.includes('platform')
+      );
+      
+      if (routeRelatedLayers.length > 0) {
+        // Route layers found! Set up drag handlers
+        this.updateDebugIndicator(`
+          🎉 ROUTE LAYERS FOUND! (check ${checkCount})
+          Route-related layers: ${routeRelatedLayers.join(', ')}
+          Setting up drag handlers...
+        `);
+        
+        // Set up drag handlers for the found route layers
+        const routeLayers = ['route', 'route-drag-detection-layer'];
+        let foundLayers = [];
+        
+        routeLayers.forEach(layer => {
+          if (map.getLayer(layer)) {
+            foundLayers.push(layer);
+            // Mouse events for desktop
+            map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
+            // Touch events for iPad
+            map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
+          }
+        });
+        
+        this.updateDebugIndicator(`
+          ✅ DRAG HANDLERS ATTACHED! (check ${checkCount})
+          Found layers: ${foundLayers.join(', ')}
+          Route-related: ${routeRelatedLayers.join(', ')}
+          Ready to drag!
+        `);
+        
+        // Stop monitoring
+        clearInterval(this.routeLayerMonitor);
+        this.routeLayerMonitor = null;
+      } else if (checkCount >= 20) {
+        // Stop after 20 checks (10 seconds)
+        this.updateDebugIndicator(`
+          ❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS
+          The route is not being drawn on the map!
+        `);
+        clearInterval(this.routeLayerMonitor);
+        this.routeLayerMonitor = null;
+      }
+    }, 500); // Check every 500ms
+  }
 
   /**
    * Setup DOM touch events - fallback for touch devices
@@ -210,9 +321,15 @@ class MapInteractionHandler {
       y: e.touches[0].clientY - rect.top
     };
     
-    const features = map.queryRenderedFeatures(point, { 
-      layers: ['route', 'route-touch-area'] 
-    });
+    let features = [];
+    try {
+      features = map.queryRenderedFeatures(point, { 
+        layers: ['route', 'route-drag-detection-layer'] 
+      });
+    } catch (error) {
+      console.warn('⚠️ queryRenderedFeatures error:', error);
+      return; // Skip if query fails
+    }
     
     if (features.length === 0) {
       console.log('❌ DOM touch not on route layers, ignoring');
@@ -248,7 +365,8 @@ class MapInteractionHandler {
    * Handle route line mouse start - for desktop route dragging
    */
   handleLineMouseStart(e) {
-    console.log('🖱️ MapInteractionHandler: Line mouse start - route drag');
+    console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
+    this.updateDebugIndicator('🚀 DRAG STARTED! Mouse down on route line detected.');
     
     try {
       e.preventDefault();
@@ -289,74 +407,15 @@ class MapInteractionHandler {
     map.once('touchend', this.onMapboxDragEnd.bind(this));
   }
 
-  /**
-   * Start drag operation - from drag-test
-   */
-  startDrag(lngLat, approach) {
-    this.isDragging = true;
-    this.activeApproach = approach;
-    this.dragStartCoord = [lngLat.lng, lngLat.lat];
-    
-    const map = this.mapManager.getMap();
-    map.getCanvas().style.cursor = 'grabbing';
-    
-    console.log(`🎯 Started drag via ${approach.toUpperCase()}`);
-  }
+  // REMOVED: Incomplete startDrag method - using complete implementation from drag-test below
 
-  /**
-   * Handle drag move events - from drag-test
-   */
-  onMapboxDragMove(e) {
-    if (!this.isDragging) return;
-    console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
-    this.updateDrag(e.lngLat);
-  }
+  // REMOVED: Incomplete onMapboxDragMove method - using complete implementation from drag-test below
 
-  /**
-   * Update drag position - from drag-test
-   */
-  updateDrag(lngLat) {
-    if (!this.isDragging) return;
-    
-    const currentCoord = [lngLat.lng, lngLat.lat];
-    console.log(`🔄 Update drag to: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
-    
-    // Let MapManager handle the drag line visualization
-    // (MapManager already has drag line implementation)
-  }
+  // REMOVED: Incomplete updateDrag method - using complete implementation from drag-test below
 
-  /**
-   * End drag operation - from drag-test
-   */
-  onMapboxDragEnd(e) {
-    console.log('🏁 Drag ended');
-    this.endDrag();
-  }
+  // REMOVED: Incomplete onMapboxDragEnd method - using complete implementation from drag-test below
 
-  /**
-   * End drag and clean up - from drag-test
-   */
-  endDrag() {
-    if (!this.isDragging) return;
-    
-    this.isDragging = false;
-    this.activeApproach = null;
-    this.dragStartCoord = null;
-    
-    const map = this.mapManager.getMap();
-    if (map) {
-      map.getCanvas().style.cursor = '';
-      
-      // Remove event listeners
-      map.off('mousemove', this.onMapboxDragMove.bind(this));
-      map.off('touchmove', this.onMapboxDragMove.bind(this));
-    }
-    
-    // Let MapManager handle drag line cleanup
-    // (MapManager already has drag line cleanup implementation)
-    
-    console.log('✅ Drag operation completed');
-  }
+  // REMOVED: Incomplete endDrag method - using complete implementation from drag-test below
 
   handleMapClick(e) {
     console.log("🗺️ MapInteractionHandler: Map clicked at coordinates:", e.lngLat);
@@ -372,7 +431,7 @@ class MapInteractionHandler {
     const map = this.mapManager.getMap();
     if (map && e.point) {
       const features = map.queryRenderedFeatures(e.point, { 
-        layers: ['waypoint-pins', 'route', 'route-touch-area', 'platforms-layer'] 
+        layers: ['waypoint-pins', 'route', 'route-drag-detection-layer', 'platforms-layer'] 
       });
       
       if (features.length > 0) {
@@ -896,25 +955,65 @@ class MapInteractionHandler {
   
   startDrag(lngLat, approach) {
     console.log('🚀 Starting drag operation from drag-test');
+    this.updateDebugIndicator('🚀 DRAG STARTED! Setting up drag state...');
+    
     this.isDragging = true;
     this.activeApproach = approach;
     this.dragStartCoord = [lngLat.lng, lngLat.lat];
     
     // Get current waypoints as original coordinates
     const waypoints = this.waypointManager.getWaypoints();
-    this.originalLineCoordinates = waypoints.map(wp => [wp.lng || wp.coordinates[0], wp.lat || wp.coordinates[1]]);
+    this.originalLineCoordinates = waypoints.map(wp => {
+      // Handle different coordinate formats
+      if (wp.lng !== undefined && wp.lat !== undefined) {
+        return [wp.lng, wp.lat];
+      } else if (wp.coordinates && wp.coordinates.length >= 2) {
+        return [wp.coordinates[0], wp.coordinates[1]];
+      } else if (wp.coords && wp.coords.length >= 2) {
+        return [wp.coords[0], wp.coords[1]];
+      } else {
+        console.warn('⚠️ Waypoint has unexpected coordinate format:', wp);
+        return [0, 0]; // Fallback coordinates
+      }
+    });
+    
+    // Calculate the correct insertion index based on where user clicked
+    this.dragInsertIndex = this.findClosestSegmentIndex(this.dragStartCoord, this.originalLineCoordinates);
+    console.log(`🎯 DRAG INSERTION INDEX: ${this.dragInsertIndex} (clicked on segment ${this.dragInsertIndex - 1} to ${this.dragInsertIndex})`);
     
     const map = this.mapManager.getMap();
     if (map && map.getCanvas) {
       map.getCanvas().style.cursor = 'grabbing';
     }
     
-    console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}`);
+    this.updateDebugIndicator(`
+      🎯 DRAG ACTIVE!
+      Mode: ${this.dragMode}
+      Approach: ${approach}
+      Waypoints: ${waypoints.length}
+      Insert Index: ${this.dragInsertIndex}
+      Move mouse to drag!
+    `);
+    
+    console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}, insertIndex=${this.dragInsertIndex}`);
   }
 
   onMapboxDragMove(e) {
     if (!this.isDragging) return;
+    
+    // Throttle drag updates to reduce flashing
+    const now = Date.now();
+    if (this.lastDragUpdate && now - this.lastDragUpdate < 16) { // ~60fps
+      return;
+    }
+    this.lastDragUpdate = now;
+    
     console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
+    this.updateDebugIndicator(`
+      🎯 DRAGGING!
+      Position: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}
+      Mode: ${this.dragMode}
+    `);
     this.updateDrag(e.lngLat);
   }
 
@@ -924,17 +1023,144 @@ class MapInteractionHandler {
     const currentCoord = [lngLat.lng, lngLat.lat];
     
     if (this.dragMode === 'insert') {
-      // Find closest point for insertion (like drag-test)
-      const closestPoint = this.findClosestPointOnLine(currentCoord);
-      if (!closestPoint) {
-        console.log('❌ Could not find closest point on line');
-        return;
+      // Update drag line visualization
+      this.updateDragLine(currentCoord);
+      console.log(`🎯 Drag updated: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
+    }
+  }
+
+  findClosestSegmentIndex(clickPoint, routeCoords) {
+    // Find which segment the user clicked on
+    let closestSegmentIndex = 1; // Default to insert after first point
+    let minDistance = Infinity;
+    
+    for (let i = 0; i < routeCoords.length - 1; i++) {
+      const segmentStart = routeCoords[i];
+      const segmentEnd = routeCoords[i + 1];
+      
+      // Calculate distance from click point to this segment
+      const distance = this.pointToSegmentDistance(clickPoint, segmentStart, segmentEnd);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestSegmentIndex = i + 1; // Insert after this segment's start point
       }
+    }
+    
+    return closestSegmentIndex;
+  }
+  
+  pointToSegmentDistance(point, segmentStart, segmentEnd) {
+    // Calculate the distance from a point to a line segment
+    const A = point[0] - segmentStart[0];
+    const B = point[1] - segmentStart[1];
+    const C = segmentEnd[0] - segmentStart[0];
+    const D = segmentEnd[1] - segmentStart[1];
+    
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    
+    if (lenSq === 0) {
+      // Degenerate case: segment is actually a point
+      return Math.sqrt(A * A + B * B);
+    }
+    
+    let param = dot / lenSq;
+    let xx, yy;
+    
+    if (param < 0) {
+      xx = segmentStart[0];
+      yy = segmentStart[1];
+    } else if (param > 1) {
+      xx = segmentEnd[0];
+      yy = segmentEnd[1];
+    } else {
+      xx = segmentStart[0] + param * C;
+      yy = segmentStart[1] + param * D;
+    }
+    
+    const dx = point[0] - xx;
+    const dy = point[1] - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  updateDragLine(currentCoord) {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+
+    try {
+      // Create drag line with insertion point calculated from drag start
+      const waypoints = this.waypointManager.getWaypoints();
+      const routeCoords = waypoints.map(wp => {
+        // Handle different coordinate formats
+        if (wp.lng !== undefined && wp.lat !== undefined) {
+          return [wp.lng, wp.lat];
+        } else if (wp.coordinates && wp.coordinates.length >= 2) {
+          return [wp.coordinates[0], wp.coordinates[1]];
+        } else if (wp.coords && wp.coords.length >= 2) {
+          return [wp.coords[0], wp.coords[1]];
+        } else {
+          console.warn('⚠️ Waypoint has unexpected coordinate format in updateDragLine:', wp);
+          return [0, 0]; // Fallback coordinates
+        }
+      });
       
-      console.log(`📍 Inserting waypoint at position ${closestPoint.insertIndex}`);
+      // Use the stored insertion index from drag start
+      const insertIndex = this.dragInsertIndex || Math.floor(routeCoords.length / 2);
       
-      // For now, just log the drag movement - actual waypoint insertion will be handled by existing system
-      console.log(`🎯 Would insert waypoint at: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
+      // Insert the current drag point at the calculated position
+      const dragLineCoords = [...routeCoords];
+      dragLineCoords.splice(insertIndex, 0, currentCoord);
+      
+      // Update drag line more efficiently - update source data instead of removing/adding
+      if (map.getSource('drag-line')) {
+        // Update existing drag line data
+        map.getSource('drag-line').setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: dragLineCoords
+          }
+        });
+      } else {
+        // Create drag line for the first time
+        map.addSource('drag-line', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: dragLineCoords
+            }
+          }
+        });
+        
+        map.addLayer({
+          id: 'drag-line',
+          type: 'line',
+          source: 'drag-line',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#FF0000',
+            'line-width': 3,
+            'line-dasharray': [2, 1.5],
+            'line-opacity': 0.8
+          }
+        });
+        
+        // Hide original route only once
+        map.setLayoutProperty('route', 'visibility', 'none');
+        if (map.getLayer('route-glow')) {
+          map.setLayoutProperty('route-glow', 'visibility', 'none');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error updating drag line:', error);
     }
   }
 
@@ -951,13 +1177,28 @@ class MapInteractionHandler {
     
     console.log(`🎉 Drag completed: ${wasApproach}, mode: ${wasMode}`);
     
+    const map = this.mapManager.getMap();
+    
+    // Clean up drag line
+    if (map && map.getSource('drag-line')) {
+      map.removeLayer('drag-line');
+      map.removeSource('drag-line');
+    }
+    
+    // Restore original route
+    if (map) {
+      map.setLayoutProperty('route', 'visibility', 'visible');
+      if (map.getLayer('route-glow')) {
+        map.setLayoutProperty('route-glow', 'visibility', 'visible');
+      }
+    }
+    
     // Reset drag state
     this.isDragging = false;
     this.activeApproach = 'none';
     this.dragMode = 'none';
     this.dragStartCoord = null;
     
-    const map = this.mapManager.getMap();
     if (map && map.getCanvas) {
       map.getCanvas().style.cursor = '';
     }
@@ -967,11 +1208,38 @@ class MapInteractionHandler {
       map.off('touchmove', this.onMapboxDragMove);
     }
     
-    // Handle the actual waypoint insertion through existing system
+    // Add waypoint at drag end location using calculated insertion index
     if (lngLat && this.waypointManager) {
-      console.log('🎯 Adding waypoint through existing system');
-      // Use the existing route click handler which has the insertion logic
-      this.handleRouteClick(lngLat, 1, null); // Insert at position 1 for now
+      console.log(`🎯 Adding waypoint at drag end: ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`);
+      
+      const coords = [lngLat.lng, lngLat.lat];
+      const waypointName = `Waypoint ${Date.now()}`;
+      
+      // Calculate insertion index based on drag start position
+      const waypoints = this.waypointManager.getWaypoints();
+      const routeCoords = waypoints.map(wp => {
+        // Handle different coordinate formats
+        if (wp.lng !== undefined && wp.lat !== undefined) {
+          return [wp.lng, wp.lat];
+        } else if (wp.coordinates && wp.coordinates.length >= 2) {
+          return [wp.coordinates[0], wp.coordinates[1]];
+        } else if (wp.coords && wp.coords.length >= 2) {
+          return [wp.coords[0], wp.coords[1]];
+        } else {
+          console.warn('⚠️ Waypoint has unexpected coordinate format in endDrag:', wp);
+          return [0, 0]; // Fallback coordinates
+        }
+      });
+      
+      // Use the stored insertion index from drag start
+      const insertIndex = this.dragInsertIndex || Math.floor(routeCoords.length / 2);
+      
+      try {
+        this.waypointManager.addWaypointAtIndex(coords, waypointName, insertIndex);
+        console.log(`✅ Successfully added waypoint: ${waypointName} at index ${insertIndex}`);
+      } catch (error) {
+        console.error('❌ Error adding waypoint:', error);
+      }
     }
   }
 
