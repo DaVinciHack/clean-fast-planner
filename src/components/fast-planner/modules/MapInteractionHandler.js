@@ -122,8 +122,7 @@ class MapInteractionHandler {
   setupSeparateHandlers(map) {
     console.log('🔧 MapInteractionHandler: Setting up separate event handlers like drag-test...');
     
-    // Create visual debug indicator
-    this.createDebugIndicator();
+    // Debug indicator removed for production
     
     try {
       // 1. General map click handler (for background clicks - add waypoints)
@@ -133,7 +132,7 @@ class MapInteractionHandler {
       
       // 2. Route-specific touch/mouse handlers for dragging
       const routeLayers = ['route', 'route-drag-detection-layer'];
-      this.updateDebugIndicator('🔍 Checking for route layers...');
+      console.log('🔍 Checking for route layers...');
       
       let foundLayers = [];
       routeLayers.forEach(layer => {
@@ -156,12 +155,8 @@ class MapInteractionHandler {
         name.includes('route') || name.includes('waypoint') || name.includes('platform')
       );
       
-      this.updateDebugIndicator(`
-        Found route layers: ${foundLayers.join(', ') || 'NONE'}
-        Route-related layers: ${routeRelatedLayers.join(', ') || 'NONE'}
-        All layers (${layerNames.length}): ${layerNames.slice(0, 15).join(', ')}...
-        ${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}
-      `);
+      console.log(`Found route layers: ${foundLayers.join(', ') || 'NONE'}`);
+      console.log(`${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}`);
       
       // Start periodic check for route layers appearing
       this.startRouteLayerMonitor(map);
@@ -177,38 +172,7 @@ class MapInteractionHandler {
     }
   }
 
-  createDebugIndicator() {
-    // Remove existing debug indicator
-    const existing = document.getElementById('drag-debug');
-    if (existing) existing.remove();
-    
-    // Create new debug indicator
-    const debugDiv = document.createElement('div');
-    debugDiv.id = 'drag-debug';
-    debugDiv.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-family: monospace;
-      font-size: 12px;
-      z-index: 10000;
-      max-width: 300px;
-      white-space: pre-wrap;
-    `;
-    debugDiv.textContent = 'Debug: Starting...';
-    document.body.appendChild(debugDiv);
-    this.debugDiv = debugDiv;
-  }
-  
-  updateDebugIndicator(message) {
-    if (this.debugDiv) {
-      this.debugDiv.textContent = message;
-    }
-  }
+  // Debug indicator methods removed for production
 
   startRouteLayerMonitor(map) {
     // Clear any existing monitor
@@ -228,11 +192,7 @@ class MapInteractionHandler {
       
       if (routeRelatedLayers.length > 0) {
         // Route layers found! Set up drag handlers
-        this.updateDebugIndicator(`
-          🎉 ROUTE LAYERS FOUND! (check ${checkCount})
-          Route-related layers: ${routeRelatedLayers.join(', ')}
-          Setting up drag handlers...
-        `);
+        console.log(`🎉 ROUTE LAYERS FOUND! (check ${checkCount}) - ${routeRelatedLayers.join(', ')}`);
         
         // Set up drag handlers for the found route layers
         const routeLayers = ['route', 'route-drag-detection-layer'];
@@ -248,22 +208,14 @@ class MapInteractionHandler {
           }
         });
         
-        this.updateDebugIndicator(`
-          ✅ DRAG HANDLERS ATTACHED! (check ${checkCount})
-          Found layers: ${foundLayers.join(', ')}
-          Route-related: ${routeRelatedLayers.join(', ')}
-          Ready to drag!
-        `);
+        console.log(`✅ DRAG HANDLERS ATTACHED! (check ${checkCount}) - Found layers: ${foundLayers.join(', ')}`);
         
         // Stop monitoring
         clearInterval(this.routeLayerMonitor);
         this.routeLayerMonitor = null;
       } else if (checkCount >= 20) {
         // Stop after 20 checks (10 seconds)
-        this.updateDebugIndicator(`
-          ❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS
-          The route is not being drawn on the map!
-        `);
+        console.log(`❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS - The route is not being drawn on the map!`);
         clearInterval(this.routeLayerMonitor);
         this.routeLayerMonitor = null;
       }
@@ -366,7 +318,7 @@ class MapInteractionHandler {
    */
   handleLineMouseStart(e) {
     console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
-    this.updateDebugIndicator('🚀 DRAG STARTED! Mouse down on route line detected.');
+    console.log('🚀 DRAG STARTED! Mouse down on route line detected.');
     
     try {
       e.preventDefault();
@@ -955,7 +907,7 @@ class MapInteractionHandler {
   
   startDrag(lngLat, approach) {
     console.log('🚀 Starting drag operation from drag-test');
-    this.updateDebugIndicator('🚀 DRAG STARTED! Setting up drag state...');
+    console.log('🚀 DRAG STARTED! Setting up drag state...');
     
     this.isDragging = true;
     this.activeApproach = approach;
@@ -986,14 +938,7 @@ class MapInteractionHandler {
       map.getCanvas().style.cursor = 'grabbing';
     }
     
-    this.updateDebugIndicator(`
-      🎯 DRAG ACTIVE!
-      Mode: ${this.dragMode}
-      Approach: ${approach}
-      Waypoints: ${waypoints.length}
-      Insert Index: ${this.dragInsertIndex}
-      Move mouse to drag!
-    `);
+    console.log(`🎯 DRAG ACTIVE! Mode: ${this.dragMode}, Approach: ${approach}, Insert Index: ${this.dragInsertIndex}`);
     
     console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}, insertIndex=${this.dragInsertIndex}`);
   }
@@ -1009,11 +954,7 @@ class MapInteractionHandler {
     this.lastDragUpdate = now;
     
     console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
-    this.updateDebugIndicator(`
-      🎯 DRAGGING!
-      Position: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}
-      Mode: ${this.dragMode}
-    `);
+    console.log(`🎯 DRAGGING! Position: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
     this.updateDrag(e.lngLat);
   }
 
