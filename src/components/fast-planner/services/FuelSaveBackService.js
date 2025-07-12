@@ -50,96 +50,38 @@ export class FuelSaveBackService {
       // Import SDK dynamically
       const sdk = await import('@flight-app/sdk');
       
-      // Create complete MainFuelV2 object with all fuel components
-      console.log('💾 Creating/updating MainFuelV2 object directly for complete fuel data');
+      // Find or create MainFuelV2 object for this flight
+      console.log('💾 Finding existing MainFuelV2 object for flight:', flightId);
       
-      // 🎯 USER CONFIRMED: fuel object 6cdf9983-8152-4be8-b0fc-4dd9416ec4b0 has flight UUID 5e3303d2-a3d7-49db-989c-779926b26bbd
-      // Let's fetch it directly first, then investigate why search isn't working
       let existingFuelObject = null;
       
-      try {
-        console.log('🎯 DIRECT FETCH: Getting fuel object 6cdf9983-8152-4be8-b0fc-4dd9416ec4b0 directly');
-        existingFuelObject = await client(sdk.MainFuelV2).fetchOne('6cdf9983-8152-4be8-b0fc-4dd9416ec4b0');
-        
-        if (existingFuelObject) {
-          console.log('✅ DIRECT FETCH SUCCESS:', {
-            primaryKey: existingFuelObject.$primaryKey,
-            flightUuid: existingFuelObject.flightUuid,
-            flightUuidMatches: existingFuelObject.flightUuid === flightId,
-            updatedAt: existingFuelObject.updatedAt
-          });
-          
-          // Verify it matches our flight
-          if (existingFuelObject.flightUuid === flightId) {
-            console.log('✅ PERFECT: Fuel object belongs to our flight!');
-          } else {
-            console.error('🚨 MISMATCH: Fuel object has wrong flight UUID!', {
-              expected: flightId,
-              actual: existingFuelObject.flightUuid
-            });
-          }
-        }
-      } catch (directFetchError) {
-        console.error('❌ DIRECT FETCH FAILED:', directFetchError.message);
-        console.log('🔍 Falling back to search...');
-      }
+      // Search for existing fuel object by flight UUID
+      console.log('🔍 Searching for MainFuelV2 objects for flight:', flightId);
       
-      // If direct fetch failed, try search to debug why it's not working
-      if (!existingFuelObject) {
-        console.log('🔍 SEARCH DEBUG: Looking for MainFuelV2 objects for flight:', flightId);
-        
-        const existingData = await client(sdk.MainFuelV2)
-          .where(fuel => fuel.flightUuid.exactMatch(flightId))
-          .fetchPage({ $pageSize: 20 }); // Get more to see all objects
-      
-        console.log('🔍 SEARCH RESULTS:', {
-          totalFound: existingData.data?.length || 0,
-          flightId: flightId
-        });
-        
-        if (!existingData.data || existingData.data.length === 0) {
-          throw new Error(`No MainFuelV2 object found for flight ${flightId}`);
-        }
-        
-        // 🚨 DEBUG: Log ALL objects found to see what's going wrong with search
-        console.log('🔍 ALL OBJECTS FOUND BY SEARCH:');
-        existingData.data.forEach((obj, index) => {
-          console.log(`  ${index + 1}. UUID: ${obj.$primaryKey}, flightUuid: ${obj.flightUuid}, matches: ${obj.flightUuid === flightId}, updatedAt: ${obj.updatedAt}`);
-        });
-        
-        // Check if our target object is in the search results
-        const targetInResults = existingData.data.find(obj => obj.$primaryKey === '6cdf9983-8152-4be8-b0fc-4dd9416ec4b0');
-        if (targetInResults) {
-          console.log('✅ TARGET FOUND IN SEARCH: Our fuel object IS in the search results');
-          existingFuelObject = targetInResults;
-        } else {
-          console.log('❌ TARGET NOT IN SEARCH: Our fuel object is NOT in the search results - this explains the problem!');
-          
-          // Find the object that ACTUALLY matches our flight UUID
-          const correctObjects = existingData.data.filter(obj => obj.flightUuid === flightId);
-          
-          if (correctObjects.length === 0) {
-            console.error('🚨 CRITICAL: Search returned objects but NONE match our flight UUID!');
-            console.error('🚨 Expected flight UUID:', flightId);
-            console.error('🚨 Found objects with UUIDs:', existingData.data.map(obj => obj.flightUuid));
-            throw new Error(`Search found objects but none match flightUuid = ${flightId}`);
-          }
-          
-          existingFuelObject = correctObjects[0];
-          console.log('⚠️ USING DIFFERENT OBJECT FROM SEARCH:', existingFuelObject.$primaryKey);
-        }
-      }
-      
-      // Final check that we have the right object
-      if (!existingFuelObject) {
-        throw new Error(`Failed to find MainFuelV2 object for flight ${flightId}`);
-      }
-      
-      console.log('✅ FINAL: Using fuel object:', {
-        primaryKey: existingFuelObject.$primaryKey,
-        flightUuid: existingFuelObject.flightUuid,
-        flightUuidMatches: existingFuelObject.flightUuid === flightId
+      const existingData = await client(sdk.MainFuelV2)
+        .where(fuel => fuel.flightUuid.exactMatch(flightId))
+        .fetchPage({ $pageSize: 5 });
+    
+      console.log('🔍 Search results:', {
+        totalFound: existingData.data?.length || 0,
+        flightId: flightId
       });
+      
+      if (existingData.data && existingData.data.length > 0) {
+        // Use the first (most recent) fuel object for this flight
+        existingFuelObject = existingData.data[0];
+        console.log('✅ Found existing fuel object:', {
+          primaryKey: existingFuelObject.$primaryKey,
+          flightUuid: existingFuelObject.flightUuid,
+          updatedAt: existingFuelObject.updatedAt
+        });
+      } else {
+        console.log('ℹ️ No existing fuel object found - will create new one');
+        // Note: createOrModifyMainFuelFastPlanner will create if no object provided
+      }
+      
+      console.log('💾 Using fuel object for modification:', 
+        existingFuelObject ? existingFuelObject.$primaryKey : 'CREATE NEW');
       
       // Use the NEW comprehensive createOrModifyMainFuelFastPlanner action
       console.log('💾 Using createOrModifyMainFuelFastPlanner - comprehensive fuel + passenger data');
@@ -275,9 +217,10 @@ export class FuelSaveBackService {
         markdownTableLines: markdownTable.split('\n').length
       });
       
+      // Build action parameters based on whether we're updating or creating
       const actionParams = {
-        // Tell action which object to modify - pass the FULL OBJECT
-        "main_fuel_v2": existingFuelObject,
+        // Only include existing object if we found one to modify
+        ...(existingFuelObject && { "main_fuel_v2": existingFuelObject }),
         
         // Complete fuel data arrays matching Fast Planner calculations
         "stop_locations": stopLocations,
@@ -384,34 +327,46 @@ export class FuelSaveBackService {
         updated_at: actionParams.updated_at
       });
       
-      // ✅ CRITICAL FIX: Now passing existing object correctly to action
-      console.log('💾 Using action to MODIFY existing MainFuelV2 object:', existingFuelObject.$primaryKey);
-      console.log('💾 DEBUG: Existing object being passed:', {
-        primaryKey: existingFuelObject.$primaryKey,
-        type: typeof existingFuelObject,
-        flightUuid: existingFuelObject.flightUuid,
-        flightUuidMatches: existingFuelObject.flightUuid === flightId
-      });
+      // Determine if we're creating or modifying
+      const isModifying = !!existingFuelObject;
+      const actionType = isModifying ? 'MODIFY_EXISTING' : 'CREATE_NEW';
       
-      // ✅ UUID VALIDATION: Check that key UUIDs are valid
-      console.log('💾 UUID VALIDATION:', {
-        flightId: flightId,
-        flightIdValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(flightId),
-        primaryKey: existingFuelObject.$primaryKey,
-        primaryKeyValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existingFuelObject.$primaryKey)
-      });
+      if (isModifying) {
+        console.log('💾 Using action to MODIFY existing MainFuelV2 object:', existingFuelObject.$primaryKey);
+        console.log('💾 DEBUG: Existing object being passed:', {
+          primaryKey: existingFuelObject.$primaryKey,
+          type: typeof existingFuelObject,
+          flightUuid: existingFuelObject.flightUuid,
+          flightUuidMatches: existingFuelObject.flightUuid === flightId
+        });
+        
+        // ✅ UUID VALIDATION: Check that key UUIDs are valid
+        console.log('💾 UUID VALIDATION:', {
+          flightId: flightId,
+          flightIdValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(flightId),
+          primaryKey: existingFuelObject.$primaryKey,
+          primaryKeyValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existingFuelObject.$primaryKey)
+        });
+      } else {
+        console.log('💾 Using action to CREATE new MainFuelV2 object for flight:', flightId);
+        console.log('💾 Flight UUID validation:', {
+          flightId: flightId,
+          flightIdValid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(flightId)
+        });
+      }
       
       // 🚨 FINAL DEBUG: Log key info before API call
       debugInfo = {
         parameterCount: Object.keys(actionParams).length,
         hasMainFuelV2: !!actionParams.main_fuel_v2,
         main_fuel_v2_primaryKey: actionParams.main_fuel_v2?.$primaryKey,
-        actionType: 'MODIFY_EXISTING'
+        actionType: actionType
       };
       console.log('💾 FINAL PARAMETERS BEING SENT TO PALANTIR:', debugInfo);
       
-      // ✅ READY: Using action with existing object reference to MODIFY, not create
-      console.log('💾 READY: Calling createOrModifyMainFuelFastPlanner to MODIFY existing object:', existingFuelObject.$primaryKey);
+      // ✅ READY: Call action to either modify existing or create new
+      console.log(`💾 READY: Calling createOrModifyMainFuelFastPlanner to ${actionType}:`, 
+        isModifying ? existingFuelObject.$primaryKey : flightId);
       
       const result = await client(sdk.createOrModifyMainFuelFastPlanner).applyAction(
         actionParams,
@@ -420,39 +375,44 @@ export class FuelSaveBackService {
       
       console.log('✅ FuelSaveBackService: createOrModifyMainFuelFastPlanner action successful:', result);
       
-      // 🔍 ENHANCED VERIFICATION: Compare before/after to see what actually changed
+      // 🔍 VERIFICATION: Load the fuel object after save to verify success
       try {
-        console.log('🔍 VERIFICATION: Loading updated object to compare changes...');
+        console.log('🔍 VERIFICATION: Loading fuel object after save...');
         
         const verifyData = await client(sdk.MainFuelV2)
           .where(fuel => fuel.flightUuid.exactMatch(flightId))
           .fetchPage({ $pageSize: 1 });
         
         if (verifyData.data && verifyData.data.length > 0) {
-          const updatedFuel = verifyData.data[0];
+          const finalFuel = verifyData.data[0];
           
-          console.log('🔍 BEFORE/AFTER COMPARISON:');
-          console.log('  BEFORE (existingFuelObject):');
-          console.log('    - UUID:', existingFuelObject.$primaryKey);
-          console.log('    - Trip Fuel:', existingFuelObject.plannedTripFuel);
-          console.log('    - Extra Fuel:', existingFuelObject.plannedExtraFuel);
-          console.log('    - Total Fuel:', existingFuelObject.minTotalFuel);
-          console.log('    - Updated At:', existingFuelObject.updatedAt);
-          
-          console.log('  AFTER (updatedFuel):');
-          console.log('    - UUID:', updatedFuel.$primaryKey);
-          console.log('    - Trip Fuel:', updatedFuel.plannedTripFuel);
-          console.log('    - Extra Fuel:', updatedFuel.plannedExtraFuel);
-          console.log('    - Total Fuel:', updatedFuel.minTotalFuel);
-          console.log('    - Updated At:', updatedFuel.updatedAt);
-          
-          console.log('  CHANGES DETECTED:');
-          console.log('    - UUID Same?', existingFuelObject.$primaryKey === updatedFuel.$primaryKey);
-          console.log('    - Trip Fuel Changed?', existingFuelObject.plannedTripFuel !== updatedFuel.plannedTripFuel);
-          console.log('    - Extra Fuel Changed?', existingFuelObject.plannedExtraFuel !== updatedFuel.plannedExtraFuel);
-          console.log('    - Total Fuel Changed?', existingFuelObject.minTotalFuel !== updatedFuel.minTotalFuel);
-          console.log('    - Timestamp Changed?', existingFuelObject.updatedAt !== updatedFuel.updatedAt);
-          
+          if (isModifying && existingFuelObject) {
+            console.log('🔍 MODIFICATION VERIFICATION:');
+            console.log('  BEFORE:');
+            console.log('    - UUID:', existingFuelObject.$primaryKey);
+            console.log('    - Trip Fuel:', existingFuelObject.plannedTripFuel);
+            console.log('    - Total Fuel:', existingFuelObject.minTotalFuel);
+            console.log('    - Updated At:', existingFuelObject.updatedAt);
+            
+            console.log('  AFTER:');
+            console.log('    - UUID:', finalFuel.$primaryKey);
+            console.log('    - Trip Fuel:', finalFuel.plannedTripFuel);
+            console.log('    - Total Fuel:', finalFuel.minTotalFuel);
+            console.log('    - Updated At:', finalFuel.updatedAt);
+            
+            console.log('  VERIFICATION:');
+            console.log('    - Same Object?', existingFuelObject.$primaryKey === finalFuel.$primaryKey);
+            console.log('    - Data Updated?', existingFuelObject.updatedAt !== finalFuel.updatedAt);
+          } else {
+            console.log('🔍 CREATION VERIFICATION:');
+            console.log('  NEW OBJECT CREATED:');
+            console.log('    - UUID:', finalFuel.$primaryKey);
+            console.log('    - Flight UUID:', finalFuel.flightUuid);
+            console.log('    - Flight UUID Match?', finalFuel.flightUuid === flightId);
+            console.log('    - Trip Fuel:', finalFuel.plannedTripFuel);
+            console.log('    - Total Fuel:', finalFuel.minTotalFuel);
+            console.log('    - Created At:', finalFuel.updatedAt);
+          }
         } else {
           console.warn('❌ VERIFICATION: No fuel data found after save!');
         }
