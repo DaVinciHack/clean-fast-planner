@@ -193,6 +193,7 @@ class MapInteractionHandler {
       if (routeRelatedLayers.length > 0) {
         // Route layers found! Set up drag handlers
         console.log(`🎉 ROUTE LAYERS FOUND! (check ${checkCount}) - ${routeRelatedLayers.join(', ')}`);
+        console.log(`🔍 ALL LAYERS ON MAP:`, layerNames);
         
         // Set up drag handlers for the found route layers
         const routeLayers = ['route', 'route-drag-detection-layer'];
@@ -201,14 +202,25 @@ class MapInteractionHandler {
         routeLayers.forEach(layer => {
           if (map.getLayer(layer)) {
             foundLayers.push(layer);
+            console.log(`📱 ATTACHING TOUCH EVENTS to layer: ${layer}`);
             // Mouse events for desktop
             map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
             // Touch events for iPad
             map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
+          } else {
+            console.log(`❌ LAYER NOT FOUND: ${layer}`);
           }
         });
         
         console.log(`✅ DRAG HANDLERS ATTACHED! (check ${checkCount}) - Found layers: ${foundLayers.join(', ')}`);
+        
+        // 🎯 ADDITIONAL TEST: Try to attach to ALL route-related layers for maximum coverage
+        routeRelatedLayers.forEach(layer => {
+          if (!foundLayers.includes(layer) && layer.includes('route')) {
+            console.log(`📱 ADDITIONAL TOUCH ATTACHMENT to: ${layer}`);
+            map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
+          }
+        });
         
         // Stop monitoring
         clearInterval(this.routeLayerMonitor);
@@ -290,14 +302,14 @@ class MapInteractionHandler {
     
     console.log('📱 DOM touch on route detected');
     
-    // IMMEDIATE VISUAL FEEDBACK for DOM touch
-    const lngLat = map.unproject(point);
-    this.showImmediateTouchFeedback(lngLat);
+    // 🎯 IMMEDIATE VISUAL FEEDBACK - Change cursor instantly on DOM touch
+    map.getCanvas().style.cursor = 'grabbing';
+    console.log('✅ INSTANT FEEDBACK: DOM cursor changed to grabbing on touch');
     
     // Try to prevent default (like drag-test)
+    const lngLat = map.unproject(point);
     if (e.cancelable) {
       e.preventDefault();
-      e.stopPropagation(); // Prevent event bubbling
       console.log('✅ e.preventDefault() called successfully on DOM touch');
     } else {
       console.warn('⚠️ DOM touch event not cancelable - cannot preventDefault()');
@@ -347,8 +359,12 @@ class MapInteractionHandler {
       return;
     }
     
-    // IMMEDIATE VISUAL FEEDBACK - Change route color instantly for iPad responsiveness
-    this.showImmediateTouchFeedback(e.lngLat);
+    // 🎯 IMMEDIATE VISUAL FEEDBACK - Change cursor instantly on touch
+    const map = this.mapManager.getMap();
+    if (map) {
+      map.getCanvas().style.cursor = 'grabbing';
+      console.log('✅ INSTANT FEEDBACK: Cursor changed to grabbing on touch');
+    }
     
     try {
       e.preventDefault();
@@ -361,37 +377,12 @@ class MapInteractionHandler {
     this.dragMode = 'insert';
     this.startDrag(e.lngLat, 'mapbox-touch');
     
-    const map = this.mapManager.getMap();
+    // Reuse the map reference from above
     map.on('touchmove', this.onMapboxDragMove.bind(this));
     map.once('touchend', this.onMapboxDragEnd.bind(this));
   }
 
-  /**
-   * Show immediate visual feedback on touch - makes iPad feel more responsive
-   */
-  showImmediateTouchFeedback(lngLat) {
-    const map = this.mapManager.getMap();
-    if (!map) return;
-    
-    try {
-      // Change route color immediately to show touch response
-      if (map.getLayer('route')) {
-        map.setPaintProperty('route', 'line-color', '#FF6B35'); // Orange to show active
-        map.setPaintProperty('route', 'line-width', 6); // Slightly thicker
-      }
-      
-      // Reset color after short delay if drag doesn't continue
-      setTimeout(() => {
-        if (!this.isDragging && map.getLayer('route')) {
-          map.setPaintProperty('route', 'line-color', '#1e8ffe'); // Back to blue
-          map.setPaintProperty('route', 'line-width', 5); // Back to normal
-        }
-      }, 200);
-      
-    } catch (error) {
-      console.warn('⚠️ Error showing immediate touch feedback:', error.message);
-    }
-  }
+  // Visual feedback methods removed - keeping only touch sensitivity improvements
 
   // REMOVED: Incomplete startDrag method - using complete implementation from drag-test below
 
@@ -1160,17 +1151,11 @@ class MapInteractionHandler {
       map.removeSource('drag-line');
     }
     
-    // Restore original route and colors
+    // Restore original route
     if (map) {
       map.setLayoutProperty('route', 'visibility', 'visible');
       if (map.getLayer('route-glow')) {
         map.setLayoutProperty('route-glow', 'visibility', 'visible');
-      }
-      
-      // Restore original route color and width
-      if (map.getLayer('route')) {
-        map.setPaintProperty('route', 'line-color', '#1e8ffe'); // Back to blue
-        map.setPaintProperty('route', 'line-width', 5); // Back to normal
       }
     }
     
@@ -1194,7 +1179,20 @@ class MapInteractionHandler {
       console.log(`🎯 Adding waypoint at drag end: ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`);
       
       const coords = [lngLat.lng, lngLat.lat];
-      const waypointName = `Waypoint ${Date.now()}`;
+      
+      // 🛢️ SNAP TO RIG: Check for nearby rigs within 2 miles
+      const snapResult = this.findNearbyRig(coords, 2.0);
+      
+      let finalCoords = coords;
+      let waypointName = `Waypoint ${Date.now()}`;
+      
+      if (snapResult) {
+        console.log(`🛢️ SNAP: Found nearby rig "${snapResult.name}" within 2 miles - snapping to it`);
+        finalCoords = snapResult.coordinates;
+        waypointName = snapResult.name;
+      } else {
+        console.log('🎯 No nearby rigs found - adding waypoint at drop location');
+      }
       
       // Calculate insertion index based on drag start position
       const waypoints = this.waypointManager.getWaypoints();
@@ -1216,12 +1214,96 @@ class MapInteractionHandler {
       const insertIndex = this.dragInsertIndex || Math.floor(routeCoords.length / 2);
       
       try {
-        this.waypointManager.addWaypointAtIndex(coords, waypointName, insertIndex);
+        this.waypointManager.addWaypointAtIndex(finalCoords, waypointName, insertIndex);
         console.log(`✅ Successfully added waypoint: ${waypointName} at index ${insertIndex}`);
       } catch (error) {
         console.error('❌ Error adding waypoint:', error);
       }
     }
+  }
+
+  /**
+   * Find nearby rig within specified distance for snapping
+   * @param {Array} coords - [lng, lat] coordinates to search around
+   * @param {number} maxDistanceMiles - Maximum distance in miles
+   * @returns {Object|null} - {name, coordinates} or null if no rig found
+   */
+  findNearbyRig(coords, maxDistanceMiles = 2.0) {
+    const [dropLng, dropLat] = coords;
+    
+    // Get platform data from platform manager
+    if (!this.platformManager) {
+      console.log('🛢️ No platform manager available for rig snapping');
+      return null;
+    }
+    
+    const platforms = this.platformManager.getPlatforms();
+    if (!platforms || platforms.length === 0) {
+      console.log('🛢️ No platforms available for rig snapping');
+      return null;
+    }
+    
+    console.log(`🛢️ Checking ${platforms.length} platforms for snapping within ${maxDistanceMiles} miles`);
+    
+    let closestRig = null;
+    let minDistance = Infinity;
+    
+    platforms.forEach(platform => {
+      // Handle different coordinate formats
+      let platLng, platLat;
+      
+      if (platform.lng !== undefined && platform.lat !== undefined) {
+        platLng = platform.lng;
+        platLat = platform.lat;
+      } else if (platform.coordinates && platform.coordinates.length >= 2) {
+        platLng = platform.coordinates[0];
+        platLat = platform.coordinates[1];
+      } else if (platform.longitude !== undefined && platform.latitude !== undefined) {
+        platLng = platform.longitude;
+        platLat = platform.latitude;
+      } else {
+        console.warn('🛢️ Platform has unexpected coordinate format:', platform);
+        return; // Skip this platform
+      }
+      
+      // Calculate distance using simple haversine approximation
+      const distance = this.calculateDistance(dropLat, dropLng, platLat, platLng);
+      
+      if (distance <= maxDistanceMiles && distance < minDistance) {
+        minDistance = distance;
+        closestRig = {
+          name: platform.name || platform.id || `Platform_${platform.objectId || 'Unknown'}`,
+          coordinates: [platLng, platLat],
+          distance: distance
+        };
+      }
+    });
+    
+    if (closestRig) {
+      console.log(`🛢️ Found closest rig: "${closestRig.name}" at ${closestRig.distance.toFixed(3)} miles`);
+    }
+    
+    return closestRig;
+  }
+
+  /**
+   * Calculate distance between two points in miles using haversine formula
+   * @param {number} lat1 - Latitude of first point
+   * @param {number} lng1 - Longitude of first point  
+   * @param {number} lat2 - Latitude of second point
+   * @param {number} lng2 - Longitude of second point
+   * @returns {number} Distance in miles
+   */
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   }
 
   findClosestPointOnLine(coord) {

@@ -1645,11 +1645,11 @@ class WaypointManager {
           layout: {
             'line-join': 'round',
             'line-cap': 'round',
-            'line-sort-key': 10 // Render on top for interactions
+            'line-sort-key': 15 // Render on top for interactions
           },
           paint: {
             'line-color': '#ff0000', // Red for debugging (will be transparent)
-            'line-width': 30, // Wide for easy clicking
+            'line-width': 40, // Wider touch zone for easier iPad interaction
             'line-opacity': 0.0 // Completely invisible
           }
         });
@@ -1692,7 +1692,7 @@ class WaypointManager {
           layout: { 
             'line-join': 'round', 
             'line-cap': 'round', 
-            'line-sort-key': 2 // Render above shadow system
+            'line-sort-key': 5 // Render above alternate lines and weather layers
           }, 
           paint: { 
             'line-color': '#1e8ffe', // Bright blue color
@@ -1711,7 +1711,7 @@ class WaypointManager {
               'line-join': 'round', 
               'line-cap': 'round', 
               'visibility': 'visible', 
-              'line-sort-key': 1 // Between shadow and main line
+              'line-sort-key': 4 // Below main route but above alternate lines
             }, 
             paint: { 
               'line-color': '#ffffff',

@@ -1,0 +1,20 @@
+# .htaccess for /plan subdirectory
+# Configuration for React SPA in subdirectory
+
+# Enable URL rewriting
+RewriteEngine On
+
+# Handle React Router - redirect all non-file requests to index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /plan/index.html [L]
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+
+# Cache assets
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|ttf|woff|woff2)$">
+    Header set Cache-Control "public, max-age=31536000"
+</FilesMatch>
