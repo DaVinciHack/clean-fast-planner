@@ -114,12 +114,20 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
     if (!waypointName) return 0;
     
-    
-    
+    // 🔍 DEBUG: Log all extra fuel lookups
+    if (fuelType === 'extraFuel') {
+      console.log(`🔍 EXTRA FUEL LOOKUP: waypoint=${waypointName}, cardIndex=${cardIndex}, fuelType=${fuelType}`);
+      console.log(`🔍 AVAILABLE OVERRIDES:`, Object.keys(locationFuelOverrides));
+    }
     
     // 🔧 EXACT MATCH ONLY: Use unique card-based naming system
     const cardIndexKey = cardIndex ? `${waypointName}_${cardIndex}_${fuelType}` : null;
     const cardIndexOverride = cardIndexKey ? locationFuelOverrides[cardIndexKey] : null;
+    
+    // 🔍 DEBUG: Log key lookup for extra fuel
+    if (fuelType === 'extraFuel') {
+      console.log(`🔍 LOOKING FOR KEY: '${cardIndexKey}', FOUND:`, cardIndexOverride);
+    }
     
     if (cardIndexOverride !== undefined && cardIndexOverride !== null) {
       // Handle both object format {value: X} and direct value format

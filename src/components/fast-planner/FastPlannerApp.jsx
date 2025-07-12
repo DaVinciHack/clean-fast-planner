@@ -22,6 +22,9 @@ import { generateStopCardsData as generateStopCardsUtil } from './utilities/Flig
 // Import segment-aware fuel utilities
 import { detectLocationSegment, createSegmentFuelKey, getSegmentBoundaries } from './utilities/SegmentUtils.js';
 
+// Import fuel save service for loading saved fuel settings
+import { FuelSaveBackService } from './services/FuelSaveBackService.js';
+
 // Import UI components
 import {
   LeftPanel,
@@ -1766,6 +1769,12 @@ const FastPlannerCore = ({
 
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
+    // 🔍 DEBUG: Log the exact flight data received by handleFlightLoad
+    console.log('🔍 handleFlightLoad: Received flight data:', flightData);
+    console.log('🔍 handleFlightLoad: Flight data keys:', Object.keys(flightData || {}));
+    console.log('🔍 handleFlightLoad: fuelPlanId present:', !!flightData?.fuelPlanId);
+    console.log('🔍 handleFlightLoad: fuelPlanId value:', flightData?.fuelPlanId);
+    
     // RESET LOADING STATE: Always reset to false first, then set to true
     setIsActuallyLoading(false);
     
@@ -1872,73 +1881,96 @@ const FastPlannerCore = ({
       if (flightData.flightId) {
         setCurrentFlightId(flightData.flightId);
         
-        // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2
+        // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2 with new OSDK v0.9.0 support
         try {
+          console.log('💾 FUEL LOAD-BACK: Loading saved fuel and refuel stops for flight:', flightData.flightId);
           
-          // Import FuelSaveBackService
-          const FuelSaveBackService = (await import('./services/FuelSaveBackService')).default;
+          // Import FuelSaveBackService with new loadFuelSettingsForFlight method
+          const { FuelSaveBackService } = await import('./services/FuelSaveBackService');
           
-          // Load existing fuel data
-          const savedFuelData = await FuelSaveBackService.loadExistingFuelData(flightData.flightId);
+          // Load fuel settings using new consolidated method - pass full flightData for fuelPlanId
+          const fuelSettings = await FuelSaveBackService.loadFuelSettingsForFlight(flightData);
           
-          if (savedFuelData) {
+          if (fuelSettings) {
+            console.log('💾 FUEL LOAD-BACK: Loaded fuel settings:', fuelSettings);
             
-            // ONLY restore USER-ENTERED values - let Fast Planner recalculate everything else
-            
-            // 1. Extra fuel (user input) - this is the most important
-            // 🚨 FIX: Only restore extraFuel in specific circumstances
-            
-            // DECISION: Only restore extraFuel if:
-            // 1. There is a saved value that's meaningful (> 0)
-            // 2. AND we're explicitly loading a different flight (not just recalculating current one)
-            // 3. AND the user hasn't already set extraFuel to something else
-            const hasMeaningfulSavedExtra = savedFuelData.plannedExtraFuel !== undefined && 
-                                           savedFuelData.plannedExtraFuel !== null &&
-                                           savedFuelData.plannedExtraFuel > 0;
-            
-            const isExplicitFlightLoad = true; // For now, assume all loads are explicit
-            const currentExtraIsDefault = flightSettings.extraFuel === 0; // Only overwrite if user hasn't changed it
-            
-            // 🚨 TEMPORARY FIX: Disable extraFuel restoration to stop the 53 persistence issue
-            // TODO: Implement proper logic to only restore extraFuel for explicitly loaded flights
-            const shouldRestoreExtraFuel = false; // hasMeaningfulSavedExtra && isExplicitFlightLoad && currentExtraIsDefault;
-            
-            if (shouldRestoreExtraFuel) {
+            // 1. Restore extra fuel (user input) - CONVERT TO DEPARTURE LOCATION OVERRIDE
+            if (typeof fuelSettings.extraFuel === 'number' && fuelSettings.extraFuel > 0) {
+              console.log('💾 FUEL LOAD-BACK: Converting extra fuel to departure location override:', fuelSettings.extraFuel);
               
-              // Show warning to user that extraFuel is being loaded from saved flight
-              if (window.LoadingIndicator) {
-                window.LoadingIndicator.updateStatusIndicator(
-                  `Loading saved extra fuel: ${savedFuelData.plannedExtraFuel} lbs`,
-                  'info',
-                  3000
-                );
-              }
-              
-              updateFlightSetting('extraFuel', savedFuelData.plannedExtraFuel);
-            } else {
-              
-              // If saved data has extraFuel = 0, explicitly set it to 0 to clear any residual values
-              if (savedFuelData.plannedExtraFuel === 0) {
+              // Get departure waypoint for location override (index 1 for departure)
+              const departureWaypoint = waypoints[0]?.name;
+              if (departureWaypoint) {
+                const overrideKey = `${departureWaypoint}_1_extraFuel`;
+                console.log('💾 FUEL LOAD-BACK: Creating departure override:', { key: overrideKey, value: fuelSettings.extraFuel });
+                
+                // Add to location fuel overrides instead of global setting
+                setLocationFuelOverrides(prev => ({
+                  ...prev,
+                  [overrideKey]: fuelSettings.extraFuel
+                }));
+                
+                // Clear global extra fuel setting since it's now location-specific
                 updateFlightSetting('extraFuel', 0);
+                
+                // 🔧 FORCE RECALCULATION: Trigger recalculation after setting location overrides
+                setForceUpdate(prev => prev + 1);
+                
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(
+                    `Restored departure extra fuel: ${fuelSettings.extraFuel} lbs`,
+                    'info',
+                    2000
+                  );
+                }
+                
+                console.log('💾 FUEL LOAD-BACK: Successfully converted extra fuel to departure location override');
+              } else {
+                console.warn('💾 FUEL LOAD-BACK: No departure waypoint found, cannot convert extra fuel');
+                // Fallback to global setting if no departure waypoint
+                updateFlightSetting('extraFuel', fuelSettings.extraFuel);
               }
             }
             
-            // Show comprehensive fuel data that was saved (for verification)
-            
-            // 3. Extra fuel reason (user input)
-            if (savedFuelData.extraFuelReason) {
-              updateFlightSetting('extraFuelReason', savedFuelData.extraFuelReason);
+            // 2. Restore refuel stop flags (user selections)
+            if (fuelSettings.refuelStops && Array.isArray(fuelSettings.refuelStops) && fuelSettings.refuelStops.length > 0) {
+              console.log('💾 FUEL LOAD-BACK: Restoring refuel stops:', fuelSettings.refuelStops);
+              
+              // Set refuel flags after waypoints are loaded
+              setTimeout(() => {
+                // Find waypoints that match the refuel stop locations
+                const currentWaypoints = waypoints || [];
+                const updatedWaypoints = currentWaypoints.map(waypoint => {
+                  const isRefuelStop = fuelSettings.refuelStops.includes(waypoint.name);
+                  if (isRefuelStop && !waypoint.refuelMode) {
+                    console.log('💾 FUEL LOAD-BACK: Setting refuel flag for:', waypoint.name);
+                  }
+                  return {
+                    ...waypoint,
+                    refuelMode: isRefuelStop
+                  };
+                });
+                
+                // Update waypoints with refuel flags
+                setWaypoints(updatedWaypoints);
+                
+                if (window.LoadingIndicator && fuelSettings.refuelStops.length > 0) {
+                  window.LoadingIndicator.updateStatusIndicator(
+                    `Restored ${fuelSettings.refuelStops.length} refuel stops`,
+                    'info',
+                    2000
+                  );
+                }
+              }, 500); // Wait for waypoints to be loaded
             }
-            
-            // NOTE: We do NOT restore calculated values like tripFuel, taxiFuel, reserveFuel, etc.
-            // These will be recalculated by Fast Planner based on current aircraft, route, and fuel policy
             
           } else {
+            console.log('💾 FUEL LOAD-BACK: No saved fuel settings found for flight');
           }
           
         } catch (fuelLoadError) {
-          console.error('❌ FUEL LOAD-BACK: Failed to load fuel data:', fuelLoadError);
-          // Don't block flight loading if fuel load fails
+          console.error('❌ FUEL LOAD-BACK: Failed to load fuel settings:', fuelLoadError);
+          // Don't block flight loading if fuel settings load fails
         }
         
         // Manually trigger weather loading
@@ -3255,6 +3287,82 @@ const FastPlannerCore = ({
         };
         return newSettings;
       });
+    }
+    
+    // Load saved fuel settings (extra fuel + refuel stops) from MainFuelV2
+    console.log('🔍 DEBUG: Checking fuel loading conditions:', {
+      hasFlightData: !!flightData,
+      flightDataId: flightData?.id,
+      flightDataKeys: flightData ? Object.keys(flightData) : 'no flightData'
+    });
+    
+    if (flightData.id) {
+      console.log('📥 Starting fuel loading for flight ID:', flightData.id);
+      // Use Promise to handle async fuel loading without blocking flight loading
+      FuelSaveBackService.loadFuelSettingsForFlight(flightData)
+        .then(savedFuelData => {
+          console.log('📥 Retrieved fuel settings:', savedFuelData);
+          console.log('📥 Current flightSettings.extraFuel before loading:', flightSettings.extraFuel);
+          
+          // Convert saved extra fuel to departure location override
+          if (savedFuelData.extraFuel > 0) {
+            console.log('📥 Converting extra fuel to departure location override:', savedFuelData.extraFuel);
+            
+            // Get departure waypoint for location override (index 1 for departure)
+            const departureWaypoint = waypoints[0]?.name;
+            if (departureWaypoint) {
+              const overrideKey = `${departureWaypoint}_1_extraFuel`;
+              console.log('📥 Creating departure override:', { key: overrideKey, value: savedFuelData.extraFuel });
+              
+              // Add to location fuel overrides instead of global setting
+              setLocationFuelOverrides(prev => ({
+                ...prev,
+                [overrideKey]: savedFuelData.extraFuel
+              }));
+              
+              // Clear global extra fuel setting since it's now location-specific
+              setFlightSettings(prev => ({
+                ...prev,
+                extraFuel: 0
+              }));
+              
+              // 🔧 FORCE RECALCULATION: Trigger recalculation after setting location overrides
+              setForceUpdate(prev => prev + 1);
+              
+              console.log('📥 Successfully converted extra fuel to departure location override');
+            } else {
+              console.warn('📥 No departure waypoint found, using global extra fuel fallback');
+              // Fallback to global setting if no departure waypoint
+              setFlightSettings(prev => ({
+                ...prev,
+                extraFuel: savedFuelData.extraFuel
+              }));
+            }
+          }
+          
+          // Set refuel stop flags on waypoints
+          if (savedFuelData.refuelStops && savedFuelData.refuelStops.length > 0) {
+            console.log('📥 Restoring refuel stops:', savedFuelData.refuelStops);
+            
+            // Use setTimeout to allow waypoints to be set first
+            setTimeout(() => {
+              setWaypoints(prevWaypoints => {
+                return prevWaypoints.map(waypoint => {
+                  const shouldRefuel = savedFuelData.refuelStops.includes(waypoint.name);
+                  if (shouldRefuel && !waypoint.refuelMode) {
+                    console.log('📥 Setting refuel flag for:', waypoint.name);
+                    return { ...waypoint, refuelMode: true };
+                  }
+                  return waypoint;
+                });
+              });
+            }, 100);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error loading fuel settings:', error);
+          // Continue flight loading even if fuel loading fails
+        });
     }
     
     // Show success message
