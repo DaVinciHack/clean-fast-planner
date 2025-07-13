@@ -173,44 +173,10 @@ class PassengerCalculator {
     
     // Process each stop card
     updatedCards.forEach((card, index) => {
-      // Get fuel for this stop (either directly or from fuel components)
-      let fuelRequired;
-      
-      if (card.fuelComponentsObject) {
-        try {
-          // Calculate from fuelComponentsObject for consistency
-          // Ensure all values are valid numbers
-          const safeComponentValues = Object.entries(card.fuelComponentsObject).map(([key, value]) => {
-            return [key, typeof value === 'number' ? value : Number(value) || 0];
-          });
-          
-          // Create a map of safe values
-          const safeComponents = Object.fromEntries(safeComponentValues);
-          
-          // Sum the components
-          fuelRequired = Object.values(safeComponents).reduce((sum, value) => sum + (Number(value) || 0), 0);
-          
-          // If there's a mismatch between calculated sum and totalFuel, log and fix it
-          if (Math.abs(fuelRequired - card.totalFuel) > 1) { // Allow 1 lb difference for rounding
-            console.warn(`PassengerCalculator: Found fuel mismatch in card ${index}`, {
-              cardTotalFuel: card.totalFuel,
-              calculatedSum: fuelRequired,
-              difference: fuelRequired - card.totalFuel,
-              components: { ...safeComponents }
-            });
-            
-            // Update totalFuel to match the calculated sum
-            card.totalFuel = fuelRequired;
-          }
-        } catch (error) {
-          console.error(`PassengerCalculator: Error calculating fuel from components for card ${index}`, error);
-          // Fallback to using totalFuel directly
-          fuelRequired = typeof card.totalFuel === 'number' ? card.totalFuel : Number(card.totalFuel) || 0;
-        }
-      } else {
-        // If no components object, use totalFuel directly
-        fuelRequired = typeof card.totalFuel === 'number' ? card.totalFuel : Number(card.totalFuel) || 0;
-      }
+      // 🛩️ AVIATION SAFETY: Use totalFuel as-is - StopCardCalculator owns all fuel logic
+      // PassengerCalculator only adds passenger data based on the fuel StopCardCalculator provides
+      // This preserves segment math, alternate enforcement, and refuel logic
+      const fuelRequired = typeof card.totalFuel === 'number' ? card.totalFuel : Number(card.totalFuel) || 0;
       
       // Calculate max passengers and available weight
       try {
