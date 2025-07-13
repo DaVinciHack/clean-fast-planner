@@ -71,6 +71,7 @@ const RightPanel = React.forwardRef(({
   alternateRouteData, // Add alternate route data for alternate stop card
   alternateRouteInput, // Add alternate route input for save functionality
   loadedFlightData, // Add loaded flight data for MainCard responsive display
+  loadedFuelObject, // 🎯 Stored fuel object to avoid duplicate lookups
   stopCards,
   waypoints,
   onRemoveWaypoint,
@@ -321,6 +322,13 @@ const RightPanel = React.forwardRef(({
         // For updates, use the existing flight ID; for creates, extract from result
         const flightId = currentFlightId || PalantirFlightService.extractFlightId(result);
         
+        console.log('🔍 FLIGHT ID DEBUG:', {
+          currentFlightId: currentFlightId,
+          extractedFlightId: PalantirFlightService.extractFlightId(result),
+          finalFlightId: flightId,
+          isUpdate: !!currentFlightId
+        });
+        
         console.log(`Flight ${currentFlightId ? 'updated' : 'created'} successfully with ID: ${flightId}`);
         
         // 🎯 IMMEDIATE PROGRESS UPDATE: Show save success in automation loader
@@ -361,23 +369,49 @@ const RightPanel = React.forwardRef(({
             reserveFuel: reserveFuel || 0
           };
           
+          console.log('💾 FUEL SAVE DEBUG: About to save fuel data:', {
+            flightId: flightId,
+            extraFuel: extraFuel,
+            currentFlightSettingsExtraFuel: currentFlightSettings.extraFuel,
+            stopCardsCount: stopCards?.length
+          });
+          
           const currentWeatherFuel = {
             araFuel: araFuel || 0,
             approachFuel: approachFuel || 0
           };
           
-          // Save fuel data using the service
-          await FuelSaveBackService.autoSaveFuelData(
+          // 🎯 SIMPLE FIX: Use the stored fuel object UUID to prevent duplicate searches
+          const existingFuelObjectId = loadedFuelObject?.$primaryKey || null;
+          console.log('💾 FUEL SAVE-BACK: Using stored fuel object ID:', existingFuelObjectId);
+          console.log('💾 FUEL SAVE-BACK: Current data being saved:', {
+            flightId,
+            stopCardsCount: stopCards?.length,
+            extraFuel: currentFlightSettings.extraFuel,
+            stopCards: stopCards?.map(card => ({
+              name: card?.name,
+              totalFuel: card?.totalFuel,
+              extraFuel: card?.extraFuel
+            }))
+          });
+          
+          // Use the existing method but pass the known fuel object ID
+          const fuelSaveResult = await FuelSaveBackService.saveFuelDataWithExistingId(
             flightId,
             stopCards,
             currentFlightSettings,
             currentWeatherFuel,
             fuelPolicy?.currentPolicy || null,
             routeStats,
-            selectedAircraft
+            selectedAircraft,
+            existingFuelObjectId  // Pass the stored fuel object ID to prevent search
           );
           
-          console.log('✅ FUEL SAVE-BACK: Fuel data saved successfully');
+          console.log('✅ FUEL SAVE-BACK: Fuel data saved successfully:', {
+            fuelObjectUuid: fuelSaveResult?.fuelObjectUuid,
+            updated: fuelSaveResult?.updated,
+            message: fuelSaveResult?.message
+          });
           
         } catch (fuelSaveError) {
           console.error('❌ FUEL SAVE-BACK: Failed to save fuel data:', fuelSaveError);
@@ -771,6 +805,9 @@ const RightPanel = React.forwardRef(({
         soId: flight.soId,
         rswId: flight.rswId,
         
+        // 💾 FUEL LOADING FIX: Include fuelPlanId for direct fuel object lookup
+        fuelPlanId: flight.fuelPlanId,
+        
         // CRITICAL FIX: Extract wind data from flight if available - use avgWindSpeed/avgWindDirection (automation calculated)
         windData: {
           windSpeed: flight._rawFlight?.avgWindSpeed || flight._rawFlight?.windSpeed || flight.avgWindSpeed || flight.windSpeed || 0,
@@ -946,6 +983,8 @@ const RightPanel = React.forwardRef(({
   const handleAutoPlan = async (autoPlanData) => {
     console.log('🎯 AUTO PLAN: Starting auto plan with data:', autoPlanData);
     console.log('🎯 AUTO PLAN: RightPanel waypoints prop:', waypoints);
+    console.log('🎯 AUTO PLAN: Current flight ID:', currentFlightId);
+    console.log('🎯 AUTO PLAN: Loaded flight data:', loadedFlightData);
     
     // 🧙‍♂️ WIZARD FIX: Check for wizard custom flight name from global storage
     const wizardFlightName = window.wizardCustomFlightName;
@@ -956,6 +995,16 @@ const RightPanel = React.forwardRef(({
     }
     
     const { isNewFlight, hasWaypoints, skipWaypointGeneration } = autoPlanData;
+    
+    // 🔧 DEBUG: Log the flight detection logic
+    console.log('🔧 AUTO PLAN DEBUG: Flight detection analysis:', {
+      isNewFlight: isNewFlight,
+      currentFlightId: currentFlightId,
+      hasCurrentFlightId: !!currentFlightId,
+      loadedFlightDataExists: !!loadedFlightData,
+      loadedFlightName: loadedFlightData?.name,
+      autoPlanDataIsNewFlight: autoPlanData.isNewFlight
+    });
     
     if (isNewFlight) {
       // For new flights: Save first, then run automation
@@ -1087,11 +1136,15 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Built locations array for existing flight:', locations);
       
-      // 🧙‍♂️ WIZARD FIX: Use wizard custom flight name if provided, otherwise generate default
+      // 🔧 FIX: Preserve existing flight name when updating, don't overwrite it
       let flightName;
       if (wizardFlightName && wizardFlightName.trim()) {
         console.log('🧙‍♂️ Using wizard custom flight name for existing flight:', wizardFlightName);
         flightName = wizardFlightName.trim();
+      } else if (loadedFlightData?.name && loadedFlightData.name.trim()) {
+        // 🎯 PRESERVE EXISTING: Use the loaded flight's existing name
+        console.log('🔧 PRESERVING: Using existing flight name:', loadedFlightData.name);
+        flightName = loadedFlightData.name.trim();
       } else {
         // Generate flight name using departure + first location + short date format
         const departure = locations[0] || 'Unknown';

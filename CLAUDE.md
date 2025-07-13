@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 CRITICAL SESSION START PROTOCOL 🚨
+
+**ALWAYS DECLARE WHEN YOU ARE STARTING FROM A CONVERSATION SUMMARY**
+
+If you are Claude starting from a conversation summary (not a fresh conversation), you MUST:
+
+1. **IMMEDIATELY TELL THE USER** - Start your first message with: "⚠️ I'm starting from a conversation summary and don't have full context. Let me understand where we are..."
+2. **ASK FOR CURRENT STATUS** - Ask what the user wants to do next, don't assume
+3. **READ THE SUMMARY CAREFULLY** - Don't jump ahead based on incomplete information
+4. **WAIT FOR DIRECTION** - Let the user guide you to the current task
+
+**NEVER assume you know what to do next when starting from a summary. The user gets frustrated when you jump in without understanding the current state.**
+
 ## ⚠️ CRITICAL REMINDER - READ FIRST ⚠️
 
 **DO NOT RUSH AHEAD OR MAKE ASSUMPTIONS**

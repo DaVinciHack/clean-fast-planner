@@ -29,7 +29,8 @@
       "Bash(touch:*)",
       "Bash(zip:*)",
       "Bash(cp:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(unzip:*)"
     ],
     "deny": []
   }

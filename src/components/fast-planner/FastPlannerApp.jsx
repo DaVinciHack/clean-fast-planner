@@ -106,6 +106,7 @@ const FastPlannerCore = ({
   // State for tracking current loaded flight for weather segments
   const [currentFlightId, setCurrentFlightId] = useState(null);
   const [loadedFlightData, setLoadedFlightData] = useState(null); // Track loaded flight data for AppHeader
+  const [loadedFuelObject, setLoadedFuelObject] = useState(null); // 🎯 Store actual fuel object to avoid duplicate lookups
   
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
@@ -764,6 +765,7 @@ const FastPlannerCore = ({
     // Clear current flight ID and weather segments
     setCurrentFlightId(null);
     setLoadedFlightData(null); // Always clear loaded flight data when clearing route
+    setLoadedFuelObject(null); // 🎯 Clear stored fuel object when clearing route
     if (!preserveFlightData) {
       // Additional flight data clearing if needed
     }
@@ -979,7 +981,8 @@ const FastPlannerCore = ({
           weatherFuel,
           fuelPolicy,
           routeStats,
-          selectedAircraft
+          selectedAircraft,
+          locationFuelOverrides
         );
 
         if (window.LoadingIndicator) {
@@ -1775,6 +1778,12 @@ const FastPlannerCore = ({
     console.log('🔍 handleFlightLoad: fuelPlanId present:', !!flightData?.fuelPlanId);
     console.log('🔍 handleFlightLoad: fuelPlanId value:', flightData?.fuelPlanId);
     
+    // 🚨 AVIATION SAFETY: Reset ALL fuel data first to prevent cross-flight contamination
+    console.log('🧹 FUEL RESET: Clearing all fuel overrides and extra fuel before loading new flight');
+    setLocationFuelOverrides({}); // Clear all location-specific fuel overrides
+    updateFlightSetting('extraFuel', 0); // Reset global extra fuel to 0
+    setForceUpdate(prev => prev + 1); // Force recalculation with clean fuel state
+    
     // RESET LOADING STATE: Always reset to false first, then set to true
     setIsActuallyLoading(false);
     
@@ -1893,42 +1902,59 @@ const FastPlannerCore = ({
           
           if (fuelSettings) {
             console.log('💾 FUEL LOAD-BACK: Loaded fuel settings:', fuelSettings);
+            console.log('💾 FUEL LOAD-BACK: DEBUG - fuelSettings structure:', {
+              hasExtraFuel: typeof fuelSettings.extraFuel !== 'undefined',
+              extraFuelValue: fuelSettings.extraFuel,
+              hasLocationOverrides: !!fuelSettings.locationOverrides,
+              locationOverridesCount: fuelSettings.locationOverrides ? Object.keys(fuelSettings.locationOverrides).length : 0,
+              hasFuelObject: !!fuelSettings.fuelObject,
+              fuelObjectId: fuelSettings.fuelObject?.$primaryKey
+            });
             
-            // 1. Restore extra fuel (user input) - CONVERT TO DEPARTURE LOCATION OVERRIDE
-            if (typeof fuelSettings.extraFuel === 'number' && fuelSettings.extraFuel > 0) {
-              console.log('💾 FUEL LOAD-BACK: Converting extra fuel to departure location override:', fuelSettings.extraFuel);
+            // 🎯 CRITICAL: Store the actual fuel object to avoid duplicate lookups during save
+            if (fuelSettings.fuelObject) {
+              console.log('💾 FUEL LOAD-BACK: Storing fuel object for reuse:', fuelSettings.fuelObject.$primaryKey);
+              setLoadedFuelObject(fuelSettings.fuelObject);
+            }
+            
+            // 1. Restore location fuel overrides (includes extra fuel and any other overrides)
+            if (fuelSettings.locationOverrides && Object.keys(fuelSettings.locationOverrides).length > 0) {
+              console.log('💾 FUEL LOAD-BACK: Restoring location fuel overrides:', fuelSettings.locationOverrides);
               
-              // Get departure waypoint for location override (index 1 for departure)
+              setLocationFuelOverrides(fuelSettings.locationOverrides);
+              
+              // 🔧 FORCE RECALCULATION: Trigger recalculation after setting location overrides
+              setForceUpdate(prev => prev + 1);
+              
+              if (window.LoadingIndicator) {
+                const overrideCount = Object.keys(fuelSettings.locationOverrides).length;
+                window.LoadingIndicator.updateStatusIndicator(
+                  `Restored ${overrideCount} fuel overrides`,
+                  'info',
+                  2000
+                );
+              }
+              
+              console.log('💾 FUEL LOAD-BACK: Successfully restored location fuel overrides');
+            } else if (typeof fuelSettings.extraFuel === 'number' && fuelSettings.extraFuel > 0) {
+              // Fallback for old flights that only have plannedExtraFuel (convert to location override)
+              console.log('💾 FUEL LOAD-BACK: Converting legacy extra fuel to departure location override:', fuelSettings.extraFuel);
+              
               const departureWaypoint = waypoints[0]?.name;
               if (departureWaypoint) {
                 const overrideKey = `${departureWaypoint}_1_extraFuel`;
-                console.log('💾 FUEL LOAD-BACK: Creating departure override:', { key: overrideKey, value: fuelSettings.extraFuel });
+                console.log('💾 FUEL LOAD-BACK: Creating departure override for legacy fuel:', { key: overrideKey, value: fuelSettings.extraFuel });
                 
-                // Add to location fuel overrides instead of global setting
-                setLocationFuelOverrides(prev => ({
-                  ...prev,
-                  [overrideKey]: fuelSettings.extraFuel
-                }));
-                
-                // Clear global extra fuel setting since it's now location-specific
-                updateFlightSetting('extraFuel', 0);
-                
-                // 🔧 FORCE RECALCULATION: Trigger recalculation after setting location overrides
+                setLocationFuelOverrides({ [overrideKey]: fuelSettings.extraFuel });
                 setForceUpdate(prev => prev + 1);
                 
                 if (window.LoadingIndicator) {
                   window.LoadingIndicator.updateStatusIndicator(
-                    `Restored departure extra fuel: ${fuelSettings.extraFuel} lbs`,
+                    `Converted legacy extra fuel: ${fuelSettings.extraFuel} lbs`,
                     'info',
                     2000
                   );
                 }
-                
-                console.log('💾 FUEL LOAD-BACK: Successfully converted extra fuel to departure location override');
-              } else {
-                console.warn('💾 FUEL LOAD-BACK: No departure waypoint found, cannot convert extra fuel');
-                // Fallback to global setting if no departure waypoint
-                updateFlightSetting('extraFuel', fuelSettings.extraFuel);
               }
             }
             
@@ -3849,6 +3875,7 @@ const FastPlannerCore = ({
           alternateRouteData={alternateRouteData} // Add alternate route data for alternate stop card
           alternateRouteInput={alternateRouteInput} // Add alternate route input for save functionality
           loadedFlightData={loadedFlightData} // Pass loaded flight data for responsive display
+          loadedFuelObject={loadedFuelObject} // 🎯 Pass stored fuel object to avoid duplicate lookups
           currentFlightId={currentFlightId} // Pass current flight ID for weather segments
           weatherSegments={weatherSegments} // Pass weather segments for rig detection
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls

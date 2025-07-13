@@ -547,6 +547,9 @@ class FlightService {
           windSpeed: flight.avgWindSpeed || flight.windSpeed || 0,
           windDirection: flight.avgWindDirection || flight.windDirection || 0,
           
+          // 💾 FUEL LOADING FIX: Include fuelPlanId for direct fuel object lookup
+          fuelPlanId: flight.fuelPlanId,
+          
           alternateLocation: flight.alternateSplitPoint ? 
             `${flight.alternateSplitPoint} ${flight.alternateName || ''}` : null,
           // Include raw flight object for detailed loading
