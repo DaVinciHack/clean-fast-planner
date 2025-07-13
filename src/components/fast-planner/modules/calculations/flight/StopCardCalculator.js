@@ -688,12 +688,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     let departureMaxPassengers = 0;
     if (selectedAircraft) {
       // Use our dedicated PassengerCalculator module
-      departureMaxPassengers = PassengerCalculator.calculateMaxPassengers(
+      const passengerResult = PassengerCalculator.calculateMaxPassengers(
         selectedAircraft, 
         departureFuelNeeded, 
         passengerWeightValue,
         cargoWeight
       );
+      departureMaxPassengers = passengerResult.maxPassengers;
     }
     
     // 🛩️ ALTERNATE FUEL LOGIC: Calculate alternate requirements when not waived
@@ -1316,12 +1317,13 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     let maxPassengers = 0;
     if (selectedAircraft) {
       // Use our dedicated PassengerCalculator module
-      maxPassengers = PassengerCalculator.calculateMaxPassengers(
+      const passengerResult = PassengerCalculator.calculateMaxPassengers(
         selectedAircraft, 
         fuelNeeded, 
         passengerWeightValue,
         cargoWeight
       );
+      maxPassengers = passengerResult.maxPassengers;
     }
     
     // Update intermediate alternate requirements with calculated passengers
@@ -2066,12 +2068,13 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   // Calculate max passengers using same logic as normal stop cards
   let maxPassengers = 0;
   if (selectedAircraft) {
-    maxPassengers = PassengerCalculator.calculateMaxPassengers(
+    const passengerResult = PassengerCalculator.calculateMaxPassengers(
       selectedAircraft, 
       totalAlternateFuel, 
       passengerWeightValue,
       cargoWeight
     );
+    maxPassengers = passengerResult.maxPassengers;
   }
 
   // Create fuel components text - CONSISTENT: Only show components > 0 (match main cards)

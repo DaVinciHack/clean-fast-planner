@@ -16,6 +16,9 @@ const StopCard = React.forwardRef(({
   totalFuel,
   maxPassengers,
   maxPassengersDisplay,
+  availableWeight,
+  usedByPassengers,
+  remainingWeight,
   groundSpeed,
   headwind,
   deckTime,
@@ -222,7 +225,18 @@ const StopCard = React.forwardRef(({
         <div className="stop-metric">
           <span className="icon"><PassengerIcon /></span>
           <div className="metric-value" style={alternateRequirements ? { color: '#f39c12' } : {}}>
-            {passengersDisplay}
+            {isDestination ? 'Final Stop' : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.1' }}>
+                <div style={{ fontSize: '1em', fontWeight: 'bold' }}>
+                  {passengersDisplay}
+                </div>
+                {availableWeight !== undefined && (
+                  <div style={{ fontSize: '0.7em', color: '#999', marginTop: '1px' }}>
+                    {availableWeight} lbs
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         

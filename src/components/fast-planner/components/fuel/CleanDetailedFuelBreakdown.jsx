@@ -16,6 +16,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import FuelInputManager from '../../modules/fuel/FuelInputManager';
 import SimpleFuelInput from './SimpleFuelInput';
 import StopCardCalculator from '../../modules/calculations/flight/StopCardCalculator';
+import PassengerCalculator from '../../modules/calculations/passengers/PassengerCalculator';
 import { DistanceIcon, TimeIcon, FuelIcon, PassengerIcon } from '../flight/stops/StopIcons';
 import { detectLocationSegment, getSegmentLocations } from '../../utilities/SegmentUtils.js';
 import { FuelStopOptimizationManager } from '../../modules/optimization/FuelStopOptimizationManager.js';
@@ -291,7 +292,14 @@ const CleanDetailedFuelBreakdown = ({
         return card;
       });
       
-      return cardsWithRefuel;
+      // 🎯 PASSENGER WEIGHT CALCULATION: Add available weight data to cards (MATCH EnhancedStopCardsContainer)
+      const cardsWithPassengerData = PassengerCalculator.updateStopCardsWithPassengers(
+        cardsWithRefuel,
+        selectedAircraft,
+        flightSettings.passengerWeight
+      );
+      
+      return cardsWithPassengerData;
       
     } catch (error) {
       console.error('🔥 MEMO: Calculation error:', error);
@@ -312,7 +320,7 @@ const CleanDetailedFuelBreakdown = ({
       
       const requestedWeight = getPassengerRequest(card.name || card.stopName, 'totalWeight');
       const requestedCount = getPassengerRequest(card.name || card.stopName, 'passengerCount');
-      const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+      const availableWeight = card.availableWeight || 0; // Use only actual available weight, not passenger calculation
       const aircraftMaxSeats = selectedAircraft?.maxPassengers || 19;
       
       // PRIMARY CHECK: Weight overload (fuel optimization can help)
@@ -402,7 +410,7 @@ const CleanDetailedFuelBreakdown = ({
             stopName: card.name || card.stopName,
             requestedPassengers: getPassengerRequest(card.name || card.stopName, 'passengerCount'),
             requestedWeight: getPassengerRequest(card.name || card.stopName, 'totalWeight'),
-            availableWeight: card.availableWeight || card.maxPassengersWeight || 0,
+            availableWeight: card.availableWeight || 0, // Use only actual available weight
             isDestination: card.isDestination
           })),
           // Get real platform data from platform manager - NO MOCK DATA
@@ -504,7 +512,7 @@ const CleanDetailedFuelBreakdown = ({
             requestedPassengers: getPassengerRequest(card.name || card.stopName, 'passengerCount'),
             requestedWeight: getPassengerRequest(card.name || card.stopName, 'totalWeight'),
             availablePassengers: card.maxPassengers || 0,
-            availableWeight: card.availableWeight || card.maxPassengersWeight || 0
+            availableWeight: card.availableWeight || 0 // Use only actual available weight
           }))
         });
       }
@@ -1119,13 +1127,13 @@ const CleanDetailedFuelBreakdown = ({
                               color: getAlternateRequirements(card) ? '#f39c12' : '#fff',
                               fontSize: '0.8rem',
                               fontWeight: '600'
-                            }}>{card.availableWeight || card.maxPassengersWeight || 0}</div>
+                            }}>{card.availableWeight || 0}</div>
                           </div>
                           <div style={{ textAlign: 'center', marginTop: '6px' }}>
                             <input
                               type="number"
                               min="0"
-                              max={card.availableWeight || card.maxPassengersWeight || 5000}
+                              max={card.availableWeight || 5000}
                               value={getPassengerRequest(card.name || card.stopName, 'totalWeight')}
                               onChange={(e) => setPassengerRequest(card.name || card.stopName, 'totalWeight', parseInt(e.target.value) || 0)}
                               placeholder="0"
@@ -1135,7 +1143,7 @@ const CleanDetailedFuelBreakdown = ({
                                 padding: '2px 4px',
                                 backgroundColor: '#1f1f1f',
                                 color: '#fff',
-                                border: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || card.maxPassengersWeight || 0)
+                                border: getPassengerRequest(card.name || card.stopName, 'totalWeight') > (card.availableWeight || 0)
                                   ? '1px solid #e74c3c'
                                   : '1px solid #4A9EFF',
                                 borderRadius: '3px',
@@ -1644,7 +1652,7 @@ const CleanDetailedFuelBreakdown = ({
                     const locationName = card.name || card.stopName;
                     const requestedPassengers = getPassengerRequest(locationName, 'passengerCount');
                     const requestedWeight = getPassengerRequest(locationName, 'totalWeight');
-                    const availableWeight = card.availableWeight || card.maxPassengersWeight || 0;
+                    const availableWeight = card.availableWeight || 0; // Use only actual available weight, not passenger calculation
                     const aircraftMaxSeats = selectedAircraft?.maxPassengers || 19;
                     
                     const isWeightOverload = requestedWeight > availableWeight;

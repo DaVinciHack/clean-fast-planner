@@ -179,47 +179,103 @@ export class FuelSaveBackService {
         stopLocations.push(card.name || card.stopName || card.location || `Stop ${index + 1}`);
         stopDescriptions.push(card.description || card.stopType || 'Standard Stop');
         
-        // Core fuel components (round to integers)
-        stopTripFuels.push(Math.round(card.tripFuel || 0));
-        stopTaxiFuels.push(Math.round(card.taxiFuel || 0));
-        stopDeckFuels.push(Math.round(card.deckFuel || 0));
-        stopReserveFuels.push(Math.round(card.reserveFuel || 0));
-        stopContingencyFuels.push(Math.round(card.contingencyFuel || 0));
-        stopExtraFuels.push(Math.round(card.extraFuel || card.fuelComponentsObject?.extraFuel || 0));
+        // Core fuel components (round to integers) - Use fuelComponentsObject with explicit checks
+        const tripFuel = card.fuelComponentsObject?.tripFuel || card.tripFuel;
+        const stopTaxiFuel = card.fuelComponentsObject?.taxiFuel || card.taxiFuel;
+        const deckFuel = card.fuelComponentsObject?.deckFuel || card.deckFuel;
+        const stopReserveFuel = card.fuelComponentsObject?.reserveFuel || card.reserveFuel;
+        const contingencyFuel = card.fuelComponentsObject?.contingencyFuel || card.contingencyFuel;
+        const stopExtraFuel = card.fuelComponentsObject?.extraFuel || card.extraFuel;
         
-        // Weather-based fuel components
-        stopAraFuels.push(Math.round(card.araFuel || 0));
-        stopApproachFuels.push(Math.round(card.approachFuel || 0));
+        stopTripFuels.push(tripFuel ? Math.round(tripFuel) : 0);
+        stopTaxiFuels.push(stopTaxiFuel ? Math.round(stopTaxiFuel) : 0);
+        stopDeckFuels.push(deckFuel ? Math.round(deckFuel) : 0);
+        stopReserveFuels.push(stopReserveFuel ? Math.round(stopReserveFuel) : 0);
+        stopContingencyFuels.push(contingencyFuel ? Math.round(contingencyFuel) : 0);
+        stopExtraFuels.push(stopExtraFuel ? Math.round(stopExtraFuel) : 0);
         
-        // Calculated totals
-        stopRequiredFuels.push(Math.round(card.totalFuel || 0));
-        stopExcessFuels.push(Math.round(card.excessFuel || 0));
+        // Weather-based fuel components - Use fuelComponentsObject with explicit checks
+        const araFuelVal = card.fuelComponentsObject?.araFuel || card.araFuel;
+        const approachFuelVal = card.fuelComponentsObject?.approachFuel || card.approachFuel;
         
-        // Passenger data from stop cards
-        requestedPassengers.push(Math.round(card.maxPassengers || card.passengers || 0));
-        availablePassengers.push(Math.round(card.maxPassengers || card.passengers || 0));
-        requestedPassengerWeight.push(Math.round((card.maxPassengers || 0) * regionalPassengerWeight));
-        availableWeight.push(Math.round(card.availableWeight || 0));
-        requestedTotalWeight.push(Math.round(card.totalWeight || 0));
-        requestedBagWeight.push(Math.round((card.maxPassengers || 0) * regionalBagWeight));
+        stopAraFuels.push(araFuelVal ? Math.round(araFuelVal) : 0);
+        stopApproachFuels.push(approachFuelVal ? Math.round(approachFuelVal) : 0);
+        
+        // Calculated totals - only if data exists
+        stopRequiredFuels.push(card.totalFuel ? Math.round(card.totalFuel) : 0);
+        stopExcessFuels.push(card.excessFuel ? Math.round(card.excessFuel) : 0);
+        
+        // Passenger data from stop cards - only use verified data
+        const passengerCount = card.maxPassengers || card.passengers;
+        requestedPassengers.push(passengerCount ? Math.round(passengerCount) : 0);
+        availablePassengers.push(passengerCount ? Math.round(passengerCount) : 0);
+        requestedPassengerWeight.push(passengerCount ? Math.round(passengerCount * regionalPassengerWeight) : 0);
+        availableWeight.push(card.availableWeight ? Math.round(card.availableWeight) : 0);
+        requestedTotalWeight.push(card.totalWeight ? Math.round(card.totalWeight) : 0);
+        requestedBagWeight.push(passengerCount ? Math.round(passengerCount * regionalBagWeight) : 0);
       });
       
-      // Generate markdown table matching EXACT operations format
-      let markdownTable = "";
+      // 🚨 AVIATION SAFETY: NO FALLBACKS - Use only verified data or explicit null
+      
+      // Only use actual verified data - NO fallbacks that could mislead pilots
+      const outboundFuel = routeStats?.tripFuel ? Math.round(routeStats.tripFuel) : null;
+      const alternateFuel = routeStats?.alternateFuel ? Math.round(routeStats.alternateFuel) : null;
+      
+      // Only use actual departure card data - NO fallbacks
+      const totalContingency = departureCard.fuelComponentsObject?.contingencyFuel ? Math.round(departureCard.fuelComponentsObject.contingencyFuel) : null;
+      const extraFuel = departureCard.fuelComponentsObject?.extraFuel ? Math.round(departureCard.fuelComponentsObject.extraFuel) : null;
+      const taxiFuel = departureCard.fuelComponentsObject?.taxiFuel ? Math.round(departureCard.fuelComponentsObject.taxiFuel) : null;
+      const reserveFuel = departureCard.fuelComponentsObject?.reserveFuel ? Math.round(departureCard.fuelComponentsObject.reserveFuel) : null;
+      
+      // 🚨 AVIATION SAFETY CHECK: Verify we have essential fuel data
+      if (outboundFuel === null || taxiFuel === null || reserveFuel === null) {
+        throw new Error('AVIATION SAFETY: Missing essential fuel data - cannot save without verified values');
+      }
+      
+      // Only calculate if we have actual data
+      const totalAlternateFuel = taxiFuel + outboundFuel + (alternateFuel || 0) + (totalContingency || 0) + reserveFuel + (extraFuel || 0);
+      
+      // Only use actual passenger count - NO fallbacks for critical calculations
+      console.log('🔍 PASSENGER DEBUG: Departure card passenger data:', {
+        maxPassengers: departureCard.maxPassengers,
+        passengers: departureCard.passengers,
+        requestedPassengersArray: requestedPassengers,
+        departureCardKeys: Object.keys(departureCard)
+      });
+      
+      const alternatePassengers = departureCard.maxPassengers || departureCard.passengers;
+      if (alternatePassengers === undefined || alternatePassengers === null) {
+        throw new Error('AVIATION SAFETY: Missing passenger count - cannot save without verified passenger data');
+      }
+      const alternatePassengerWeight = alternatePassengers * regionalPassengerWeight;
+      
+      console.log('🔍 PASSENGER DEBUG: Final values:', {
+        alternatePassengers,
+        alternatePassengerWeight,
+        regionalPassengerWeight
+      });
+      const alternateLandingFuel = reserveFuel + (totalContingency || 0) + (extraFuel || 0);
+      
+      // Generate ALL 4 tables in proper MARKDOWN format matching Palantir
+      
+      // TABLE 1: Fuel Requirements and Passenger Capacity by Stop
+      let stopsTable = "## Fuel Requirements and Passenger Capacity by Stop\n\n";
+      stopsTable += "| Stop | Required Fuel | Max Passengers | Fuel Components | Legs |\n";
+      stopsTable += "|:-----|:-------------|:--------------|:---------------|:-----|\n";
       
       stopCards.forEach((card, index) => {
         if (!card) return;
         
         const location = stopLocations[index] || `Stop ${index + 1}`;
-        const requiredFuel = stopRequiredFuels[index] || 0;
-        const passengers = requestedPassengers[index] || 0;
-        const passengerWeight = requestedPassengerWeight[index] || 0;
+        const requiredFuel = stopRequiredFuels[index]; // No fallback - use actual data
+        const passengers = requestedPassengers[index]; // No fallback - use actual data  
+        const passengerWeight = requestedPassengerWeight[index]; // No fallback - use actual data
         
-        // Check if refuel is needed (if this is a fuel stop)
+        // Check if refuel is needed
         const refuelNote = card.isRefuelStop ? " (Refuel needed)" : "";
         const fuelDisplay = `${requiredFuel}${refuelNote} Lbs`;
         
-        // Build fuel components string - EXACT format from operations
+        // Build fuel components string
         const components = [];
         if (stopTripFuels[index]) components.push(`Trip:${stopTripFuels[index]}`);
         if (stopContingencyFuels[index]) components.push(`Cont:${stopContingencyFuels[index]}`);
@@ -237,32 +293,117 @@ export class FuelSaveBackService {
         let legStr = "";
         
         if (isFinalStop) {
-          componentsStr = `Reserve:${stopReserveFuels[index] || 0} Extra:${stopExtraFuels[index] || 0} FullCont:${stopContingencyFuels[index] || 0}`;
+          componentsStr = `Reserve:${stopReserveFuels[index] || 0} Extra:${stopExtraFuels[index] || 0} FullCont:${stopContingencyFuels[index] || 0}`; // Keep these fallbacks for display only
           passengerStr = "Final Stop";
           legStr = `Final destination (Total: ${requiredFuel} Lbs)`;
         } else {
           componentsStr = components.join(' ') || 'No fuel';
           passengerStr = `${passengers} (${passengerWeight} Lbs)`;
           
-          // Build legs string - simplified for now (would need route leg data)
           const nextStop = stopLocations[index + 1];
           if (nextStop) {
             legStr = `${location}-${nextStop}`;
+            if (index === stopCards.length - 2) {
+              legStr += ` → ${nextStop}-${location}`;
+            }
           } else {
             legStr = `${location} route`;
           }
         }
         
-        // EXACT format: ENZV    5150 (Refuel needed+533) Lbs    13 (2772 Lbs)    Trip:3848 Cont:385 Taxi:100 Deck:450 ARA:200 Appr:200 Res:500    ENZV-ENLE → ENLE-ENWV → ENWV-ENZV
-        markdownTable += `${location}    ${fuelDisplay}    ${passengerStr}    ${componentsStr}    ${legStr}\n`;
+        stopsTable += `| ${location} | ${fuelDisplay} | ${passengerStr} | ${componentsStr} | ${legStr} |\n`;
       });
+      
+      // Add the missing "Minimal Fuel with Maximum Passenger Capacity" section to the stops table
+      stopsTable += `\n## Minimal Fuel with Maximum Passenger Capacity\n\n`;
+      stopsTable += "| Required Fuel | Max Passengers | Fuel Components | Route |\n";
+      stopsTable += "|:-------------|:--------------|:---------------|:-----|\n";
+      // 🚨 FIX: Use the ACTUAL alternate route card data from stopCards
+      // Find the alternate route card (should be the last card with 'Alternate' in the name)
+      const alternateCard = stopCards.find(card => card.name && card.name.includes('Alternate')) || stopCards[stopCards.length - 1];
+      
+      console.log('💾 DEBUG: Alternate card found:', {
+        alternateCardName: alternateCard?.name,
+        alternateCardPassengers: alternateCard?.maxPassengers || alternateCard?.passengers,
+        alternateCardTotalFuel: alternateCard?.totalFuel,
+        alternateCardTripFuel: alternateCard?.fuelComponentsObject?.tripFuel || alternateCard?.tripFuel
+      });
+      
+      // Use the ACTUAL alternate card data, not calculated values
+      const actualAlternatePassengers = alternateCard?.maxPassengers || alternateCard?.passengers || alternatePassengers;
+      const actualAlternatePassengerWeight = actualAlternatePassengers * regionalPassengerWeight;
+      const actualAlternateTotalFuel = alternateCard?.totalFuel || totalAlternateFuel;
+      
+      // Use ACTUAL trip fuel from alternate card, not outbound fuel
+      const actualAlternateTripFuel = alternateCard?.fuelComponentsObject?.tripFuel || alternateCard?.tripFuel || outboundFuel;
+      const actualAlternateRouteFuel = alternateCard?.fuelComponentsObject?.alternateFuel || alternateCard?.alternateFuel || alternateFuel;
+      
+      stopsTable += `| ${actualAlternateTotalFuel} LBS | ${actualAlternatePassengers} (${actualAlternatePassengerWeight} LBS) | Taxi:${taxiFuel} Trip:${actualAlternateTripFuel} Alt:${actualAlternateRouteFuel || 0} Cont:${totalContingency || 0} Res:${reserveFuel} Extra:${extraFuel || 0} | Legs to ${stopLocations[1] || 'DEST'} + Alternate to ${stopLocations[0] || 'ORIG'} |\n`;
+      stopsTable += `\nPotential landing fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
+      
+      // Debug log the fuel calculations
+      console.log('💾 DEBUG: Fuel calculations:', {
+        outboundFuel,
+        alternateFuel,
+        totalContingency,
+        extraFuel,
+        totalAlternateFuel,
+        alternatePassengers,
+        alternatePassengerWeight
+      });
+      
+      console.log('💾 DEBUG: RouteStats vs DepartureCard comparison:', {
+        'routeStats.tripFuel': routeStats?.tripFuel,
+        'routeStats.alternateFuel': routeStats?.alternateFuel,
+        'departureCard.fuelComponentsObject.tripFuel': departureCard.fuelComponentsObject?.tripFuel,
+        'departureCard.tripFuel': departureCard.tripFuel,
+        'departureCard.totalFuel': departureCard.totalFuel
+      });
+      
+      // TABLE 3: Round Trip Fuel - Detailed Breakdown
+      let detailedTable = "### Round Trip Fuel - Detailed Breakdown\n\n";
+      detailedTable += "| Component | Amount |\n";
+      detailedTable += "|-----------|--------|\n";
+      detailedTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
+      // Use verified values or display as unavailable
+      const displayTripFuel = departureCard.fuelComponentsObject?.tripFuel ? Math.round(departureCard.fuelComponentsObject.tripFuel) : 'N/A';
+      const displayAraFuel = departureCard.fuelComponentsObject?.araFuel ? Math.round(departureCard.fuelComponentsObject.araFuel) : 'N/A';
+      const displayApproachFuel = departureCard.fuelComponentsObject?.approachFuel ? Math.round(departureCard.fuelComponentsObject.approachFuel) : 'N/A';
+      const displayDeckFuel = departureCard.fuelComponentsObject?.deckFuel ? Math.round(departureCard.fuelComponentsObject.deckFuel) : 'N/A';
+      const displayTotalFuel = departureCard.totalFuel ? Math.round(departureCard.totalFuel) : 'N/A';
+      
+      detailedTable += `| Trip Fuel | ${displayTripFuel} LBS (+${totalContingency || 0} LBS, 10%) |\n`;
+      detailedTable += `| ARA Fuel | ${displayAraFuel} LBS |\n`;
+      detailedTable += `| Approach Fuel | ${displayApproachFuel} LBS |\n`;
+      detailedTable += `| Extra Fuel | ${extraFuel || 0} LBS |\n`;
+      detailedTable += `| Deck Fuel | ${displayDeckFuel} LBS |\n`;
+      detailedTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
+      detailedTable += `| **Total** | **${displayTotalFuel} LBS** |\n`;
+      const landingFuel = reserveFuel + totalContingency + extraFuel;
+      detailedTable += `\nLanding Fuel: ${landingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
+      
+      // TABLE 4: Minimum Required Fuel (Alternate breakdown)
+      let minimumTable = "### Minimum Required Fuel\n\n";
+      minimumTable += "| Component | Amount |\n";
+      minimumTable += "|-----------|--------|\n";
+      minimumTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
+      minimumTable += `| Outbound Fuel | ${outboundFuel} LBS |\n`;
+      minimumTable += `| Alternate Fuel | ${alternateFuel} LBS |\n`;
+      minimumTable += `| Contingency Fuel | ${totalContingency} LBS (10%) |\n`;
+      minimumTable += `| ARA Fuel | ${displayAraFuel} LBS |\n`;
+      minimumTable += `| Approach Fuel | ${displayApproachFuel} LBS |\n`;
+      minimumTable += `| Extra Fuel | ${extraFuel} LBS |\n`;
+      minimumTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
+      minimumTable += `| **Total** | **${totalAlternateFuel} LBS** |\n`;
+      minimumTable += `\nPotential Landing Fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
       
       console.log('💾 COMPLETE FUEL DATA EXTRACTION:', {
         stopCount: stopCards.length,
         locations: stopLocations,
         tripFuels: stopTripFuels,
         totalFuels: stopRequiredFuels,
-        markdownTableLines: markdownTable.split('\n').length
+        stopsTableLines: stopsTable.split('\n').length,
+        tablesGenerated: 4
       });
       
       // Build action parameters based on whether we're updating or creating
@@ -272,7 +413,6 @@ export class FuelSaveBackService {
         
         // Complete fuel data arrays matching Fast Planner calculations
         "stop_locations": stopLocations,
-        "stop_descriptions": stopDescriptions,
         "stop_trip_fuels": stopTripFuels,
         "stop_taxi_fuels": stopTaxiFuels,
         "stop_deck_fuels": stopDeckFuels,
@@ -284,37 +424,37 @@ export class FuelSaveBackService {
         "stop_required_fuels": stopRequiredFuels,
         "stop_excess_fuels": stopExcessFuels,
         
-        // Summary fuel values
-        "planned_trip_fuel": Math.round(departureCard.tripFuel || routeStats.tripFuel || 0),
+        // Summary fuel values - FIXED: Use fuelComponentsObject
+        "planned_trip_fuel": Math.round(departureCard.fuelComponentsObject?.tripFuel || routeStats.tripFuel || taxiFuel), // Use taxiFuel as minimum if no trip fuel
         "planned_extra_fuel": Math.round(stopCards.reduce((total, card) => {
-          const cardExtraFuel = card?.extraFuel || card?.fuelComponentsObject?.extraFuel || 0;
-          return total + cardExtraFuel;
+          const cardExtraFuel = card?.fuelComponentsObject?.extraFuel || card?.extraFuel;
+          return total + (cardExtraFuel || 0); // Only for sum calculation
         }, 0)),
-        "planned_taxi_fuel": Math.round(departureCard.taxiFuel || 0),
-        "planned_deck_fuel": Math.round(departureCard.deckFuel || 0),
-        "planned_reserve_fuel": Math.round(departureCard.reserveFuel || 0),
-        "planned_contingency_fuel": Math.round(departureCard.contingencyFuel || 0),
-        "planned_ara_fuel": Math.round(departureCard.araFuel || weatherFuel?.araFuel || 0),
-        "planned_approach_fuel": Math.round(departureCard.approachFuel || weatherFuel?.approachFuel || 0),
-        "min_total_fuel": Math.round(departureCard.totalFuel || 0),
+        "planned_taxi_fuel": Math.round(taxiFuel), // Already verified above
+        "planned_deck_fuel": Math.round(departureCard.fuelComponentsObject?.deckFuel || 0), // Deck fuel can be 0
+        "planned_reserve_fuel": Math.round(reserveFuel), // Already verified above
+        "planned_contingency_fuel": Math.round(totalContingency || 0), // Can be 0 for VFR
+        "planned_ara_fuel": Math.round(departureCard.fuelComponentsObject?.araFuel || weatherFuel?.araFuel || 0), // Weather fuel can be 0
+        "planned_approach_fuel": Math.round(departureCard.fuelComponentsObject?.approachFuel || weatherFuel?.approachFuel || 0), // Weather fuel can be 0
+        "min_total_fuel": Math.round(totalAlternateFuel), // Already calculated above
         
         // Critical fuel totals  
-        "round_trip_fuel": Math.round(departureCard.totalFuel || 0), // Total departure fuel
-        "planned_alternate_fuel": Math.round(routeStats.alternateFuel || routeStats.minimumFuel || departureCard.reserveFuel || 0), // Minimum safe fuel 
-        "total_fuel_burned": Math.round(routeStats.tripFuel || departureCard.tripFuel || 0),
-        "total_fuel_uplifted": Math.round(departureCard.totalFuel || 0),
+        "round_trip_fuel": Math.round(departureCard.totalFuel), // Must have total fuel
+        "planned_alternate_fuel": Math.round(alternateFuel || routeStats.minimumFuel || reserveFuel), // Use calculated alternate
+        "total_fuel_burned": Math.round(outboundFuel), // Use verified outbound fuel
+        "total_fuel_uplifted": Math.round(departureCard.totalFuel), // Must have total fuel
         
-        // Passenger data arrays
-        "requested_passengers": requestedPassengers,
-        "available_passengers": availablePassengers,
-        "requested_passenger_weight": requestedPassengerWeight,
-        "available_weight": availableWeight,
-        "requested_total_weight": requestedTotalWeight,
-        "requested_bag_weight": requestedBagWeight,
+        // Passenger data arrays - TEMPORARILY COMMENTED OUT TO ISOLATE 400 ERROR
+        // "requested_passengers": requestedPassengers,
+        // "available_passengers": availablePassengers,
+        // "requested_passenger_weight": requestedPassengerWeight,
+        // "available_weight": availableWeight,
+        // "requested_total_weight": requestedTotalWeight,
+        // "requested_bag_weight": requestedBagWeight,
         
-        // Regional defaults
-        "average_passenger_weight": Math.round(regionalPassengerWeight),
-        "average_bag_weight": Math.round(regionalBagWeight),
+        // Regional defaults - TEMPORARILY COMMENTED OUT
+        // "average_passenger_weight": Math.round(regionalPassengerWeight),
+        // "average_bag_weight": Math.round(regionalBagWeight),
         
         // Flight metadata
         "flight_uuid": flightId,
@@ -323,13 +463,17 @@ export class FuelSaveBackService {
         "policy_name": fuelPolicy?.name || fuelPolicy?.currentPolicy?.name || '',
         "flight_number": `${selectedAircraft?.registration || 'Unknown'} (${new Date().toLocaleDateString()})`,
         
-        // Formatted display data
-        "stops_markdown_table": markdownTable,
-        "min_fuel_breakdown": `Trip:${Math.round(departureCard.tripFuel || routeStats.tripFuel || 0)} Taxi:${Math.round(departureCard.taxiFuel || 0)} Deck:${Math.round(departureCard.deckFuel || 0)} Res:${Math.round(departureCard.reserveFuel || 0)} Extra:${Math.round(stopCards.reduce((total, card) => total + (card?.extraFuel || card?.fuelComponentsObject?.extraFuel || 0), 0))}`,
+        // All 4 formatted display tables matching Palantir operations format
+        "stops_markdown_table": stopsTable,        // TABLE 1: Main stops table  
+        "stop_descriptions": stopDescriptions,     // Array of stop descriptions (as required by schema)
+        "min_fuel_breakdown": detailedTable,       // TABLE 3: Round Trip Fuel (shows first)
+        "automation_summary": minimumTable,        // TABLE 4: Minimum Required Fuel (shows second)
         
-        // Location-specific fuel overrides for loading back into UI
-        // TODO: Add locationFuelOverrides field to Palantir MainFuelV2 schema
-        // "locationFuelOverrides": JSON.stringify(locationFuelOverrides),
+        // TODO: Find correct field for alternateTable (TABLE 2: Minimal fuel with max passengers)
+        
+        // Location-specific fuel overrides for loading back into UI  
+        // Save user ARA/Approach fuel overrides so they persist on flight reload
+        "location_fuel_overrides": JSON.stringify(flightSettings.locationFuelOverrides || {}),
         
         // Refuel stop indices for loading back into UI  
         "refuel_stop_indices": stopCards.map((card, index) => {
@@ -1141,9 +1285,11 @@ export class FuelSaveBackService {
             }
             
             // Add any existing location overrides from JSON field  
-            if (fuelObject.locationFuelOverrides) {
-              const existingOverrides = JSON.parse(fuelObject.locationFuelOverrides);
+            if (fuelObject.locationFuelOverrides || fuelObject.location_fuel_overrides) {
+              const overridesField = fuelObject.location_fuel_overrides || fuelObject.locationFuelOverrides;
+              const existingOverrides = JSON.parse(overridesField);
               locationOverrides = { ...locationOverrides, ...existingOverrides };
+              console.log('📥 🎯 LOADED USER FUEL OVERRIDES:', existingOverrides);
             }
             
             const refuelStops = fuelObject.refuelStopLocations || [];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import StopCard from './StopCard';
 import StopCardCalculator from '../../../modules/calculations/flight/StopCardCalculator.js';
+import PassengerCalculator from '../../../modules/calculations/passengers/PassengerCalculator.js';
 import { detectLocationSegment, createSegmentFuelKey } from '../../../utilities/SegmentUtils.js';
 
 /**
@@ -217,12 +218,19 @@ const EnhancedStopCardsContainer = ({
             return card;
           });
           
+          // 🎯 PASSENGER WEIGHT CALCULATION: Add available weight data to cards
+          const cardsWithPassengerData = PassengerCalculator.updateStopCardsWithPassengers(
+            cardsWithRefuel,
+            selectedAircraft,
+            passengerWeight
+          );
+          
           // 🚨 RACE CONDITION FIX: Only update if cards have actually changed
-          const newCardsString = JSON.stringify(cardsWithRefuel);
+          const newCardsString = JSON.stringify(cardsWithPassengerData);
           const currentCardsString = JSON.stringify(displayStopCards);
           
           if (newCardsString !== currentCardsString) {
-            setDisplayStopCards(cardsWithRefuel);
+            setDisplayStopCards(cardsWithPassengerData);
             
             // 🛩️ HEADER SYNC: Notify header of new stop cards for totals update (prevent infinite loop)
             // 🚨 RACE CONDITION FIX: Add timeout to prevent rapid successive calls
@@ -230,7 +238,7 @@ const EnhancedStopCardsContainer = ({
               lastNotifiedCardsRef.current = newCardsString;
               // Use setTimeout to debounce the callback and break any synchronous update chains
               setTimeout(() => {
-                onStopCardsCalculated(cardsWithRefuel);
+                onStopCardsCalculated(cardsWithPassengerData);
               }, 0);
             }
           } else {
@@ -666,6 +674,9 @@ const EnhancedStopCardsContainer = ({
                 totalFuel={card.totalFuel}
                 maxPassengers={card.maxPassengers}
                 maxPassengersDisplay={card.maxPassengersDisplay}
+                availableWeight={card.availableWeight}
+                usedByPassengers={card.usedByPassengers}
+                remainingWeight={card.remainingWeight}
                 groundSpeed={card.groundSpeed}
                 headwind={card.headwind}
                 deckTime={card.deckTime}
@@ -699,6 +710,9 @@ const EnhancedStopCardsContainer = ({
               totalFuel={alternateStopCard.totalFuel}
               maxPassengers={alternateStopCard.maxPassengers}
               maxPassengersDisplay={alternateStopCard.maxPassengersDisplay}
+              availableWeight={alternateStopCard.availableWeight}
+              usedByPassengers={alternateStopCard.usedByPassengers}
+              remainingWeight={alternateStopCard.remainingWeight}
               groundSpeed={alternateStopCard.groundSpeed}
               headwind={alternateStopCard.headwind}
               deckTime={alternateStopCard.deckTime}
