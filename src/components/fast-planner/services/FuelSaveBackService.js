@@ -267,14 +267,16 @@ export class FuelSaveBackService {
       stopCards.forEach((card, index) => {
         if (!card) return;
         
-        const location = stopLocations[index] || `Stop ${index + 1}`;
+        const baseLocation = stopLocations[index] || `Stop ${index + 1}`;
+        // Add (Refuel) notation to location name if it's a refuel stop
+        const isRefuelLocation = card?.refuelMode === true || card?.isRefuelStop === true;
+        const location = isRefuelLocation ? `${baseLocation} (Refuel)` : baseLocation;
+        
         const requiredFuel = stopRequiredFuels[index]; // No fallback - use actual data
         const passengers = requestedPassengers[index]; // No fallback - use actual data  
         const passengerWeight = requestedPassengerWeight[index]; // No fallback - use actual data
         
-        // Check if refuel is needed
-        const refuelNote = card.isRefuelStop ? " (Refuel needed)" : "";
-        const fuelDisplay = `${requiredFuel}${refuelNote} Lbs`;
+        const fuelDisplay = `${requiredFuel} Lbs`;
         
         // Build fuel components string
         const components = [];
@@ -303,12 +305,12 @@ export class FuelSaveBackService {
           
           const nextStop = stopLocations[index + 1];
           if (nextStop) {
-            legStr = `${location}-${nextStop}`;
+            legStr = `${baseLocation}-${nextStop}`;
             if (index === stopCards.length - 2) {
-              legStr += ` → ${nextStop}-${location}`;
+              legStr += ` → ${nextStop}-${baseLocation}`;
             }
           } else {
-            legStr = `${location} route`;
+            legStr = `${baseLocation} route`;
           }
         }
         
@@ -484,10 +486,19 @@ export class FuelSaveBackService {
         // 🔧 REMOVED: location_fuel_overrides - not a valid Palantir column
         // Location-specific fuel overrides handled separately in FastPlanner
         
-        // Refuel stop indices for loading back into UI  
+        // Refuel stop indices for loading back into UI (1-based to match waypoint indices)
         "refuel_stop_indices": stopCards.map((card, index) => {
-          return card?.refuelMode === true ? index : null;
+          return card?.refuelMode === true ? (index + 1) : null;
         }).filter(index => index !== null),
+        
+        // 🔧 TEMPORARILY DISABLED: refuelStopLocations - field not yet deployed to Palantir backend
+        // Will re-enable once backend schema is updated with OSDK 0.9.0
+        // "refuelStopLocations": stopCards.map((card, index) => {
+        //   if (card?.refuelMode === true || card?.isRefuelStop === true) {
+        //     return stopLocations[index]; // Map index to actual location name
+        //   }
+        //   return null;
+        // }).filter(location => location !== null),
         
         // Technical metadata
         "calculation_unit": "LBS",
@@ -1301,7 +1312,20 @@ export class FuelSaveBackService {
               console.log('📥 🎯 LOADED USER FUEL OVERRIDES:', existingOverrides);
             }
             
-            const refuelStops = fuelObject.refuelStopLocations || [];
+            // Use refuel_stop_indices to restore refuel checkbox states
+            const refuelIndices = fuelObject.refuelStopIndices || [];
+            // Convert indices back to location names using stop_locations array (adjust for 0-based array)
+            const stopLocationsArray = fuelObject.stopLocations || [];
+            const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
+            
+            console.log('📥 🔧 REFUEL INDICES DEBUG (LOAD):', {
+              savedRefuelIndices: refuelIndices,
+              savedStopLocations: stopLocationsArray,
+              convertedRefuelStops: refuelStops,
+              hasRefuelData: refuelIndices.length > 0,
+              indexToLocationMapping: refuelIndices.map(idx => `${idx} -> ${stopLocationsArray[idx - 1]}`),
+              totalWaypoints: 'Will show in FastPlannerApp'
+            });
             console.log('📥 ✅ Extracted fuel settings via fuelPlanId:', { 
               extraFuel, 
               refuelStops, 
@@ -1378,7 +1402,11 @@ export class FuelSaveBackService {
         
         // Extract the fuel settings we want to restore
         const extraFuel = Number(fuelObject.plannedExtraFuel) || 0;
-        const refuelStops = fuelObject.refuelStopLocations || [];
+        // Use refuel_stop_indices to restore refuel checkbox states
+        const refuelIndices = fuelObject.refuelStopIndices || [];
+        // Convert indices back to location names using stop_locations array (adjust for 0-based array)
+        const stopLocationsArray = fuelObject.stopLocations || [];
+        const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
         
         console.log('📥 FUEL EXTRACTION DEBUG:', {
           rawPlannedExtraFuel: fuelObject.plannedExtraFuel,
@@ -1597,6 +1625,15 @@ export class FuelSaveBackService {
       "available_passengers": availablePassengers,
       "requested_passenger_weight": requestedPassengerWeight,
       "average_passenger_weight": Math.round(regionalPassengerWeight),
+      
+      // 🔧 TEMPORARILY DISABLED: refuelStopLocations - field not yet deployed to Palantir backend
+      // Will re-enable once backend schema is updated with OSDK 0.9.0
+      // "refuelStopLocations": stopCards.map((card, index) => {
+      //   if (card?.refuelMode === true || card?.isRefuelStop === true) {
+      //     return stopLocations[index]; // Map index to actual location name
+      //   }
+      //   return null;
+      // }).filter(location => location !== null),
       
       // Flight metadata
       "flight_uuid": flightId,

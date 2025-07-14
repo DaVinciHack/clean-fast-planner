@@ -293,11 +293,14 @@ const CleanDetailedFuelBreakdown = ({
       });
       
       // 🎯 PASSENGER WEIGHT CALCULATION: Add available weight data to cards (MATCH EnhancedStopCardsContainer)
-      const cardsWithPassengerData = PassengerCalculator.updateStopCardsWithPassengers(
-        cardsWithRefuel,
-        selectedAircraft,
-        flightSettings.passengerWeight
-      );
+      // Safety check: only process if we have valid cards and aircraft
+      const cardsWithPassengerData = (cardsWithRefuel && cardsWithRefuel.length > 0 && selectedAircraft) 
+        ? PassengerCalculator.updateStopCardsWithPassengers(
+            cardsWithRefuel,
+            selectedAircraft,
+            flightSettings.passengerWeight
+          )
+        : cardsWithRefuel;
       
       return cardsWithPassengerData;
       

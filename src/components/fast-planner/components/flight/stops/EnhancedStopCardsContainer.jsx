@@ -120,12 +120,18 @@ const EnhancedStopCardsContainer = ({
   
   // 🚫 CRITICAL FIX: Sync local refuel stops with currentRefuelStops from DetailedFuelBreakdown
   useEffect(() => {
+    console.log('🔄 CONTAINER SYNC: currentRefuelStops changed:', currentRefuelStops);
+    console.log('🔄 CONTAINER SYNC: local refuelStops:', refuelStops);
+    
     if (currentRefuelStops && Array.isArray(currentRefuelStops)) {
       // Always sync - whether adding or clearing refuel stops
       const currentStopsStr = JSON.stringify(currentRefuelStops.sort());
       const localStopsStr = JSON.stringify(refuelStops.sort());
       
+      console.log('🔄 CONTAINER SYNC: Comparing strings:', { currentStopsStr, localStopsStr });
+      
       if (currentStopsStr !== localStopsStr) {
+        console.log('🔄 CONTAINER SYNC: Syncing local state to match parent:', currentRefuelStops);
         isUpdatingFromParentRef.current = true;
         setRefuelStops(currentRefuelStops);
         
@@ -133,6 +139,13 @@ const EnhancedStopCardsContainer = ({
         setTimeout(() => {
           isUpdatingFromParentRef.current = false;
         }, 0);
+      } else {
+        console.log('🔄 CONTAINER SYNC: States already match, no sync needed');
+      }
+    } else {
+      console.log('🔄 CONTAINER SYNC: currentRefuelStops is empty/invalid, clearing local state');
+      if (refuelStops.length > 0) {
+        setRefuelStops([]);
       }
     }
   }, [currentRefuelStops]); // Remove refuelStops dependency to prevent loop

@@ -164,8 +164,8 @@ class PassengerCalculator {
    */
   static updateStopCardsWithPassengers(stopCards, aircraft, passengerWeight) {
     if (!Array.isArray(stopCards) || stopCards.length === 0) {
-      console.error('PassengerCalculator: Invalid stop cards data');
-      return stopCards;
+      console.warn('PassengerCalculator: No stop cards data to process (normal during initialization)');
+      return stopCards || [];
     }
     
     // Clone the input array to avoid modifying the original
