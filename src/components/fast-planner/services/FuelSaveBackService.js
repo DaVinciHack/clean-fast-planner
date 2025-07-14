@@ -363,7 +363,7 @@ export class FuelSaveBackService {
       const departureExtra = departureCard.fuelComponentsObject?.extraFuel || 0;
       const departureTotal = departureCard.totalFuel || 0;
       
-      let detailedTable = "### Round Trip Fuel - Detailed Breakdown\n\n";
+      let detailedTable = "#### Round Trip Fuel - Detailed Breakdown\n\n";
       detailedTable += "| Component | Amount |\n";
       detailedTable += "|-----------|--------|\n";
       detailedTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
@@ -378,7 +378,7 @@ export class FuelSaveBackService {
       detailedTable += `\nLanding Fuel: ${landingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
       
       // TABLE 4: Minimum Required Fuel - Uses alternate card data (minimum IFR fuel)
-      let minimumTable = "### Minimum Required Fuel\n\n";
+      let minimumTable = "#### Minimum Required Fuel\n\n";
       minimumTable += "| Component | Amount |\n";
       minimumTable += "|-----------|--------|\n";
       minimumTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
@@ -476,8 +476,8 @@ export class FuelSaveBackService {
         // All 4 formatted display tables matching Palantir operations format
         "stops_markdown_table": stopsTable,        // TABLE 1: Main stops table  
         "stop_descriptions": stopDescriptions,     // Array of stop descriptions (as required by schema)
-        "min_fuel_breakdown": detailedTable,       // TABLE 3: Round Trip Fuel (shows first)
-        "automation_summary": minimumTable,        // TABLE 4: Minimum Required Fuel (shows second)
+        "min_fuel_breakdown": minimumTable,        // TABLE 4: Minimum Required Fuel (shows first/left)
+        "automation_summary": detailedTable,       // TABLE 3: Round Trip Fuel (shows second/right)
         
         // TODO: Find correct field for alternateTable (TABLE 2: Minimal fuel with max passengers)
         
@@ -1584,7 +1584,7 @@ export class FuelSaveBackService {
       "planned_contingency_fuel": Math.round(departureCard.contingencyFuel || 0),
       "planned_ara_fuel": Math.round(departureCard.araFuel || weatherFuel?.araFuel || 0),
       "planned_approach_fuel": Math.round(departureCard.approachFuel || weatherFuel?.approachFuel || 0),
-      "min_total_fuel": Math.round(departureCard.totalFuel || 0),
+      "min_total_fuel": Math.round(alternateStopCard?.totalFuel || departureCard.totalFuel || 0),
       
       // Critical fuel totals  
       "round_trip_fuel": Math.round(departureCard.totalFuel || 0),
