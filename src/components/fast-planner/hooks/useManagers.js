@@ -857,39 +857,19 @@ const useManagers = ({
         // First, make sure global flags are properly set
         window.isWaypointModeActive = window.isWaypointModeActive || false;
         
-        // Clean up any existing handlers before initializing new ones
-        const map = mapManagerRef.current.getMap();
-        if (map && map._listeners && map._listeners.click) {
-          console.log(`🧹 Removing ${map._listeners.click.length} existing click handlers before initializing`);
-          map.off('click');
-        }
-        
-        // Add a small delay to ensure the map is fully loaded
-        setTimeout(() => {
-          // Initialize map interactions carefully
-          if (mapInteractionHandlerRef.current) {
-            // Only initialize if we haven't already
-            if (!mapInteractionHandlerRef.current.isInitialized) {
-              const initSuccess = mapInteractionHandlerRef.current.initialize();
-              
-              if (initSuccess) {
-                console.log("🧹 Map interaction handler initialized successfully");
-              } else {
-                console.error("🧹 Failed to initialize map interaction handler, will retry once");
-                
-                // Try again after a longer delay
-                setTimeout(() => {
-                  if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
-                    console.log("🧹 Second attempt at initializing map handler");
-                    mapInteractionHandlerRef.current.initialize();
-                  }
-                }, 1000);
-              }
-            } else {
-              console.log("🧹 Map interaction handler already initialized, skipping");
-            }
+        // Initialize map interactions immediately - no delay
+        if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
+          console.log("🧹 Initializing map interaction handler immediately");
+          const initSuccess = mapInteractionHandlerRef.current.initialize();
+          
+          if (initSuccess) {
+            console.log("🧹 Map interaction handler initialized successfully");
+          } else {
+            console.error("🧹 Failed to initialize map interaction handler");
           }
-        }, 500);
+        } else {
+          console.log("🧹 Map interaction handler already initialized, skipping");
+        }
       }
     } catch (error) {
       console.error("Error in handleMapReady:", error);

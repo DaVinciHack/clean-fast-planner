@@ -159,7 +159,9 @@ class MapInteractionHandler {
       console.log(`${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}`);
       
       // Start periodic check for route layers appearing
+      console.log('🔍 Starting route layer monitor during initialization...');
       this.startRouteLayerMonitor(map);
+      console.log('🔍 Route layer monitor started, interval ID:', this.routeLayerMonitor);
       
       // 3. DOM touch events fallback for iPad
       if (this.isTouchDevice) {
@@ -183,6 +185,7 @@ class MapInteractionHandler {
     let checkCount = 0;
     this.routeLayerMonitor = setInterval(() => {
       checkCount++;
+      console.log(`🔍 Route monitor check ${checkCount}...`);
       
       const allLayers = map.getStyle().layers;
       const layerNames = allLayers.map(l => l.id);
@@ -190,7 +193,12 @@ class MapInteractionHandler {
         name.includes('route') || name.includes('waypoint') || name.includes('platform')
       );
       
-      if (routeRelatedLayers.length > 0) {
+      // Only look for actual route layers, not platforms
+      const actualRouteLayers = layerNames.filter(name => name.includes('route'));
+      
+      console.log(`🔍 Found ${actualRouteLayers.length} actual route layers:`, actualRouteLayers);
+      
+      if (actualRouteLayers.length > 0) {
         // Route layers found! Set up drag handlers
         console.log(`🎉 ROUTE LAYERS FOUND! (check ${checkCount}) - ${routeRelatedLayers.join(', ')}`);
         console.log(`🔍 ALL LAYERS ON MAP:`, layerNames);
@@ -287,9 +295,12 @@ class MapInteractionHandler {
     
     let features = [];
     try {
-      features = map.queryRenderedFeatures(point, { 
-        layers: ['route', 'route-drag-detection-layer'] 
-      });
+      const layersToCheck = ['route', 'route-drag-detection-layer'];
+      const existingLayers = layersToCheck.filter(layerId => map.getLayer(layerId));
+      
+      if (existingLayers.length > 0) {
+        features = map.queryRenderedFeatures(point, { layers: existingLayers });
+      }
     } catch (error) {
       console.warn('⚠️ queryRenderedFeatures error:', error);
       return; // Skip if query fails
@@ -427,13 +438,16 @@ class MapInteractionHandler {
     // FEATURE CHECK: Don't add waypoints on existing features (like drag-test)
     const map = this.mapManager.getMap();
     if (map && e.point) {
-      const features = map.queryRenderedFeatures(e.point, { 
-        layers: ['waypoint-pins', 'route', 'route-drag-detection-layer', 'platforms-layer'] 
-      });
+      const layersToCheck = ['waypoint-pins', 'route', 'route-drag-detection-layer', 'platforms-layer'];
+      const existingLayers = layersToCheck.filter(layerId => map.getLayer(layerId));
       
-      if (features.length > 0) {
-        console.log('🖱️ MapInteractionHandler: Click on existing feature, ignoring');
-        return; // Click was on a pin, line, or platform
+      if (existingLayers.length > 0) {
+        const features = map.queryRenderedFeatures(e.point, { layers: existingLayers });
+        
+        if (features.length > 0) {
+          console.log('🖱️ MapInteractionHandler: Click on existing feature, ignoring');
+          return; // Click was on a pin, line, or platform
+        }
       }
     }
     

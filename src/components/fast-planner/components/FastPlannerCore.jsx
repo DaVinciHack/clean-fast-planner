@@ -300,26 +300,7 @@ const FastPlannerCore = ({ mapManagerRef, appManagers }) => {
         cargoWeight={flightSettings.cargoWeight}
       />
       
-      {/* Map Component - only render if mapManager is available */}
-      {mapManager ? (
-        <MapComponent
-          mapManagerRef={{ current: mapManager }}
-          onMapReady={handleMapReady}
-        />
-      ) : (
-        <div className="loading-message" style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.7)',
-          color: 'white',
-          padding: '20px',
-          borderRadius: '5px'
-        }}>
-          Loading map manager...
-        </div>
-      )}
+      {/* Map Component removed - handled by parent FastPlannerApp to prevent duplication */}
       
       {/* Left Panel (Route Editor) */}
       <LeftPanel

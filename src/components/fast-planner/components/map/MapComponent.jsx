@@ -98,6 +98,12 @@ const MapComponent = ({
           console.log(`%c MAP COMPONENT DIAGNOSTIC: Initializing map with options:`, 
                       'background: #ff6b6b; color: white;', initOptions);
           
+          // Clean the map container before initialization
+          const mapContainer = document.getElementById('fast-planner-map');
+          if (mapContainer) {
+            mapContainer.innerHTML = ''; // Clear any existing content
+          }
+          
           // Initialize map using the captured mapManager reference with region data
           // CRITICAL: Use 'fast-planner-map' as the ID to match what other components expect
           const mapInstance = await mapManager.initializeMap('fast-planner-map', initOptions);
