@@ -335,6 +335,16 @@ class MapInteractionHandler {
     console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
     console.log('🚀 DRAG STARTED! Mouse down on route line detected.');
     
+    // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
+    const isAlternateMode = window.isAlternateModeActive === true;
+    if (isAlternateMode) {
+      console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
+      }
+      return;
+    }
+    
     try {
       e.preventDefault();
       this.dragMode = 'insert';
@@ -353,6 +363,16 @@ class MapInteractionHandler {
    */
   handleLineTouchStart(e) {
     console.log('📱 MapInteractionHandler: Line touch start - route drag');
+    
+    // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
+    const isAlternateMode = window.isAlternateModeActive === true;
+    if (isAlternateMode) {
+      console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
+      }
+      return;
+    }
     
     if (e.points.length !== 1) {
       console.log('❌ Multi-touch detected, ignoring');
@@ -714,9 +734,20 @@ class MapInteractionHandler {
 
   handleMapBackgroundClick(lngLat) {
     const isWaypointMode = window.isWaypointModeActive === true;
+    const isAlternateMode = window.isAlternateModeActive === true;
+    
     if (this.callbacks.onMapClick) {
       this.triggerCallback('onMapClick', { lngLat: lngLat, coordinates: [lngLat.lng, lngLat.lat], mapClickSource: 'directClick', isWaypointMode: isWaypointMode });
     } else {
+      // ALTERNATE MODE CHECK: Prevent adding waypoints to main route in alternate mode
+      if (isAlternateMode) {
+        console.log('🎯 MapInteractionHandler: Ignoring waypoint add - alternate mode is active');
+        if (window.LoadingIndicator) {
+          window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click on route for split point or rig for alternate', 'info', 2000);
+        }
+        return;
+      }
+      
       const name = isWaypointMode ? `Waypoint ${this.waypointManager.getWaypoints().length + 1}` : `Stop ${this.waypointManager.getWaypoints().length + 1}`;
       this.waypointManager.addWaypoint([lngLat.lng, lngLat.lat], name, { isWaypoint: isWaypointMode, type: isWaypointMode ? 'WAYPOINT' : 'STOP', pointType: isWaypointMode ? 'NAVIGATION_WAYPOINT' : 'LANDING_STOP' });
     }

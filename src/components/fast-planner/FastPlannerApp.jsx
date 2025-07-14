@@ -1425,18 +1425,18 @@ const FastPlannerCore = ({
             let alternateString;
             if (window.currentSplitPoint) {
               // Use custom split point to create pair
-              alternateString = `${window.currentSplitPoint} ${locationName}`;
+              alternateString = `${window.currentSplitPoint.replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
               window.currentSplitPoint = null; // Reset for next time
             } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
               // We have a single location in input (split point from route click), add destination to complete pair
-              alternateString = `${alternateRouteInput.trim()} ${locationName}`;
+              alternateString = `${alternateRouteInput.trim().replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
               // Clear the split point state since we're using it
               setAlternateSplitPoint(null);
             } else {
-              // 🎯 LOADED FLIGHT FIX: Use stops[0] (always the first landing stop)
-              const splitPoint = loadedFlightData?.stops?.[0];
+              // 🎯 LOADED FLIGHT FIX: Use stops[1] (first landing stop, not departure)
+              const splitPoint = loadedFlightData?.stops?.[1];
               if (splitPoint) {
-                alternateString = `${splitPoint} ${locationName}`;
+                alternateString = `${splitPoint.replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
               } else {
                 alternateString = locationName;
               }
@@ -1485,16 +1485,16 @@ const FastPlannerCore = ({
             let alternateString;
             if (window.currentSplitPoint) {
               // Use custom split point to create pair
-              alternateString = `${window.currentSplitPoint} ${locationName}`;
+              alternateString = `${window.currentSplitPoint.replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
               window.currentSplitPoint = null; // Reset for next time
             } else if (alternateRouteInput && alternateRouteInput.trim() && !alternateRouteInput.includes(' ')) {
               // We have a single location in input (split point from route click), add destination to complete pair
-              alternateString = `${alternateRouteInput.trim()} ${locationName}`;
+              alternateString = `${alternateRouteInput.trim().replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
             } else {
-              // 🎯 LOADED FLIGHT FIX: Use stops[0] (always the first landing stop)
-              const splitPoint = loadedFlightData?.stops?.[0];
+              // 🎯 LOADED FLIGHT FIX: Use stops[1] (first landing stop, not departure)
+              const splitPoint = loadedFlightData?.stops?.[1];
               if (splitPoint) {
-                alternateString = `${splitPoint} ${locationName}`;
+                alternateString = `${splitPoint.replace(/\s+/g, '_')} ${locationName.replace(/\s+/g, '_')}`;
               } else {
                 alternateString = locationName;
               }
@@ -1599,7 +1599,7 @@ const FastPlannerCore = ({
     try {
       // Parse the input to determine if it's single location or pair
       const trimmedInput = input.trim();
-      const locations = trimmedInput.split(/\s+/).filter(loc => loc.length > 0);
+      const locations = trimmedInput.split(/\s+/).filter(loc => loc.length > 0).map(loc => loc.replace(/_/g, ' '));
 
       // Helper function to look up coordinates for a location
       const getLocationCoordinates = async (locationName) => {
