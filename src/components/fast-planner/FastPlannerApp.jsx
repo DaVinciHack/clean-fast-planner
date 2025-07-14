@@ -1823,6 +1823,18 @@ const FastPlannerCore = ({
     console.log('🔍 handleFlightLoad: fuelPlanId present:', !!flightData?.fuelPlanId);
     console.log('🔍 handleFlightLoad: fuelPlanId value:', flightData?.fuelPlanId);
     
+    // 🚨 CRITICAL: Clear ALL refuel state before loading new flight
+    console.log('🧹 REFUEL RESET: Clearing all refuel state for new flight load');
+    setCurrentRefuelStops([]); // Clear current refuel stops
+    setPendingRefuelStops(null); // Clear pending refuel stops
+    
+    // 🚨 CRITICAL: Clear temp fuel object cache to prevent persistence between flights
+    const { FuelSaveBackService } = await import('./services/FuelSaveBackService');
+    if (FuelSaveBackService._tempExistingFuelObject) {
+      console.log('🧹 CACHE CLEAR: Clearing temp fuel object cache');
+      delete FuelSaveBackService._tempExistingFuelObject;
+    }
+    
     // 🚨 AVIATION SAFETY: Reset ALL fuel data first to prevent cross-flight contamination
     console.log('🧹 FUEL RESET: Clearing all fuel overrides and extra fuel before loading new flight');
     setLocationFuelOverrides({}); // Clear all location-specific fuel overrides
@@ -1955,6 +1967,12 @@ const FastPlannerCore = ({
           
           if (fuelSettings) {
             console.log('💾 FUEL LOAD-BACK: Loaded fuel settings:', fuelSettings);
+            console.log('💾 FUEL LOAD-BACK: Flight data details:', {
+              flightId: flightData?.id || flightData?.flightId,
+              fuelPlanId: flightData?.fuelPlanId,
+              currentWaypoints: waypoints?.map(w => w.name),
+              loadedRefuelStops: fuelSettings.refuelStops
+            });
             console.log('💾 FUEL LOAD-BACK: DEBUG - fuelSettings structure:', {
               hasExtraFuel: typeof fuelSettings.extraFuel !== 'undefined',
               extraFuelValue: fuelSettings.extraFuel,
@@ -2051,9 +2069,11 @@ const FastPlannerCore = ({
                 
                 // Update currentRefuelStops state for UI checkboxes
                 if (refuelIndices.length > 0) {
-                  console.log('💾 FUEL LOAD-BACK: Setting currentRefuelStops to:', refuelIndices);
+                  // 🚨 CRITICAL FIX: Remove duplicates from refuelIndices
+                  const uniqueRefuelIndices = [...new Set(refuelIndices)];
+                  console.log('💾 FUEL LOAD-BACK: Setting currentRefuelStops to:', uniqueRefuelIndices);
                   console.log('💾 FUEL LOAD-BACK: Before setCurrentRefuelStops - current state:', currentRefuelStops);
-                  setCurrentRefuelStops(refuelIndices);
+                  setCurrentRefuelStops(uniqueRefuelIndices);
                   
                   // Verify state update with setTimeout
                   setTimeout(() => {

@@ -1318,20 +1318,25 @@ export class FuelSaveBackService {
             const stopLocationsArray = fuelObject.stopLocations || [];
             const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
             
-            console.log('📥 🔧 REFUEL INDICES DEBUG (LOAD):', {
-              savedRefuelIndices: refuelIndices,
-              savedStopLocations: stopLocationsArray,
-              convertedRefuelStops: refuelStops,
-              hasRefuelData: refuelIndices.length > 0,
-              indexToLocationMapping: refuelIndices.map(idx => `${idx} -> ${stopLocationsArray[idx - 1]}`),
-              totalWaypoints: 'Will show in FastPlannerApp'
+            // CRITICAL DEBUG: Log what fuel data is being loaded
+            console.log('🚨 FUEL DATA DEBUG:', {
+              fuelObjectId: fuelObject.$primaryKey,
+              flightUuid: fuelObject.flightUuid,
+              refuelIndices: refuelIndices,
+              stopLocations: stopLocationsArray,
+              calculatedRefuelStops: refuelStops,
+              shouldHaveRefuel: refuelIndices.length > 0
             });
-            console.log('📥 ✅ Extracted fuel settings via fuelPlanId:', { 
-              extraFuel, 
-              refuelStops, 
-              locationOverrides,
-              distributedStops: Object.keys(locationOverrides).length
-            });
+            
+            // 🚨 CRITICAL SAFETY CHECK: Only return refuel stops if this is the exact right flight
+            // If we're loading fuel data that doesn't exactly match this flight, don't load refuel stops
+            const isExactMatch = fuelObject.flightUuid === (flightData.id || flightData.flightId);
+            if (!isExactMatch && refuelStops.length > 0) {
+              console.log('🚨 SAFETY: Flight UUID mismatch - clearing refuel stops to prevent contamination');
+              console.log('🚨 SAFETY: Expected:', flightData.id || flightData.flightId, 'Got:', fuelObject.flightUuid);
+              refuelStops.length = 0; // Clear the refuel stops array
+            }
+            // Reduced logging for performance
             
             // 🎯 CRITICAL: Return the actual fuel object to avoid duplicate lookups
             return { 
@@ -1353,77 +1358,58 @@ export class FuelSaveBackService {
           console.warn('📥 Direct lookup failed, falling back to search:', directError.message);
         }
       } else {
-        console.log('📥 ⚠️ No fuelPlanId in flight data, using fallback search');
+        console.log('📥 ⚠️ No fuelPlanId in flight data - using SAFE fallback search');
       }
       
-      // FALLBACK: Old backwards search method
+      // SAFE FALLBACK: Only for flights without fuelPlanId
       const flightId = flightData.id || flightData.flightId;
-      console.log('📥 🔄 FALLBACK: Searching for fuel object by flightUuid:', flightId);
+      console.log('📥 🔄 SAFE FALLBACK: Searching for fuel object by flightUuid:', flightId);
       
       const fuelData = await client(sdk.MainFuelV2)
         .where(fuel => fuel.flightUuid.exactMatch(flightId))
-        .fetchPage({ $pageSize: 1 });
+        .fetchPage({ $pageSize: 5 });
       
-      console.log('📥 🔍 FUEL QUERY RESULTS:', {
+      console.log('📥 🔍 FALLBACK QUERY RESULTS:', {
         totalFound: fuelData.data?.length || 0,
         searchingForFlightId: flightId
       });
       
-      // Log ALL found fuel objects to see what we're getting
       if (fuelData.data && fuelData.data.length > 0) {
-        console.log('📥 🔍 ALL FOUND FUEL OBJECTS:');
-        fuelData.data.forEach((fuel, index) => {
-          console.log(`📥 🔍 Fuel Object ${index}:`, {
-            primaryKey: fuel.$primaryKey,
-            flightUuid: fuel.flightUuid,
-            flightNumber: fuel.flightNumber,
-            matches: fuel.flightUuid === flightId
-          });
-        });
-      }
-      
-      if (fuelData.data && fuelData.data.length > 0) {
-        const fuelObject = fuelData.data[0];
+        // 🚨 CRITICAL SAFETY: Only use fuel objects that EXACTLY match this flight ID
+        const exactMatches = fuelData.data.filter(fuel => fuel.flightUuid === flightId);
         
-        console.log('📥 🔍 COMPLETE FUEL OBJECT FROM PALANTIR:');
-        console.log(fuelObject);
-        console.log('📥 🔍 ALL FUEL OBJECT KEYS:', Object.keys(fuelObject));
-        console.log('📥 🔍 plannedExtraFuel SPECIFICALLY:', fuelObject.plannedExtraFuel);
-        console.log('📥 🔍 refuelStopLocations SPECIFICALLY:', fuelObject.refuelStopLocations);
+        if (exactMatches.length === 0) {
+          console.log('🚨 SAFETY: No exact UUID matches in fallback - returning defaults');
+          return { extraFuel: 0, refuelStops: [] };
+        }
         
-        console.log('📥 Found fuel object:', {
+        if (exactMatches.length > 1) {
+          console.warn('⚠️ Multiple exact matches found - using most recent');
+        }
+        
+        const fuelObject = exactMatches[0];
+        console.log('📥 ✅ SAFE FALLBACK: Found exact match:', {
           primaryKey: fuelObject.$primaryKey,
           flightUuid: fuelObject.flightUuid,
-          hasExtraFuel: fuelObject.plannedExtraFuel !== undefined,
-          hasRefuelStops: fuelObject.refuelStopLocations !== undefined,
-          rawExtraFuel: fuelObject.plannedExtraFuel,
-          rawRefuelStops: fuelObject.refuelStopLocations
+          isExactMatch: fuelObject.flightUuid === flightId
         });
         
-        // Extract the fuel settings we want to restore
+        // Extract fuel settings safely
         const extraFuel = Number(fuelObject.plannedExtraFuel) || 0;
-        // Use refuel_stop_indices to restore refuel checkbox states
         const refuelIndices = fuelObject.refuelStopIndices || [];
-        // Convert indices back to location names using stop_locations array (adjust for 0-based array)
         const stopLocationsArray = fuelObject.stopLocations || [];
         const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
         
-        console.log('📥 FUEL EXTRACTION DEBUG:', {
-          rawPlannedExtraFuel: fuelObject.plannedExtraFuel,
-          convertedExtraFuel: extraFuel,
-          extractionSuccessful: extraFuel > 0
-        });
-        
-        console.log('📥 Extracted fuel settings:', {
-          extraFuel: extraFuel,
-          refuelStops: refuelStops,
-          refuelStopsCount: refuelStops.length
+        console.log('📥 SAFE FALLBACK: Extracted fuel settings:', {
+          extraFuel,
+          refuelStops,
+          hasRefuelStops: refuelStops.length > 0
         });
         
         return {
-          extraFuel: extraFuel,
-          refuelStops: refuelStops,
-          fuelObject: fuelObject  // Store the actual fuel object for reuse
+          extraFuel,
+          refuelStops,
+          fuelObject
         };
       }
       
