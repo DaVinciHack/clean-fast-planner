@@ -353,59 +353,68 @@ export class FuelSaveBackService {
         alternatePassengerWeight
       });
       
-      console.log('💾 DEBUG: RouteStats vs DepartureCard comparison:', {
-        'routeStats.tripFuel': routeStats?.tripFuel,
-        'routeStats.alternateFuel': routeStats?.alternateFuel,
-        'departureCard.fuelComponentsObject.tripFuel': departureCard.fuelComponentsObject?.tripFuel,
-        'departureCard.tripFuel': departureCard.tripFuel,
-        'departureCard.totalFuel': departureCard.totalFuel
-      });
       
-      // TABLE 3: Round Trip Fuel - Detailed Breakdown
+      // TABLE 3: Round Trip Fuel - Uses departure card data (main route with all stops)
+      const departureTrip = departureCard.fuelComponentsObject?.tripFuel || 0;
+      const departureContingency = departureCard.fuelComponentsObject?.contingencyFuel || 0;
+      const departureAra = departureCard.fuelComponentsObject?.araFuel || 0;
+      const departureApproach = departureCard.fuelComponentsObject?.approachFuel || 0;
+      const departureDeck = departureCard.fuelComponentsObject?.deckFuel || 0;
+      const departureExtra = departureCard.fuelComponentsObject?.extraFuel || 0;
+      const departureTotal = departureCard.totalFuel || 0;
+      
       let detailedTable = "### Round Trip Fuel - Detailed Breakdown\n\n";
       detailedTable += "| Component | Amount |\n";
       detailedTable += "|-----------|--------|\n";
       detailedTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
-      // Use verified values or display as unavailable
-      const displayTripFuel = departureCard.fuelComponentsObject?.tripFuel ? Math.round(departureCard.fuelComponentsObject.tripFuel) : 'N/A';
-      const displayAraFuel = departureCard.fuelComponentsObject?.araFuel ? Math.round(departureCard.fuelComponentsObject.araFuel) : 'N/A';
-      const displayApproachFuel = departureCard.fuelComponentsObject?.approachFuel ? Math.round(departureCard.fuelComponentsObject.approachFuel) : 'N/A';
-      const displayDeckFuel = departureCard.fuelComponentsObject?.deckFuel ? Math.round(departureCard.fuelComponentsObject.deckFuel) : 'N/A';
-      const displayTotalFuel = departureCard.totalFuel ? Math.round(departureCard.totalFuel) : 'N/A';
-      
-      detailedTable += `| Trip Fuel | ${displayTripFuel} LBS (+${totalContingency || 0} LBS, 10%) |\n`;
-      detailedTable += `| ARA Fuel | ${displayAraFuel} LBS |\n`;
-      detailedTable += `| Approach Fuel | ${displayApproachFuel} LBS |\n`;
-      detailedTable += `| Extra Fuel | ${extraFuel || 0} LBS |\n`;
-      detailedTable += `| Deck Fuel | ${displayDeckFuel} LBS |\n`;
+      detailedTable += `| Trip Fuel | ${departureTrip} LBS (+${departureContingency} LBS, 10%) |\n`;
+      detailedTable += `| ARA Fuel | ${departureAra} LBS |\n`;
+      detailedTable += `| Approach Fuel | ${departureApproach} LBS |\n`;
+      detailedTable += `| Extra Fuel | ${departureExtra} LBS |\n`;
+      detailedTable += `| Deck Fuel | ${departureDeck} LBS |\n`;
       detailedTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
-      detailedTable += `| **Total** | **${displayTotalFuel} LBS** |\n`;
-      const landingFuel = reserveFuel + totalContingency + extraFuel;
+      detailedTable += `| **Total** | **${departureTotal} LBS** |\n`;
+      const landingFuel = reserveFuel + departureContingency + departureExtra;
       detailedTable += `\nLanding Fuel: ${landingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
       
-      // TABLE 4: Minimum Required Fuel (Alternate breakdown)
+      // TABLE 4: Minimum Required Fuel - Uses alternate card data (minimum IFR fuel)
       let minimumTable = "### Minimum Required Fuel\n\n";
       minimumTable += "| Component | Amount |\n";
       minimumTable += "|-----------|--------|\n";
       minimumTable += `| Taxi Fuel | ${taxiFuel} LBS |\n`;
-      minimumTable += `| Outbound Fuel | ${outboundFuel} LBS |\n`;
-      minimumTable += `| Alternate Fuel | ${alternateFuel} LBS |\n`;
-      minimumTable += `| Contingency Fuel | ${totalContingency} LBS (10%) |\n`;
-      minimumTable += `| ARA Fuel | ${displayAraFuel} LBS |\n`;
-      minimumTable += `| Approach Fuel | ${displayApproachFuel} LBS |\n`;
-      minimumTable += `| Extra Fuel | ${extraFuel} LBS |\n`;
-      minimumTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
-      minimumTable += `| **Total** | **${totalAlternateFuel} LBS** |\n`;
-      minimumTable += `\nPotential Landing Fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
       
-      console.log('💾 COMPLETE FUEL DATA EXTRACTION:', {
-        stopCount: stopCards.length,
-        locations: stopLocations,
-        tripFuels: stopTripFuels,
-        totalFuels: stopRequiredFuels,
-        stopsTableLines: stopsTable.split('\n').length,
-        tablesGenerated: 4
-      });
+      if (alternateCard) {
+        // Use actual alternate card data
+        const alternateTrip = alternateCard.fuelComponentsObject?.tripFuel || 0;
+        const alternateAltFuel = alternateCard.fuelComponentsObject?.altFuel || 0;
+        const alternateContingency = alternateCard.fuelComponentsObject?.contingencyFuel || 0;
+        const alternateAra = alternateCard.fuelComponentsObject?.araFuel || 0;
+        const alternateApproach = alternateCard.fuelComponentsObject?.approachFuel || 0;
+        const alternateExtra = alternateCard.fuelComponentsObject?.extraFuel || 0;
+        const alternateTotal = alternateCard.totalFuel || 0;
+        
+        minimumTable += `| Outbound Fuel | ${alternateTrip} LBS (+${Math.round(alternateTrip * 0.1)} LBS, 10%) |\n`;
+        minimumTable += `| Alternate Fuel | ${alternateAltFuel} LBS (+${Math.round(alternateAltFuel * 0.1)} LBS, 10%) |\n`;
+        minimumTable += `| ARA Fuel | ${alternateAra} LBS |\n`;
+        minimumTable += `| Approach Fuel | ${alternateApproach} LBS |\n`;
+        minimumTable += `| Extra Fuel | ${alternateExtra} LBS |\n`;
+        minimumTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
+        minimumTable += `| **Total** | **${alternateTotal} LBS** |\n`;
+        
+        const alternateLandingFuel = reserveFuel + alternateContingency + alternateExtra;
+        minimumTable += `\nPotential Landing Fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
+      } else {
+        // Fallback to calculated values
+        minimumTable += `| Outbound Fuel | ${outboundFuel} LBS |\n`;
+        minimumTable += `| Alternate Fuel | ${alternateFuel} LBS |\n`;
+        minimumTable += `| ARA Fuel | ${departureAra} LBS |\n`;
+        minimumTable += `| Approach Fuel | ${departureApproach} LBS |\n`;
+        minimumTable += `| Extra Fuel | ${extraFuel} LBS |\n`;
+        minimumTable += `| Reserve Fuel | ${reserveFuel} LBS |\n`;
+        minimumTable += `| **Total** | **${totalAlternateFuel} LBS** |\n`;
+        minimumTable += `\nPotential Landing Fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
+      }
+      
       
       // Build action parameters based on whether we're updating or creating
       const actionParams = {
@@ -437,7 +446,7 @@ export class FuelSaveBackService {
         "planned_contingency_fuel": Math.round(totalContingency || 0), // Can be 0 for VFR
         "planned_ara_fuel": Math.round(departureCard.fuelComponentsObject?.araFuel || weatherFuel?.araFuel || 0), // Weather fuel can be 0
         "planned_approach_fuel": Math.round(departureCard.fuelComponentsObject?.approachFuel || weatherFuel?.approachFuel || 0), // Weather fuel can be 0
-        "min_total_fuel": Math.round(totalAlternateFuel), // Already calculated above
+        "min_total_fuel": Math.round(alternateCard?.totalFuel || totalAlternateFuel), // Use alternate card total fuel
         
         // Critical fuel totals  
         "round_trip_fuel": Math.round(departureCard.totalFuel), // Must have total fuel
