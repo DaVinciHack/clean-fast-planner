@@ -124,6 +124,8 @@ const RightPanel = React.forwardRef(({
   onShowFuelBreakdown = null,
   // 🔧 NEW: Callback to receive alternate card data
   onAlternateCardCalculated = null,
+  // 🔧 NEW: Alternate card data for fuel save operations
+  alternateStopCard = null,
   // ✅ SYNC FIX: Location-specific fuel overrides for stop card synchronization
   locationFuelOverrides = {},
   // 🚫 REFUEL SYNC: Current refuel stops from DetailedFuelBreakdown
@@ -404,7 +406,8 @@ const RightPanel = React.forwardRef(({
             fuelPolicy?.currentPolicy || null,
             routeStats,
             selectedAircraft,
-            existingFuelObjectId  // Pass the stored fuel object ID to prevent search
+            existingFuelObjectId,  // Pass the stored fuel object ID to prevent search
+            alternateStopCard  // 🔧 NEW: Pass alternate card data for fuel save operations
           );
           
           console.log('✅ FUEL SAVE-BACK: Fuel data saved successfully:', {

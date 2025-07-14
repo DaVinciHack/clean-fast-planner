@@ -760,7 +760,8 @@ const DetailedFuelBreakdown = ({
         weatherFuel,
         fuelPolicy,
         routeStats,
-        selectedAircraft
+        selectedAircraft,
+        null  // 🔧 TODO: Pass alternateStopCard if available in this component
       );
       
       if (window.LoadingIndicator) {

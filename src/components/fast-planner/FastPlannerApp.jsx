@@ -982,7 +982,7 @@ const FastPlannerCore = ({
           fuelPolicy,
           routeStats,
           selectedAircraft,
-          locationFuelOverrides
+          alternateStopCard  // 🔧 NEW: Pass alternate card data for fuel save operations
         );
 
         if (window.LoadingIndicator) {
@@ -3842,6 +3842,7 @@ const FastPlannerCore = ({
           onStopCardsCalculated={handleStopCardsCalculated} // 🛩️ HEADER SYNC: Callback for stop cards synchronization
           onShowFuelBreakdown={() => setShowFuelBreakdown(true)} // 📊 FUEL BREAKDOWN: Callback to show modal
           onAlternateCardCalculated={setAlternateStopCard} // 🔧 NEW: Callback to receive alternate card data
+          alternateStopCard={alternateStopCard} // 🔧 NEW: Pass alternate card data to RightPanel for fuel save
           onRefuelStopsChanged={handleRefuelStopsChanged} // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
           
           // ✅ FIX: Pass locationFuelOverrides from state to RightPanel

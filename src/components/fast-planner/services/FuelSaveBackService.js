@@ -28,9 +28,10 @@ export class FuelSaveBackService {
    * @param {Object} fuelPolicy - Selected fuel policy object
    * @param {Object} routeStats - Route statistics
    * @param {Object} selectedAircraft - Aircraft object
+   * @param {Object} alternateStopCard - Alternate route stop card data (optional)
    * @returns {Promise<Object>} - OSDK save result
    */
-  static async saveFuelData(flightId, stopCards, flightSettings = {}, weatherFuel = {}, fuelPolicy = null, routeStats = {}, selectedAircraft = null) {
+  static async saveFuelData(flightId, stopCards, flightSettings = {}, weatherFuel = {}, fuelPolicy = null, routeStats = {}, selectedAircraft = null, alternateStopCard = null) {
     console.log('💾 FuelSaveBackService: Starting MainFuelV2 save-back for flight:', flightId);
     console.log('💾 Stop cards count:', stopCards?.length);
     
@@ -318,27 +319,27 @@ export class FuelSaveBackService {
       stopsTable += `\n## Minimal Fuel with Maximum Passenger Capacity\n\n`;
       stopsTable += "| Required Fuel | Max Passengers | Fuel Components | Route |\n";
       stopsTable += "|:-------------|:--------------|:---------------|:-----|\n";
-      // 🚨 FIX: Use the ACTUAL alternate route card data from stopCards
-      // Find the alternate route card (should be the last card with 'Alternate' in the name)
-      const alternateCard = stopCards.find(card => card.name && card.name.includes('Alternate')) || stopCards[stopCards.length - 1];
+      // 🔧 FIXED: Use the ACTUAL alternate route card data passed as parameter
+      // Use the alternateStopCard parameter instead of searching in stopCards array
+      const alternateCard = alternateStopCard || null;
       
-      console.log('💾 DEBUG: Alternate card found:', {
-        alternateCardName: alternateCard?.name,
-        alternateCardPassengers: alternateCard?.maxPassengers || alternateCard?.passengers,
-        alternateCardTotalFuel: alternateCard?.totalFuel,
-        alternateCardTripFuel: alternateCard?.fuelComponentsObject?.tripFuel || alternateCard?.tripFuel
-      });
       
-      // Use the ACTUAL alternate card data, not calculated values
-      const actualAlternatePassengers = alternateCard?.maxPassengers || alternateCard?.passengers || alternatePassengers;
-      const actualAlternatePassengerWeight = actualAlternatePassengers * regionalPassengerWeight;
-      const actualAlternateTotalFuel = alternateCard?.totalFuel || totalAlternateFuel;
-      
-      // Use ACTUAL trip fuel from alternate card, not outbound fuel
-      const actualAlternateTripFuel = alternateCard?.fuelComponentsObject?.tripFuel || alternateCard?.tripFuel || outboundFuel;
-      const actualAlternateRouteFuel = alternateCard?.fuelComponentsObject?.alternateFuel || alternateCard?.alternateFuel || alternateFuel;
-      
-      stopsTable += `| ${actualAlternateTotalFuel} LBS | ${actualAlternatePassengers} (${actualAlternatePassengerWeight} LBS) | Taxi:${taxiFuel} Trip:${actualAlternateTripFuel} Alt:${actualAlternateRouteFuel || 0} Cont:${totalContingency || 0} Res:${reserveFuel} Extra:${extraFuel || 0} | Legs to ${stopLocations[1] || 'DEST'} + Alternate to ${stopLocations[0] || 'ORIG'} |\n`;
+      if (alternateCard) {
+        // Use the ACTUAL alternate card data when available
+        const actualAlternatePassengers = alternateCard.maxPassengers || alternateCard.passengers || alternatePassengers;
+        const actualAlternatePassengerWeight = actualAlternatePassengers * regionalPassengerWeight;
+        const actualAlternateTotalFuel = alternateCard.totalFuel || totalAlternateFuel;
+        
+        // Use ACTUAL trip fuel from alternate card, not outbound fuel
+        const actualAlternateTripFuel = alternateCard.fuelComponentsObject?.tripFuel || alternateCard.tripFuel || outboundFuel;
+        const actualAlternateRouteFuel = alternateCard.fuelComponentsObject?.altFuel || alternateCard.alternateFuel || alternateFuel;
+        
+        stopsTable += `| ${actualAlternateTotalFuel} LBS | ${actualAlternatePassengers} (${actualAlternatePassengerWeight} LBS) | Taxi:${taxiFuel} Trip:${actualAlternateTripFuel} Alt:${actualAlternateRouteFuel || 0} Cont:${totalContingency || 0} Res:${reserveFuel} Extra:${extraFuel || 0} | Legs to ${alternateCard.routeDescription || 'Alternate Route'} |\n`;
+      } else {
+        // Fallback to calculated values when no alternate card available
+        console.log('💾 DEBUG: No alternate card available, using calculated values');
+        stopsTable += `| ${totalAlternateFuel} LBS | ${alternatePassengers} (${alternatePassengerWeight} LBS) | Taxi:${taxiFuel} Trip:${outboundFuel} Alt:${alternateFuel || 0} Cont:${totalContingency || 0} Res:${reserveFuel} Extra:${extraFuel || 0} | Legs to ${stopLocations[1] || 'DEST'} + Alternate to ${stopLocations[0] || 'ORIG'} |\n`;
+      }
       stopsTable += `\nPotential landing fuel: ${alternateLandingFuel} LBS (Reserve + FULL Contingency + Extra)\n`;
       
       // Debug log the fuel calculations
@@ -471,9 +472,8 @@ export class FuelSaveBackService {
         
         // TODO: Find correct field for alternateTable (TABLE 2: Minimal fuel with max passengers)
         
-        // Location-specific fuel overrides for loading back into UI  
-        // Save user ARA/Approach fuel overrides so they persist on flight reload
-        "location_fuel_overrides": JSON.stringify(flightSettings.locationFuelOverrides || {}),
+        // 🔧 REMOVED: location_fuel_overrides - not a valid Palantir column
+        // Location-specific fuel overrides handled separately in FastPlanner
         
         // Refuel stop indices for loading back into UI  
         "refuel_stop_indices": stopCards.map((card, index) => {
@@ -1411,9 +1411,10 @@ export class FuelSaveBackService {
    * @param {Object} routeStats - Route statistics
    * @param {Object} selectedAircraft - Aircraft object
    * @param {string} existingFuelObjectId - Existing fuel object UUID (optional)
+   * @param {Object} alternateStopCard - Alternate route stop card data (optional)
    * @returns {Promise<Object>} - OSDK save result
    */
-  static async saveFuelDataWithExistingId(flightId, stopCards, flightSettings = {}, weatherFuel = {}, fuelPolicy = null, routeStats = {}, selectedAircraft = null, existingFuelObjectId = null) {
+  static async saveFuelDataWithExistingId(flightId, stopCards, flightSettings = {}, weatherFuel = {}, fuelPolicy = null, routeStats = {}, selectedAircraft = null, existingFuelObjectId = null, alternateStopCard = null) {
     console.log('💾 FuelSaveBackService: Starting fuel save with existing ID:', {
       flightId,
       existingFuelObjectId,
@@ -1465,7 +1466,7 @@ export class FuelSaveBackService {
         this._tempExistingFuelObject = existingFuelObject;
         
         try {
-          const result = await this.saveFuelData(flightId, stopCards, flightSettings, weatherFuel, fuelPolicy, routeStats, selectedAircraft);
+          const result = await this.saveFuelData(flightId, stopCards, flightSettings, weatherFuel, fuelPolicy, routeStats, selectedAircraft, alternateStopCard);
           return result;
         } finally {
           // Clean up the temporary object
@@ -1473,7 +1474,7 @@ export class FuelSaveBackService {
         }
       } else {
         console.log('ℹ️ No existing fuel object found, will create new one');
-        return await this.saveFuelData(flightId, stopCards, flightSettings, weatherFuel, fuelPolicy, routeStats, selectedAircraft);
+        return await this.saveFuelData(flightId, stopCards, flightSettings, weatherFuel, fuelPolicy, routeStats, selectedAircraft, alternateStopCard);
       }
       
     } catch (error) {
