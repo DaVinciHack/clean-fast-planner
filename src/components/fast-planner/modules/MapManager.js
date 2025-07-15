@@ -4,6 +4,15 @@
  * Handles map initialization, event setup, and basic map interactions
  */
 
+// Debug flags for controlling console output
+const DEBUG_MAP_INIT = false;      // Map initialization operations
+const DEBUG_MAP_LAYERS = false;    // Map layer management
+const DEBUG_MAP_EVENTS = false;    // Map event handling
+const DEBUG_MAP_RESIZE = false;    // Map resize operations
+const DEBUG_MAP_MARKERS = false;   // Map marker operations
+const DEBUG_MAP_STYLE = false;     // Map style operations
+const DEBUG_MAP_REGIONS = false;   // Map region operations
+
 class MapManager {
   constructor() {
     this.map = null;
@@ -39,7 +48,7 @@ class MapManager {
         }
         
         // Validate MapBox GL version
-        if (window.mapboxgl.version) {
+        if (window.mapboxgl.version && DEBUG_MAP_INIT) {
           console.log('✅ MapBox GL version:', window.mapboxgl.version);
         }
         
@@ -61,23 +70,27 @@ class MapManager {
         window.mapboxgl.accessToken = this.mapboxToken;
         
         // 🛡️ PRODUCTION DEBUG: Log token status
-        console.log('✅ MapBox token set, creating instance...');
-        console.log('Token starts with:', this.mapboxToken.substring(0, 20) + '...');
+        if (DEBUG_MAP_INIT) {
+          console.log('✅ MapBox token set, creating instance...');
+          console.log('Token starts with:', this.mapboxToken.substring(0, 20) + '...');
+        }
         
         // Validate token format (MapBox tokens start with 'pk.')
         if (!this.mapboxToken.startsWith('pk.')) {
           console.warn('⚠️ MapBox token format may be invalid (should start with pk.)');
         }
         
-        console.log('Creating MapBox instance...');
-        
-        // DIAGNOSTIC: Log if this is happening during a region change
-        if (window.REGION_CHANGE_IN_PROGRESS) {
-          console.log(`%c MAPMANAGER DIAGNOSTIC: ⚠️ Creating map during region change! 
-            From: ${window.REGION_CHANGE_FROM} 
-            To: ${window.REGION_CHANGE_TO}
-            Time: ${window.REGION_CHANGE_TIME}`, 
-            'background: orange; color: black; font-weight: bold');
+        if (DEBUG_MAP_INIT) {
+          console.log('Creating MapBox instance...');
+          
+          // DIAGNOSTIC: Log if this is happening during a region change
+          if (window.REGION_CHANGE_IN_PROGRESS) {
+            console.log(`%c MAPMANAGER DIAGNOSTIC: ⚠️ Creating map during region change! 
+              From: ${window.REGION_CHANGE_FROM} 
+              To: ${window.REGION_CHANGE_TO}
+              Time: ${window.REGION_CHANGE_TIME}`, 
+              'background: orange; color: black; font-weight: bold');
+          }
         }
         
         // Always use Gulf of Mexico as the initial map position
@@ -86,8 +99,10 @@ class MapManager {
         let initialZoom = 6;
         
         // DIAGNOSTIC: Log center being used
-        console.log(`%c MAPMANAGER DIAGNOSTIC: Using initial center: [${initialCenter}], zoom: ${initialZoom}`, 
-                    'background: orange; color: black;');
+        if (DEBUG_MAP_INIT) {
+          console.log(`%c MAPMANAGER DIAGNOSTIC: Using initial center: [${initialCenter}], zoom: ${initialZoom}`, 
+                      'background: orange; color: black;');
+        }
         
         // Create map instance with determined settings
         this.map = new window.mapboxgl.Map({
@@ -99,14 +114,18 @@ class MapManager {
           preserveDrawingBuffer: true
         });
         
-        console.log('Map instance created successfully');
+        if (DEBUG_MAP_INIT) {
+          console.log('Map instance created successfully');
+        }
 
         this._isLoaded = false; // Reset flag on initialization
         this._loadCallbacks = []; // Clear any previous callbacks
 
         // Attach the single 'load' event listener
         this.map.once('load', () => {
-          console.log('Map loaded event fired');
+          if (DEBUG_MAP_INIT) {
+            console.log('Map loaded event fired');
+          }
           this._isLoaded = true; // Set the internal flag
           
           // Add the grid first
@@ -116,7 +135,9 @@ class MapManager {
           this.enhanceLandBrightness();
           
           // Execute and clear any pending callbacks
-          console.log(`Executing ${this._loadCallbacks.length} queued onMapLoaded callbacks.`);
+          if (DEBUG_MAP_INIT) {
+            console.log(`Executing ${this._loadCallbacks.length} queued onMapLoaded callbacks.`);
+          }
           this._loadCallbacks.forEach(cb => {
             try {
               cb();
@@ -140,11 +161,15 @@ class MapManager {
           try {
             if (event.detail && event.detail.region) {
               const region = event.detail.region;
-              console.log(`MapManager: Received region change event for ${region.name}`);
+              if (DEBUG_MAP_REGIONS) {
+                console.log(`MapManager: Received region change event for ${region.name}`);
+              }
               
               // Ensure the map smoothly flies to the region bounds
               if (this.map && typeof this.map.fitBounds === 'function' && region.bounds) {
-                console.log(`MapManager: Flying to ${region.name} bounds`);
+                if (DEBUG_MAP_REGIONS) {
+                  console.log(`MapManager: Flying to ${region.name} bounds`);
+                }
                 this.map.fitBounds(region.bounds, {
                   padding: 50,
                   maxZoom: region.zoom || 6,
@@ -197,12 +222,16 @@ class MapManager {
       try {
         // 🛡️ PRODUCTION FIX: Check if scripts are already loaded (from HTML)
         if (window.mapboxgl && window.turf) {
-          console.log('✅ Scripts already loaded from HTML - skipping dynamic loading');
+          if (DEBUG_MAP_INIT) {
+            console.log('✅ Scripts already loaded from HTML - skipping dynamic loading');
+          }
           resolve();
           return;
         }
         
-        console.log('📦 Scripts not pre-loaded, loading dynamically...');
+        if (DEBUG_MAP_INIT) {
+          console.log('📦 Scripts not pre-loaded, loading dynamically...');
+        }
         
         // Only load scripts if they're not already available
         if (!window.mapboxgl) {
@@ -232,7 +261,9 @@ class MapManager {
         const checkScriptsLoaded = setInterval(() => {
           if (window.mapboxgl && window.turf) {
             clearInterval(checkScriptsLoaded);
-            console.log('✅ Dynamic scripts loaded successfully');
+            if (DEBUG_MAP_INIT) {
+              console.log('✅ Dynamic scripts loaded successfully');
+            }
             resolve();
           }
         }, 100);
@@ -261,7 +292,9 @@ class MapManager {
     const map = this.map;
     if (!map) return;
     
-    console.log('Adding grid to map (called from map load event)');
+    if (DEBUG_MAP_LAYERS) {
+      console.log('Adding grid to map (called from map load event)');
+    }
     
     try {
       // Map is guaranteed to be loaded here as this is called from the 'load' event handler
@@ -280,7 +313,9 @@ class MapManager {
     if (!map) return;
     
     try {
-      console.log('Adding simple grid to map');
+      if (DEBUG_MAP_LAYERS) {
+        console.log('Adding simple grid to map');
+      }
       // No need to double-check map.loaded() here
       this._addSimpleGridSafely();
     } catch (error) {
@@ -300,7 +335,9 @@ class MapManager {
     }
     
     try {
-      console.log('Creating grid data');
+      if (DEBUG_MAP_LAYERS) {
+        console.log('Creating grid data');
+      }
       // Create grid with simple lines
       const latLines = [];
       const longLines = [];
@@ -345,45 +382,65 @@ class MapManager {
       
       // Remove existing layers first
       try {
-        console.log('Checking for existing grid layers');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('Checking for existing grid layers');
+        }
         if (map.getLayer('grid-labels')) {
-          console.log('Removing grid-labels layer');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('Removing grid-labels layer');
+          }
           map.removeLayer('grid-labels');
         }
       } catch (e) {
-        console.warn('Could not remove grid-labels layer:', e.message);
+        if (DEBUG_MAP_LAYERS) {
+          console.warn('Could not remove grid-labels layer:', e.message);
+        }
       }
       
       try {
         if (map.getLayer('longitude-lines')) {
-          console.log('Removing longitude-lines layer');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('Removing longitude-lines layer');
+          }
           map.removeLayer('longitude-lines');
         }
       } catch (e) {
-        console.warn('Could not remove longitude-lines layer:', e.message);
+        if (DEBUG_MAP_LAYERS) {
+          console.warn('Could not remove longitude-lines layer:', e.message);
+        }
       }
       
       try {
         if (map.getLayer('latitude-lines')) {
-          console.log('Removing latitude-lines layer');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('Removing latitude-lines layer');
+          }
           map.removeLayer('latitude-lines');
         }
       } catch (e) {
-        console.warn('Could not remove latitude-lines layer:', e.message);
+        if (DEBUG_MAP_LAYERS) {
+          console.warn('Could not remove latitude-lines layer:', e.message);
+        }
       }
       
       try {
         if (map.getSource('grid-lines')) {
-          console.log('Removing grid-lines source');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('Removing grid-lines source');
+          }
           map.removeSource('grid-lines');
         }
       } catch (e) {
-        console.warn('Could not remove grid-lines source:', e.message);
+        if (DEBUG_MAP_LAYERS) {
+          console.warn('Could not remove grid-lines source:', e.message);
+        }
       }
       
       // Add source
       try {
-        console.log('Adding grid-lines source');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('Adding grid-lines source');
+        }
         map.addSource('grid-lines', {
           type: 'geojson',
           data: {
@@ -398,7 +455,9 @@ class MapManager {
       
       // Add latitude lines layer
       try {
-        console.log('Adding latitude-lines layer');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('Adding latitude-lines layer');
+        }
         map.addLayer({
           id: 'latitude-lines',
           type: 'line',
@@ -416,7 +475,9 @@ class MapManager {
       
       // Add longitude lines layer
       try {
-        console.log('Adding longitude-lines layer');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('Adding longitude-lines layer');
+        }
         map.addLayer({
           id: 'longitude-lines',
           type: 'line',
@@ -434,7 +495,9 @@ class MapManager {
       
       // Add grid labels layer
       try {
-        console.log('Adding grid-labels layer');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('Adding grid-labels layer');
+        }
         map.addLayer({
           id: 'grid-labels',
           type: 'symbol',
@@ -458,7 +521,9 @@ class MapManager {
         console.error('Error adding grid-labels layer:', e.message);
       }
       
-      console.log('Grid added successfully');
+      if (DEBUG_MAP_LAYERS) {
+        console.log('Grid added successfully');
+      }
     } catch (error) {
       console.error('Error in _addSimpleGridSafely:', error);
     }
@@ -474,7 +539,9 @@ class MapManager {
       return;
     }
     
-    console.log('🌍 MapManager: Enhancing land brightness for better visibility');
+    if (DEBUG_MAP_STYLE) {
+      console.log('🌍 MapManager: Enhancing land brightness for better visibility');
+    }
     
     try {
       // Get all layers to find land-related ones
@@ -518,7 +585,9 @@ class MapManager {
             // Get current background color and brighten it more
             const currentColor = this.map.getPaintProperty(layer.id, 'background-color') || '#000000';
             this.map.setPaintProperty(layer.id, 'background-color', this.brightenColor(currentColor, 2.5));
-            console.log(`✅ Enhanced background layer: ${layer.id}`);
+            if (DEBUG_MAP_STYLE) {
+              console.log(`✅ Enhanced background layer: ${layer.id}`);
+            }
           } catch (e) {
             console.warn(`⚠️ Could not enhance background layer ${layer.id}:`, e.message);
           }
@@ -531,7 +600,9 @@ class MapManager {
             if (currentColor && layer.id.includes('land')) {
               // Only brighten land, not water - increased brightness
               this.map.setPaintProperty(layer.id, 'fill-color', this.brightenColor(currentColor, 2.2));
-              console.log(`✅ Enhanced land fill layer: ${layer.id}`);
+              if (DEBUG_MAP_STYLE) {
+                console.log(`✅ Enhanced land fill layer: ${layer.id}`);
+              }
             }
           } catch (e) {
             console.warn(`⚠️ Could not enhance fill layer ${layer.id}:`, e.message);
@@ -539,7 +610,9 @@ class MapManager {
         }
       });
       
-      console.log('🌍 Land brightness enhancement completed');
+      if (DEBUG_MAP_STYLE) {
+        console.log('🌍 Land brightness enhancement completed');
+      }
       
     } catch (error) {
       console.error('MapManager: Error enhancing land brightness:', error);
@@ -590,7 +663,9 @@ class MapManager {
       const currentMapState = this.getMapState();
       const targetPitch = currentMapState.isStarlightMode ? 60 : 0;
       
-      console.log(`MapManager: Fitting map to bounds with pitch: ${targetPitch}°`, fitOptions);
+      if (DEBUG_MAP_REGIONS) {
+        console.log(`MapManager: Fitting map to bounds with pitch: ${targetPitch}°`, fitOptions);
+      }
       this.map.fitBounds(bounds, {
         ...fitOptions,
         pitch: targetPitch  // Explicitly set pitch instead of preserving random values
@@ -619,7 +694,9 @@ class MapManager {
         return false;
       }
       
-      console.log(`MapManager: Flying to region ${region.name || 'unknown'}`);
+      if (DEBUG_MAP_REGIONS) {
+        console.log(`MapManager: Flying to region ${region.name || 'unknown'}`);
+      }
       
       // Use fitMapToBounds with region-specific options
       return this.fitMapToBounds(region.bounds, {
@@ -660,7 +737,9 @@ class MapManager {
    * @returns {Promise} - Resolves with the map instance
    */
   reInitializeMap(containerId, options = {}) {
-    console.log('🗺️ Reinitializing map...');
+    if (DEBUG_MAP_INIT) {
+      console.log('🗺️ Reinitializing map...');
+    }
     
     return new Promise((resolve, reject) => {
       try {
@@ -695,7 +774,9 @@ class MapManager {
             // Remove the map
             this.map.remove();
             
-            console.log('🗺️ Cleaned up existing map');
+            if (DEBUG_MAP_INIT) {
+              console.log('🗺️ Cleaned up existing map');
+            }
           } catch (error) {
             console.warn('🗺️ Error cleaning up existing map:', error);
             // Continue anyway to recreate the map
@@ -734,7 +815,9 @@ class MapManager {
     
     if (this.isMapLoaded()) {
       // Map is already loaded, execute immediately but in a try/catch for safety
-      console.log("onMapLoaded: Map already loaded, executing callback immediately");
+      if (DEBUG_MAP_EVENTS) {
+        console.log("onMapLoaded: Map already loaded, executing callback immediately");
+      }
       try {
         callback();
       } catch (e) {
@@ -742,11 +825,15 @@ class MapManager {
       }
     } else if (this.map) {
       // Map exists but not loaded, queue the callback
-      console.log("onMapLoaded: Map not loaded, queuing callback for later execution");
+      if (DEBUG_MAP_EVENTS) {
+        console.log("onMapLoaded: Map not loaded, queuing callback for later execution");
+      }
       this._loadCallbacks.push(callback);
     } else {
       // Map doesn't exist yet, log warning (this isn't an error case necessarily)
-      console.warn("onMapLoaded called before map instance exists, callback will be deferred");
+      if (DEBUG_MAP_EVENTS) {
+        console.warn("onMapLoaded called before map instance exists, callback will be deferred");
+      }
       // Still queue the callback - it will run when the map is eventually initialized
       this._loadCallbacks.push(callback);
     }
@@ -760,7 +847,9 @@ class MapManager {
     const map = this.map;
     if (!map) return;
 
-    console.log('Setting up route dragging functionality');
+    if (DEBUG_MAP_EVENTS) {
+      console.log('Setting up route dragging functionality');
+    }
 
     let isDragging = false;
     let draggedLineCoordinates = [];
@@ -880,7 +969,9 @@ class MapManager {
       
       // ALTERNATE MODE CHECK: Skip route dragging in alternate mode
       if (window.isAlternateModeActive === true) {
-        console.log('🎯 MapManager: Skipping route drag - alternate mode is active');
+        if (DEBUG_MAP_EVENTS) {
+          console.log('🎯 MapManager: Skipping route drag - alternate mode is active');
+        }
         return;
       }
       
@@ -897,9 +988,11 @@ class MapManager {
       
       // If mouse is directly over the route or within distance threshold
       if (closestInfo) {
-        console.log('Starting route drag operation at segment:', closestInfo.index, 
-                   'Distance:', closestInfo.distance.toFixed(2) + ' nm',
-                   'Directly over route:', closestInfo.isDirectlyOver);
+        if (DEBUG_MAP_EVENTS) {
+          console.log('Starting route drag operation at segment:', closestInfo.index, 
+                     'Distance:', closestInfo.distance.toFixed(2) + ' nm',
+                     'Directly over route:', closestInfo.isDirectlyOver);
+        }
         
         // Get the original route coordinates
         const routeSource = map.getSource('route');
@@ -1001,7 +1094,9 @@ class MapManager {
       
       // Call the callback with the segment index and new point
       if (onRoutePointAdded && typeof onRoutePointAdded === 'function') {
-        console.log('Route drag complete, adding new point at index:', closestPointIndex + 1);
+        if (DEBUG_MAP_EVENTS) {
+          console.log('Route drag complete, adding new point at index:', closestPointIndex + 1);
+        }
         onRoutePointAdded(closestPointIndex + 1, [e.lngLat.lng, e.lngLat.lat]);
       }
       
@@ -1020,7 +1115,9 @@ class MapManager {
     map.on('mouseout', () => {
       if (!isDragging) return;
       
-      console.log('Mouse left map area, canceling route drag');
+      if (DEBUG_MAP_EVENTS) {
+        console.log('Mouse left map area, canceling route drag');
+      }
       
       // Clean up
       isDragging = false;
@@ -1079,7 +1176,9 @@ class MapManager {
         return;
       }
 
-      console.log(`🗺️ Switching map style to: ${styleId} (${styleUrl})`);
+      if (DEBUG_MAP_STYLE) {
+        console.log(`🗺️ Switching map style to: ${styleId} (${styleUrl})`);
+      }
 
       // Store current style for comparison
       this._previousStyle = this.getCurrentStyle();
@@ -1091,11 +1190,15 @@ class MapManager {
       const currentBearing = this.map.getBearing();
       const currentPitch = this.map.getPitch();
 
-      console.log(`🗺️ Saving map state: center=${currentCenter.lng.toFixed(3)},${currentCenter.lat.toFixed(3)} zoom=${currentZoom.toFixed(1)}`);
+      if (DEBUG_MAP_STYLE) {
+        console.log(`🗺️ Saving map state: center=${currentCenter.lng.toFixed(3)},${currentCenter.lat.toFixed(3)} zoom=${currentZoom.toFixed(1)}`);
+      }
 
       // Listen for style load completion  
       const onStyleLoad = () => {
-        console.log(`🗺️ Style ${styleId} loaded successfully`);
+        if (DEBUG_MAP_STYLE) {
+          console.log(`🗺️ Style ${styleId} loaded successfully`);
+        }
 
         // Restore map position - MAP STATE AWARE pitch handling
         const targetPitch = styleId === '3d' ? 
@@ -1119,7 +1222,9 @@ class MapManager {
         // Store current style info
         this._currentStyle = styleId;
 
-        console.log(`🗺️ Style change complete from ${this._previousStyle} to ${styleId}`);
+        if (DEBUG_MAP_STYLE) {
+          console.log(`🗺️ Style change complete from ${this._previousStyle} to ${styleId}`);
+        }
         
         // Add the grid back
         setTimeout(() => {
@@ -1161,7 +1266,9 @@ class MapManager {
               'sky-atmosphere-sun-intensity': 15
             }
           });
-          console.log('🌅 Atmospheric sky layer added');
+          if (DEBUG_MAP_STYLE) {
+            console.log('🌅 Atmospheric sky layer added');
+          }
         } catch (skyError) {
           console.log('ℹ️ Sky layer not supported in this style');
         }
@@ -1173,16 +1280,22 @@ class MapManager {
           pitch: 60,
           duration: 2000
         });
-        console.log('📐 Camera pitch adjusted for 3D viewing');
+        if (DEBUG_MAP_STYLE) {
+          console.log('📐 Camera pitch adjusted for 3D viewing');
+        }
       } else {
-        console.log('📐 Already in starlight mode - preserving current pitch');
+        if (DEBUG_MAP_STYLE) {
+          console.log('📐 Already in starlight mode - preserving current pitch');
+        }
       }
 
       // Try to add terrain if available (may not be supported in all styles)
       try {
         if (this.map.getSource('mapbox-dem')) {
           this.map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
-          console.log('🏔️ 3D terrain enabled');
+          if (DEBUG_MAP_STYLE) {
+            console.log('🏔️ 3D terrain enabled');
+          }
         }
       } catch (terrainError) {
         console.log('ℹ️ 3D terrain not available in this style');
@@ -1211,7 +1324,9 @@ class MapManager {
     }
     
     try {
-      console.log(`🎯 MapManager: Auto-zooming to fit ${waypoints.length} waypoints`);
+      if (DEBUG_MAP_REGIONS) {
+        console.log(`🎯 MapManager: Auto-zooming to fit ${waypoints.length} waypoints`);
+      }
       
       // Extract coordinates from waypoints
       const coordinates = [];
@@ -1240,7 +1355,9 @@ class MapManager {
             lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
             lat !== 0 && lng !== 0) { // Filter out placeholder coordinates
           coordinates.push([lng, lat]); // GeoJSON format
-          console.log(`🎯 Added waypoint ${index}: ${waypoint.name || 'Unknown'} at [${lng.toFixed(4)}, ${lat.toFixed(4)}]`);
+          if (DEBUG_MAP_REGIONS) {
+            console.log(`🎯 Added waypoint ${index}: ${waypoint.name || 'Unknown'} at [${lng.toFixed(4)}, ${lat.toFixed(4)}]`);
+          }
         } else {
           console.warn(`🎯 Skipped waypoint ${index}: ${waypoint.name || 'Unknown'} - invalid coordinates`, { lat, lng });
         }
@@ -1267,11 +1384,15 @@ class MapManager {
       // Create bounds array for Mapbox (southwest, northeast corners)
       const bounds = [[minLng, minLat], [maxLng, maxLat]];
       
-      console.log(`🎯 MapManager: Calculated bounds:`, bounds);
+      if (DEBUG_MAP_REGIONS) {
+        console.log(`🎯 MapManager: Calculated bounds:`, bounds);
+      }
       
       // Handle single point case
       if (coordinates.length === 1) {
-        console.log('🎯 MapManager: Single waypoint - centering and zooming');
+        if (DEBUG_MAP_REGIONS) {
+          console.log('🎯 MapManager: Single waypoint - centering and zooming');
+        }
         this.map.flyTo({
           center: coordinates[0],
           zoom: options.singlePointZoom || 10,
@@ -1295,7 +1416,9 @@ class MapManager {
       const currentMapState = this.getMapState();
       const targetPitch = currentMapState.isStarlightMode ? 60 : 0;
       
-      console.log(`🎯 MapManager: Auto-zoom with map state awareness - pitch: ${targetPitch}°`, fitOptions);
+      if (DEBUG_MAP_REGIONS) {
+        console.log(`🎯 MapManager: Auto-zoom with map state awareness - pitch: ${targetPitch}°`, fitOptions);
+      }
       
       this.map.fitBounds(bounds, {
         ...fitOptions,
@@ -1320,7 +1443,9 @@ class MapManager {
    */
   autoLoadWeatherCircles() {
     try {
-      console.log('🌤️ MapManager: Checking for weather data to auto-load weather circles');
+      if (DEBUG_MAP_LAYERS) {
+        console.log('🌤️ MapManager: Checking for weather data to auto-load weather circles');
+      }
       
       // Find available weather data
       let weatherData = null;
@@ -1331,7 +1456,9 @@ class MapManager {
         dataSource = 'window.loadedWeatherSegments';
       }
       
-      console.log(`🌤️ MapManager: Found weather data from ${dataSource}, segments:`, weatherData?.length || 0);
+      if (DEBUG_MAP_LAYERS) {
+        console.log(`🌤️ MapManager: Found weather data from ${dataSource}, segments:`, weatherData?.length || 0);
+      }
       
       if (weatherData && weatherData.length > 0) {
         // Import and create weather circles layer
@@ -1348,19 +1475,25 @@ class MapManager {
           }
           
           // Create new weather circles layer
-          console.log('🌤️ MapManager: Auto-creating weather circles for new flight');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('🌤️ MapManager: Auto-creating weather circles for new flight');
+          }
           const weatherCirclesLayer = new WeatherCirclesLayer(this.map);
           weatherCirclesLayer.addWeatherCircles(weatherData);
           window.currentWeatherCirclesLayer = weatherCirclesLayer;
           
-          console.log('🌤️ MapManager: Weather circles auto-loaded successfully');
+          if (DEBUG_MAP_LAYERS) {
+            console.log('🌤️ MapManager: Weather circles auto-loaded successfully');
+          }
           return true;
         }).catch(error => {
           console.error('🌤️ MapManager: Error auto-loading weather circles:', error);
           return false;
         });
       } else {
-        console.log('🌤️ MapManager: No weather data available for auto-loading');
+        if (DEBUG_MAP_LAYERS) {
+          console.log('🌤️ MapManager: No weather data available for auto-loading');
+        }
         return false;
       }
     } catch (error) {
@@ -1455,7 +1588,9 @@ class MapManager {
       const { duration = 3000, easing = 'ease-in-out' } = options;
       const currentBearing = this.map.getBearing();
       
-      console.log('🌪️ MapManager: Starting 360° fly-around spin');
+      if (DEBUG_MAP_EVENTS) {
+        console.log('🌪️ MapManager: Starting 360° fly-around spin');
+      }
       
       this.map.easeTo({
         bearing: currentBearing + 360,
@@ -1467,7 +1602,9 @@ class MapManager {
       
       // Resolve after spin completes
       setTimeout(() => {
-        console.log('🌪️ MapManager: 360° fly-around spin completed');
+        if (DEBUG_MAP_EVENTS) {
+          console.log('🌪️ MapManager: 360° fly-around spin completed');
+        }
         resolve();
       }, duration + 100);
     });

@@ -197,7 +197,7 @@ const SARCard = ({
     sarWeight,
     timeOnTask,
     stopCards?.length, // Track stop cards changes (for alternate route addition/removal)
-    stopCards?.find(card => card.isAlternate)?.fuelComponentsObject?.altFuel, // Track alternate fuel changes
+    stopCards?.some(card => card.isAlternate), // Track alternate card presence (more stable)
     // Add a stringified version of the final waypoint to catch all changes
     JSON.stringify(waypoints?.[waypoints?.length - 1] || null)
   ]);

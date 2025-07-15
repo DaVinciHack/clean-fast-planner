@@ -6,6 +6,16 @@
  * Based on working drag-test implementation
  */
 
+// Debug flags to control logging output
+const DEBUG_INTERACTION = false;    // Map interaction events (clicks, touches)
+const DEBUG_DRAG = false;          // Route dragging operations
+const DEBUG_CLICK = false;         // Click event handling
+const DEBUG_MARKERS = false;       // Marker operations
+const DEBUG_LAYERS = false;        // Layer management
+const DEBUG_INIT = false;          // Initialization logging
+const DEBUG_MONITOR = false;       // Route layer monitoring
+const DEBUG_TOUCH = false;         // Touch event handling
+
 class MapInteractionHandler {
   constructor(mapManager, waypointManager, platformManager) {
     this.mapManager = mapManager;
@@ -31,7 +41,7 @@ class MapInteractionHandler {
     this.dragMode = 'none'; // 'insert', 'extend', 'none'
     this.originalLineCoordinates = [];
     
-    console.log(`🚀 MapInteractionHandler: Device detection - ${this.isIPad ? 'iPad' : this.isTouchDevice ? 'Touch Device' : 'Desktop'}`);
+    if (DEBUG_INIT) console.log(`🚀 MapInteractionHandler: Device detection - ${this.isIPad ? 'iPad' : this.isTouchDevice ? 'Touch Device' : 'Desktop'}`);
   }
 
   setCallback(type, callback) {
@@ -51,16 +61,16 @@ class MapInteractionHandler {
    */
   disableMapClicks() {
     this.isMapClicksDisabled = true;
-    console.log('🚫 MapInteractionHandler: Map clicks disabled');
+    if (DEBUG_INTERACTION) console.log('🚫 MapInteractionHandler: Map clicks disabled');
   }
 
   enableMapClicks() {
     this.isMapClicksDisabled = false;
-    console.log('✅ MapInteractionHandler: Map clicks enabled');
+    if (DEBUG_INTERACTION) console.log('✅ MapInteractionHandler: Map clicks enabled');
   }
 
   initialize() {
-    console.log('🚨 MapInteractionHandler: Attempting to initialize map interaction handlers');
+    if (DEBUG_INIT) console.log('🚨 MapInteractionHandler: Attempting to initialize map interaction handlers');
     if (!this.mapManager || !this.waypointManager || !this.platformManager) {
       console.error('MapInteractionHandler: Missing required managers for initialization.');
       this.triggerCallback('onError', 'Missing required managers for MapInteractionHandler');
@@ -68,7 +78,7 @@ class MapInteractionHandler {
     }
 
     this.mapManager.onMapLoaded(() => {
-      console.log('🗺️ MapInteractionHandler: Map is loaded, (re)initializing click handlers.');
+      if (DEBUG_INIT) console.log('🗺️ MapInteractionHandler: Map is loaded, (re)initializing click handlers.');
       const map = this.mapManager.getMap();
       if (!map) {
         console.error('MapInteractionHandler: Map not available for (re)initializing click handlers.');
@@ -82,13 +92,13 @@ class MapInteractionHandler {
         // Remove our specific handler if it exists
         if (this._boundClickHandler) {
           map.off('click', this._boundClickHandler);
-          console.log('MapInteractionHandler: Removed old _boundClickHandler.');
+          if (DEBUG_INIT) console.log('MapInteractionHandler: Removed old _boundClickHandler.');
         }
         
         // Remove ALL click handlers to clean up any orphaned handlers from emergency fixes
         const existingHandlers = map._listeners?.click?.length || 0;
         if (existingHandlers > 0) {
-          console.log(`🧹 MapInteractionHandler: Removing ${existingHandlers} existing click handlers to prevent duplicates`);
+          if (DEBUG_INIT) console.log(`🧹 MapInteractionHandler: Removing ${existingHandlers} existing click handlers to prevent duplicates`);
           map.off('click');
         }
       }
@@ -98,21 +108,21 @@ class MapInteractionHandler {
 
       // 4. CONSOLIDATION: Removed WaypointManager.setupRouteDragging call
       // MapInteractionHandler now handles all route dragging via setupSeparateHandlers
-      console.log('MapInteractionHandler: Using consolidated drag system via setupSeparateHandlers.');
+      if (DEBUG_INIT) console.log('MapInteractionHandler: Using consolidated drag system via setupSeparateHandlers.');
       
       // Keep style change listener for waypoint layer restoration
       if (this.waypointManager && typeof this.waypointManager.setupStyleChangeListener === 'function') {
         this.waypointManager.setupStyleChangeListener();
-        console.log('MapInteractionHandler: Waypoint style change listener set up.');
+        if (DEBUG_INIT) console.log('MapInteractionHandler: Waypoint style change listener set up.');
       }
 
       // 5. Mark as initialized
       this.isInitialized = true;
-      console.log('MapInteractionHandler: Map interactions (re)initialized successfully.');
+      if (DEBUG_INIT) console.log('MapInteractionHandler: Map interactions (re)initialized successfully.');
     });
 
     // The initial call to initialize() still returns true to indicate it's queued.
-    console.log('MapInteractionHandler: Initialization queued with onMapLoaded.');
+    if (DEBUG_INIT) console.log('MapInteractionHandler: Initialization queued with onMapLoaded.');
     return true;
   }
 
@@ -120,7 +130,7 @@ class MapInteractionHandler {
    * Setup separate event handlers like working drag-test
    */
   setupSeparateHandlers(map) {
-    console.log('🔧 MapInteractionHandler: Setting up separate event handlers like drag-test...');
+    if (DEBUG_INIT) console.log('🔧 MapInteractionHandler: Setting up separate event handlers like drag-test...');
     
     // Debug indicator removed for production
     
@@ -128,11 +138,11 @@ class MapInteractionHandler {
       // 1. General map click handler (for background clicks - add waypoints)
       this._boundClickHandler = this.handleMapClick.bind(this);
       map.on('click', this._boundClickHandler);
-      console.log('✅ General map click handler attached');
+      if (DEBUG_INIT) console.log('✅ General map click handler attached');
       
       // 2. Route-specific touch/mouse handlers for dragging
       const routeLayers = ['route', 'route-drag-detection-layer'];
-      console.log('🔍 Checking for route layers...');
+      if (DEBUG_LAYERS) console.log('🔍 Checking for route layers...');
       
       let foundLayers = [];
       routeLayers.forEach(layer => {
@@ -142,7 +152,7 @@ class MapInteractionHandler {
           map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
           // Touch events for iPad
           map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
-          console.log(`✅ Route interaction handlers attached to ${layer} layer`);
+          if (DEBUG_INIT) console.log(`✅ Route interaction handlers attached to ${layer} layer`);
         }
       });
       
@@ -155,13 +165,13 @@ class MapInteractionHandler {
         name.includes('route') || name.includes('waypoint') || name.includes('platform')
       );
       
-      console.log(`Found route layers: ${foundLayers.join(', ') || 'NONE'}`);
-      console.log(`${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}`);
+      if (DEBUG_LAYERS) console.log(`Found route layers: ${foundLayers.join(', ') || 'NONE'}`);
+      if (DEBUG_LAYERS) console.log(`${foundLayers.length > 0 ? '✅ Drag handlers attached!' : '❌ No route layers found!'}`);
       
       // Start periodic check for route layers appearing
-      console.log('🔍 Starting route layer monitor during initialization...');
+      if (DEBUG_MONITOR) console.log('🔍 Starting route layer monitor during initialization...');
       this.startRouteLayerMonitor(map);
-      console.log('🔍 Route layer monitor started, interval ID:', this.routeLayerMonitor);
+      if (DEBUG_MONITOR) console.log('🔍 Route layer monitor started, interval ID:', this.routeLayerMonitor);
       
       // 3. DOM touch events fallback for iPad
       if (this.isTouchDevice) {
@@ -185,7 +195,7 @@ class MapInteractionHandler {
     let checkCount = 0;
     this.routeLayerMonitor = setInterval(() => {
       checkCount++;
-      console.log(`🔍 Route monitor check ${checkCount}...`);
+      if (DEBUG_MONITOR) console.log(`🔍 Route monitor check ${checkCount}...`);
       
       const allLayers = map.getStyle().layers;
       const layerNames = allLayers.map(l => l.id);
@@ -196,12 +206,12 @@ class MapInteractionHandler {
       // Only look for actual route layers, not platforms
       const actualRouteLayers = layerNames.filter(name => name.includes('route'));
       
-      console.log(`🔍 Found ${actualRouteLayers.length} actual route layers:`, actualRouteLayers);
+      if (DEBUG_MONITOR) console.log(`🔍 Found ${actualRouteLayers.length} actual route layers:`, actualRouteLayers);
       
       if (actualRouteLayers.length > 0) {
         // Route layers found! Set up drag handlers
-        console.log(`🎉 ROUTE LAYERS FOUND! (check ${checkCount}) - ${routeRelatedLayers.join(', ')}`);
-        console.log(`🔍 ALL LAYERS ON MAP:`, layerNames);
+        if (DEBUG_MONITOR) console.log(`🎉 ROUTE LAYERS FOUND! (check ${checkCount}) - ${routeRelatedLayers.join(', ')}`);
+        if (DEBUG_MONITOR) console.log(`🔍 ALL LAYERS ON MAP:`, layerNames);
         
         // Set up drag handlers for the found route layers
         const routeLayers = ['route', 'route-drag-detection-layer'];
@@ -210,22 +220,22 @@ class MapInteractionHandler {
         routeLayers.forEach(layer => {
           if (map.getLayer(layer)) {
             foundLayers.push(layer);
-            console.log(`📱 ATTACHING TOUCH EVENTS to layer: ${layer}`);
+            if (DEBUG_MONITOR) console.log(`📱 ATTACHING TOUCH EVENTS to layer: ${layer}`);
             // Mouse events for desktop
             map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
             // Touch events for iPad
             map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
           } else {
-            console.log(`❌ LAYER NOT FOUND: ${layer}`);
+            if (DEBUG_MONITOR) console.log(`❌ LAYER NOT FOUND: ${layer}`);
           }
         });
         
-        console.log(`✅ DRAG HANDLERS ATTACHED! (check ${checkCount}) - Found layers: ${foundLayers.join(', ')}`);
+        if (DEBUG_MONITOR) console.log(`✅ DRAG HANDLERS ATTACHED! (check ${checkCount}) - Found layers: ${foundLayers.join(', ')}`);
         
         // 🎯 ADDITIONAL TEST: Try to attach to ALL route-related layers for maximum coverage
         routeRelatedLayers.forEach(layer => {
           if (!foundLayers.includes(layer) && layer.includes('route')) {
-            console.log(`📱 ADDITIONAL TOUCH ATTACHMENT to: ${layer}`);
+            if (DEBUG_MONITOR) console.log(`📱 ADDITIONAL TOUCH ATTACHMENT to: ${layer}`);
             map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
           }
         });
@@ -235,7 +245,7 @@ class MapInteractionHandler {
         this.routeLayerMonitor = null;
       } else if (checkCount >= 20) {
         // Stop after 20 checks (10 seconds)
-        console.log(`❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS - The route is not being drawn on the map!`);
+        if (DEBUG_MONITOR) console.log(`❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS - The route is not being drawn on the map!`);
         clearInterval(this.routeLayerMonitor);
         this.routeLayerMonitor = null;
       }
@@ -246,7 +256,7 @@ class MapInteractionHandler {
    * Setup DOM touch events - fallback for touch devices
    */
   setupDOMTouchEvents(map) {
-    console.log('📱 MapInteractionHandler: Setting up DOM touch events as fallback...');
+    if (DEBUG_TOUCH) console.log('📱 MapInteractionHandler: Setting up DOM touch events as fallback...');
     
     try {
       const canvas = map.getCanvasContainer();
@@ -263,7 +273,7 @@ class MapInteractionHandler {
           capture: true   // Capture early in event chain
         });
         
-        console.log('✅ DOM touch events registered with passive:false');
+        if (DEBUG_TOUCH) console.log('✅ DOM touch events registered with passive:false');
       }
     } catch (e) {
       console.error('❌ DOM touch events failed:', e.message);
@@ -275,11 +285,11 @@ class MapInteractionHandler {
    * Handle DOM touch events - fallback for iPad
    */
   handleDOMTouchStart(e) {
-    console.log('📱 DOM touch event:', e.touches.length, 'touches');
+    if (DEBUG_TOUCH) console.log('📱 DOM touch event:', e.touches.length, 'touches');
     this.activeApproach = 'dom-touch';
     
     if (e.touches.length !== 1) {
-      console.log('❌ Multi-touch detected in DOM event, ignoring');
+      if (DEBUG_TOUCH) console.log('❌ Multi-touch detected in DOM event, ignoring');
       return;
     }
     
@@ -307,21 +317,21 @@ class MapInteractionHandler {
     }
     
     if (features.length === 0) {
-      console.log('❌ DOM touch not on route layers, ignoring');
+      if (DEBUG_TOUCH) console.log('❌ DOM touch not on route layers, ignoring');
       return;
     }
     
-    console.log('📱 DOM touch on route detected');
+    if (DEBUG_TOUCH) console.log('📱 DOM touch on route detected');
     
     // 🎯 IMMEDIATE VISUAL FEEDBACK - Change cursor instantly on DOM touch
     map.getCanvas().style.cursor = 'grabbing';
-    console.log('✅ INSTANT FEEDBACK: DOM cursor changed to grabbing on touch');
+    if (DEBUG_TOUCH) console.log('✅ INSTANT FEEDBACK: DOM cursor changed to grabbing on touch');
     
     // Try to prevent default (like drag-test)
     const lngLat = map.unproject(point);
     if (e.cancelable) {
       e.preventDefault();
-      console.log('✅ e.preventDefault() called successfully on DOM touch');
+      if (DEBUG_TOUCH) console.log('✅ e.preventDefault() called successfully on DOM touch');
     } else {
       console.warn('⚠️ DOM touch event not cancelable - cannot preventDefault()');
     }
@@ -343,13 +353,13 @@ class MapInteractionHandler {
    * Handle route line mouse start - for desktop route dragging
    */
   handleLineMouseStart(e) {
-    console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
-    console.log('🚀 DRAG STARTED! Mouse down on route line detected.');
+    if (DEBUG_DRAG) console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
+    if (DEBUG_DRAG) console.log('🚀 DRAG STARTED! Mouse down on route line detected.');
     
     // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
     const isAlternateMode = window.isAlternateModeActive === true;
     if (isAlternateMode) {
-      console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
+      if (DEBUG_DRAG) console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
       }
@@ -373,12 +383,12 @@ class MapInteractionHandler {
    * Handle route line touch start - for iPad route dragging
    */
   handleLineTouchStart(e) {
-    console.log('📱 MapInteractionHandler: Line touch start - route drag');
+    if (DEBUG_DRAG) console.log('📱 MapInteractionHandler: Line touch start - route drag');
     
     // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
     const isAlternateMode = window.isAlternateModeActive === true;
     if (isAlternateMode) {
-      console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
+      if (DEBUG_DRAG) console.log('🎯 MapInteractionHandler: Ignoring route drag start - alternate mode is active');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
       }
@@ -386,7 +396,7 @@ class MapInteractionHandler {
     }
     
     if (e.points.length !== 1) {
-      console.log('❌ Multi-touch detected, ignoring');
+      if (DEBUG_DRAG) console.log('❌ Multi-touch detected, ignoring');
       return;
     }
     
@@ -394,13 +404,13 @@ class MapInteractionHandler {
     const map = this.mapManager.getMap();
     if (map) {
       map.getCanvas().style.cursor = 'grabbing';
-      console.log('✅ INSTANT FEEDBACK: Cursor changed to grabbing on touch');
+      if (DEBUG_DRAG) console.log('✅ INSTANT FEEDBACK: Cursor changed to grabbing on touch');
     }
     
     try {
       e.preventDefault();
       e.stopPropagation(); // Prevent event bubbling
-      console.log('✅ e.preventDefault() called successfully on line touch');
+      if (DEBUG_DRAG) console.log('✅ e.preventDefault() called successfully on line touch');
     } catch (error) {
       console.warn('⚠️ e.preventDefault() failed on line touch:', error.message);
     }
@@ -426,12 +436,12 @@ class MapInteractionHandler {
   // REMOVED: Incomplete endDrag method - using complete implementation from drag-test below
 
   handleMapClick(e) {
-    console.log("🗺️ MapInteractionHandler: Map clicked at coordinates:", e.lngLat);
-    console.log("🗺️ MapInteractionHandler: Click event:", { button: e.originalEvent?.button, type: e.type });
+    if (DEBUG_CLICK) console.log("🗺️ MapInteractionHandler: Map clicked at coordinates:", e.lngLat);
+    if (DEBUG_CLICK) console.log("🗺️ MapInteractionHandler: Click event:", { button: e.originalEvent?.button, type: e.type });
     
     // DRAG CHECK: Don't add points while dragging (like drag-test)
     if (this.isDragging) {
-      console.log('🖱️ MapInteractionHandler: Ignoring click - currently dragging');
+      if (DEBUG_CLICK) console.log('🖱️ MapInteractionHandler: Ignoring click - currently dragging');
       return;
     }
     
@@ -445,7 +455,7 @@ class MapInteractionHandler {
         const features = map.queryRenderedFeatures(e.point, { layers: existingLayers });
         
         if (features.length > 0) {
-          console.log('🖱️ MapInteractionHandler: Click on existing feature, ignoring');
+          if (DEBUG_CLICK) console.log('🖱️ MapInteractionHandler: Click on existing feature, ignoring');
           return; // Click was on a pin, line, or platform
         }
       }
@@ -453,14 +463,14 @@ class MapInteractionHandler {
     
     // RIGHT-CLICK CHECK: Handle right-click to delete last waypoint
     if (e.originalEvent?.button === 2) {
-      console.log('🖱️ MapInteractionHandler: Right-click detected - attempting to delete last waypoint');
+      if (DEBUG_CLICK) console.log('🖱️ MapInteractionHandler: Right-click detected - attempting to delete last waypoint');
       this.handleRightClick(e);
       return;
     }
     
     // LOCK CHECK: Prevent map clicks when editing is locked
     if (this.isMapClicksDisabled || window.isEditLocked === true) {
-      console.log('🔒 MapInteractionHandler: Ignoring click - editing is locked');
+      if (DEBUG_CLICK) console.log('🔒 MapInteractionHandler: Ignoring click - editing is locked');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
       }
@@ -469,21 +479,21 @@ class MapInteractionHandler {
     
     // SEPARATE HANDLERS CHECK: If separate mode handlers are active, defer to them
     if (window.toggleMapMode && typeof window.toggleMapMode === 'function') {
-      console.log('🔄 MapInteractionHandler: Separate mode handlers are active, deferring click handling');
+      if (DEBUG_CLICK) console.log('🔄 MapInteractionHandler: Separate mode handlers are active, deferring click handling');
       return;
     }
     
     if (window.isRegionLoading === true) {
-      console.log('MapInteractionHandler: Ignoring click - region is loading/changing.');
+      if (DEBUG_CLICK) console.log('MapInteractionHandler: Ignoring click - region is loading/changing.');
       if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator('Map interactions paused during region update...', 'info', 1500);
       return;
     }
     if (window._processingMapClick === true) {
-      console.log('MapInteractionHandler: Ignoring duplicate click - already processing');
+      if (DEBUG_CLICK) console.log('MapInteractionHandler: Ignoring duplicate click - already processing');
       return;
     }
     if (window._routeDragJustFinished || window._isRouteDragging) {
-      console.log('MapInteractionHandler: Click event ignored due to recent/active route drag.');
+      if (DEBUG_CLICK) console.log('MapInteractionHandler: Click event ignored due to recent/active route drag.');
       return; 
     }
     window._processingMapClick = true;
@@ -491,7 +501,7 @@ class MapInteractionHandler {
     try {
       const isWaypointMode = window.isWaypointModeActive === true;
       const isAlternateMode = window.isAlternateModeActive === true;
-      console.log(`MapInteractionHandler: Map clicked in ${isWaypointMode ? 'WAYPOINT' : isAlternateMode ? 'ALTERNATE' : 'NORMAL'} mode.`);
+      if (DEBUG_CLICK) console.log(`MapInteractionHandler: Map clicked in ${isWaypointMode ? 'WAYPOINT' : isAlternateMode ? 'ALTERNATE' : 'NORMAL'} mode.`);
 
       if (!this.mapManager || !this.waypointManager || !this.platformManager) {
         console.error('MapInteractionHandler: Essential managers missing!');
@@ -513,7 +523,7 @@ class MapInteractionHandler {
       if (isWaypointMode) {
         const waypointHandler = window.waypointHandler || this.getWaypointHandler(); 
         if (waypointHandler && typeof waypointHandler.handleMapClick === 'function') {
-            console.log("MapInteractionHandler: Deferring click to active WaypointModeHandler.");
+            if (DEBUG_CLICK) console.log("MapInteractionHandler: Deferring click to active WaypointModeHandler.");
             waypointHandler.handleMapClick(e); 
             window._processingMapClick = false; 
             return; 
@@ -544,35 +554,35 @@ class MapInteractionHandler {
       
       // ALTERNATE MODE: Handle alternate mode clicks
       if (isAlternateMode) {
-        console.log("MapInteractionHandler: Alternate mode active - checking for alternate mode handler");
+        if (DEBUG_CLICK) console.log("MapInteractionHandler: Alternate mode active - checking for alternate mode handler");
         if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
-          console.log("MapInteractionHandler: Deferring click to alternate mode handler");
+          if (DEBUG_CLICK) console.log("MapInteractionHandler: Deferring click to alternate mode handler");
           
           // Check for platform at click point
           let nearestPlatform = null;
           // In alternate mode, only fuel and airport layers are visible
           const platformLayerIds = ['fuel-available-layer', 'airfields-layer'];
           const activePlatformLayers = platformLayerIds.filter(id => map.getLayer(id));
-          console.log("MapInteractionHandler: Alternate mode - checking layers:", activePlatformLayers);
+          if (DEBUG_CLICK) console.log("MapInteractionHandler: Alternate mode - checking layers:", activePlatformLayers);
           
           if (activePlatformLayers.length > 0) {
             const features = map.queryRenderedFeatures(e.point, { layers: activePlatformLayers });
-            console.log("MapInteractionHandler: Platform query result:", features?.length || 0, "features found");
+            if (DEBUG_CLICK) console.log("MapInteractionHandler: Platform query result:", features?.length || 0, "features found");
             if (features && features.length > 0) {
               nearestPlatform = features[0].properties;
-              console.log("MapInteractionHandler: Found platform at click:", nearestPlatform);
+              if (DEBUG_CLICK) console.log("MapInteractionHandler: Found platform at click:", nearestPlatform);
             }
           }
           
           // If no platform clicked, check for nearby platforms
           if (!nearestPlatform && this.platformManager && typeof this.platformManager.findNearestPlatform === 'function') {
             nearestPlatform = this.platformManager.findNearestPlatform(e.lngLat.lat, e.lngLat.lng, 1);
-            console.log("MapInteractionHandler: findNearestPlatform result:", nearestPlatform);
+            if (DEBUG_CLICK) console.log("MapInteractionHandler: findNearestPlatform result:", nearestPlatform);
           }
           
           // Call the alternate mode handler
           const handled = window.alternateModeClickHandler(e.lngLat, nearestPlatform);
-          console.log("MapInteractionHandler: Alternate mode handler result:", handled);
+          if (DEBUG_CLICK) console.log("MapInteractionHandler: Alternate mode handler result:", handled);
           
           window._processingMapClick = false;
           return; // Exit here regardless of whether it was handled
@@ -599,7 +609,7 @@ class MapInteractionHandler {
               }
               if (platformFeatures.length > 0) {
                   const feature = platformFeatures[0];
-                  console.log(`MapInteractionHandler: Clicked on platform ${feature.properties.name} in normal mode.`);
+                  if (DEBUG_CLICK) console.log(`MapInteractionHandler: Clicked on platform ${feature.properties.name} in normal mode.`);
                   this.handlePlatformClick(feature.geometry.coordinates.slice(), feature.properties.name);
                   featuresClicked = true;
               } else {
@@ -612,7 +622,7 @@ class MapInteractionHandler {
 
       if (!featuresClicked) {
           if (window.debugRegionChange) console.log('[DEBUG Region Change] No specific feature clicked, treating as background click.');
-          console.log("MapInteractionHandler: No specific feature clicked, treating as background click.");
+          if (DEBUG_CLICK) console.log("MapInteractionHandler: No specific feature clicked, treating as background click.");
           this.handleMapBackgroundClick(e.lngLat);
       }
 
@@ -631,7 +641,7 @@ class MapInteractionHandler {
     
     // LOCK CHECK: Respect editing lock for right-click too
     if (this.isMapClicksDisabled || window.isEditLocked === true) {
-      console.log('🔒 MapInteractionHandler: Ignoring right-click - editing is locked');
+      if (DEBUG_CLICK) console.log('🔒 MapInteractionHandler: Ignoring right-click - editing is locked');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
       }
@@ -646,7 +656,7 @@ class MapInteractionHandler {
     
     const waypoints = this.waypointManager.getWaypoints();
     if (!waypoints || waypoints.length === 0) {
-      console.log('🖱️ MapInteractionHandler: No waypoints to remove');
+      if (DEBUG_CLICK) console.log('🖱️ MapInteractionHandler: No waypoints to remove');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('No waypoints to remove', 'info', 1500);
       }
@@ -657,7 +667,7 @@ class MapInteractionHandler {
     const lastWaypoint = waypoints[waypoints.length - 1];
     const lastIndex = waypoints.length - 1;
     
-    console.log(`🗑️ MapInteractionHandler: Removing last waypoint "${lastWaypoint.name}" at index ${lastIndex}`);
+    if (DEBUG_CLICK) console.log(`🗑️ MapInteractionHandler: Removing last waypoint "${lastWaypoint.name}" at index ${lastIndex}`);
     
     // Remove the last waypoint
     try {
@@ -668,7 +678,7 @@ class MapInteractionHandler {
         window.LoadingIndicator.updateStatusIndicator(`Removed waypoint: ${lastWaypoint.name}`, 'success', 2000);
       }
       
-      console.log(`✅ MapInteractionHandler: Successfully removed waypoint "${lastWaypoint.name}"`);
+      if (DEBUG_CLICK) console.log(`✅ MapInteractionHandler: Successfully removed waypoint "${lastWaypoint.name}"`);
     } catch (error) {
       console.error('MapInteractionHandler: Error removing last waypoint:', error);
       if (window.LoadingIndicator) {
@@ -691,13 +701,13 @@ class MapInteractionHandler {
     
     // ALTERNATE MODE: Handle route clicks for split point selection
     if (isAlternateMode) {
-      console.log('🎯 MapInteractionHandler: Route clicked in alternate mode');
+      if (DEBUG_CLICK) console.log('🎯 MapInteractionHandler: Route clicked in alternate mode');
       
       // Find the nearest waypoint for the split point
       const waypoints = this.waypointManager.getWaypoints();
       if (waypoints && waypoints.length > insertIndex) {
         const nearestWaypoint = waypoints[insertIndex];
-        console.log('🎯 MapInteractionHandler: Setting route waypoint as split point:', nearestWaypoint.name);
+        if (DEBUG_CLICK) console.log('🎯 MapInteractionHandler: Setting route waypoint as split point:', nearestWaypoint.name);
         
         // Call alternate mode handler directly
         if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
@@ -755,7 +765,7 @@ class MapInteractionHandler {
     } else {
       // ALTERNATE MODE CHECK: Prevent adding waypoints to main route in alternate mode
       if (isAlternateMode) {
-        console.log('🎯 MapInteractionHandler: Ignoring waypoint add - alternate mode is active');
+        if (DEBUG_CLICK) console.log('🎯 MapInteractionHandler: Ignoring waypoint add - alternate mode is active');
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click on route for split point or rig for alternate', 'info', 2000);
         }
@@ -768,11 +778,11 @@ class MapInteractionHandler {
   }
 
   handleRouteDragComplete(insertIndex, coords, dragData = {}) {
-    console.log(`MapInteractionHandler.handleRouteDragComplete: Received insertIndex: ${insertIndex}, coords: ${JSON.stringify(coords)}, dragData: ${JSON.stringify(dragData)}`);
+    if (DEBUG_DRAG) console.log(`MapInteractionHandler.handleRouteDragComplete: Received insertIndex: ${insertIndex}, coords: ${JSON.stringify(coords)}, dragData: ${JSON.stringify(dragData)}`);
     
     // LOCK CHECK: Prevent route drag completion when editing is locked
     if (this.isMapClicksDisabled || window.isEditLocked === true) {
-      console.log('🔒 MapInteractionHandler: Ignoring route drag completion - editing is locked');
+      if (DEBUG_DRAG) console.log('🔒 MapInteractionHandler: Ignoring route drag completion - editing is locked');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
       }
@@ -782,7 +792,7 @@ class MapInteractionHandler {
     // ALTERNATE MODE CHECK: Prevent route drag completion in alternate mode
     const isAlternateMode = window.isAlternateModeActive === true;
     if (isAlternateMode) {
-      console.log('🎯 MapInteractionHandler: Ignoring route drag completion - alternate mode is active');
+      if (DEBUG_DRAG) console.log('🎯 MapInteractionHandler: Ignoring route drag completion - alternate mode is active');
       if (window.LoadingIndicator) {
         window.LoadingIndicator.updateStatusIndicator('🎯 Alternate mode: Click to set split point or select alternate', 'info', 2000);
       }
@@ -790,16 +800,16 @@ class MapInteractionHandler {
     }
     
     if (window._processingRouteDrag === true) {
-      console.log('MapInteractionHandler: Ignoring duplicate route drag - already processing');
+      if (DEBUG_DRAG) console.log('MapInteractionHandler: Ignoring duplicate route drag - already processing');
       return;
     }
     window._processingRouteDrag = true;
     
     try {
       const isWaypointMode = window.isWaypointModeActive === true;
-      console.log(`MapInteractionHandler: Mode determined by window.isWaypointModeActive: ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'}`);
+      if (DEBUG_DRAG) console.log(`MapInteractionHandler: Mode determined by window.isWaypointModeActive: ${isWaypointMode ? 'WAYPOINT' : 'NORMAL'}`);
       if (dragData) { 
-          console.log(`MapInteractionHandler: Contextual dragData.isWaypointMode: ${dragData.isWaypointMode}`);
+          if (DEBUG_DRAG) console.log(`MapInteractionHandler: Contextual dragData.isWaypointMode: ${dragData.isWaypointMode}`);
       }
 
       if (insertIndex === undefined || insertIndex === null || isNaN(parseInt(insertIndex))) {
@@ -819,7 +829,7 @@ class MapInteractionHandler {
       if (insertIndex < 0) insertIndex = 0;
       if (insertIndex > waypointCount) insertIndex = waypointCount;
       
-      console.log(`MapInteractionHandler: Using validated insertIndex: ${insertIndex}`);
+      if (DEBUG_DRAG) console.log(`MapInteractionHandler: Using validated insertIndex: ${insertIndex}`);
       
       const map = this.mapManager.getMap(); // Get map instance for queryRenderedFeatures
 
@@ -835,11 +845,11 @@ class MapInteractionHandler {
                   [dragData.point.x - pixelRadius, dragData.point.y - pixelRadius],
                   [dragData.point.x + pixelRadius, dragData.point.y + pixelRadius]
                 ];
-                console.log(`MapInteractionHandler (Waypoint Mode): Querying rendered features in BBox:`, queryBBox, `on layers:`, osdkWaypointLayers);
+                if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Waypoint Mode): Querying rendered features in BBox:`, queryBBox, `on layers:`, osdkWaypointLayers);
                 const features = map.queryRenderedFeatures(queryBBox, { layers: osdkWaypointLayers });
                 
                 if (features && features.length > 0) {
-                    console.log(`MapInteractionHandler (Waypoint Mode): Found ${features.length} features in BBox query.`);
+                    if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Waypoint Mode): Found ${features.length} features in BBox query.`);
                     let closestFeature = null;
                     let minDistance = Infinity;
 
@@ -862,7 +872,7 @@ class MapInteractionHandler {
                     if (closestFeature) {
                         const props = closestFeature.properties;
                         const featureCoords = closestFeature.geometry.coordinates.slice();
-                        console.log(`MapInteractionHandler (Waypoint Mode): Snapping to CLOSEST OSDK Waypoint via queryRenderedFeatures: ${props.name} at index ${insertIndex}`);
+                        if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Waypoint Mode): Snapping to CLOSEST OSDK Waypoint via queryRenderedFeatures: ${props.name} at index ${insertIndex}`);
                         if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator(`Snapped to waypoint: ${props.name} (direct drop)`, 'success', 2000);
                         this.waypointManager.addWaypointAtIndex(
                             featureCoords, 
@@ -885,7 +895,7 @@ class MapInteractionHandler {
             }
             
             if (nearestOsdkWp && nearestOsdkWp.distance < searchRadiusNM) {
-              console.log(`MapInteractionHandler (Waypoint Mode): Snapping to OSDK Waypoint via findNearest (fallback): ${nearestOsdkWp.name} (dist: ${nearestOsdkWp.distance.toFixed(1)}nm) at index ${insertIndex}`);
+              if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Waypoint Mode): Snapping to OSDK Waypoint via findNearest (fallback): ${nearestOsdkWp.name} (dist: ${nearestOsdkWp.distance.toFixed(1)}nm) at index ${insertIndex}`);
               if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator(`Snapped to waypoint: ${nearestOsdkWp.name} (${nearestOsdkWp.distance.toFixed(1)} nm away)`, 'success', 2000);
               this.waypointManager.addWaypointAtIndex(
                 nearestOsdkWp.coordinates, 
@@ -894,7 +904,7 @@ class MapInteractionHandler {
                 { isWaypoint: true, type: 'WAYPOINT', pointType: 'NAVIGATION_WAYPOINT' }
               );
             } else {
-              console.log(`MapInteractionHandler (Waypoint Mode): No nearby OSDK waypoint (direct or findNearest within ${searchRadiusNM}nm), adding generic waypoint at index ${insertIndex}`);
+              if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Waypoint Mode): No nearby OSDK waypoint (direct or findNearest within ${searchRadiusNM}nm), adding generic waypoint at index ${insertIndex}`);
               const genericName = `Waypoint ${insertIndex + 1}`;
               this.waypointManager.addWaypointAtIndex(
                 coords, 
@@ -913,7 +923,7 @@ class MapInteractionHandler {
         }
         
         if (nearestPlatform && nearestPlatform.distance < searchRadiusPlatformsNM) {
-          console.log(`MapInteractionHandler (Normal Mode): Snapping to Platform: ${nearestPlatform.name} (dist: ${nearestPlatform.distance.toFixed(1)}nm) at index ${insertIndex}`);
+          if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Normal Mode): Snapping to Platform: ${nearestPlatform.name} (dist: ${nearestPlatform.distance.toFixed(1)}nm) at index ${insertIndex}`);
           if (window.LoadingIndicator) window.LoadingIndicator.updateStatusIndicator(`Snapped to ${nearestPlatform.name} (${nearestPlatform.distance.toFixed(1)} nm away)`, 'success', 2000);
           this.waypointManager.addWaypointAtIndex(
             nearestPlatform.coordinates, 
@@ -922,7 +932,7 @@ class MapInteractionHandler {
             { isWaypoint: false, type: 'STOP', pointType: 'LANDING_STOP' }
           );
         } else {
-          console.log(`MapInteractionHandler (Normal Mode): No nearby platform within ${searchRadiusPlatformsNM}nm, adding generic stop at index ${insertIndex}`);
+          if (DEBUG_MARKERS) console.log(`MapInteractionHandler (Normal Mode): No nearby platform within ${searchRadiusPlatformsNM}nm, adding generic stop at index ${insertIndex}`);
           const genericName = `Stop ${insertIndex + 1}`;
           this.waypointManager.addWaypointAtIndex(
             coords, 
@@ -932,7 +942,7 @@ class MapInteractionHandler {
           );
         }
       }
-      console.log(`MapInteractionHandler: Add operation completed for index ${insertIndex}.`);
+      if (DEBUG_DRAG) console.log(`MapInteractionHandler: Add operation completed for index ${insertIndex}.`);
     } catch (err) {
       console.error('MapInteractionHandler: Error in handleRouteDragComplete snapping logic:', err);
       const fallbackIsWaypoint = window.isWaypointModeActive === true; 
@@ -945,7 +955,7 @@ class MapInteractionHandler {
     } finally {
       setTimeout(() => {
         window._processingRouteDrag = false;
-        console.log('MapInteractionHandler: Route drag processing complete, cleared flag');
+        if (DEBUG_DRAG) console.log('MapInteractionHandler: Route drag processing complete, cleared flag');
       }, 300);
     }
   }
@@ -976,8 +986,8 @@ class MapInteractionHandler {
    */
   
   startDrag(lngLat, approach) {
-    console.log('🚀 Starting drag operation from drag-test');
-    console.log('🚀 DRAG STARTED! Setting up drag state...');
+    if (DEBUG_DRAG) console.log('🚀 Starting drag operation from drag-test');
+    if (DEBUG_DRAG) console.log('🚀 DRAG STARTED! Setting up drag state...');
     
     this.isDragging = true;
     this.activeApproach = approach;
@@ -1001,16 +1011,16 @@ class MapInteractionHandler {
     
     // Calculate the correct insertion index based on where user clicked
     this.dragInsertIndex = this.findClosestSegmentIndex(this.dragStartCoord, this.originalLineCoordinates);
-    console.log(`🎯 DRAG INSERTION INDEX: ${this.dragInsertIndex} (clicked on segment ${this.dragInsertIndex - 1} to ${this.dragInsertIndex})`);
+    if (DEBUG_DRAG) console.log(`🎯 DRAG INSERTION INDEX: ${this.dragInsertIndex} (clicked on segment ${this.dragInsertIndex - 1} to ${this.dragInsertIndex})`);
     
     const map = this.mapManager.getMap();
     if (map && map.getCanvas) {
       map.getCanvas().style.cursor = 'grabbing';
     }
     
-    console.log(`🎯 DRAG ACTIVE! Mode: ${this.dragMode}, Approach: ${approach}, Insert Index: ${this.dragInsertIndex}`);
+    if (DEBUG_DRAG) console.log(`🎯 DRAG ACTIVE! Mode: ${this.dragMode}, Approach: ${approach}, Insert Index: ${this.dragInsertIndex}`);
     
-    console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}, insertIndex=${this.dragInsertIndex}`);
+    if (DEBUG_DRAG) console.log(`🎯 DRAG STARTED: mode=${this.dragMode}, approach=${approach}, insertIndex=${this.dragInsertIndex}`);
   }
 
   onMapboxDragMove(e) {
@@ -1023,8 +1033,8 @@ class MapInteractionHandler {
     }
     this.lastDragUpdate = now;
     
-    console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
-    console.log(`🎯 DRAGGING! Position: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
+    if (DEBUG_DRAG) console.log(`📍 Drag move: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
+    if (DEBUG_DRAG) console.log(`🎯 DRAGGING! Position: ${e.lngLat.lng.toFixed(4)}, ${e.lngLat.lat.toFixed(4)}`);
     this.updateDrag(e.lngLat);
   }
 
@@ -1036,7 +1046,7 @@ class MapInteractionHandler {
     if (this.dragMode === 'insert') {
       // Update drag line visualization
       this.updateDragLine(currentCoord);
-      console.log(`🎯 Drag updated: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
+      if (DEBUG_DRAG) console.log(`🎯 Drag updated: ${currentCoord[0].toFixed(4)}, ${currentCoord[1].toFixed(4)}`);
     }
   }
 
@@ -1176,7 +1186,7 @@ class MapInteractionHandler {
   }
 
   onMapboxDragEnd(e) {
-    console.log('🏁 Drag end event from drag-test');
+    if (DEBUG_DRAG) console.log('🏁 Drag end event from drag-test');
     this.endDrag(e.lngLat);
   }
 
@@ -1186,7 +1196,7 @@ class MapInteractionHandler {
     const wasApproach = this.activeApproach;
     const wasMode = this.dragMode;
     
-    console.log(`🎉 Drag completed: ${wasApproach}, mode: ${wasMode}`);
+    if (DEBUG_DRAG) console.log(`🎉 Drag completed: ${wasApproach}, mode: ${wasMode}`);
     
     const map = this.mapManager.getMap();
     
@@ -1221,7 +1231,7 @@ class MapInteractionHandler {
     
     // Add waypoint at drag end location using calculated insertion index
     if (lngLat && this.waypointManager) {
-      console.log(`🎯 Adding waypoint at drag end: ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`);
+      if (DEBUG_DRAG) console.log(`🎯 Adding waypoint at drag end: ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`);
       
       const coords = [lngLat.lng, lngLat.lat];
       
@@ -1232,11 +1242,11 @@ class MapInteractionHandler {
       let waypointName = `Waypoint ${Date.now()}`;
       
       if (snapResult) {
-        console.log(`🛢️ SNAP: Found nearby rig "${snapResult.name}" within 2 miles - snapping to it`);
+        if (DEBUG_DRAG) console.log(`🛢️ SNAP: Found nearby rig "${snapResult.name}" within 2 miles - snapping to it`);
         finalCoords = snapResult.coordinates;
         waypointName = snapResult.name;
       } else {
-        console.log('🎯 No nearby rigs found - adding waypoint at drop location');
+        if (DEBUG_DRAG) console.log('🎯 No nearby rigs found - adding waypoint at drop location');
       }
       
       // Calculate insertion index based on drag start position
@@ -1260,7 +1270,7 @@ class MapInteractionHandler {
       
       try {
         this.waypointManager.addWaypointAtIndex(finalCoords, waypointName, insertIndex);
-        console.log(`✅ Successfully added waypoint: ${waypointName} at index ${insertIndex}`);
+        if (DEBUG_DRAG) console.log(`✅ Successfully added waypoint: ${waypointName} at index ${insertIndex}`);
       } catch (error) {
         console.error('❌ Error adding waypoint:', error);
       }
@@ -1278,17 +1288,17 @@ class MapInteractionHandler {
     
     // Get platform data from platform manager
     if (!this.platformManager) {
-      console.log('🛢️ No platform manager available for rig snapping');
+      if (DEBUG_DRAG) console.log('🛢️ No platform manager available for rig snapping');
       return null;
     }
     
     const platforms = this.platformManager.getPlatforms();
     if (!platforms || platforms.length === 0) {
-      console.log('🛢️ No platforms available for rig snapping');
+      if (DEBUG_DRAG) console.log('🛢️ No platforms available for rig snapping');
       return null;
     }
     
-    console.log(`🛢️ Checking ${platforms.length} platforms for snapping within ${maxDistanceMiles} miles`);
+    if (DEBUG_DRAG) console.log(`🛢️ Checking ${platforms.length} platforms for snapping within ${maxDistanceMiles} miles`);
     
     let closestRig = null;
     let minDistance = Infinity;
@@ -1325,7 +1335,7 @@ class MapInteractionHandler {
     });
     
     if (closestRig) {
-      console.log(`🛢️ Found closest rig: "${closestRig.name}" at ${closestRig.distance.toFixed(3)} miles`);
+      if (DEBUG_DRAG) console.log(`🛢️ Found closest rig: "${closestRig.name}" at ${closestRig.distance.toFixed(3)} miles`);
     }
     
     return closestRig;
@@ -1353,7 +1363,7 @@ class MapInteractionHandler {
 
   findClosestPointOnLine(coord) {
     if (!this.originalLineCoordinates || this.originalLineCoordinates.length < 2) {
-      console.log('❌ No original coordinates for closest point calculation');
+      if (DEBUG_DRAG) console.log('❌ No original coordinates for closest point calculation');
       return null;
     }
     
@@ -1383,7 +1393,7 @@ class MapInteractionHandler {
       }
     }
     
-    console.log(`🎯 Closest segment: ${bestSegment}, insert at position ${insertIndex}`);
+    if (DEBUG_DRAG) console.log(`🎯 Closest segment: ${bestSegment}, insert at position ${insertIndex}`);
     return { insertIndex, distance: minDistance, segment: bestSegment };
   }
 }

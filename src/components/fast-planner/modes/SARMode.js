@@ -215,7 +215,13 @@ export const useSARMode = ({
     
     console.log('🚁 SAR: No alternate fuel found, using 0');
     return 0;
-  }, [alternateStats, alternateRouteData, stopCards]);
+  }, [alternateStats, alternateRouteData, stopCards,
+      // Add granular dependency tracking for alternate route data properties
+      alternateStats?.totalFuelRequired, alternateStats?.fuelRequired,
+      alternateRouteData?.stats?.totalFuelRequired, alternateRouteData?.stats?.fuelRequired,
+      // Track changes to stop cards length and presence of alternate cards (more stable)
+      stopCards?.length, 
+      stopCards?.some(card => card.isAlternate)]);
   const reserveFuelValue = customReserveFuel !== null ? customReserveFuel : (() => {
     console.log('🚁 SAR: Extracting reserveFuel:', {
       hasPreCalculatedReserve: reserveFuel !== null,
@@ -357,8 +363,16 @@ export const useSARMode = ({
       finalWaypoint,
       waypointDependency,
       routeFuel,
+      alternateFuel,
       routeStats: !!routeStats,
-      takeoffFuel
+      takeoffFuel,
+      // Add alternate route data debug info
+      alternateRouteDataStats: alternateRouteData?.stats,
+      alternateStatsData: alternateStats,
+      alternateRouteHasStats: !!alternateRouteData?.stats,
+      alternateStatsHasData: !!alternateStats,
+      alternateRouteDataStatsFuel: alternateRouteData?.stats?.totalFuelRequired || alternateRouteData?.stats?.fuelRequired,
+      alternateStatsFuel: alternateStats?.totalFuelRequired || alternateStats?.fuelRequired
     });
     
     console.log('🚁 SAR: About to call calculateOperationalRadius with:', {
@@ -397,7 +411,10 @@ export const useSARMode = ({
         severity: 'error'
       };
     }
-  }, [sarEnabled, selectedAircraft, takeoffFuel, sarWeight, timeOnTask, routeFuel, alternateFuel, reserveFuelValue, waypointDependency]);
+  }, [sarEnabled, selectedAircraft, takeoffFuel, sarWeight, timeOnTask, routeFuel, alternateFuel, reserveFuelValue, waypointDependency, 
+      // Add specific alternate route dependencies to ensure SAR recalculates when alternate data changes
+      alternateRouteData?.stats?.totalFuelRequired, alternateRouteData?.stats?.fuelRequired, 
+      alternateStats?.totalFuelRequired, alternateStats?.fuelRequired]);
   
   // ========================================
   // AIRCRAFT CAPABILITY ANALYSIS (SIMPLIFIED)

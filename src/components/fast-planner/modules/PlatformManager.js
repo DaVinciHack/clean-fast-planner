@@ -6,6 +6,16 @@
 import LoadingIndicator from './LoadingIndicator';
 import EnhancedLocationSearch from './EnhancedLocationSearch.js';
 
+// 🔧 DEBUG FLAGS: Control logging output for performance and debugging
+const DEBUG_PLATFORM = false;     // Platform loading and processing
+const DEBUG_WAYPOINT = false;     // Waypoint processing
+const DEBUG_SEARCH = false;       // Search operations
+const DEBUG_REGIONS = false;      // Region filtering
+const DEBUG_MARKERS = false;      // Marker operations
+
+// Debug helper function for conditional logging
+const debugLog = (flag, ...args) => flag && console.log(...args);
+
 class PlatformManager {
   /**
    * Process waypoint results to extract valid waypoints
@@ -15,7 +25,7 @@ class PlatformManager {
   processWaypointResults(result) {
     
     if (!result || !result.data || result.data.length === 0) {
-      console.log("PlatformManager: No waypoint data to process");
+      debugLog(DEBUG_WAYPOINT, "PlatformManager: No waypoint data to process");
       return [];
     }
     
@@ -54,7 +64,7 @@ class PlatformManager {
       })
       .filter(wp => wp !== null); // Remove null entries
     
-    console.log(`PlatformManager: Processed ${waypoints.length} valid waypoints`);
+    debugLog(DEBUG_WAYPOINT, `PlatformManager: Processed ${waypoints.length} valid waypoints`);
     
     // Log route direction statistics for debugging
     const routeDirectionStats = {};
@@ -62,7 +72,7 @@ class PlatformManager {
       const direction = wp.routeDirection || 'NONE';
       routeDirectionStats[direction] = (routeDirectionStats[direction] || 0) + 1;
     });
-    console.log('🎯 WAYPOINT ROUTE DIRECTIONS:', routeDirectionStats);
+    debugLog(DEBUG_WAYPOINT, '🎯 WAYPOINT ROUTE DIRECTIONS:', routeDirectionStats);
     
     return waypoints;
   }
@@ -142,7 +152,7 @@ class PlatformManager {
       }
     }
     
-    console.log(`🌍 REGION MAPPING: "${originalRegionName}" → "${regionName}" for OSDK query`);
+    debugLog(DEBUG_SEARCH, `🌍 REGION MAPPING: "${originalRegionName}" → "${regionName}" for OSDK query`);
     
     // Show loading indicator - use fallback container if main one not found
     const loaderId = LoadingIndicator.show('.route-stats-title', 
@@ -154,7 +164,7 @@ class PlatformManager {
       // Clear any existing data first to ensure fresh load
       this.clearPlatforms();
     } else {
-      console.log(`Skipping clearPlatforms due to skipNextClear flag for region: ${regionName}`);
+      debugLog(DEBUG_REGIONS, `Skipping clearPlatforms due to skipNextClear flag for region: ${regionName}`);
       // Reset the flag for next time
       this.skipNextClear = false;
     }
@@ -189,7 +199,7 @@ class PlatformManager {
       
       // We'll remove the problematic authentication check and rely on the client implementation
       // to handle authentication errors properly during the API call
-      console.log("Using OSDK client to load platforms...");
+      debugLog(DEBUG_PLATFORM, "Using OSDK client to load platforms...");
       
       try {
         // Import the SDK
@@ -215,7 +225,7 @@ class PlatformManager {
         }
         
         // Query for platforms and locations without excessive logging
-        console.log(`Querying for platforms and airports in ${regionName}`);
+        debugLog(DEBUG_PLATFORM, `Querying for platforms and airports in ${regionName}`);
         
         // Update loading indicator
         LoadingIndicator.updateText(loaderId, `Querying for platforms in ${regionName}...`);
@@ -225,7 +235,7 @@ class PlatformManager {
         
         // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil data
         if (regionName === "BRAZIL EAST") {
-          console.log(`🇧🇷 BRAZIL FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for complete coverage`);
+          debugLog(DEBUG_PLATFORM, `🇧🇷 BRAZIL FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for complete coverage`);
           result = await client(locationObject)
             .where({ 
               region: { $in: ["BRAZIL EAST", "BRAZIL"] }
@@ -258,7 +268,7 @@ class PlatformManager {
               allTypes.add(item.locationType);
             }
           });
-          console.log("All location types in results:", Array.from(allTypes));
+          debugLog(DEBUG_PLATFORM, "All location types in results:", Array.from(allTypes));
           
           // Filter to include only active items (for all types)
           const originalCount = result.data.length;
@@ -318,11 +328,11 @@ class PlatformManager {
             return false;
           });
           
-          console.log(`Filtered from ${originalCount} to ${result.data.length} ACTIVE items (platforms and airports)`);
+          debugLog(DEBUG_PLATFORM, `Filtered from ${originalCount} to ${result.data.length} ACTIVE items (platforms and airports)`);
           
           // Log how many inactive items were filtered out
           const inactiveCount = originalCount - result.data.length;
-          console.log(`Filtered out ${inactiveCount} inactive items (activeSite ≠ "Active")`);
+          debugLog(DEBUG_PLATFORM, `Filtered out ${inactiveCount} inactive items (activeSite ≠ "Active")`);
           
           // Check platform count by region to ensure we're getting data for all regions
           let platformCountByRegion = {};
@@ -331,14 +341,14 @@ class PlatformManager {
               platformCountByRegion[item.region] = (platformCountByRegion[item.region] || 0) + 1;
             }
           });
-          console.log(`Platform count by region after filtering:`, platformCountByRegion);
+          debugLog(DEBUG_SEARCH, `Platform count by region after filtering:`, platformCountByRegion);
           
           // Check for key platforms in Norway as a sanity check
           if (regionName === "NORWAY") {
             const criticalPlatforms = ["ENLE", "ENWS", "ENWV"];
             criticalPlatforms.forEach(platform => {
               const found = result.data.some(item => item.locName === platform);
-              console.log(`Platform ${platform} found in filtered results: ${found}`);
+              debugLog(DEBUG_SEARCH, `Platform ${platform} found in filtered results: ${found}`);
             });
           } 
           // Check for platforms in Gulf of Mexico
@@ -365,7 +375,7 @@ class PlatformManager {
           
         
         // Always run specific queries for our key locations regardless of other results
-        console.log("Running specific queries for critical locations...");
+        debugLog(DEBUG_PLATFORM, "Running specific queries for critical locations...");
         
         // Track what we've already found
         const existingNames = new Set();
@@ -379,14 +389,14 @@ class PlatformManager {
         
         // Always query for airfields/airports in THIS SPECIFIC region
         try {
-          console.log(`Specifically searching for airports in REGION: "${regionName}"`);
+          debugLog(DEBUG_SEARCH, `Specifically searching for airports in REGION: "${regionName}"`);
           
           // Simpler, more direct query to ensure proper filtering
           let airportResult;
           
           // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil airports
           if (regionName === "BRAZIL EAST") {
-            console.log(`🇧🇷 BRAZIL AIRPORT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for airports`);
+            debugLog(DEBUG_PLATFORM, `🇧🇷 BRAZIL AIRPORT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for airports`);
             airportResult = await client(locationObject)
               .where({ 
                 region: { $in: ["BRAZIL EAST", "BRAZIL"] },
@@ -443,7 +453,7 @@ class PlatformManager {
               }
             }
           } else {
-            console.log(`No airports found in region ${regionName}`);
+            debugLog(DEBUG_PLATFORM, `No airports found in region ${regionName}`);
           }
         } catch (err) {
           console.warn("Error in airport-specific query:", err);
@@ -462,14 +472,14 @@ class PlatformManager {
           
           // No need for special case platform handling anymore since our filter is now correctly
           // detecting all platform types including our key fixed platforms
-          console.log(`Using standard filtering for all platform types in ${regionName}`);
+          debugLog(DEBUG_SEARCH, `Using standard filtering for all platform types in ${regionName}`);
           
           if (criticalLocations.length > 0) {
-            console.log(`Looking for critical locations in ${regionName}: ${criticalLocations.join(', ')}`);
+            debugLog(DEBUG_PLATFORM, `Looking for critical locations in ${regionName}: ${criticalLocations.join(', ')}`);
             
             for (const locName of criticalLocations) {
               if (!existingNames.has(locName)) {
-                console.log(`Specifically searching for ${locName} in ${regionName}...`);
+                debugLog(DEBUG_SEARCH, `Specifically searching for ${locName} in ${regionName}...`);
                 
                 let specificResult;
                 
@@ -504,12 +514,12 @@ class PlatformManager {
                     }
                   }
                 } else {
-                  console.log(`${locName} not found in ${regionName} specific search`);
+                  debugLog(DEBUG_SEARCH, `${locName} not found in ${regionName} specific search`);
                 }
               }
             }
           } else {
-            console.log(`No critical locations defined for region: ${regionName}`);
+            debugLog(DEBUG_PLATFORM, `No critical locations defined for region: ${regionName}`);
           }
         } catch (err) {
           console.warn("Error in critical location search:", err);
@@ -520,7 +530,7 @@ class PlatformManager {
           return Promise.reject(new Error("No data returned from API"));
         }
         
-        console.log(`Successfully fetched ${result.data.length} items`);
+        debugLog(DEBUG_PLATFORM, `Successfully fetched ${result.data.length} items`);
         
         // Log the structure of the data to understand what we're working with
         if (result.data.length > 0) {
@@ -544,7 +554,7 @@ class PlatformManager {
               }
             }
           }
-          console.log("Potential coordinate fields:", potentialCoordFields);
+          debugLog(DEBUG_PLATFORM, "Potential coordinate fields:", potentialCoordFields);
         }
         
         // Process data with improved type classification 
@@ -572,7 +582,7 @@ class PlatformManager {
             }
           });
         }
-        console.log("Location types in results:", typeCount);
+        debugLog(DEBUG_PLATFORM, "Location types in results:", typeCount);
         
         if (!result.data || result.data.length === 0) {
           console.warn("No data returned for processing");
@@ -585,11 +595,11 @@ class PlatformManager {
             // For Brazil region, accept both "BRAZIL EAST" and "BRAZIL"
             if (regionName === "BRAZIL EAST") {
               if (item.region !== "BRAZIL EAST" && item.region !== "BRAZIL") {
-                console.log(`Skipping item from wrong region: ${item.locName} (${item.region})`);
+                debugLog(DEBUG_REGIONS, `Skipping item from wrong region: ${item.locName} (${item.region})`);
                 continue;
               }
             } else if (item.region !== regionName) {
-              console.log(`Skipping item from wrong region: ${item.locName} (${item.region})`);
+              debugLog(DEBUG_REGIONS, `Skipping item from wrong region: ${item.locName} (${item.region})`);
               continue;
             }
           }
@@ -641,7 +651,7 @@ class PlatformManager {
           
           // Skip if we still couldn't get coordinates
           if (!coords) {
-            console.log(`Skipping ${name} - no coordinates found`);
+            debugLog(DEBUG_REGIONS, `Skipping ${name} - no coordinates found`);
             continue;
           }
           
@@ -697,13 +707,13 @@ class PlatformManager {
               );
               
               if (isPlatformType) {
-                console.log(`Hiding platform/rig in waypoint mode: ${name} (${type})`);
+                debugLog(DEBUG_WAYPOINT, `Hiding platform/rig in waypoint mode: ${name} (${type})`);
                 continue;
               }
               
               // Also hide if it's identified as a platform/vessel by the isPlatformOrVessel logic
               if (isPlatformOrVessel) {
-                console.log(`Hiding platform/vessel in waypoint mode: ${name} (${type})`);
+                debugLog(DEBUG_WAYPOINT, `Hiding platform/vessel in waypoint mode: ${name} (${type})`);
                 continue;
               }
             }
@@ -718,7 +728,7 @@ class PlatformManager {
                 upperType.includes('FIX') ||
                 upperType.includes('INTERSECTION') ||
                 upperType.includes('NAVAID'))) {
-              console.log(`Skipping navigation point: ${name} (${type})`);
+              debugLog(DEBUG_WAYPOINT, `Skipping navigation point: ${name} (${type})`);
               continue;
             }
             
@@ -879,9 +889,7 @@ class PlatformManager {
             platformsCount++;
             fixedPlatformCount++; // Keep legacy counter for now
             // Debug: Log fixed platform types
-            if (platformsCount <= 3) { // Only log first few to avoid spam
-              console.log(`Fixed Platform found: "${name}" with type: "${type}"`);
-            }
+            debugLog(DEBUG_PLATFORM, `Fixed Platform found: "${name}" with type: "${type}"`);
           } else if (isMovable) {
             movablePlatformCount++;
           } else if (isBlocks) {
@@ -891,7 +899,7 @@ class PlatformManager {
             basesCount++;
             // Debug: Log ALL bases found with their isBase field value
             const baseField = item.isbase !== undefined ? item.isbase : 'not found';
-            console.log(`Base found: "${name}" with isBase field: "${baseField}" and type: "${type}"`);
+            debugLog(DEBUG_PLATFORM, `Base found: "${name}" with isBase field: "${baseField}" and type: "${type}"`);
           }
           
           if (hasFuel) {
@@ -916,13 +924,13 @@ class PlatformManager {
         }
         
         // Enhanced logging - show summary with new categories
-        console.log(`Processed ${locations.length} locations:`);
-        console.log(`  - ${airportsCount} airfields`);
-        console.log(`  - ${platformsCount} platforms (fixed)`);
-        console.log(`  - ${movablePlatformCount} movable platforms`);
-        console.log(`  - ${blocksCount} blocks`);
-        console.log(`  - ${basesCount} bases`);
-        console.log(`  - ${fuelAvailableCount} locations with fuel available`);
+        debugLog(DEBUG_PLATFORM, `Processed ${locations.length} locations:`);
+        debugLog(DEBUG_PLATFORM, `  - ${airportsCount} airfields`);
+        debugLog(DEBUG_PLATFORM, `  - ${platformsCount} platforms (fixed)`);
+        debugLog(DEBUG_PLATFORM, `  - ${movablePlatformCount} movable platforms`);
+        debugLog(DEBUG_PLATFORM, `  - ${blocksCount} blocks`);
+        debugLog(DEBUG_PLATFORM, `  - ${basesCount} bases`);
+        debugLog(DEBUG_PLATFORM, `  - ${fuelAvailableCount} locations with fuel available`);
         
         // Update loading indicator
         LoadingIndicator.updateText(loaderId, `Adding ${locations.length} locations to map...`);
@@ -934,7 +942,7 @@ class PlatformManager {
           // 🔍 ENHANCED SEARCH: Store raw OSDK data and initialize enhanced search
           this.rawOSDKData = result.data || [];
           this.enhancedLocationSearch.setPlatforms(locations, this.rawOSDKData);
-          console.log(`🔍 Enhanced search initialized with ${this.rawOSDKData.length} raw OSDK records`);
+          debugLog(DEBUG_SEARCH, `🔍 Enhanced search initialized with ${this.rawOSDKData.length} raw OSDK records`);
           
           this.addPlatformsToMap(locations);
           
@@ -1034,7 +1042,7 @@ class PlatformManager {
     ];
     const sourceId = 'major-platforms';
 
-    console.log("PlatformManager: Removing platform layers and source");
+    debugLog(DEBUG_PLATFORM, "PlatformManager: Removing platform layers and source");
 
     // First, hide all layers to prevent visual flickering
     layerIds.forEach(layerId => {
@@ -1053,7 +1061,7 @@ class PlatformManager {
       try {
         if (map.getLayer && typeof map.getLayer === 'function' && map.getLayer(layerId)) {
           map.removeLayer(layerId);
-          console.log(`PlatformManager: Removed layer ${layerId}`);
+          debugLog(DEBUG_MARKERS, `PlatformManager: Removed layer ${layerId}`);
         }
       } catch (e) {
         console.warn(`PlatformManager: Error removing layer ${layerId}: ${e.message}`);
@@ -1064,7 +1072,7 @@ class PlatformManager {
     try {
       if (map.getSource && typeof map.getSource === 'function' && map.getSource(sourceId)) {
         map.removeSource(sourceId);
-        console.log(`PlatformManager: Removed source ${sourceId}`);
+        debugLog(DEBUG_MARKERS, `PlatformManager: Removed source ${sourceId}`);
       }
     } catch (e) {
       console.warn(`PlatformManager: Error removing source ${sourceId}: ${e.message}`);
@@ -1089,21 +1097,21 @@ class PlatformManager {
       return;
     }
     
-    console.log('PlatformManager: Clearing all platforms from map');
+    debugLog(DEBUG_PLATFORM, 'PlatformManager: Clearing all platforms from map');
     
     // Check if the map is loaded before using onMapLoaded
     if (this.mapManager.isMapLoaded()) {
       // Map is loaded, directly remove layers and sources
       this._removePlatformLayersAndSource();
       this.platforms = []; // Clear the internal platform data
-      console.log('PlatformManager: Platforms cleared from map and data store');
+      debugLog(DEBUG_PLATFORM, 'PlatformManager: Platforms cleared from map and data store');
     } else {
       // Map is not loaded yet, queue it for when the map loads
-      console.log('PlatformManager: Map not loaded, queuing platform clearing');
+      debugLog(DEBUG_PLATFORM, 'PlatformManager: Map not loaded, queuing platform clearing');
       this.mapManager.onMapLoaded(() => {
         this._removePlatformLayersAndSource();
         this.platforms = []; // Clear the internal platform data
-        console.log('PlatformManager: Platforms cleared from map and data store (deferred)');
+        debugLog(DEBUG_PLATFORM, 'PlatformManager: Platforms cleared from map and data store (deferred)');
       });
     }
   }
@@ -1189,7 +1197,7 @@ class PlatformManager {
                 width: size, 
                 height: size 
               });
-              console.log('PlatformManager: Created custom airport icon');
+              debugLog(DEBUG_MARKERS, 'PlatformManager: Created custom airport icon');
             } catch (error) {
               console.error('PlatformManager: Error creating airport icon:', error);
             }
@@ -1551,7 +1559,7 @@ class PlatformManager {
           });
           }
           
-          console.log('PlatformManager: Platform layers added/updated.');
+          debugLog(DEBUG_MARKERS, 'PlatformManager: Platform layers added/updated.');
           
           // Ensure UI is synced with actual layer visibility
           this._syncUIWithLayers();
@@ -1561,7 +1569,7 @@ class PlatformManager {
           
           // Note: Weather features are loaded by other systems (FastPlannerApp, RightPanel)
           // PlatformManager only handles restoration during style changes
-          console.log('🌤️ ARCHITECTURE: PlatformManager will handle weather restoration during style changes only');
+          debugLog(DEBUG_MARKERS, '🌤️ ARCHITECTURE: PlatformManager will handle weather restoration during style changes only');
           
           this.triggerCallback('onPlatformsLoaded', platforms);
         } catch (error) {
@@ -1661,7 +1669,7 @@ class PlatformManager {
         }
       });
       
-      console.log(`Airfields visibility set to: ${visibility}`);
+      debugLog(DEBUG_MARKERS, `Airfields visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling airfield visibility:', error);
     }
@@ -1700,10 +1708,10 @@ class PlatformManager {
       if (map.getLayer('platforms-fixed-labels')) {
         const visibility = this.fixedPlatformsVisible ? 'visible' : 'none';
         map.setLayoutProperty('platforms-fixed-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Platform labels visibility set to: ${visibility}`);
+        debugLog(DEBUG_MARKERS, `PlatformManager: Platform labels visibility set to: ${visibility}`);
       }
       
-      console.log(`Fixed platforms visibility set to: ${visibility}`);
+      debugLog(DEBUG_MARKERS, `Fixed platforms visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling fixed platform visibility:', error);
     }
@@ -1738,7 +1746,7 @@ class PlatformManager {
         }
       });
       
-      console.log(`Movable platforms visibility set to: ${visibility}`);
+      debugLog(DEBUG_MARKERS, `Movable platforms visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling movable platform visibility:', error);
     }
@@ -1769,10 +1777,10 @@ class PlatformManager {
       if (map.getLayer('blocks-labels')) {
         const visibility = this.blocksVisible ? 'visible' : 'none';
         map.setLayoutProperty('blocks-labels', 'visibility', visibility);
-        console.log(`PlatformManager: Block labels visibility set to: ${visibility}`);
+        debugLog(DEBUG_MARKERS, `PlatformManager: Block labels visibility set to: ${visibility}`);
       }
       
-      console.log(`Blocks visibility set to: ${this.blocksVisible ? 'visible' : 'none'}`);
+      debugLog(DEBUG_MARKERS, `Blocks visibility set to: ${this.blocksVisible ? 'visible' : 'none'}`);
     } catch (error) {
       console.warn('Error toggling blocks visibility:', error);
     }
@@ -1807,7 +1815,7 @@ class PlatformManager {
         }
       });
       
-      console.log(`Fuel available overlay and labels visibility set to: ${visibility}`);
+      debugLog(DEBUG_MARKERS, `Fuel available overlay and labels visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling fuel available visibility:', error);
     }
@@ -1842,7 +1850,7 @@ class PlatformManager {
         }
       });
       
-      console.log(`Bases visibility set to: ${visibility}`);
+      debugLog(DEBUG_MARKERS, `Bases visibility set to: ${visibility}`);
     } catch (error) {
       console.warn('Error toggling bases visibility:', error);
     }
@@ -1858,8 +1866,8 @@ class PlatformManager {
     const map = this.mapManager.getMap();
     if (!map) return;
     
-    console.log('PlatformManager: Syncing UI with layer visibility states');
-    console.log('Initial states:', {
+    debugLog(DEBUG_MARKERS, 'PlatformManager: Syncing UI with layer visibility states');
+    debugLog(DEBUG_MARKERS, 'Initial states:', {
       airfields: this.airfieldsVisible,
       platforms: this.fixedPlatformsVisible, 
       movable: this.movablePlatformsVisible,
@@ -1892,14 +1900,14 @@ class PlatformManager {
     // This fixes the issue where labels don't reappear after layer recreation
     if (map.getLayer('platforms-fixed-labels')) {
       map.setLayoutProperty('platforms-fixed-labels', 'visibility', this.fixedPlatformsVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Platform labels visibility synced to: ${this.fixedPlatformsVisible ? 'visible' : 'none'}`);
+      debugLog(DEBUG_MARKERS, `PlatformManager: Platform labels visibility synced to: ${this.fixedPlatformsVisible ? 'visible' : 'none'}`);
     }
     if (map.getLayer('platforms-movable-labels')) {
       map.setLayoutProperty('platforms-movable-labels', 'visibility', this.movablePlatformsVisible ? 'visible' : 'none');
     }
     if (map.getLayer('blocks-labels')) {
       map.setLayoutProperty('blocks-labels', 'visibility', this.blocksVisible ? 'visible' : 'none');
-      console.log(`PlatformManager: Block labels visibility synced to: ${this.blocksVisible ? 'visible' : 'none'}`);
+      debugLog(DEBUG_MARKERS, `PlatformManager: Block labels visibility synced to: ${this.blocksVisible ? 'visible' : 'none'}`);
     }
     if (map.getLayer('airfields-labels')) {
       map.setLayoutProperty('airfields-labels', 'visibility', this.airfieldsVisible ? 'visible' : 'none');
@@ -1911,7 +1919,7 @@ class PlatformManager {
       map.setLayoutProperty('fuel-available-labels', 'visibility', this.fuelAvailableVisible ? 'visible' : 'none');
     }
     
-    console.log('PlatformManager: Layer visibility sync completed');
+    debugLog(DEBUG_MARKERS, 'PlatformManager: Layer visibility sync completed');
   }
 
   /**
@@ -1969,20 +1977,20 @@ class PlatformManager {
         layersFound++;
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`✅ PlatformManager: Successfully set ${layerId} visibility to ${visibility}`);
+          debugLog(DEBUG_MARKERS, `✅ PlatformManager: Successfully set ${layerId} visibility to ${visibility}`);
         } catch (e) {
           console.error(`❌ PlatformManager: Error setting visibility for ${layerId}:`, e);
         }
       } else {
-        console.log(`⚠️ PlatformManager: Layer ${layerId} not found on map`);
+        debugLog(DEBUG_MARKERS, `⚠️ PlatformManager: Layer ${layerId} not found on map`);
       }
     });
     
-    console.log(`🔍 PlatformManager: Platform visibility ${visible ? 'ON' : 'OFF'} - Processed ${layersProcessed} layers, found ${layersFound} on map`);
+    debugLog(DEBUG_MARKERS, `🔍 PlatformManager: Platform visibility ${visible ? 'ON' : 'OFF'} - Processed ${layersProcessed} layers, found ${layersFound} on map`);
     
     // DEBUG: Show ALL layers currently on the map to see what we're missing
     if (!visible) { // Only when hiding layers
-      console.log('🔍 DEBUG: ALL LAYERS CURRENTLY ON MAP:');
+      debugLog(DEBUG_MARKERS, '🔍 DEBUG: ALL LAYERS CURRENTLY ON MAP:');
       const style = map.getStyle();
       if (style && style.layers) {
         const allLayers = style.layers.map(layer => layer.id);
@@ -1995,11 +2003,11 @@ class PlatformManager {
           id.includes('base') ||
           id.includes('fuel')
         );
-        console.log('🔍 Platform-related layers on map:', platformRelated);
-        console.log('🔍 ALL layers on map:', allLayers);
+        debugLog(DEBUG_MARKERS, '🔍 Platform-related layers on map:', platformRelated);
+        debugLog(DEBUG_MARKERS, '🔍 ALL layers on map:', allLayers);
         
         // DEBUG: Check if platforms are loaded
-        console.log('🔍 DEBUG: Platform data loaded?', {
+        debugLog(DEBUG_MARKERS, '🔍 DEBUG: Platform data loaded?', {
           platformsCount: this.platforms?.length || 0,
           platformsLoaded: this.platformsLoaded,
           isVisible: this.isVisible,
@@ -2008,7 +2016,7 @@ class PlatformManager {
       }
     }
     
-    console.log(`Platform layers visibility set to: ${visibility}`);
+    debugLog(DEBUG_MARKERS, `Platform layers visibility set to: ${visibility}`);
   }
 
   /**
@@ -2031,24 +2039,24 @@ class PlatformManager {
       if (map.getLayer(layerId)) {
         try {
           map.setLayoutProperty(layerId, 'visibility', visibility);
-          console.log(`✅ OSDK waypoint layer ${layerId} visibility set to: ${visibility}`);
+          debugLog(DEBUG_MARKERS, `✅ OSDK waypoint layer ${layerId} visibility set to: ${visibility}`);
           layersFound = true;
         } catch (e) {
           console.error(`❌ Error setting OSDK waypoint layer ${layerId} visibility:`, e);
         }
       } else {
-        console.log(`⚠️ PlatformManager: OSDK waypoint layer ${layerId} NOT found on map`);
+        debugLog(DEBUG_WAYPOINT, `⚠️ PlatformManager: OSDK waypoint layer ${layerId} NOT found on map`);
       }
     });
     
     // Store visibility state
     this.osdkWaypointsVisible = visible;
-    console.log(`OSDK waypoint layer visibility set to: ${visibility}`);
+    debugLog(DEBUG_MARKERS, `OSDK waypoint layer visibility set to: ${visibility}`);
     
     // If no layers were found but we have waypoints and want to make them visible,
     // call _addOsdkWaypointsToMap to create the layers
     if (!layersFound && visible && this.osdkWaypoints && this.osdkWaypoints.length > 0) {
-      console.log("No waypoint layers found but have waypoints. Creating layers now...");
+      debugLog(DEBUG_WAYPOINT, "No waypoint layers found but have waypoints. Creating layers now...");
       this._addOsdkWaypointsToMap();
     }
   }
@@ -2061,7 +2069,7 @@ class PlatformManager {
     const map = this.mapManager.getMap();
     if (!map) return;
     
-    console.log('🗺️ Hiding base map airport/platform features during waypoint mode');
+    debugLog(DEBUG_WAYPOINT, '🗺️ Hiding base map airport/platform features during waypoint mode');
     
     // Store original visibility states for restoration
     this._baseMapStates = {};
@@ -2093,7 +2101,7 @@ class PlatformManager {
           
           // Hide the layer
           map.setLayoutProperty(layerId, 'visibility', 'none');
-          console.log(`✅ Hidden base map layer: ${layerId}`);
+          debugLog(DEBUG_MARKERS, `✅ Hidden base map layer: ${layerId}`);
         } catch (e) {
           console.warn(`⚠️ Could not hide base map layer ${layerId}:`, e);
         }
@@ -2109,14 +2117,14 @@ class PlatformManager {
     const map = this.mapManager.getMap();
     if (!map || !this._baseMapStates) return;
     
-    console.log('🗺️ Restoring base map airport/platform features after waypoint mode');
+    debugLog(DEBUG_WAYPOINT, '🗺️ Restoring base map airport/platform features after waypoint mode');
     
     // Restore each base map feature layer to its original state
     Object.entries(this._baseMapStates).forEach(([layerId, originalVisibility]) => {
       if (map.getLayer(layerId)) {
         try {
           map.setLayoutProperty(layerId, 'visibility', originalVisibility);
-          console.log(`✅ Restored base map layer: ${layerId} to ${originalVisibility}`);
+          debugLog(DEBUG_MARKERS, `✅ Restored base map layer: ${layerId} to ${originalVisibility}`);
         } catch (e) {
           console.warn(`⚠️ Could not restore base map layer ${layerId}:`, e);
         }
@@ -2135,13 +2143,13 @@ class PlatformManager {
    * @param {string} regionName - The current region name, required if waypoints need to be loaded.
    */
   toggleWaypointMode(active, client, regionName) {
-    console.log(`PlatformManager: ENTERING toggleWaypointMode. Active: ${active}, Region: ${regionName}`);
+    debugLog(DEBUG_WAYPOINT, `PlatformManager: ENTERING toggleWaypointMode. Active: ${active}, Region: ${regionName}`);
     this.waypointModeActive = active;
     window.isWaypointModeActive = active;
 
     this.mapManager.onMapLoaded(() => {
       const map = this.mapManager.getMap();
-      console.log(`PlatformManager: toggleWaypointMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
+      debugLog(DEBUG_WAYPOINT, `PlatformManager: toggleWaypointMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
       if (!map) {
         console.error("PlatformManager: Map not available for toggleWaypointMode even after onMapLoaded. Exiting.");
         return;
@@ -2149,7 +2157,7 @@ class PlatformManager {
 
       if (active) {
       // Entering waypoint mode
-      console.log("PlatformManager: Entering waypoint mode - hiding platforms, showing waypoints");
+      debugLog(DEBUG_WAYPOINT, "PlatformManager: Entering waypoint mode - hiding platforms, showing waypoints");
       
       // Store current visibility states before hiding everything
       this._preWaypointModeStates = {
@@ -2171,7 +2179,7 @@ class PlatformManager {
       
       // Check if we already have waypoints loaded
       if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
-        console.log(`🗺️ PlatformManager: ${this.osdkWaypoints.length} waypoints already loaded, making visible`);
+        debugLog(DEBUG_WAYPOINT, `🗺️ PlatformManager: ${this.osdkWaypoints.length} waypoints already loaded, making visible`);
         this._setOsdkWaypointLayerVisibility(true);
         
         // Show success message
@@ -2183,7 +2191,7 @@ class PlatformManager {
           );
         }
       } else {
-        console.log(`📥 PlatformManager: No waypoints loaded yet, need to fetch from OSDK`);
+        debugLog(DEBUG_WAYPOINT, `📥 PlatformManager: No waypoints loaded yet, need to fetch from OSDK`);
         
         // Validate client and region name
         if (!client) {
@@ -2258,7 +2266,7 @@ class PlatformManager {
         
         // Load waypoints with standardized region name
         this.loadOsdkWaypointsFromFoundry(client, regionName).then(waypoints => {
-          console.log(`PlatformManager: Successfully loaded ${waypoints.length} waypoints`);
+          debugLog(DEBUG_WAYPOINT, `PlatformManager: Successfully loaded ${waypoints.length} waypoints`);
           
           // If still in waypoint mode, make the waypoints visible
           if (this.waypointModeActive) {
@@ -2288,7 +2296,7 @@ class PlatformManager {
       }
     } else {
       // Exiting waypoint mode
-      console.log("PlatformManager: Exiting waypoint mode - hiding waypoints, showing platforms");
+      debugLog(DEBUG_WAYPOINT, "PlatformManager: Exiting waypoint mode - hiding waypoints, showing platforms");
       this._setOsdkWaypointLayerVisibility(false); // Hide OSDK waypoints
       
       // Restore platform and airport layers - always show when exiting waypoint mode
@@ -2299,13 +2307,13 @@ class PlatformManager {
       
       // Restore other layer groups to their previous states
       if (this._preWaypointModeStates) {
-        console.log("🔄 PlatformManager: Restoring layer visibility states");
+        debugLog(DEBUG_MARKERS, "🔄 PlatformManager: Restoring layer visibility states");
         this.toggleBlocksVisibility(this._preWaypointModeStates.blocksVisible);
         this.toggleBasesVisibility(this._preWaypointModeStates.basesVisible);
         this.toggleFuelAvailableVisibility(this._preWaypointModeStates.fuelAvailableVisible);
         this._preWaypointModeStates = null; // Clear stored states
       } else {
-        console.log("⚠️ PlatformManager: No stored states, using defaults");
+        debugLog(DEBUG_MARKERS, "⚠️ PlatformManager: No stored states, using defaults");
         // Default restoration - you may need to adjust these defaults
         this.toggleBlocksVisibility(true);
         this.toggleBasesVisibility(true);
@@ -2323,13 +2331,13 @@ class PlatformManager {
    * @param {boolean} active - Whether to activate alternate mode
    */
   toggleAlternateMode(active) {
-    console.log(`PlatformManager: ENTERING toggleAlternateMode. Active: ${active}`);
+    debugLog(DEBUG_MARKERS, `PlatformManager: ENTERING toggleAlternateMode. Active: ${active}`);
     this.alternateModeActive = active;
     window.isAlternateModeActive = active;
 
     this.mapManager.onMapLoaded(() => {
       const map = this.mapManager.getMap();
-      console.log(`PlatformManager: toggleAlternateMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
+      debugLog(DEBUG_MARKERS, `PlatformManager: toggleAlternateMode (inside onMapLoaded) - map instance:`, map ? 'Exists' : 'NULL');
       if (!map) {
         console.error("PlatformManager: Map not available for toggleAlternateMode even after onMapLoaded. Exiting.");
         return;
@@ -2337,7 +2345,7 @@ class PlatformManager {
 
       if (active) {
         // Entering alternate mode
-        console.log("PlatformManager: Entering alternate mode - hiding non-fuel platforms, showing fuel locations and airports");
+        debugLog(DEBUG_MARKERS, "PlatformManager: Entering alternate mode - hiding non-fuel platforms, showing fuel locations and airports");
         
         // Store current visibility states before changing anything
         this._preAlternateModeStates = {
@@ -2373,7 +2381,7 @@ class PlatformManager {
         
       } else {
         // Exiting alternate mode
-        console.log("PlatformManager: Exiting alternate mode - restoring normal platform visibility");
+        debugLog(DEBUG_MARKERS, "PlatformManager: Exiting alternate mode - restoring normal platform visibility");
         
         // Restore platform layers
         this._setPlatformLayersVisibility(true);
@@ -2383,14 +2391,14 @@ class PlatformManager {
         
         // Restore layer visibility states
         if (this._preAlternateModeStates) {
-          console.log("🔄 PlatformManager: Restoring alternate mode layer visibility states");
+          debugLog(DEBUG_MARKERS, "🔄 PlatformManager: Restoring alternate mode layer visibility states");
           this.toggleBlocksVisibility(this._preAlternateModeStates.blocksVisible);
           this.toggleBasesVisibility(this._preAlternateModeStates.basesVisible);
           this.toggleFuelAvailableVisibility(this._preAlternateModeStates.fuelAvailableVisible);
           this.toggleAirfieldsVisibility(this._preAlternateModeStates.airfieldsVisible);
           this._preAlternateModeStates = null; // Clear stored states
         } else {
-          console.log("⚠️ PlatformManager: No stored alternate mode states, using defaults");
+          debugLog(DEBUG_MARKERS, "⚠️ PlatformManager: No stored alternate mode states, using defaults");
           // Default restoration
           this.toggleBlocksVisibility(true);
           this.toggleBasesVisibility(true);
@@ -2451,7 +2459,7 @@ class PlatformManager {
     
     // Clear the stored waypoints
     this.osdkWaypoints = [];
-    console.log("PlatformManager: Cleared OSDK waypoint layers and data.");
+    debugLog(DEBUG_WAYPOINT, "PlatformManager: Cleared OSDK waypoint layers and data.");
   }
 
   /**
@@ -2515,7 +2523,7 @@ class PlatformManager {
          
          if (locationOptions.length > 0) {
            locationObject = sdk[locationOptions[0]];
-           console.log(`PlatformManager: Using ${locationOptions[0]} for waypoints`);
+           debugLog(DEBUG_WAYPOINT, `PlatformManager: Using ${locationOptions[0]} for waypoints`);
          } else {
            throw new Error('No location-related objects found in SDK for waypoints');
          }
@@ -2587,7 +2595,7 @@ class PlatformManager {
         ];
       }
       
-      console.log(`PlatformManager: Querying for ${regionName} waypoints with types: ${waypointLocationTypes.join(', ')}`);
+      debugLog(DEBUG_WAYPOINT, `PlatformManager: Querying for ${regionName} waypoints with types: ${waypointLocationTypes.join(', ')}`);
       
       // Store client reference to global for later use if needed
       window.osdkClient = client;
@@ -2595,15 +2603,15 @@ class PlatformManager {
       // For problematic regions (Norway, Nigeria, UK), make two queries to be extra thorough
       let result;
       if (regionName === "NORWAY" || regionName === "NIGERIA" || regionName === "UNITED KINGDOM" || regionName === "BRAZIL EAST") {
-        console.log(`PlatformManager: Using comprehensive waypoint loading logic for ${regionName}`);
+        debugLog(DEBUG_WAYPOINT, `PlatformManager: Using comprehensive waypoint loading logic for ${regionName}`);
         
         // First query: With locationType filter
-        console.log(`PlatformManager: First ${regionName} query with locationType filter`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: First ${regionName} query with locationType filter`);
         let result1, result2;
         
         // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil waypoints
         if (regionName === "BRAZIL EAST") {
-          console.log(`🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
+          debugLog(DEBUG_WAYPOINT, `🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
           result1 = await client(locationObject)
             .where({ 
               region: { $in: ["BRAZIL EAST", "BRAZIL"] },
@@ -2620,10 +2628,10 @@ class PlatformManager {
             .fetchPage({ $pageSize: 20000 });
         }
         
-        console.log(`PlatformManager: First query returned ${result1?.data?.length || 0} results`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: First query returned ${result1?.data?.length || 0} results`);
         
         // Second query: Without locationType filter to get everything
-        console.log(`PlatformManager: Second ${regionName} query without locationType filter`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: Second ${regionName} query without locationType filter`);
         
         // BRAZIL REGION FIX: Apply same logic to second query
         if (regionName === "BRAZIL EAST") {
@@ -2637,7 +2645,7 @@ class PlatformManager {
             .fetchPage({ $pageSize: 20000 });
         }
         
-        console.log(`PlatformManager: Second query returned ${result2?.data?.length || 0} results`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: Second query returned ${result2?.data?.length || 0} results`);
         
         // Combine results, avoiding duplicates
         const combinedData = [];
@@ -2674,18 +2682,18 @@ class PlatformManager {
           }
         }
         
-        console.log(`PlatformManager: Combined ${combinedData.length} unique results for ${regionName}`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: Combined ${combinedData.length} unique results for ${regionName}`);
         
         // Create a result object similar to the OSDK response
         result = { data: combinedData };
       }
       else {
         // For other regions, use normal query
-        console.log(`PlatformManager: Executing OSDK query for waypoints in ${regionName}`);
+        debugLog(DEBUG_WAYPOINT, `PlatformManager: Executing OSDK query for waypoints in ${regionName}`);
         
         // BRAZIL REGION FIX: Query both "BRAZIL EAST" and "BRAZIL" regions for Brazil waypoints
         if (regionName === "BRAZIL EAST") {
-          console.log(`🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
+          debugLog(DEBUG_WAYPOINT, `🇧🇷 BRAZIL WAYPOINT FIX: Querying both "BRAZIL EAST" and "BRAZIL" regions for waypoints`);
           result = await client(locationObject)
             .where({ 
               region: { $in: ["BRAZIL EAST", "BRAZIL"] },
@@ -2702,12 +2710,12 @@ class PlatformManager {
             .fetchPage({ $pageSize: 20000 });
         }
         
-        console.log(`PlatformManager: OSDK query returned ${result?.data?.length || 0} raw results`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: OSDK query returned ${result?.data?.length || 0} raw results`);
       }
       
       this.osdkWaypoints = this.processWaypointResults(result);
 
-      console.log(`PlatformManager: Loaded ${this.osdkWaypoints.length} OSDK waypoints for ${regionName}.`);
+      debugLog(DEBUG_WAYPOINT, `PlatformManager: Loaded ${this.osdkWaypoints.length} OSDK waypoints for ${regionName}.`);
       
       if (this.waypointModeActive) { // If waypoint mode is active when waypoints are loaded
         this.osdkWaypointsVisible = true; // Set them to be visible
@@ -2917,7 +2925,7 @@ class PlatformManager {
    */
   findNearestPlatform(lat, lng, maxDistance = 5) {
     if (!this.platforms || this.platforms.length === 0) {
-      console.log('PlatformManager: No platforms loaded, cannot find nearest platform');
+      debugLog(DEBUG_SEARCH, 'PlatformManager: No platforms loaded, cannot find nearest platform');
       return null;
     }
     
@@ -2962,7 +2970,7 @@ class PlatformManager {
       if (minDistance <= maxDistance) {
         return nearestPlatform;
       } else if (nearestPlatform) {
-        console.log(`PlatformManager: Nearest platform ${nearestPlatform.name} is too far (${nearestPlatform.distance.toFixed(2)} nm > ${maxDistance} nm)`);
+        debugLog(DEBUG_SEARCH, `PlatformManager: Nearest platform ${nearestPlatform.name} is too far (${nearestPlatform.distance.toFixed(2)} nm > ${maxDistance} nm)`);
       }
     } catch (error) {
       console.error('PlatformManager: Error finding nearest platform:', error);
@@ -3093,7 +3101,7 @@ class PlatformManager {
     
     // For backward compatibility, also try the original logic as fallback
     if (!searchResult.platform && searchResult.matchType === 'none') {
-      console.log(`🔍 Enhanced search failed, trying legacy search for: ${name}`);
+      debugLog(DEBUG_SEARCH, `🔍 Enhanced search failed, trying legacy search for: ${name}`);
       
       const normalizedName = name.toLowerCase().trim();
       
@@ -3132,7 +3140,7 @@ class PlatformManager {
    * Called when the map style is switched (e.g., to 3D)
    */
   restoreLayersAfterStyleChange() {
-    console.log('🔄 PlatformManager: Restoring layers after style change...');
+    debugLog(DEBUG_MARKERS, '🔄 PlatformManager: Restoring layers after style change...');
     
     if (!this.mapManager || !this.mapManager.getMap()) {
       console.warn('PlatformManager: Cannot restore layers - map not available');
@@ -3141,7 +3149,7 @@ class PlatformManager {
 
     const map = this.mapManager.getMap();
     const currentStyle = this.mapManager.getCurrentStyle?.() || 'dark';
-    console.log(`🔄 Restoring layers for style: ${currentStyle}`);
+    debugLog(DEBUG_MARKERS, `🔄 Restoring layers for style: ${currentStyle}`);
 
     // Clear any existing layers first to avoid conflicts
     this._removePlatformLayersAndSource();
@@ -3180,7 +3188,7 @@ class PlatformManager {
             });
           }
           
-          console.log(`🚁 3D functionality disabled - keeping normal 2D rigs in all modes`);
+          debugLog(DEBUG_MARKERS, `🚁 3D functionality disabled - keeping normal 2D rigs in all modes`);
           
         } catch (error) {
           console.error('❌ Error restoring platform layers:', error);
@@ -3194,7 +3202,7 @@ class PlatformManager {
 
     // Re-add OSDK waypoints if we have them loaded
     if (this.osdkWaypoints && this.osdkWaypoints.length > 0) {
-      console.log(`🔄 Restoring ${this.osdkWaypoints.length} OSDK waypoints`);
+      debugLog(DEBUG_WAYPOINT, `🔄 Restoring ${this.osdkWaypoints.length} OSDK waypoints`);
       setTimeout(() => {
         try {
           this.addOsdkWaypointsToMap();
@@ -3222,7 +3230,7 @@ class PlatformManager {
     //   console.log('🚁 Adding 3D rigs on top for enhanced 3D mode');
     //   this.add3DRigsOnTopOfExistingLayers();
     // }, 500);
-    console.log('🚁 3D rigs disabled - keeping normal 2D platform layers');
+    debugLog(DEBUG_MARKERS, '🚁 3D rigs disabled - keeping normal 2D platform layers');
   }
 
   /**
@@ -3397,7 +3405,7 @@ class PlatformManager {
       // if (currentStyle === '3d' || currentStyle === 'satellite') {
       //   this.add3DRigModels();
       // }
-      console.log(`ℹ️ 3D rig models disabled - keeping normal circle markers in ${currentStyle} mode`);
+      debugLog(DEBUG_MARKERS, `ℹ️ 3D rig models disabled - keeping normal circle markers in ${currentStyle} mode`);
 
       console.log('✅ Basic platform layers added successfully');
       
@@ -3434,7 +3442,7 @@ class PlatformManager {
 
     // CRITICAL: Prevent infinite loop by checking if 3D layer already exists
     if (map.getLayer('3d-rigs-layer')) {
-      console.log('ℹ️ 3D rigs layer already exists, skipping creation');
+      debugLog(DEBUG_MARKERS, 'ℹ️ 3D rigs layer already exists, skipping creation');
       this._adding3DModels = false;
       return;
     }
@@ -3462,7 +3470,7 @@ class PlatformManager {
       p.coordinates && p.coordinates.length === 2
     );
 
-    console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs`);
+    debugLog(DEBUG_MARKERS, `🛢️ Creating 3D models for ${rigsFor3D.length} rigs`);
     if (rigsFor3D.length > 0) {
     }
 
@@ -3500,7 +3508,7 @@ class PlatformManager {
         renderingMode: '3d',
       
       onAdd: function(map, gl) {
-        console.log('🛢️ Initializing 3D rig layer...');
+        debugLog(DEBUG_MARKERS, '🛢️ Initializing 3D rig layer...');
         
         try {
           // Initialize Three.js scene
@@ -3524,7 +3532,7 @@ class PlatformManager {
             }
           });
 
-          console.log(`✅ 3D rig layer initialized with ${modelData.length} models`);
+          debugLog(DEBUG_MARKERS, `✅ 3D rig layer initialized with ${modelData.length} models`);
           
         } catch (error) {
           console.error('❌ Error initializing 3D rig layer:', error);
@@ -3534,7 +3542,7 @@ class PlatformManager {
       render: function(gl, matrix) {
         // Add occasional debug to verify rendering is happening
         if (Math.random() < 0.001) { // Log 1 in 1000 renders
-          console.log('🎨 3D rig render cycle active');
+          debugLog(DEBUG_MARKERS, '🎨 3D rig render cycle active');
         }
         
         try {
@@ -3563,7 +3571,7 @@ class PlatformManager {
       },
 
       createRigModel: function(rig, index) {
-        console.log(`🛢️ Creating 3D model for ${rig.name} at [${rig.coordinates}]`);
+        debugLog(DEBUG_MARKERS, `🛢️ Creating 3D model for ${rig.name} at [${rig.coordinates}]`);
         
         try {
           // Create a simple oil rig structure
@@ -3614,7 +3622,7 @@ class PlatformManager {
 
 
           this.scene.add(rigGroup);
-          console.log(`✅ Added MASSIVE 3D model ${index + 1} for ${rig.name}`);
+          debugLog(DEBUG_MARKERS, `✅ Added MASSIVE 3D model ${index + 1} for ${rig.name}`);
           
         } catch (error) {
           console.error(`❌ Error in createRigModel for ${rig.name}:`, error);
@@ -3622,7 +3630,7 @@ class PlatformManager {
       }
     });
 
-      console.log('🛢️ 3D rig layer added to map');
+      debugLog(DEBUG_MARKERS, '🛢️ 3D rig layer added to map');
       
     } catch (error) {
       console.error('❌ Error adding 3D rig layer:', error);
@@ -3647,7 +3655,7 @@ class PlatformManager {
         
         if (newStyle === '3d') {
           // 3D MODE: Keep rigs OFF for clean view (no clutter)
-          console.log('🔄 RESTORE: 3D mode - keeping rigs OFF for clean view');
+          debugLog(DEBUG_MARKERS, '🔄 RESTORE: 3D mode - keeping rigs OFF for clean view');
           
           // Restore weather circles and alternate lines in 3D mode too
           this.restoreWeatherFeatures();
@@ -3838,7 +3846,7 @@ class PlatformManager {
       p.coordinates && p.coordinates.length === 2
     ).slice(0, 10); // Just first 10 for testing
 
-    console.log(`🛢️ Creating simple 3D markers for ${rigsFor3D.length} rigs`);
+    debugLog(DEBUG_MARKERS, `🛢️ Creating simple 3D markers for ${rigsFor3D.length} rigs`);
 
     if (rigsFor3D.length === 0) {
       console.log('ℹ️ No rigs found for simple 3D markers');
@@ -3923,7 +3931,7 @@ class PlatformManager {
       }
     });
 
-    console.log(`✅ Added ${rigsFor3D.length} layered 3D-style oil rig markers!`);
+    debugLog(DEBUG_MARKERS, `✅ Added ${rigsFor3D.length} layered 3D-style oil rig markers!`);
   }
 
   /**
@@ -3940,7 +3948,7 @@ class PlatformManager {
     const layersToRemove = ['real-3d-rigs', 'real-3d-rigs-helipad'];
     layersToRemove.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`🧹 Removing existing layer: ${layerId}`);
+        debugLog(DEBUG_MARKERS, `🧹 Removing existing layer: ${layerId}`);
         map.removeLayer(layerId);
       }
     });
@@ -3956,7 +3964,7 @@ class PlatformManager {
       p.coordinates && p.coordinates.length === 2
     ).slice(0, 3); // Just 3 for testing
 
-    console.log(`🛢️ Creating REAL 3D models for ${rigsFor3D.length} rigs using POLYGON geometry`);
+    debugLog(DEBUG_MARKERS, `🛢️ Creating REAL 3D models for ${rigsFor3D.length} rigs using POLYGON geometry`);
 
     if (rigsFor3D.length === 0) {
       console.log('ℹ️ No rigs found for real 3D modeling');
@@ -4027,7 +4035,7 @@ class PlatformManager {
       }
     });
 
-    console.log(`✅ Added ${rigsFor3D.length} REAL 3D extruded oil rigs with POLYGON geometry!`);
+    debugLog(DEBUG_MARKERS, `✅ Added ${rigsFor3D.length} REAL 3D extruded oil rigs with POLYGON geometry!`);
   }
 
   /**
@@ -4052,7 +4060,7 @@ class PlatformManager {
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ No map available`);
+      debugLog(DEBUG_MARKERS, `❌ No map available`);
       return;
     }
 
@@ -4079,7 +4087,7 @@ class PlatformManager {
     console.log(`🛢️ Creating ${rigsFor3D.length} Three.js rigs`);
 
     if (rigsFor3D.length === 0) {
-      console.log('❌ No rigs found');
+      debugLog(DEBUG_MARKERS, '❌ No rigs found');
       return;
     }
 
@@ -4182,7 +4190,7 @@ class PlatformManager {
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ No map available`);
+      debugLog(DEBUG_MARKERS, `❌ No map available`);
       return;
     }
 
@@ -4205,10 +4213,10 @@ class PlatformManager {
       p.coordinates && p.coordinates.length === 2
     ).slice(0, 200); // More rigs now that they're smaller!
 
-    console.log(`🛢️ Creating 3D models for ${allRigs.length} rigs of different types`);
+    debugLog(DEBUG_MARKERS, `🛢️ Creating 3D models for ${allRigs.length} rigs of different types`);
 
     if (allRigs.length === 0) {
-      console.log('❌ No rigs found');
+      debugLog(DEBUG_MARKERS, '❌ No rigs found');
       return;
     }
 
@@ -4241,7 +4249,7 @@ class PlatformManager {
       renderingMode: '3d',
       
       onAdd: function(map, gl) {
-        console.log('🚁 Initializing ALL 3D RIGS layer');
+        debugLog(DEBUG_MARKERS, '🚁 Initializing ALL 3D RIGS layer');
         
         // Create Three.js scene
         this.camera = new THREE.Camera();
@@ -4262,7 +4270,7 @@ class PlatformManager {
           this.createRigByType(rig, index);
         });
 
-        console.log(`✅ ALL 3D RIGS layer initialized with ${rigData.length} models`);
+        debugLog(DEBUG_MARKERS, `✅ ALL 3D RIGS layer initialized with ${rigData.length} models`);
       },
 
       render: function(gl, matrix) {
@@ -4295,7 +4303,7 @@ class PlatformManager {
         this.scene.add(rigGroup);
         
         if (index < 10) { // Only log first 10 to avoid spam
-          console.log(`✅ Added realistic ${rig.type} rig for ${rig.name}`);
+          debugLog(DEBUG_MARKERS, `✅ Added realistic ${rig.type} rig for ${rig.name}`);
         }
       },
 
@@ -4380,24 +4388,24 @@ class PlatformManager {
       }
     });
 
-    console.log('🚁 ALL 3D RIGS layer added to map - NO MORE CIRCLES!');
+    debugLog(DEBUG_MARKERS, '🚁 ALL 3D RIGS layer added to map - NO MORE CIRCLES!');
   }
 
   /**
    * 🛢️ ADD 3D RIGS ON TOP - Don't touch the beautiful original 2D styling!
    */
   add3DRigsOnTopOfExistingLayers() {
-    console.log(`🚁 ADDING 3D rigs ON TOP of existing beautiful layers!`);
+    debugLog(DEBUG_MARKERS, `🚁 ADDING 3D rigs ON TOP of existing beautiful layers!`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ No map available`);
+      debugLog(DEBUG_MARKERS, `❌ No map available`);
       return;
     }
 
     // Clean up ONLY our 3D layer (don't touch original 2D layers!)
     if (map.getLayer('additive-3d-rigs-layer')) {
-      console.log('🧹 Removing only our 3D layer, keeping original beautiful styling');
+      debugLog(DEBUG_MARKERS, '🧹 Removing only our 3D layer, keeping original beautiful styling');
       map.removeLayer('additive-3d-rigs-layer');
     }
 
@@ -4407,19 +4415,19 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ Three.js available - adding 3D models ON TOP of original styling`);
+    debugLog(DEBUG_MARKERS, `✅ Three.js available - adding 3D models ON TOP of original styling`);
 
     // Get ONLY BLOCKS for 3D rig replacement
     const rigsFor3D = this.platforms.filter(p => 
       p.isBlocks && p.coordinates && p.coordinates.length === 2
     ); // All blocks, no limit
     
-    console.log(`🎯 BLOCKS ONLY: Found ${rigsFor3D.length} blocks to replace with 3D rigs`);
+    debugLog(DEBUG_MARKERS, `🎯 BLOCKS ONLY: Found ${rigsFor3D.length} blocks to replace with 3D rigs`);
 
-    console.log(`🛢️ Creating 3D models for ${rigsFor3D.length} rigs ON TOP of existing styling`);
+    debugLog(DEBUG_MARKERS, `🛢️ Creating 3D models for ${rigsFor3D.length} rigs ON TOP of existing styling`);
 
     if (rigsFor3D.length === 0) {
-      console.log('❌ No rigs found');
+      debugLog(DEBUG_MARKERS, '❌ No rigs found');
       return;
     }
 
@@ -4440,7 +4448,7 @@ class PlatformManager {
       renderingMode: '3d',
       
       onAdd: function(map, gl) {
-        console.log('🚁 Initializing ADDITIVE 3D RIGS layer - keeping original styling!');
+        debugLog(DEBUG_MARKERS, '🚁 Initializing ADDITIVE 3D RIGS layer - keeping original styling!');
         
         // Create Three.js scene
         this.camera = new THREE.Camera();
@@ -4461,7 +4469,7 @@ class PlatformManager {
           this.createSimple3DRig(rig, index);
         });
 
-        console.log(`✅ ADDITIVE 3D RIGS layer initialized - original styling preserved!`);
+        debugLog(DEBUG_MARKERS, `✅ ADDITIVE 3D RIGS layer initialized - original styling preserved!`);
       },
 
       render: function(gl, matrix) {
@@ -4541,12 +4549,12 @@ class PlatformManager {
         this.scene.add(rigGroup);
         
         if (index < 5) {
-          console.log(`✅ Added rig for ${rig.name} - deck should be at ground level for pin landing!`);
+          debugLog(DEBUG_MARKERS, `✅ Added rig for ${rig.name} - deck should be at ground level for pin landing!`);
         }
       }
     });
 
-    console.log('🚁 ADDITIVE 3D layer added - original beautiful styling PRESERVED!');
+    debugLog(DEBUG_MARKERS, '🚁 ADDITIVE 3D layer added - original beautiful styling PRESERVED!');
     
     // REMOVED: Flashing Mapbox labels - using physical nameplates instead
   }
@@ -4555,17 +4563,17 @@ class PlatformManager {
    * 🎯 REPLACE ALL BLOCKS WITH 3D RIGS - Dedicated function for blocks only
    */
   replaceBlocksWith3DRigs() {
-    console.log(`🎯 REPLACING ALL BLOCKS WITH 3D RIGS!`);
+    debugLog(DEBUG_MARKERS, `🎯 REPLACING ALL BLOCKS WITH 3D RIGS!`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ No map available`);
+      debugLog(DEBUG_MARKERS, `❌ No map available`);
       return;
     }
 
     // Clean up any existing 3D layers
     if (map.getLayer('blocks-3d-rigs-layer')) {
-      console.log('🧹 Removing existing blocks 3D layer');
+      debugLog(DEBUG_MARKERS, '🧹 Removing existing blocks 3D layer');
       map.removeLayer('blocks-3d-rigs-layer');
     }
     
@@ -4576,7 +4584,7 @@ class PlatformManager {
     
     blockLayers.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`🙈 Hiding regular block layer: ${layerId}`);
+        debugLog(DEBUG_MARKERS, `🙈 Hiding regular block layer: ${layerId}`);
         map.setLayoutProperty(layerId, 'visibility', 'none');
       }
     });
@@ -4587,17 +4595,17 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ Three.js available - replacing blocks with 3D rigs`);
+    debugLog(DEBUG_MARKERS, `✅ Three.js available - replacing blocks with 3D rigs`);
 
     // Get ONLY blocks for replacement
     const blocksFor3D = this.platforms.filter(p => 
       p.isBlocks && p.coordinates && p.coordinates.length === 2
     );
     
-    console.log(`🎯 Found ${blocksFor3D.length} blocks to replace with 3D rigs`);
+    debugLog(DEBUG_MARKERS, `🎯 Found ${blocksFor3D.length} blocks to replace with 3D rigs`);
 
     if (blocksFor3D.length === 0) {
-      console.log('❌ No blocks found');
+      debugLog(DEBUG_MARKERS, '❌ No blocks found');
       return;
     }
 
@@ -4615,7 +4623,7 @@ class PlatformManager {
       renderingMode: '3d',
       
       onAdd: function(map, gl) {
-        console.log('🎯 Initializing BLOCKS 3D RIGS layer');
+        debugLog(DEBUG_MARKERS, '🎯 Initializing BLOCKS 3D RIGS layer');
         
         // Create Three.js scene
         this.camera = new THREE.Camera();
@@ -4636,7 +4644,7 @@ class PlatformManager {
           this.createBlockRig(block, index);
         });
 
-        console.log(`✅ BLOCKS 3D RIGS layer initialized with ${rigData.length} rigs!`);
+        debugLog(DEBUG_MARKERS, `✅ BLOCKS 3D RIGS layer initialized with ${rigData.length} rigs!`);
       },
 
       render: function(gl, matrix) {
@@ -4676,28 +4684,28 @@ class PlatformManager {
         rigGroup.applyMatrix4(modelAsMatrix);
         
         this.scene.add(rigGroup);
-        console.log(`✅ Added 3D rig for block: ${block.name}`);
+        debugLog(DEBUG_MARKERS, `✅ Added 3D rig for block: ${block.name}`);
       }
     });
 
-    console.log('🎯 BLOCKS 3D RIGS layer added - blocks replaced with 3D rigs!');
+    debugLog(DEBUG_MARKERS, '🎯 BLOCKS 3D RIGS layer added - blocks replaced with 3D rigs!');
   }
 
   /**
    * 🏗️ REPLACE ALL PLATFORMS WITH BIG 3D RIGS WITH TOWERS - Dedicated function for platforms
    */
   replacePlatformsWith3DRigs() {
-    console.log(`🏗️ REPLACING ALL PLATFORMS WITH BIG 3D RIGS WITH TOWERS!`);
+    debugLog(DEBUG_MARKERS, `🏗️ REPLACING ALL PLATFORMS WITH BIG 3D RIGS WITH TOWERS!`);
     
     const map = this.mapManager.getMap();
     if (!map) {
-      console.log(`❌ No map available`);
+      debugLog(DEBUG_MARKERS, `❌ No map available`);
       return;
     }
 
     // Clean up any existing platform 3D layers
     if (map.getLayer('platforms-3d-rigs-layer')) {
-      console.log('🧹 Removing existing platforms 3D layer');
+      debugLog(DEBUG_MARKERS, '🧹 Removing existing platforms 3D layer');
       map.removeLayer('platforms-3d-rigs-layer');
     }
     
@@ -4709,7 +4717,7 @@ class PlatformManager {
     
     platformLayers.forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`🙈 Hiding regular platform layer: ${layerId}`);
+        debugLog(DEBUG_MARKERS, `🙈 Hiding regular platform layer: ${layerId}`);
         map.setLayoutProperty(layerId, 'visibility', 'none');
       }
     });
@@ -4720,17 +4728,17 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ Three.js available - replacing platforms with BIG 3D rigs with towers`);
+    debugLog(DEBUG_MARKERS, `✅ Three.js available - replacing platforms with BIG 3D rigs with towers`);
 
     // Get ONLY platforms for replacement (isPlatform but not blocks, bases, etc.)
     const platformsFor3D = this.platforms.filter(p => 
       p.isPlatform && !p.isBlocks && !p.isBases && !p.isAirfield && p.coordinates && p.coordinates.length === 2
     );
     
-    console.log(`🏗️ Found ${platformsFor3D.length} platforms to replace with big 3D rigs with towers`);
+    debugLog(DEBUG_MARKERS, `🏗️ Found ${platformsFor3D.length} platforms to replace with big 3D rigs with towers`);
 
     if (platformsFor3D.length === 0) {
-      console.log('❌ No platforms found');
+      debugLog(DEBUG_MARKERS, '❌ No platforms found');
       return;
     }
 
@@ -4749,7 +4757,7 @@ class PlatformManager {
       renderingMode: '3d',
       
       onAdd: function(map, gl) {
-        console.log('🏗️ Initializing PLATFORMS 3D RIGS layer with towers');
+        debugLog(DEBUG_MARKERS, '🏗️ Initializing PLATFORMS 3D RIGS layer with towers');
         
         // Create Three.js scene
         this.camera = new THREE.Camera();
@@ -4770,7 +4778,7 @@ class PlatformManager {
           this.createPlatformRigWithTower(platform, index);
         });
 
-        console.log(`✅ PLATFORMS 3D RIGS layer initialized with ${rigData.length} big rigs with towers!`);
+        debugLog(DEBUG_MARKERS, `✅ PLATFORMS 3D RIGS layer initialized with ${rigData.length} big rigs with towers!`);
       },
 
       render: function(gl, matrix) {
@@ -4826,18 +4834,18 @@ class PlatformManager {
         rigGroup.applyMatrix4(modelAsMatrix);
         
         this.scene.add(rigGroup);
-        console.log(`✅ Added BIG 3D rig with tower for platform: ${platform.name}`);
+        debugLog(DEBUG_MARKERS, `✅ Added BIG 3D rig with tower for platform: ${platform.name}`);
       }
     });
 
-    console.log('🏗️ PLATFORMS 3D RIGS layer added - platforms replaced with big 3D rigs with towers!');
+    debugLog(DEBUG_MARKERS, '🏗️ PLATFORMS 3D RIGS layer added - platforms replaced with big 3D rigs with towers!');
   }
 
   /**
    * 🚁 AUTO 3D RIGS - Enable all 3D rigs automatically when switching to 3D view
    */
   enableAuto3DRigs() {
-    console.log('🚁 AUTO-ENABLING ALL 3D RIGS for 3D view...');
+    debugLog(DEBUG_MARKERS, '🚁 AUTO-ENABLING ALL 3D RIGS for 3D view...');
     
     const map = this.mapManager.getMap();
     if (!map) {
@@ -4846,16 +4854,16 @@ class PlatformManager {
     }
 
     // DEBUG: Check if we have platforms data
-    console.log(`🔍 DEBUG: Have ${this.platforms?.length || 0} platforms in memory`);
+    debugLog(DEBUG_MARKERS, `🔍 DEBUG: Have ${this.platforms?.length || 0} platforms in memory`);
     if (!this.platforms || this.platforms.length === 0) {
-      console.log('❌ No platforms data available for 3D rigs');
+      debugLog(DEBUG_MARKERS, '❌ No platforms data available for 3D rigs');
       return;
     }
 
     // Clean up any existing 3D layers
     ['blocks-3d-rigs-layer', 'platforms-3d-rigs-layer', 'auto-3d-rigs-layer'].forEach(layerId => {
       if (map.getLayer(layerId)) {
-        console.log(`🧹 Removing existing layer: ${layerId}`);
+        debugLog(DEBUG_MARKERS, `🧹 Removing existing layer: ${layerId}`);
         map.removeLayer(layerId);
       }
     });
@@ -4868,7 +4876,7 @@ class PlatformManager {
       return;
     }
 
-    console.log(`✅ Creating auto 3D rigs for all ${this.platforms.length} platforms`);
+    debugLog(DEBUG_MARKERS, `✅ Creating auto 3D rigs for all ${this.platforms.length} platforms`);
 
     // Get all platforms that have coordinates
     const allPlatformsFor3D = this.platforms.filter(p => 
@@ -4876,7 +4884,7 @@ class PlatformManager {
     );
     
     if (allPlatformsFor3D.length === 0) {
-      console.log('❌ No platforms with coordinates found');
+      debugLog(DEBUG_MARKERS, '❌ No platforms with coordinates found');
       return;
     }
 

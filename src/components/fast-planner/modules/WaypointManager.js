@@ -4,6 +4,18 @@
  * Handles waypoint creation, deletion, and manipulation
  */
 
+// Debug flags for controlling console output
+const DEBUG_WAYPOINT_ADD = false;       // Waypoint addition operations
+const DEBUG_WAYPOINT_REMOVE = false;    // Waypoint removal operations  
+const DEBUG_WAYPOINT_LOAD = false;      // Waypoint loading from OSDK
+const DEBUG_WAYPOINT_SEARCH = false;    // Waypoint search operations
+const DEBUG_WAYPOINT_MODE = false;      // Waypoint mode switching and dragging
+const DEBUG_MARKERS = false;            // Marker operations
+const DEBUG_REGIONS = false;            // Region filtering
+const DEBUG_ROUTE = false;              // Route creation and updates
+const DEBUG_ALTERNATES = false;         // Alternate route operations
+const DEBUG_PERFORMANCE = false;        // Performance-related logging
+
 class WaypointManager {
   constructor(mapManager, platformManager = null) {
     this.mapManager = mapManager;
@@ -38,7 +50,7 @@ class WaypointManager {
    * Clear stored alternate route data (call when starting new route)
    */
   clearAlternateRouteData() {
-    console.log('⭐ Clearing stored alternate route data');
+    if (DEBUG_ALTERNATES) console.log('⭐ Clearing stored alternate route data');
     this.storedAlternateRouteData = null;
   }
 
@@ -47,12 +59,12 @@ class WaypointManager {
    */
   disableWaypointDragging() {
     this.isWaypointDraggingDisabled = true;
-    console.log('🚫 WaypointManager: Waypoint dragging disabled');
+    if (DEBUG_WAYPOINT_MODE) console.log('🚫 WaypointManager: Waypoint dragging disabled');
   }
 
   enableWaypointDragging() {
     this.isWaypointDraggingDisabled = false;
-    console.log('✅ WaypointManager: Waypoint dragging enabled');
+    if (DEBUG_WAYPOINT_MODE) console.log('✅ WaypointManager: Waypoint dragging enabled');
   }
 
   /**
@@ -60,7 +72,7 @@ class WaypointManager {
    */
   setWaiveAlternates(shouldWaive) {
     this.waiveAlternates = shouldWaive;
-    console.log(`🛩️ WaypointManager: Waive alternates set to ${shouldWaive}`);
+    if (DEBUG_WAYPOINT_MODE) console.log(`🛩️ WaypointManager: Waive alternates set to ${shouldWaive}`);
   }
 
 
@@ -125,13 +137,13 @@ class WaypointManager {
     const legIndex = this._calculateLegIndex(isWaypoint, allCurrentWaypoints.length, allCurrentWaypoints);
     
     // CRITICAL FIX: Improved waypoint naming and coordinate snapping
-    console.log(`[WM.addWaypoint] Received name: "${name}", options:`, options);
+    if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] Received name: "${name}", options:`, options);
     let waypointName = name;
     let snappedCoords = [...coords]; // Create a copy to avoid reference issues
     
     // If no name provided, try to find nearby waypoint or platform to snap to
     if (!waypointName) {
-      console.log(`[WM.addWaypoint] waypointName is initially falsy. Attempting to find/snap name. isWaypoint: ${isWaypoint}`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] waypointName is initially falsy. Attempting to find/snap name. isWaypoint: ${isWaypoint}`);
       // For navigation waypoints, try to snap to nearest OSDK waypoint
       if (isWaypoint && this.platformManager) {
         let nearestNavWaypoint = null;
@@ -149,7 +161,7 @@ class WaypointManager {
         if (nearestNavWaypoint) {
           waypointName = nearestNavWaypoint.name;
           snappedCoords = nearestNavWaypoint.coordinates || nearestNavWaypoint.coords || coords;
-          console.log(`Snapped to navigation waypoint: ${waypointName} at [${snappedCoords}]`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`Snapped to navigation waypoint: ${waypointName} at [${snappedCoords}]`);
           
           // Show feedback to user
           if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -162,7 +174,7 @@ class WaypointManager {
         } else {
           // Default name for navigation waypoints
           waypointName = `Waypoint ${this.waypoints.length + 1}`;
-          console.log(`[WM.addWaypoint] Defaulted to navigation waypoint name: "${waypointName}"`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] Defaulted to navigation waypoint name: "${waypointName}"`);
         }
       } 
       // For stops, try to snap to nearest platform
@@ -177,7 +189,7 @@ class WaypointManager {
         if (nearestPlatform) {
           waypointName = nearestPlatform.name;
           snappedCoords = nearestPlatform.coordinates || nearestPlatform.coords || coords;
-          console.log(`Snapped to platform: ${waypointName} at [${snappedCoords}]`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`Snapped to platform: ${waypointName} at [${snappedCoords}]`);
           
           // Show feedback to user
           if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -190,15 +202,15 @@ class WaypointManager {
         } else {
           // Default name for stops
           waypointName = `Stop ${this.waypoints.length + 1}`;
-          console.log(`[WM.addWaypoint] Defaulted to stop name: "${waypointName}"`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] Defaulted to stop name: "${waypointName}"`);
         }
       } else {
         // Default names if platformManager not available
         waypointName = isWaypoint ? `Waypoint ${this.waypoints.length + 1}` : `Stop ${this.waypoints.length + 1}`;
-        console.log(`[WM.addWaypoint] PlatformManager not available or not applicable, defaulted to: "${waypointName}"`);
+        if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] PlatformManager not available or not applicable, defaulted to: "${waypointName}"`);
       }
     } else {
-      console.log(`[WM.addWaypoint] Using provided waypointName: "${waypointName}"`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypoint] Using provided waypointName: "${waypointName}"`);
     }
     
     // Create the waypoint object with explicit type information
@@ -236,7 +248,7 @@ class WaypointManager {
         marker.on('dragend', () => {
           // LOCK CHECK: Prevent waypoint marker dragging when editing is locked
           if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
-            console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
+            if (DEBUG_WAYPOINT_MODE) console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
             }
@@ -269,8 +281,8 @@ class WaypointManager {
       this.triggerCallback('onWaypointAdded', waypoint);
       this.triggerCallback('onChange', this.waypoints);
       
-      console.log('🗺️ WaypointManager: addWaypoint complete, total waypoints:', this.waypoints.length);
-      console.log('🗺️ WaypointManager: triggerCallback onChange called with waypoints:', this.waypoints.map(wp => ({ name: wp.name, coords: wp.coords })));
+      if (DEBUG_WAYPOINT_ADD) console.log('🗺️ WaypointManager: addWaypoint complete, total waypoints:', this.waypoints.length);
+      if (DEBUG_WAYPOINT_ADD) console.log('🗺️ WaypointManager: triggerCallback onChange called with waypoints:', this.waypoints.map(wp => ({ name: wp.name, coords: wp.coords })));
       
       return waypoint;
     } catch (error) {
@@ -308,7 +320,7 @@ class WaypointManager {
           const nearestOsdkWp = platformMgr.findNearestOsdkWaypoint(newCoords[1], newCoords[0], 2);
           if (nearestOsdkWp) {
             potentialName = nearestOsdkWp.name;
-            console.log(`Snapped waypoint to: ${potentialName}`);
+            if (DEBUG_WAYPOINT_ADD) console.log(`Snapped waypoint to: ${potentialName}`);
             
             // Show feedback to user
             if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -327,7 +339,7 @@ class WaypointManager {
           const nearestPlatform = platformMgr.findNearestPlatform(newCoords[1], newCoords[0], 2);
           if (nearestPlatform) {
             potentialName = nearestPlatform.name;
-            console.log(`Snapped stop to: ${potentialName}`);
+            if (DEBUG_WAYPOINT_ADD) console.log(`Snapped stop to: ${potentialName}`);
             
             // Show feedback to user
             if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -425,7 +437,7 @@ class WaypointManager {
    */
   async addWaypointByName(waypointName, options = {}) {
     try {
-      console.log(`WaypointManager.addWaypointByName: Looking up waypoint "${waypointName}"`);
+      if (DEBUG_WAYPOINT_SEARCH) console.log(`WaypointManager.addWaypointByName: Looking up waypoint "${waypointName}"`);
       
       if (!waypointName || typeof waypointName !== 'string') {
         console.error('Invalid waypoint name provided:', waypointName);
@@ -537,13 +549,13 @@ class WaypointManager {
     const legIndex = this._calculateLegIndex(isWaypoint, index, allCurrentWaypoints);
     
     // CRITICAL FIX: Improved waypoint naming and coordinate snapping
-    console.log(`[WM.addWaypointAtIndex] Received name: "${name}", index: ${index}, options:`, options);
+    if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] Received name: "${name}", index: ${index}, options:`, options);
     let waypointName = name;
     let snappedCoords = [...coords]; // Create a copy to avoid reference issues
     
     // If no name provided, try to find nearby waypoint or platform to snap to
     if (!waypointName) {
-      console.log(`[WM.addWaypointAtIndex] waypointName is initially falsy. Attempting to find/snap name. isWaypoint: ${isWaypoint}`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] waypointName is initially falsy. Attempting to find/snap name. isWaypoint: ${isWaypoint}`);
       // For navigation waypoints, try to snap to nearest OSDK waypoint
       if (isWaypoint && this.platformManager) {
         let nearestNavWaypoint = null;
@@ -561,7 +573,7 @@ class WaypointManager {
         if (nearestNavWaypoint) {
           waypointName = nearestNavWaypoint.name;
           snappedCoords = nearestNavWaypoint.coordinates || nearestNavWaypoint.coords || coords;
-          console.log(`Snapped to navigation waypoint: ${waypointName} at [${snappedCoords}]`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`Snapped to navigation waypoint: ${waypointName} at [${snappedCoords}]`);
           
           // Show feedback to user
           if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -574,7 +586,7 @@ class WaypointManager {
         } else {
           // Default name for navigation waypoints
           waypointName = `Waypoint ${index + 1}`;
-          console.log(`[WM.addWaypointAtIndex] Defaulted to navigation waypoint name: "${waypointName}"`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] Defaulted to navigation waypoint name: "${waypointName}"`);
         }
       } 
       // For stops, try to snap to nearest platform
@@ -589,7 +601,7 @@ class WaypointManager {
         if (nearestPlatform) {
           waypointName = nearestPlatform.name;
           snappedCoords = nearestPlatform.coordinates || nearestPlatform.coords || coords;
-          console.log(`Snapped to platform: ${waypointName} at [${snappedCoords}]`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`Snapped to platform: ${waypointName} at [${snappedCoords}]`);
           
           // Show feedback to user
           if (window.LoadingIndicator && window.LoadingIndicator.updateStatusIndicator) {
@@ -602,15 +614,15 @@ class WaypointManager {
         } else {
           // Default name for stops
           waypointName = `Stop ${index + 1}`;
-          console.log(`[WM.addWaypointAtIndex] Defaulted to stop name: "${waypointName}"`);
+          if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] Defaulted to stop name: "${waypointName}"`);
         }
       } else {
         // Default names if platformManager not available
         waypointName = isWaypoint ? `Waypoint ${index + 1}` : `Stop ${index + 1}`;
-        console.log(`[WM.addWaypointAtIndex] PlatformManager not available or not applicable, defaulted to: "${waypointName}"`);
+        if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] PlatformManager not available or not applicable, defaulted to: "${waypointName}"`);
       }
     } else {
-      console.log(`[WM.addWaypointAtIndex] Using provided waypointName: "${waypointName}"`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`[WM.addWaypointAtIndex] Using provided waypointName: "${waypointName}"`);
     }
     
     // Create the waypoint object with explicit type information
@@ -648,7 +660,7 @@ class WaypointManager {
     marker.on('dragend', () => {
       // LOCK CHECK: Prevent waypoint marker dragging when editing is locked
       if (this.isWaypointDraggingDisabled || window.isEditLocked === true) {
-        console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
+        if (DEBUG_WAYPOINT_MODE) console.log('🔒 WaypointManager: Reverting waypoint drag - editing is locked');
         if (window.LoadingIndicator) {
           window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
         }
@@ -675,14 +687,14 @@ class WaypointManager {
       this.waypoints.splice(index, 0, waypoint);
       this.markers.splice(index, 0, marker);
       
-      console.log(`Successfully added ${pointType} at index ${index}: ${waypointName}`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`Successfully added ${pointType} at index ${index}: ${waypointName}`);
     } catch (error) {
       console.error('Error adding waypoint at index:', error);
       
       // Fallback to adding at end if splice fails
       this.waypoints.push(waypoint);
       this.markers.push(marker);
-      console.log(`Fallback: Added ${pointType} at end: ${waypointName}`);
+      if (DEBUG_WAYPOINT_ADD) console.log(`Fallback: Added ${pointType} at end: ${waypointName}`);
     }
     
     // Update the route display
@@ -907,7 +919,7 @@ class WaypointManager {
       maxCurveOffset = Math.min(0.1, distance * 0.006); // Max for long distances
     }
     
-    console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
+    if (DEBUG_ROUTE) console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
     
     for (let i = 0; i <= numPoints; i++) {
       const t = i / numPoints; // Progress along the segment (0 to 1)
@@ -953,7 +965,7 @@ class WaypointManager {
       maxCurveOffset = Math.min(0.08, distance * 0.005); // Slightly reduced max for long distances
     }
     
-    console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
+    if (DEBUG_ROUTE) console.log(`🚀 Creating curved segment: distance=${distance}nm, curveOffset=${maxCurveOffset}, points=${numPoints}`);
     
     for (let i = 0; i <= numPoints; i++) {
       const t = i / numPoints; // Progress along the segment (0 to 1)
@@ -993,8 +1005,8 @@ class WaypointManager {
   }
 
   createArrowsAlongLine(allWaypointsCoordinates, routeStats = null, flightPathData = null) {
-    console.log("⭐ Creating route labels with distance and time information");
-    console.log("⭐ Flight path data available:", !!flightPathData);
+    if (DEBUG_ROUTE) console.log("⭐ Creating route labels with distance and time information");
+    if (DEBUG_ROUTE) console.log("⭐ Flight path data available:", !!flightPathData);
     
     if (!allWaypointsCoordinates || allWaypointsCoordinates.length < 2) {
       return { type: 'FeatureCollection', features: [] };
@@ -1059,14 +1071,14 @@ class WaypointManager {
         }
         
         // Log the complete, sorted leg boundaries for debugging
-        console.log(`⭐ Sorted leg boundaries at indices:`, legBoundaries);
+        if (DEBUG_ROUTE) console.log(`⭐ Sorted leg boundaries at indices:`, legBoundaries);
         
       }
     }
     
     // If no leg boundaries found or invalid, treat each waypoint as a boundary
     if (legBoundaries.length < 2) {
-      console.log("⭐ No leg boundaries found, using individual segments");
+      if (DEBUG_ROUTE) console.log("⭐ No leg boundaries found, using individual segments");
       
       // Process each segment as its own leg
       for (let i = 0; i < validCoordinates.length - 1; i++) {
@@ -1339,7 +1351,7 @@ class WaypointManager {
           }
           // REMOVED: Dangerous fallback calculation - aviation safety requires real data only
           
-          console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null (no real data available)'}`);
+          if (DEBUG_PERFORMANCE) console.log(`Leg ${legIdx} final time value: ${legTime !== null ? legTime : 'null (no real data available)'}`);
           
           // Create a line for the longest segment for label placement
           const line = turf.lineString([longestSegment.startCoords, longestSegment.endCoords]);
@@ -1438,7 +1450,7 @@ class WaypointManager {
           })();
           
           if (!shouldShowLegPill) {
-            console.log(`⭐ Skipping leg ${legIdx} pill - segment too short for display`);
+            if (DEBUG_PERFORMANCE) console.log(`⭐ Skipping leg ${legIdx} pill - segment too short for display`);
             continue; // Skip this leg pill if segment is too short
           }
           
@@ -1463,7 +1475,7 @@ class WaypointManager {
       }
     }
     
-    console.log(`⭐ Created ${features.length} route labels`);
+    if (DEBUG_ROUTE) console.log(`⭐ Created ${features.length} route labels`);
     return { type: 'FeatureCollection', features: features };
   }
   
@@ -1504,7 +1516,7 @@ class WaypointManager {
       // This is critical for the UI to update properly
       this.triggerCallback('onChange', this.waypoints);
       
-      console.log(`WaypointManager: Waypoint removed and callbacks triggered, ID: ${id}, index: ${index}`);
+      if (DEBUG_WAYPOINT_REMOVE) console.log(`WaypointManager: Waypoint removed and callbacks triggered, ID: ${id}, index: ${index}`);
     }
   }
 
@@ -1526,7 +1538,7 @@ class WaypointManager {
   updateRoute(routeStats = null, alternateRouteData = null) {
     // Store alternate route data for persistence across route updates
     if (alternateRouteData !== null) {
-      console.log('⭐ Storing alternate route data in WaypointManager');
+      if (DEBUG_ALTERNATES) console.log('⭐ Storing alternate route data in WaypointManager');
       this.storedAlternateRouteData = alternateRouteData;
     }
     
@@ -1541,7 +1553,7 @@ class WaypointManager {
     // CRITICAL SAFETY FIX: Never use any routeStats object that has time or fuel values without an aircraft
     if (routeStats) {
       // If using routeStats directly, log that fact
-      console.log("⭐ WaypointManager.updateRoute called with routeStats:", {
+      if (DEBUG_ROUTE) console.log("⭐ WaypointManager.updateRoute called with routeStats:", {
         hasAircraft: routeStats.aircraft ? true : false,
         timeHours: routeStats.timeHours,
         estimatedTime: routeStats.estimatedTime,
@@ -1606,16 +1618,16 @@ class WaypointManager {
       };
       
       // Add debugging logs
-      console.log("⭐ Creating route with coordinates:", coordinates.length);
-      console.log("⭐ Curved path coordinates:", routeGeoJson.geometry.coordinates.length);
-      console.log("⭐ Drag detection coordinates:", dragDetectionGeoJson.geometry.coordinates.length);
+      if (DEBUG_ROUTE) console.log("⭐ Creating route with coordinates:", coordinates.length);
+      if (DEBUG_ROUTE) console.log("⭐ Curved path coordinates:", routeGeoJson.geometry.coordinates.length);
+      if (DEBUG_ROUTE) console.log("⭐ Drag detection coordinates:", dragDetectionGeoJson.geometry.coordinates.length);
       
       // Pass original waypoint coordinates to pill creation (pills work with waypoint logic)
       // But store curved path for reference
       const arrowsData = this.createArrowsAlongLine(coordinates, routeStats, flightPathData);
       
       // Debug the arrows data
-      console.log("⭐ Arrow data features:", arrowsData.features ? arrowsData.features.length : 0);
+      if (DEBUG_ROUTE) console.log("⭐ Arrow data features:", arrowsData.features ? arrowsData.features.length : 0);
       if (arrowsData.features && arrowsData.features.length > 0) {
       }
 
@@ -1654,7 +1666,7 @@ class WaypointManager {
           }
         });
         
-        console.log("⭐ Added invisible drag detection layer");
+        if (DEBUG_ROUTE) console.log("⭐ Added invisible drag detection layer");
       }
       
       // Add or update drop shadow source
@@ -1726,14 +1738,14 @@ class WaypointManager {
 
       // 🛩️ VFR OPERATIONS: Render alternate route if available and not waived
       if (activeAlternateRouteData && activeAlternateRouteData.coordinates && !this.waiveAlternates) {
-        console.log('⭐ Using alternate route data:', activeAlternateRouteData.name || 'No name');
+        if (DEBUG_ALTERNATES) console.log('⭐ Using alternate route data:', activeAlternateRouteData.name || 'No name');
         this.renderAlternateRoute(activeAlternateRouteData, map);
       } else {
         if (this.waiveAlternates) {
-          console.log('🛩️ Alternates waived - not rendering alternate route');
+          if (DEBUG_ALTERNATES) console.log('🛩️ Alternates waived - not rendering alternate route');
         } else {
-          console.log('⭐ No alternate route data available or clearing alternate route');
-          console.log('⭐ activeAlternateRouteData:', activeAlternateRouteData);
+          if (DEBUG_ALTERNATES) console.log('⭐ No alternate route data available or clearing alternate route');
+          if (DEBUG_ALTERNATES) console.log('⭐ activeAlternateRouteData:', activeAlternateRouteData);
         }
         this.clearAlternateRoute(map);
       }
@@ -1909,7 +1921,7 @@ class WaypointManager {
         'route-drag-detection'       // Add missing drag detection source
       ];
       
-      console.log("🧹 Cleaning up route - removing", layersToRemove.length, "layers and", sourcesToRemove.length, "sources");
+      if (DEBUG_ROUTE) console.log("🧹 Cleaning up route - removing", layersToRemove.length, "layers and", sourcesToRemove.length, "sources");
       
       // Verify map is ready for operations before cleanup
       if (!this.isMapReadyForOperations()) {
@@ -1922,7 +1934,7 @@ class WaypointManager {
         try {
           if (map.getLayer && typeof map.getLayer === 'function' && map.getLayer(layerId)) {
             map.removeLayer(layerId);
-            console.log("🧹 Removed layer:", layerId);
+            if (DEBUG_ROUTE) console.log("🧹 Removed layer:", layerId);
           }
         } catch (error) {
           console.warn(`Failed to remove layer ${layerId}:`, error);
@@ -1934,7 +1946,7 @@ class WaypointManager {
         try {
           if (map.getSource && typeof map.getSource === 'function' && map.getSource(sourceId)) {
             map.removeSource(sourceId);
-            console.log("🧹 Removed source:", sourceId);
+            if (DEBUG_ROUTE) console.log("🧹 Removed source:", sourceId);
           }
         } catch (error) {
           console.warn(`Failed to remove source ${sourceId}:`, error);
@@ -1996,7 +2008,7 @@ class WaypointManager {
   }
 
   clearRoute() {
-    console.log('WaypointManager: Clearing route and markers');
+    if (DEBUG_WAYPOINT_REMOVE) console.log('WaypointManager: Clearing route and markers');
     
     // Safely remove all markers
     try {
@@ -2021,7 +2033,7 @@ class WaypointManager {
     
     // CRITICAL: Also clear alternate route data and visual elements
     try {
-      console.log('🧹 WaypointManager: Clearing alternate route data');
+      if (DEBUG_ALTERNATES) console.log('🧹 WaypointManager: Clearing alternate route data');
       this.clearAlternateRouteData();
       
       // Clear alternate route visual elements from map
@@ -2127,7 +2139,7 @@ class WaypointManager {
   findPathInsertIndex(clickedPoint) {
     // Check if we have enough waypoints to determine a path
     if (this.waypoints.length < 2) {
-      console.log('Not enough waypoints to find insert index, returning end position');
+      if (DEBUG_WAYPOINT_ADD) console.log('Not enough waypoints to find insert index, returning end position');
       return this.waypoints.length;
     }
     
@@ -2184,8 +2196,8 @@ class WaypointManager {
       
       // Log detailed information about the closest segment for debugging
       if (closestSegmentInfo) {
-        console.log(`Distance to nearest point: ${closestSegmentInfo.distance.toFixed(2)} nautical miles`);
-        console.log(`Insertion index will be: ${insertIndex}`);
+        if (DEBUG_WAYPOINT_ADD) console.log(`Distance to nearest point: ${closestSegmentInfo.distance.toFixed(2)} nautical miles`);
+        if (DEBUG_WAYPOINT_ADD) console.log(`Insertion index will be: ${insertIndex}`);
       } else {
         console.warn('No valid closest segment found - using end of route');
         insertIndex = this.waypoints.length;
@@ -2211,17 +2223,17 @@ class WaypointManager {
    * This ensures route labels are restored after platform layer toggles
    */
   refreshRouteDisplay() {
-    console.log('WaypointManager.refreshRouteDisplay: Refreshing route display and labels');
+    if (DEBUG_ROUTE) console.log('WaypointManager.refreshRouteDisplay: Refreshing route display and labels');
     
     const map = this.mapManager.getMap();
     if (!map || !this.mapManager.isMapLoaded()) {
-      console.log('WaypointManager.refreshRouteDisplay: Map not ready, skipping refresh');
+      if (DEBUG_ROUTE) console.log('WaypointManager.refreshRouteDisplay: Map not ready, skipping refresh');
       return;
     }
     
     // If we have waypoints, trigger a route update to restore labels
     if (this.waypoints && this.waypoints.length >= 2) {
-      console.log(`WaypointManager.refreshRouteDisplay: Refreshing route with ${this.waypoints.length} waypoints`);
+      if (DEBUG_ROUTE) console.log(`WaypointManager.refreshRouteDisplay: Refreshing route with ${this.waypoints.length} waypoints`);
       
       // Force update the route which will recreate all labels and sources
       this.updateRoute();
@@ -2234,9 +2246,9 @@ class WaypointManager {
         }
       });
       
-      console.log('WaypointManager.refreshRouteDisplay: Route display refreshed successfully');
+      if (DEBUG_ROUTE) console.log('WaypointManager.refreshRouteDisplay: Route display refreshed successfully');
     } else {
-      console.log('WaypointManager.refreshRouteDisplay: No route to refresh (less than 2 waypoints)');
+      if (DEBUG_ROUTE) console.log('WaypointManager.refreshRouteDisplay: No route to refresh (less than 2 waypoints)');
     }
   }
 
@@ -2248,7 +2260,7 @@ class WaypointManager {
    * Restore waypoint layers after a map style change
    */
   restoreLayersAfterStyleChange() {
-    console.log('🔄 WaypointManager: Restoring layers after style change...');
+    if (DEBUG_ROUTE) console.log('🔄 WaypointManager: Restoring layers after style change...');
     
     if (!this.mapManager || !this.mapManager.getMap()) {
       console.warn('WaypointManager: Cannot restore layers - map not available');
@@ -2257,7 +2269,7 @@ class WaypointManager {
 
     // Re-add waypoint markers
     if (this.waypoints && this.waypoints.length > 0) {
-      console.log(`🔄 Restoring ${this.waypoints.length} waypoints`);
+      if (DEBUG_ROUTE) console.log(`🔄 Restoring ${this.waypoints.length} waypoints`);
       // Recreate markers
       this.markers.forEach(marker => {
         if (marker && marker.getElement()) {
@@ -2268,11 +2280,11 @@ class WaypointManager {
 
     // Re-add route if we have waypoints
     if (this.waypoints && this.waypoints.length >= 2) {
-      console.log('🔄 Restoring route visualization');
+      if (DEBUG_ROUTE) console.log('🔄 Restoring route visualization');
       this.updateRoute();
     }
 
-    console.log('✅ WaypointManager: Layer restoration complete');
+    if (DEBUG_ROUTE) console.log('✅ WaypointManager: Layer restoration complete');
   }
 
   /**
@@ -2286,12 +2298,12 @@ class WaypointManager {
     map.on('styledata', () => {
       // Longer delay to ensure style is fully loaded and platforms are restored first
       setTimeout(() => {
-        console.log('🎨 Style change detected, restoring waypoint layers...');
+        if (DEBUG_ROUTE) console.log('🎨 Style change detected, restoring waypoint layers...');
         this.restoreLayersAfterStyleChange();
       }, 800); // Even longer delay to come after platforms
     });
 
-    console.log('🎨 WaypointManager: Style change listener set up');
+    if (DEBUG_ROUTE) console.log('🎨 WaypointManager: Style change listener set up');
   }
 
   /**
@@ -2322,7 +2334,7 @@ class WaypointManager {
       const alternateRouteGeoJson = alternateFlightPathData.mainPath;
       const alternateShadowGeoJson = alternateFlightPathData.dropShadow;
 
-      console.log('⭐ Created 3D alternate route with', alternateRouteGeoJson.geometry.coordinates.length, 'curved coordinates');
+      if (DEBUG_ALTERNATES) console.log('⭐ Created 3D alternate route with', alternateRouteGeoJson.geometry.coordinates.length, 'curved coordinates');
 
       // Add or update alternate route shadow source
       if (map.getSource(alternateShadowSourceId)) {
@@ -2400,7 +2412,7 @@ class WaypointManager {
         }
       }
 
-      console.log('⭐ Alternate route rendered successfully');
+      if (DEBUG_ALTERNATES) console.log('⭐ Alternate route rendered successfully');
 
     } catch (error) {
       console.error('⭐ Error rendering alternate route:', error);
@@ -2412,7 +2424,7 @@ class WaypointManager {
    * @param {Object} map - MapBox map instance
    */
   clearAlternateRoute(map) {
-    console.log('⭐ clearAlternateRoute called - checking for existing layers...');
+    if (DEBUG_ALTERNATES) console.log('⭐ clearAlternateRoute called - checking for existing layers...');
     
     if (!this.isMapReadyForOperations()) {
       console.warn('⭐ clearAlternateRoute: Map not ready for operations');
@@ -2436,7 +2448,7 @@ class WaypointManager {
     layersToRemove.forEach(layerId => {
       if (map.getLayer && map.getLayer(layerId)) {
         map.removeLayer(layerId);
-        console.log('⭐ Removed alternate route layer:', layerId);
+        if (DEBUG_ALTERNATES) console.log('⭐ Removed alternate route layer:', layerId);
         removedAny = true;
       }
     });
@@ -2445,13 +2457,13 @@ class WaypointManager {
     sourcesToRemove.forEach(sourceId => {
       if (map.getSource && map.getSource(sourceId)) {
         map.removeSource(sourceId);
-        console.log('⭐ Removed alternate route source:', sourceId);
+        if (DEBUG_ALTERNATES) console.log('⭐ Removed alternate route source:', sourceId);
         removedAny = true;
       }
     });
 
     if (!removedAny) {
-      console.log('⭐ No alternate route layers to remove');
+      if (DEBUG_ALTERNATES) console.log('⭐ No alternate route layers to remove');
     }
   }
 }

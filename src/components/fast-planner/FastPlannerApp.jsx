@@ -724,7 +724,8 @@ const FastPlannerCore = ({
   // 🚨 AVIATION CRITICAL: Recalculate alternate route stats when aircraft becomes available
   useEffect(() => {
     if (alternateRouteData && selectedAircraft && alternateRouteData.coordinates && 
-        (!alternateRouteData.totalDistance || alternateRouteData.totalDistance === 0)) {
+        ((!alternateRouteData.totalDistance || alternateRouteData.totalDistance === 0) || 
+         (!alternateRouteData.stats || !alternateRouteData.stats.totalFuelRequired))) {
       
       debugLog(DEBUG_ROUTE, '🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
       
@@ -744,14 +745,22 @@ const FastPlannerCore = ({
           ...alternateRouteData,
           totalDistance: alternateRouteStats.totalDistance,
           estimatedTime: alternateRouteStats.estimatedTime,
-          timeHours: alternateRouteStats.timeHours
+          timeHours: alternateRouteStats.timeHours,
+          // 🔧 SAR FIX: Add fuel stats for SAR calculations
+          stats: {
+            totalFuelRequired: alternateRouteStats.totalFuelRequired,
+            fuelRequired: alternateRouteStats.fuelRequired,
+            totalDistance: alternateRouteStats.totalDistance,
+            estimatedTime: alternateRouteStats.estimatedTime,
+            timeHours: alternateRouteStats.timeHours
+          }
         };
         
         debugLog(DEBUG_ROUTE, '🔍 UPDATED ALTERNATE ROUTE DATA:', updatedAlternateRouteData);
         setAlternateRouteData(updatedAlternateRouteData);
       }
     }
-  }, [alternateRouteData, selectedAircraft, appManagers, weather, flightSettings]);
+  }, [selectedAircraft, appManagers, weather, flightSettings]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({
@@ -945,7 +954,7 @@ const FastPlannerCore = ({
       }
     }
     
-  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, alternateRouteData, setWeatherFuel, resetUserFlightSettings]);
+  }, [hookClearRoute, setAlternateRouteData, setAlternateRouteInput, clearWeatherSegments, setWeatherFuel, resetUserFlightSettings]);
   
   // Make aggressive clear available globally for debugging
   useEffect(() => {
