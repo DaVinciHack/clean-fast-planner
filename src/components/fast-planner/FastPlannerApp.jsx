@@ -559,8 +559,18 @@ const FastPlannerCore = ({
   }), [flightSettings, weatherFuel, alternateRouteData, locationFuelOverrides]);
   
   // ✅ CRITICAL FIX: Auto-trigger calculations when route/aircraft change
+  // Debounce to prevent calculation spam
+  const debounceTimeoutRef = useRef(null);
+  
   useEffect(() => {
-    console.log('🧮 AUTO-CALCULATION: useEffect triggered, refuel stops:', currentRefuelStops.length);
+    // Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Debounce calculations by 200ms
+    debounceTimeoutRef.current = setTimeout(() => {
+      console.log('🧮 AUTO-CALCULATION: useEffect triggered, refuel stops:', currentRefuelStops.length);
     
     // 🔍 DEBUG: Always log aircraft data to see what's available
     if (selectedAircraft) {
@@ -638,9 +648,14 @@ const FastPlannerCore = ({
             // Let the fuel calculation system manage route optimization when refuel configured
             if (currentRefuelStops.length === 0) {
               setRouteStats(newRouteStats);
-              console.log('🗺️ AUTO-CALC: Updated route stats (no refuel stops)');
+              // Reduced logging
             } else {
-              console.log('🗺️ AUTO-CALC: Skipping route stats update (refuel stops active - fuel system manages routing)');
+              // CRITICAL: Set route stats anyway on first load to prevent time clearing
+              if (!routeStats || !routeStats.totalDistance) {
+                console.log('🗺️ AUTO-CALC: First load with refuel stops - setting route stats to prevent time clearing');
+                setRouteStats(newRouteStats);
+              }
+              // Reduced logging
             }
           }
         }
@@ -675,6 +690,15 @@ const FastPlannerCore = ({
     } else {
       setStopCards([]);
     }
+    
+    }, 200); // 200ms debounce
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, [waypoints, selectedAircraft, stopCardOptions, weather]);
 
   // 🚨 AVIATION CRITICAL: Recalculate alternate route stats when aircraft becomes available
