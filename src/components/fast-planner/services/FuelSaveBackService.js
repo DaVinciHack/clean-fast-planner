@@ -1349,19 +1349,19 @@ export class FuelSaveBackService {
             console.warn('📥 ❌ Direct lookup returned null/undefined - fuel object does not exist with this UUID');
           }
         } catch (directError) {
-          console.error('📥 ❌ Direct lookup failed with error:', {
+          console.warn('📥 ❌ Direct lookup failed with error:', {
             error: directError.message,
             errorType: directError.constructor.name,
-            errorCode: directError.code,
-            stack: directError.stack
+            fuelPlanId: flightData.fuelPlanId,
+            expectedBehavior: 'This is normal for flights before automation runs - falling back to search'
           });
-          console.warn('📥 Direct lookup failed, falling back to search:', directError.message);
+          console.log('📥 Falling back to search by flightUuid:', directError.message);
         }
       } else {
-        console.log('📥 ⚠️ No fuelPlanId in flight data - using SAFE fallback search');
+        console.log('📥 ⚠️ No fuelPlanId in flight data - using fallback search');
       }
       
-      // SAFE FALLBACK: Only for flights without fuelPlanId
+      // SAFE FALLBACK: For flights without fuelPlanId OR when direct lookup fails
       const flightId = flightData.id || flightData.flightId;
       console.log('📥 🔄 SAFE FALLBACK: Searching for fuel object by flightUuid:', flightId);
       
@@ -1371,7 +1371,12 @@ export class FuelSaveBackService {
       
       console.log('📥 🔍 FALLBACK QUERY RESULTS:', {
         totalFound: fuelData.data?.length || 0,
-        searchingForFlightId: flightId
+        searchingForFlightId: flightId,
+        foundFuelObjects: fuelData.data?.map(fuel => ({
+          primaryKey: fuel.$primaryKey,
+          flightUuid: fuel.flightUuid,
+          matches: fuel.flightUuid === flightId
+        })) || []
       });
       
       if (fuelData.data && fuelData.data.length > 0) {
