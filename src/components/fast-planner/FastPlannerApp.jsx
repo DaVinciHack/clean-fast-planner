@@ -68,6 +68,16 @@ import useMapLayers from './hooks/useMapLayers';
 import useWeatherSegments from './hooks/useWeatherSegments';
 import useFuelPolicy from './hooks/useFuelPolicy';
 
+// 🔧 DEBUG FLAGS: Control logging output for performance and debugging
+const DEBUG_CALC = false;      // Calculation logging
+const DEBUG_ROUTE = false;     // Route calculation logging
+const DEBUG_AIRCRAFT = false;  // Aircraft data logging
+const DEBUG_FUEL = false;      // Fuel calculation logging
+const DEBUG_WEATHER = false;   // Weather processing logging
+
+// Debug helper function for conditional logging
+const debugLog = (flag, ...args) => flag && console.log(...args);
+
 /**
  * FastPlannerCore Component
  * Contains the main application logic and UI, and can safely use useRegion()
@@ -570,10 +580,10 @@ const FastPlannerCore = ({
     
     // Debounce calculations by 200ms
     debounceTimeoutRef.current = setTimeout(() => {
-      console.log('🧮 AUTO-CALCULATION: useEffect triggered, refuel stops:', currentRefuelStops.length);
+      debugLog(DEBUG_CALC, '🧮 AUTO-CALCULATION: useEffect triggered, refuel stops:', currentRefuelStops.length);
     
-    // 🔍 DEBUG: Always log aircraft data to see what's available
-    if (selectedAircraft) {
+    // 🔍 DEBUG: Aircraft data analysis - only when debugging
+    if (selectedAircraft && DEBUG_AIRCRAFT) {
       const aircraftDebug = {
         emptyWeight: selectedAircraft.emptyWeight,
         empty_weight: selectedAircraft.empty_weight,
@@ -586,6 +596,7 @@ const FastPlannerCore = ({
         maxGrossWeight: selectedAircraft.maxGrossWeight,
         maxTakeoffWeight: selectedAircraft.maxTakeoffWeight
       };
+      debugLog(DEBUG_AIRCRAFT, '🔍 AIRCRAFT DEBUG DATA:', aircraftDebug);
     }
     
     // 🚨 SAFETY: Wait for aircraft data to be complete before calculating
@@ -593,15 +604,19 @@ const FastPlannerCore = ({
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
-    const debugInfo = {
-      hasWaypoints: waypoints && waypoints.length >= 2,
-      hasSelectedAircraft: !!selectedAircraft,
-      hasRequiredAircraftData: hasRequiredAircraftData,
-      usefulLoad: selectedAircraft?.usefulLoad,
-      fuelBurn: selectedAircraft?.fuelBurn
-    };
+    // 🔍 DEBUG: Route calculation state analysis - only when debugging
+    if (DEBUG_CALC) {
+      const debugInfo = {
+        hasWaypoints: waypoints && waypoints.length >= 2,
+        hasSelectedAircraft: !!selectedAircraft,
+        hasRequiredAircraftData: hasRequiredAircraftData,
+        usefulLoad: selectedAircraft?.usefulLoad,
+        fuelBurn: selectedAircraft?.fuelBurn
+      };
+      debugLog(DEBUG_CALC, '🔍 CALC DEBUG INFO:', debugInfo);
+    }
     
-    // 🚨 AIRCRAFT DEBUG: Log when aircraft is missing required data
+    // 🚨 AIRCRAFT WARNING: Keep this critical aviation safety warning
     if (selectedAircraft && !hasRequiredAircraftData) {
       console.warn('❌ AIRCRAFT MISSING DATA:', {
         hasFuelBurn: !!selectedAircraft.fuelBurn,
@@ -614,12 +629,15 @@ const FastPlannerCore = ({
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
       
-      // 🔧 DEBUG: Log flightSettings to see what we're passing
-      const settingsDebug = {
-        flightSettings,
-        extraFuel: flightSettings.extraFuel,
-        cargoWeight: flightSettings.cargoWeight
-      };
+      // 🔧 DEBUG: Flight settings analysis - only when debugging
+      if (DEBUG_CALC) {
+        const settingsDebug = {
+          flightSettings,
+          extraFuel: flightSettings.extraFuel,
+          cargoWeight: flightSettings.cargoWeight
+        };
+        debugLog(DEBUG_CALC, '🔧 SETTINGS DEBUG:', settingsDebug);
+      }
       
       // 🔧 PROPER FIX: Calculate routeStats with FILTERED landing stops only (matches StopCardCalculator)
       if (appManagers?.routeCalculatorRef?.current && waypoints.length >= 2) {
@@ -648,14 +666,14 @@ const FastPlannerCore = ({
             // Let the fuel calculation system manage route optimization when refuel configured
             if (currentRefuelStops.length === 0) {
               setRouteStats(newRouteStats);
-              // Reduced logging
+              debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Updated route stats (no refuel stops)');
             } else {
               // CRITICAL: Set route stats anyway on first load to prevent time clearing
               if (!routeStats || !routeStats.totalDistance) {
-                console.log('🗺️ AUTO-CALC: First load with refuel stops - setting route stats to prevent time clearing');
+                debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: First load with refuel stops - setting route stats to prevent time clearing');
                 setRouteStats(newRouteStats);
               }
-              // Reduced logging
+              debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Skipping route stats update (refuel stops active)');
             }
           }
         }
@@ -677,9 +695,9 @@ const FastPlannerCore = ({
         // Let the fuel calculation system manage stop cards when refuel configured
         if (currentRefuelStops.length === 0) {
           setStopCards(newStopCards);
-          console.log('🧮 AUTO-CALC: Updated stop cards (no refuel stops)');
+          debugLog(DEBUG_CALC, '🧮 AUTO-CALC: Updated stop cards (no refuel stops)');
         } else {
-          console.log('🧮 AUTO-CALC: Skipping stop cards update (refuel stops active - fuel system manages cards)');
+          debugLog(DEBUG_CALC, '🧮 AUTO-CALC: Skipping stop cards update (refuel stops active - fuel system manages cards)');
         }
       } else {
         // Only clear if no refuel stops
