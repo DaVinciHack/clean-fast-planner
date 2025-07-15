@@ -14,7 +14,15 @@ import PassengerCalculator from '../passengers/PassengerCalculator';
 // Import segment-aware utilities for refuel flight handling
 import { detectLocationSegment, createSegmentFuelKey, parseSegmentFuelKey } from '../../../utilities/SegmentUtils.js';
 
+// 🔧 DEBUG FLAGS: Control logging output for performance and debugging
+const DEBUG_FUEL_CALC = false;    // Main fuel calculation logging
+const DEBUG_ARA_FUEL = false;     // ARA fuel calculation logging
+const DEBUG_SEGMENTS = false;     // Segment detection logging
+const DEBUG_LOOKUP = false;       // Fuel lookup logging
+const DEBUG_ALTERNATE = false;    // Alternate calculations logging
 
+// Debug helper function for conditional logging
+const debugLog = (flag, ...args) => flag && console.log(...args);
 
 /**
  * Calculate stop cards data for a route
@@ -114,19 +122,19 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
     const waypointName = waypoint?.name || waypoint?.stopName || waypoint?.location;
     if (!waypointName) return 0;
     
-    // 🔍 DEBUG: Log all extra fuel lookups
-    if (fuelType === 'extraFuel') {
-      console.log(`🔍 EXTRA FUEL LOOKUP: waypoint=${waypointName}, cardIndex=${cardIndex}, fuelType=${fuelType}`);
-      console.log(`🔍 AVAILABLE OVERRIDES:`, Object.keys(locationFuelOverrides));
+    // 🔍 DEBUG: Log all extra fuel lookups - only when debugging
+    if (fuelType === 'extraFuel' && DEBUG_LOOKUP) {
+      debugLog(DEBUG_LOOKUP, `🔍 EXTRA FUEL LOOKUP: waypoint=${waypointName}, cardIndex=${cardIndex}, fuelType=${fuelType}`);
+      debugLog(DEBUG_LOOKUP, `🔍 AVAILABLE OVERRIDES:`, Object.keys(locationFuelOverrides));
     }
     
     // 🔧 EXACT MATCH ONLY: Use unique card-based naming system
     const cardIndexKey = cardIndex ? `${waypointName}_${cardIndex}_${fuelType}` : null;
     const cardIndexOverride = cardIndexKey ? locationFuelOverrides[cardIndexKey] : null;
     
-    // 🔍 DEBUG: Log key lookup for extra fuel
-    if (fuelType === 'extraFuel') {
-      console.log(`🔍 LOOKING FOR KEY: '${cardIndexKey}', FOUND:`, cardIndexOverride);
+    // 🔍 DEBUG: Log key lookup for extra fuel - only when debugging
+    if (fuelType === 'extraFuel' && DEBUG_LOOKUP) {
+      debugLog(DEBUG_LOOKUP, `🔍 LOOKING FOR KEY: '${cardIndexKey}', FOUND:`, cardIndexOverride);
     }
     
     if (cardIndexOverride !== undefined && cardIndexOverride !== null) {
@@ -717,7 +725,7 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         departureMaxPassengers = alternatePassengers;
       } else {
         // Keep the refuel-optimized values that include ARA fuel
-        console.log(`🛩️ KEEPING REFUEL-OPTIMIZED FUEL: ${departureFuelNeeded} lbs (includes ARA) vs alternate ${alternateFuel} lbs`);
+        debugLog(DEBUG_ALTERNATE, `🛩️ KEEPING REFUEL-OPTIMIZED FUEL: ${departureFuelNeeded} lbs (includes ARA) vs alternate ${alternateFuel} lbs`);
       }
       
       // Determine if we're overriding an optimization (for UI indication)
@@ -1120,9 +1128,9 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       // 🔧 REFUEL FIX: Don't add approach consumption at refuel stops to new segment's cumulative count
       if (currentLocationConsumesApproach && approachFuelNeededHere > 0 && !isRefuelStop) {
         cumulativeApproachFuelConsumed += approachFuelNeededHere;
-        console.log(`🛩️ APPROACH CONSUMPTION: ${toWaypoint.name} consumes ${approachFuelNeededHere} lbs, cumulative now ${cumulativeApproachFuelConsumed}`);
+        debugLog(DEBUG_ARA_FUEL, `🛩️ APPROACH CONSUMPTION: ${toWaypoint.name} consumes ${approachFuelNeededHere} lbs, cumulative now ${cumulativeApproachFuelConsumed}`);
       } else if (isRefuelStop && currentLocationConsumesApproach) {
-        console.log(`🔧 REFUEL STOP: ${toWaypoint.name} approach consumption (${approachFuelNeededHere}) NOT added to new segment cumulative`);
+        debugLog(DEBUG_ARA_FUEL, `🔧 REFUEL STOP: ${toWaypoint.name} approach consumption (${approachFuelNeededHere}) NOT added to new segment cumulative`);
       }
       
       // 🛩️ AVIATION LOGIC: Calculate remaining fuel AFTER consumption at this location
@@ -1947,12 +1955,12 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       const deckTimeForThisStop = individualDeckTime > 0 ? individualDeckTime : deckTimePerStopValue;
       alternateDeckTimeMinutes += deckTimeForThisStop;
       
-      console.log(`🔧 ALTERNATE DECK TIME: ${stop?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
+      debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE DECK TIME: ${stop?.name} (card ${cardIndex}) = ${deckTimeForThisStop} minutes`);
     }
   }
   const alternateDeckTimeHours = alternateDeckTimeMinutes / 60;
   const alternateDeckFuel = Math.round(alternateDeckTimeHours * deckFuelFlowValue);
-  console.log(`🔧 ALTERNATE TOTAL DECK: ${alternateDeckTimeMinutes} minutes = ${alternateDeckFuel} lbs`);
+  debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE TOTAL DECK: ${alternateDeckTimeMinutes} minutes = ${alternateDeckFuel} lbs`);
   
   // 🚨 CRITICAL FIX: Calculate segment 1 ARA fuel for alternate card (same as main calculation)
   // Import the segment-aware utilities if not already available
@@ -1975,7 +1983,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
         if (detectLocationSegment) {
           const waypointSegment = detectLocationSegment(waypointName, landingStopsOnly, options.refuelStops, 'requirements', index + 1);
           
-          console.log(`🔍 ALTERNATE CARD SEGMENT: ${waypointName} detected as segment ${waypointSegment}, refuelStops:`, options.refuelStops);
+          debugLog(DEBUG_SEGMENTS, `🔍 ALTERNATE CARD SEGMENT: ${waypointName} detected as segment ${waypointSegment}, refuelStops:`, options.refuelStops);
           
           if (waypointSegment === 1) {
             // Check for segment-aware ARA fuel override first
@@ -1990,7 +1998,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
               const legacyKey = `${waypointName}_araFuel`;
               const legacyOverride = options.locationFuelOverrides[legacyKey];
               
-              console.log(`🔍 ALTERNATE LEGACY CHECK: Looking for key '${legacyKey}', found:`, legacyOverride);
+              debugLog(DEBUG_LOOKUP, `🔍 ALTERNATE LEGACY CHECK: Looking for key '${legacyKey}', found:`, legacyOverride);
               
               if (legacyOverride !== undefined) {
                 // Handle both object format {value: X} and direct value format
@@ -1999,7 +2007,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
                   : Number(legacyOverride) || 0;
                 
                 if (overrideValue > 0) {
-                  console.log(`🌦️ ALTERNATE CARD LEGACY ARA: ${waypointName} araFuel = ${overrideValue} lbs (legacy key)`);
+                  debugLog(DEBUG_ARA_FUEL, `🌦️ ALTERNATE CARD LEGACY ARA: ${waypointName} araFuel = ${overrideValue} lbs (legacy key)`);
                   segment1AraTotal += overrideValue;
                 }
               }
@@ -2009,7 +2017,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
       }
     });
     
-    console.log(`🎯 ALTERNATE CARD: segment1AraTotal = ${segment1AraTotal}, will set alternateAraFuel = ${segment1AraTotal > 0 ? segment1AraTotal : alternateAraFuel}`);
+    debugLog(DEBUG_ALTERNATE, `🎯 ALTERNATE CARD: segment1AraTotal = ${segment1AraTotal}, will set alternateAraFuel = ${segment1AraTotal > 0 ? segment1AraTotal : alternateAraFuel}`);
     
     if (segment1AraTotal > 0) {
       alternateAraFuel = segment1AraTotal;
@@ -2023,7 +2031,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
   const alternateExtraFuel = departureWaypoint ? 
     (getLocationFuel(departureWaypoint, 'extraFuel', 1) || 0) : 0;
     
-  console.log(`🔧 ALTERNATE CARD: ${departureWaypoint?.name} extraFuel = ${alternateExtraFuel} lbs (segment-aware)`);
+  debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE CARD: ${departureWaypoint?.name} extraFuel = ${alternateExtraFuel} lbs (segment-aware)`);
   
   // 🔧 CRITICAL ARA FIX: Check for current key format ARA fuel overrides in segment 1
   let totalUserAraFuel = 0;
@@ -2034,7 +2042,7 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
     const firstRefuelCardIndex = options.refuelStops && options.refuelStops.length > 0 ? Math.min(...options.refuelStops) : landingStopsOnly.length;
     const segment1EndIndex = Math.min(firstRefuelCardIndex, landingStopsOnly.length);
     
-    console.log(`🔧 ALTERNATE CARD: Checking segment 1 (cards 1 to ${segment1EndIndex}) for ARA fuel`);
+    debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE CARD: Checking segment 1 (cards 1 to ${segment1EndIndex}) for ARA fuel`);
     
     // Check all stops in segment 1 for ARA fuel overrides
     for (let i = 0; i < segment1EndIndex; i++) {
@@ -2049,18 +2057,18 @@ const calculateAlternateStopCard = (waypoints, alternateRouteData, routeStats, s
         const araValue = typeof currentOverride === 'object' ? 
           (currentOverride.value || 0) : (currentOverride || 0);
         totalUserAraFuel += Number(araValue) || 0;
-        console.log(`🔧 ALTERNATE CARD ARA: Found ${currentFormatKey} = ${araValue} lbs (card ${cardIndex})`);
+        debugLog(DEBUG_ARA_FUEL, `🔧 ALTERNATE CARD ARA: Found ${currentFormatKey} = ${araValue} lbs (card ${cardIndex})`);
       }
     }
   }
   
-  console.log(`🔧 ALTERNATE CARD: Total user ARA fuel in segment 1 = ${totalUserAraFuel} lbs`);
-  console.log(`🔧 ALTERNATE CARD: Existing alternateAraFuel = ${alternateAraFuel} lbs`);
+  debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE CARD: Total user ARA fuel in segment 1 = ${totalUserAraFuel} lbs`);
+  debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE CARD: Existing alternateAraFuel = ${alternateAraFuel} lbs`);
   
   // 🔧 SEGMENT 1 → ALTERNATE CARD: Use higher of calculated ARA or user ARA overrides
   const finalAlternateAraFuel = Math.max(alternateAraFuel, totalUserAraFuel);
   
-  console.log(`🔧 ALTERNATE CARD: Final ARA fuel = ${finalAlternateAraFuel} lbs (max of calculated vs user)`);
+  debugLog(DEBUG_ALTERNATE, `🔧 ALTERNATE CARD: Final ARA fuel = ${finalAlternateAraFuel} lbs (max of calculated vs user)`);
   
   // Calculate total fuel required for alternate route (using corrected ARA fuel)
   const totalAlternateFuel = taxiFuelValue + totalAlternateTripFuel + alternateContingencyFuel + finalAlternateAraFuel + alternateDeckFuel + approachFuel + reserveFuelValue + alternateExtraFuel;
