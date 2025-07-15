@@ -722,10 +722,18 @@ const FastPlannerCore = ({
   }, [waypoints, selectedAircraft, stopCardOptions, weather]);
 
   // 🚨 AVIATION CRITICAL: Recalculate alternate route stats when aircraft becomes available
+  const lastAlternateRecalcKey = useRef('');
+  
   useEffect(() => {
     if (alternateRouteData && selectedAircraft && alternateRouteData.coordinates && 
         ((!alternateRouteData.totalDistance || alternateRouteData.totalDistance === 0) || 
          (!alternateRouteData.stats || !alternateRouteData.stats.totalFuelRequired))) {
+      
+      // Create a key to prevent duplicate recalculations
+      const recalcKey = `${JSON.stringify(alternateRouteData.coordinates)}-${selectedAircraft.id}`;
+      if (lastAlternateRecalcKey.current === recalcKey) {
+        return; // Skip if already calculated for this combination
+      }
       
       debugLog(DEBUG_ROUTE, '🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
       
@@ -741,6 +749,8 @@ const FastPlannerCore = ({
       );
       
       if (alternateRouteStats) {
+        lastAlternateRecalcKey.current = recalcKey; // Mark as calculated
+        
         const updatedAlternateRouteData = {
           ...alternateRouteData,
           totalDistance: alternateRouteStats.totalDistance,
@@ -760,7 +770,7 @@ const FastPlannerCore = ({
         setAlternateRouteData(updatedAlternateRouteData);
       }
     }
-  }, [selectedAircraft, appManagers, weather, flightSettings]);
+  }, [alternateRouteData?.coordinates, selectedAircraft, appManagers, weather, flightSettings]);
 
   // Weather segments integration - MOVED BEFORE clearRoute to fix initialization order
   const weatherSegmentsHook = useWeatherSegments({

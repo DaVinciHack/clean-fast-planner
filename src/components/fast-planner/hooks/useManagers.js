@@ -204,7 +204,15 @@ const useManagers = ({
           if (currentRegion && platformManagerRef.current && window.client) {
             const regionName = currentRegion.osdkRegion || currentRegion.name;
             console.log(`🚀 AUTO-LOADING: Triggering platform load for region: ${regionName}`);
-            platformManagerRef.current.loadPlatformsFromFoundry(window.client, regionName);
+            platformManagerRef.current.loadPlatformsFromFoundry(window.client, regionName)
+              .catch(error => {
+                // Suppress "Map is not initialized" errors - just a timing issue on first load
+                if (error.message?.includes('Map is not initialized')) {
+                  console.log('⏳ AUTO-LOADING: Map not ready yet, will retry later');
+                } else {
+                  console.warn('⚠️ AUTO-LOADING: Platform loading error:', error.message);
+                }
+              });
           } else {
             console.log('⏳ AUTO-LOADING: Region not detected yet, will try again...', {
               currentRegion: !!currentRegion,
@@ -717,7 +725,6 @@ const useManagers = ({
     console.log("✅ CALLBACK RE-BINDING: Waypoint callbacks updated successfully");
   }, [
     managersInitialized, 
-    setWaypoints, // Re-bind when setWaypoints function changes
     waypointManagerRef
   ]);
 

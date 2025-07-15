@@ -5,6 +5,11 @@
  * fuel requirements, and passenger weight settings.
  */
 
+// Debug flags for passenger calculations
+const DEBUG_PASSENGER_CALC = false;  // Main passenger calculations
+const DEBUG_WEIGHT_CALC = false;     // Weight calculations and validation
+const DEBUG_AIRCRAFT_DATA = false;   // Aircraft data processing
+
 class PassengerCalculator {
   /**
    * Calculate the maximum number of passengers that can be carried on a leg
@@ -19,7 +24,9 @@ class PassengerCalculator {
   static calculateMaxPassengers(aircraft, fuelWeight, passengerWeight, cargoWeight = 0) {
     // Validate inputs
     if (!aircraft) {
-      console.error('PassengerCalculator: Invalid aircraft data provided');
+      if (DEBUG_PASSENGER_CALC) {
+        console.error('PassengerCalculator: Invalid aircraft data provided');
+      }
       return 0;
     }
 
@@ -43,7 +50,9 @@ class PassengerCalculator {
     
     // If passenger weight is zero or invalid, return 0 to avoid division by zero
     if (passengerWeightNum <= 0) {
-      console.error('PassengerCalculator: Invalid passenger weight (zero or negative)');
+      if (DEBUG_PASSENGER_CALC) {
+        console.error('PassengerCalculator: Invalid passenger weight (zero or negative)');
+      }
       return {
         maxPassengers: 0,
         availableWeight: 0,
@@ -56,37 +65,47 @@ class PassengerCalculator {
     let usableLoadWithoutFuel = 0;
     
     // 🔍 DEBUG: Log aircraft data to understand what we're working with
-    console.log('🔍 PASSENGER DEBUG: Aircraft data:', {
-      usableLoad: aircraft.usableLoad,
-      usefulLoad: aircraft.usefulLoad,
-      maxTakeoffWeight: aircraft.maxTakeoffWeight,
-      emptyWeight: aircraft.emptyWeight,
-      fuelWeight: fuelWeightNum,
-      cargoWeight: cargoWeight || 0
-    });
+    if (DEBUG_AIRCRAFT_DATA) {
+      console.log('🔍 PASSENGER DEBUG: Aircraft data:', {
+        usableLoad: aircraft.usableLoad,
+        usefulLoad: aircraft.usefulLoad,
+        maxTakeoffWeight: aircraft.maxTakeoffWeight,
+        emptyWeight: aircraft.emptyWeight,
+        fuelWeight: fuelWeightNum,
+        cargoWeight: cargoWeight || 0
+      });
+    }
     
     // First, try to use aircraft.usableLoad property if it exists
     // This would be the most direct and accurate way
     if (aircraft.usableLoad !== undefined) {
       // Ensure we're properly subtracting fuel when using usableLoad
       usableLoadWithoutFuel = Number(aircraft.usableLoad) - fuelWeightNum;
-      console.log('🔍 Using usableLoad:', aircraft.usableLoad, '- fuel:', fuelWeightNum, '= available:', usableLoadWithoutFuel);
+      if (DEBUG_WEIGHT_CALC) {
+        console.log('🔍 Using usableLoad:', aircraft.usableLoad, '- fuel:', fuelWeightNum, '= available:', usableLoadWithoutFuel);
+      }
     }
     // Then, try to use aircraft.usefulLoad property if it exists (from OSDK data)
     else if (aircraft.usefulLoad !== undefined) {
       // Ensure we're properly subtracting fuel and cargo when using usefulLoad
       usableLoadWithoutFuel = Number(aircraft.usefulLoad) - fuelWeightNum - (cargoWeight || 0);
-      console.log('🔍 Using usefulLoad:', aircraft.usefulLoad, '- fuel:', fuelWeightNum, '- cargo:', (cargoWeight || 0), '= available:', usableLoadWithoutFuel);
+      if (DEBUG_WEIGHT_CALC) {
+        console.log('🔍 Using usefulLoad:', aircraft.usefulLoad, '- fuel:', fuelWeightNum, '- cargo:', (cargoWeight || 0), '= available:', usableLoadWithoutFuel);
+      }
     }
     // If not available, calculate it from maxTakeoffWeight and emptyWeight
     else if (aircraft.maxTakeoffWeight && aircraft.emptyWeight) {
       usableLoadWithoutFuel = aircraft.maxTakeoffWeight - aircraft.emptyWeight - fuelWeightNum - (cargoWeight || 0);
-      console.log('🔍 Using calculated:', aircraft.maxTakeoffWeight, '- empty:', aircraft.emptyWeight, '- fuel:', fuelWeightNum, '- cargo:', (cargoWeight || 0), '= available:', usableLoadWithoutFuel);
+      if (DEBUG_WEIGHT_CALC) {
+        console.log('🔍 Using calculated:', aircraft.maxTakeoffWeight, '- empty:', aircraft.emptyWeight, '- fuel:', fuelWeightNum, '- cargo:', (cargoWeight || 0), '= available:', usableLoadWithoutFuel);
+      }
     } 
     // If neither option is available, return 0
     else {
-      console.error('🚨 PassengerCalculator: Cannot calculate usableLoad - missing aircraft weight data');
-      console.error('🚨 Available aircraft properties:', Object.keys(aircraft));
+      if (DEBUG_PASSENGER_CALC) {
+        console.error('🚨 PassengerCalculator: Cannot calculate usableLoad - missing aircraft weight data');
+        console.error('🚨 Available aircraft properties:', Object.keys(aircraft));
+      }
       return {
         maxPassengers: 0,
         availableWeight: 0,
@@ -115,12 +134,14 @@ class PassengerCalculator {
       remainingWeight: Math.round(usableLoadWithoutFuel - (result * passengerWeightNum)) // Weight still available
     };
     
-    console.log('🔍 FINAL PASSENGER RESULT:', {
-      maxPassengers: finalResult.maxPassengers,
-      availableWeight: finalResult.availableWeight,
-      usedByPassengers: finalResult.usedByPassengers,
-      remainingWeight: finalResult.remainingWeight
-    });
+    if (DEBUG_PASSENGER_CALC) {
+      console.log('🔍 FINAL PASSENGER RESULT:', {
+        maxPassengers: finalResult.maxPassengers,
+        availableWeight: finalResult.availableWeight,
+        usedByPassengers: finalResult.usedByPassengers,
+        remainingWeight: finalResult.remainingWeight
+      });
+    }
     return finalResult;
   }
   
@@ -134,7 +155,9 @@ class PassengerCalculator {
    */
   static calculatePassengersForRoute(legs, aircraft, passengerWeight) {
     if (!Array.isArray(legs) || legs.length === 0) {
-      console.error('PassengerCalculator: Invalid legs data');
+      if (DEBUG_PASSENGER_CALC) {
+        console.error('PassengerCalculator: Invalid legs data');
+      }
       return [];
     }
     
@@ -164,7 +187,9 @@ class PassengerCalculator {
    */
   static updateStopCardsWithPassengers(stopCards, aircraft, passengerWeight) {
     if (!Array.isArray(stopCards) || stopCards.length === 0) {
-      console.warn('PassengerCalculator: No stop cards data to process (normal during initialization)');
+      if (DEBUG_PASSENGER_CALC) {
+        console.warn('PassengerCalculator: No stop cards data to process (normal during initialization)');
+      }
       return stopCards || [];
     }
     
@@ -198,7 +223,9 @@ class PassengerCalculator {
         card.remainingWeight = passengerResult.remainingWeight || 0;
         
       } catch (error) {
-        console.error(`PassengerCalculator: Error calculating passengers for card ${index}`, error);
+        if (DEBUG_PASSENGER_CALC) {
+          console.error(`PassengerCalculator: Error calculating passengers for card ${index}`, error);
+        }
         // Set safe defaults
         card.maxPassengers = 0;
         card.maxPassengersDisplay = card.isDestination ? "Final Stop" : "0";
