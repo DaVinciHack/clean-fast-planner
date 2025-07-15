@@ -115,9 +115,9 @@ const FastPlannerCore = ({
   // 🔧 TIMING FIX: Process pending refuel stops when stop cards become available
   useEffect(() => {
     if (pendingRefuelStops && pendingRefuelStops.length > 0 && stopCards && stopCards.length > 0) {
-      console.log('🔧 PENDING REFUEL: Processing pending refuel stops now that stop cards are available');
-      console.log('🔧 PENDING REFUEL: Pending stops:', pendingRefuelStops);
-      console.log('🔧 PENDING REFUEL: Available stop cards:', stopCards.length);
+      debugLog(DEBUG_FUEL, '🔧 PENDING REFUEL: Processing pending refuel stops now that stop cards are available');
+      debugLog(DEBUG_FUEL, '🔧 PENDING REFUEL: Pending stops:', pendingRefuelStops);
+      debugLog(DEBUG_FUEL, '🔧 PENDING REFUEL: Available stop cards:', stopCards.length);
       
       const refuelIndices = [];
       
@@ -126,7 +126,7 @@ const FastPlannerCore = ({
         const stopCardIndex = stopCards.findIndex(card => card.stopName === locationName);
         if (stopCardIndex >= 0) {
           const stopCardUIIndex = stopCardIndex + 1; // Stop cards use 1-based indexing
-          console.log('🔧 PENDING REFUEL: Found', locationName, 'at stop card index:', stopCardUIIndex);
+          debugLog(DEBUG_FUEL, '🔧 PENDING REFUEL: Found', locationName, 'at stop card index:', stopCardUIIndex);
           refuelIndices.push(stopCardUIIndex);
         } else {
           console.warn('🔧 PENDING REFUEL: Could not find stop card for location:', locationName);
@@ -134,7 +134,7 @@ const FastPlannerCore = ({
       });
       
       if (refuelIndices.length > 0) {
-        console.log('🔧 PENDING REFUEL: Setting currentRefuelStops to:', refuelIndices);
+        debugLog(DEBUG_FUEL, '🔧 PENDING REFUEL: Setting currentRefuelStops to:', refuelIndices);
         setCurrentRefuelStops(refuelIndices);
         
         // Update waypoint refuelMode flags too
@@ -195,23 +195,25 @@ const FastPlannerCore = ({
       setShowInitialOverlay(false);
     };
     
-    // 🔍 DEBUG: Log authentication states to see what's happening
-    console.log('🔍 WIZARD LOGIC CHECK:', {
-      isAuthenticated,
-      isLoading,
-      userName,
-      userDetails: !!userDetails,
-      wizardDisabled,
-      shouldWait: !isAuthenticated || isLoading
-    });
+    // 🔍 DEBUG: Authentication state analysis - only when debugging
+    if (DEBUG_CALC) {
+      debugLog(DEBUG_CALC, '🔍 WIZARD LOGIC CHECK:', {
+        isAuthenticated,
+        isLoading,
+        userName,
+        userDetails: !!userDetails,
+        wizardDisabled,
+        shouldWait: !isAuthenticated || isLoading
+      });
+    }
     
     // If not authenticated yet OR still loading user data, keep overlay showing
     if (!isAuthenticated || isLoading) {
-      console.log('🔍 WAITING: Not proceeding to wizard yet (auth or loading)');
+      debugLog(DEBUG_CALC, '🔍 WAITING: Not proceeding to wizard yet (auth or loading)');
       return;
     }
     
-    console.log('🔍 PROCEEDING: Authentication complete, proceeding with wizard logic');
+    debugLog(DEBUG_CALC, '🔍 PROCEEDING: Authentication complete, proceeding with wizard logic');
     
     if (!wizardDisabled) {
       // Show wizard first, then fade out base overlay after wizard is visible
@@ -724,7 +726,7 @@ const FastPlannerCore = ({
     if (alternateRouteData && selectedAircraft && alternateRouteData.coordinates && 
         (!alternateRouteData.totalDistance || alternateRouteData.totalDistance === 0)) {
       
-      console.log('🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
+      debugLog(DEBUG_ROUTE, '🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
       
       // Recalculate route statistics with current aircraft
       const alternateRouteStats = appManagers?.routeCalculatorRef?.current?.calculateRouteStats(
@@ -745,7 +747,7 @@ const FastPlannerCore = ({
           timeHours: alternateRouteStats.timeHours
         };
         
-        console.log('🔍 UPDATED ALTERNATE ROUTE DATA:', updatedAlternateRouteData);
+        debugLog(DEBUG_ROUTE, '🔍 UPDATED ALTERNATE ROUTE DATA:', updatedAlternateRouteData);
         setAlternateRouteData(updatedAlternateRouteData);
       }
     }
