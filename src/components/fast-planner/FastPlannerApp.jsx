@@ -1931,28 +1931,73 @@ const FastPlannerCore = ({
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
     // 🔍 DEBUG: Log the exact flight data received by handleFlightLoad
+    console.log('🔍 handleFlightLoad: ===== FLIGHT LOAD STARTED =====');
     console.log('🔍 handleFlightLoad: Received flight data:', flightData);
     console.log('🔍 handleFlightLoad: Flight data keys:', Object.keys(flightData || {}));
     console.log('🔍 handleFlightLoad: fuelPlanId present:', !!flightData?.fuelPlanId);
     console.log('🔍 handleFlightLoad: fuelPlanId value:', flightData?.fuelPlanId);
+    console.log('🔍 handleFlightLoad: Current state before reset:');
+    console.log('🔍 handleFlightLoad: - currentRefuelStops:', currentRefuelStops);
+    console.log('🔍 handleFlightLoad: - locationFuelOverrides:', locationFuelOverrides);
+    console.log('🔍 handleFlightLoad: - waypoints length:', waypoints.length);
+    console.log('🔍 handleFlightLoad: - loadedFlightData:', loadedFlightData?.flightId);
     
-    // 🚨 CRITICAL: Clear ALL refuel state before loading new flight
-    console.log('🧹 REFUEL RESET: Clearing all refuel state for new flight load');
+    // 🚨 CRITICAL: COMPREHENSIVE STATE RESET - Clear ALL state before loading new flight
+    console.log('🧹 COMPREHENSIVE RESET: Clearing all state for new flight load');
+    
+    // 1. Refuel state
     setCurrentRefuelStops([]); // Clear current refuel stops
     setPendingRefuelStops(null); // Clear pending refuel stops
     
-    // 🚨 CRITICAL: Clear temp fuel object cache to prevent persistence between flights
+    // 2. Fuel-related state
+    setLocationFuelOverrides({}); // Clear all location-specific fuel overrides
+    updateFlightSetting('extraFuel', 0); // Reset global extra fuel to 0
+    setWeatherFuel({ araFuel: 0, approachFuel: 0 }); // Reset weather fuel
+    
+    // 3. Flight data state
+    setLoadedFlightData(null); // Clear previous flight data
+    setLoadedFuelObject(null); // Clear previous fuel object
+    setCurrentFlightId(null); // Clear previous flight ID
+    
+    // 4. Alternate route state
+    setAlternateStopCard(null); // Clear alternate card
+    setAlternateModeActive(false); // Reset alternate mode
+    setAlternateSplitPoint(null); // Clear split point
+    setAlternateRouteData(null); // Clear alternate route data
+    setAlternateRouteInput(''); // Clear alternate route input
+    
+    // 5. SAR and other mode states
+    setSarData(null); // Clear SAR data
+    setWaiveAlternates(false); // Reset waive alternates
+    
+    // 6. SMOOTH TRANSITION: Clear waypoints and stopCards with minimal delay
+    console.log('🧹 WAYPOINTS RESET: Clearing all waypoints before new flight load');
+    
+    // Add a tiny delay to make the transition smoother
+    setTimeout(() => {
+      setWaypoints([]);
+      setStopCards([]); // Clear after tiny delay to reduce flash
+    }, 10);
+    
+    // 7. SMOOTH TRANSITION: StopCards cleared with waypoints above
+    console.log('🧹 STOPCARDS RESET: Preparing for smooth stopCard transition');
+    
+    // 8. Clear route stats (will be recalculated)
+    setRouteStats(null);
+    
+    // 9. Clear temp fuel object cache
     const { FuelSaveBackService } = await import('./services/FuelSaveBackService');
     if (FuelSaveBackService._tempExistingFuelObject) {
       console.log('🧹 CACHE CLEAR: Clearing temp fuel object cache');
       delete FuelSaveBackService._tempExistingFuelObject;
     }
     
-    // 🚨 AVIATION SAFETY: Reset ALL fuel data first to prevent cross-flight contamination
-    console.log('🧹 FUEL RESET: Clearing all fuel overrides and extra fuel before loading new flight');
-    setLocationFuelOverrides({}); // Clear all location-specific fuel overrides
-    updateFlightSetting('extraFuel', 0); // Reset global extra fuel to 0
+    // 10. Force recalculation with clean state
     setForceUpdate(prev => prev + 1); // Force recalculation with clean fuel state
+    
+    // 11. CRITICAL: Allow all state clearing to complete before continuing
+    console.log('🧹 STATE RESET: Waiting for all state clearing to complete...');
+    await new Promise(resolve => setTimeout(resolve, 20)); // Minimal delay to prevent glitching
     
     // RESET LOADING STATE: Always reset to false first, then set to true
     setIsActuallyLoading(false);
@@ -2120,6 +2165,8 @@ const FastPlannerCore = ({
         // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2 with new OSDK v0.9.0 support
         try {
           console.log('💾 FUEL LOAD-BACK: Loading saved fuel and refuel stops for flight:', flightData.flightId);
+          console.log('💾 FUEL LOAD-BACK: fuelPlanId:', flightData.fuelPlanId);
+          console.log('💾 FUEL LOAD-BACK: Previous fuel object state:', loadedFuelObject?.primaryKey);
           
           // 🔄 CRITICAL: Clear refuel state at start of flight loading
           console.log('💾 FUEL LOAD-BACK: Clearing refuel state at start of flight load');
@@ -2134,6 +2181,8 @@ const FastPlannerCore = ({
           
           // Load fuel settings using new consolidated method - pass full flightData for fuelPlanId
           const fuelSettings = await FuelSaveBackService.loadFuelSettingsForFlight(flightData);
+          console.log('💾 FUEL LOAD-BACK: FuelSaveBackService.loadFuelSettingsForFlight completed');
+          console.log('💾 FUEL LOAD-BACK: fuelSettings result:', fuelSettings ? 'SUCCESS' : 'FAILED');
           
           if (fuelSettings) {
             console.log('💾 FUEL LOAD-BACK: Loaded fuel settings:', fuelSettings);
@@ -2232,67 +2281,32 @@ const FastPlannerCore = ({
             
             // 2. Restore refuel stop flags (user selections)
             if (fuelSettings.refuelStops && Array.isArray(fuelSettings.refuelStops) && fuelSettings.refuelStops.length > 0) {
-              console.log('💾 FUEL LOAD-BACK: Restoring refuel stops:', fuelSettings.refuelStops);
-              console.log('💾 FUEL LOAD-BACK: Current waypoints:', waypoints.map((w, i) => `${i}: ${w.name}`));
+              console.log('💾 FUEL LOAD-BACK: Restoring refuel stops (indices):', fuelSettings.refuelStops);
               
-              // Set refuel flags after waypoints are loaded
-              setTimeout(() => {
-                // Find waypoints that match the refuel stop locations
-                const currentWaypoints = waypoints || [];
-                const refuelIndices = [];
+              // 🎯 CRITICAL FIX: refuelStops now contains index numbers, not waypoint names
+              // Just use them directly for the UI checkboxes
+              const refuelIndices = fuelSettings.refuelStops.filter(index => typeof index === 'number' && index > 0);
+              
+              if (refuelIndices.length > 0) {
+                console.log('💾 FUEL LOAD-BACK: Setting currentRefuelStops to:', refuelIndices);
+                setCurrentRefuelStops(refuelIndices);
                 
-                const updatedWaypoints = currentWaypoints.map((waypoint, index) => {
-                  const isRefuelStop = fuelSettings.refuelStops.includes(waypoint.name);
-                  if (isRefuelStop) {
-                    // ✅ CRITICAL FIX: Find the stop card index for this waypoint name, not waypoint index
-                    // We need to find where this waypoint appears in the stop cards, not waypoints
-                    const stopCardIndex = stopCards.findIndex(card => card.stopName === waypoint.name);
-                    if (stopCardIndex >= 0) {
-                      const stopCardUIIndex = stopCardIndex + 1; // Stop cards use 1-based indexing
-                      console.log('💾 FUEL LOAD-BACK: Found', waypoint.name, 'at stop card index:', stopCardUIIndex);
-                      refuelIndices.push(stopCardUIIndex);
-                    } else {
-                      console.warn('💾 FUEL LOAD-BACK: Could not find stop card for waypoint:', waypoint.name);
-                    }
-                  }
-                  return {
-                    ...waypoint,
-                    refuelMode: isRefuelStop
-                  };
-                });
+                // 🎨 COLOR TRIGGER FIX: Force recalculation after refuel state is set
+                setTimeout(() => {
+                  console.log('🎨 COLOR TRIGGER: Forcing recalculation to update alternate fuel colors');
+                  setForceUpdate(prev => prev + 1); // Force recalculation to trigger color changes
+                }, 200); // Extra delay to ensure refuel state is fully propagated
                 
-                // Update waypoints with refuel flags
-                setWaypoints(updatedWaypoints);
-                
-                // Update currentRefuelStops state for UI checkboxes
-                if (refuelIndices.length > 0) {
-                  // 🚨 CRITICAL FIX: Remove duplicates from refuelIndices
-                  const uniqueRefuelIndices = [...new Set(refuelIndices)];
-                  console.log('💾 FUEL LOAD-BACK: Setting currentRefuelStops to:', uniqueRefuelIndices);
-                  console.log('💾 FUEL LOAD-BACK: Before setCurrentRefuelStops - current state:', currentRefuelStops);
-                  setCurrentRefuelStops(uniqueRefuelIndices);
-                  
-                  // Verify state update with setTimeout
-                  setTimeout(() => {
-                    console.log('💾 FUEL LOAD-BACK: After setCurrentRefuelStops - new state should be:', refuelIndices);
-                  }, 100);
-                } else {
-                  console.log('💾 FUEL LOAD-BACK: No refuel indices found, checking if we should store pending');
-                  // Store for later processing when stop cards are available
-                  if (fuelSettings.refuelStops && fuelSettings.refuelStops.length > 0) {
-                    console.log('💾 FUEL LOAD-BACK: Storing pending refuel stops for later:', fuelSettings.refuelStops);
-                    setPendingRefuelStops(fuelSettings.refuelStops);
-                  }
-                }
-                
-                if (window.LoadingIndicator && fuelSettings.refuelStops.length > 0) {
+                if (window.LoadingIndicator) {
                   window.LoadingIndicator.updateStatusIndicator(
-                    `Restored ${fuelSettings.refuelStops.length} refuel stops`,
+                    `Restored ${refuelIndices.length} refuel stops`,
                     'info',
                     2000
                   );
                 }
-              }, 500); // Wait for waypoints to be loaded
+              } else {
+                console.log('💾 FUEL LOAD-BACK: No valid refuel indices found');
+              }
             }
             
           } else {

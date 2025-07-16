@@ -205,7 +205,7 @@ const LoadFlightsCard = ({
               {searchTerm ? 'No flights match your search' : 'No saved flights found'}
             </div>
           ) : (
-            filteredFlights.map(flight => {
+            filteredFlights.map((flight, index) => {
               // Check if flight is new (created within last 24 hours)
               const isNewFlight = flight.date && 
                 (new Date() - new Date(flight.date)) < 24 * 60 * 60 * 1000;
@@ -217,8 +217,11 @@ const LoadFlightsCard = ({
                     padding: '10px',
                     borderBottom: '1px solid #444',
                     cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                    backgroundColor: selectedFlightId === flight.id ? 'rgba(60, 130, 180, 0.4)' : 'transparent'
+                    transition: 'all 0.3s ease',
+                    backgroundColor: selectedFlightId === flight.id ? 'rgba(60, 130, 180, 0.4)' : 'transparent',
+                    opacity: 0,
+                    transform: 'translateY(20px)',
+                    animation: `cascadeIn 0.4s ease-out forwards ${index * 0.1}s`
                   }}
                   onClick={() => setSelectedFlightId(flight.id)}
                 >

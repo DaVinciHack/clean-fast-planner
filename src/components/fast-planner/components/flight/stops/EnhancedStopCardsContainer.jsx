@@ -700,12 +700,20 @@ const EnhancedStopCardsContainer = ({
             }
             
             return (
-              <StopCard
+              <div
                 key={`main-stop-${index}`}
-                id={cardId}
-                index={card.index}
-                stopName={card.stopName}
-                totalDistance={card.totalDistance}
+                style={{
+                  opacity: 0,
+                  transform: 'translateY(20px)',
+                  animation: `cascadeIn 0.4s ease-out forwards ${index * 0.1}s`
+                }}
+              >
+                <StopCard
+                  key={`main-stop-${index}`}
+                  id={cardId}
+                  index={card.index}
+                  stopName={card.stopName}
+                  totalDistance={card.totalDistance}
                 totalTime={card.totalTime}
                 totalFuel={card.totalFuel}
                 maxPassengers={card.maxPassengers}
@@ -731,14 +739,22 @@ const EnhancedStopCardsContainer = ({
                 // Fuel capacity warning for aircraft limits
                 fuelCapacityWarning={card.fuelCapacityWarning}
               />
+              </div>
             );
           })}
           
           {/* Render alternate stop card if available and alternates not waived */}
           {alternateStopCard && !waiveAlternates && (
-            <StopCard
-              key="alternate-stop-card"
-              id="alternate-stop-card"
+            <div
+              style={{
+                opacity: 0,
+                transform: 'translateY(20px)',
+                animation: `cascadeIn 0.4s ease-out forwards ${displayStopCards.length * 0.1}s`
+              }}
+            >
+              <StopCard
+                key="alternate-stop-card"
+                id="alternate-stop-card"
               index={alternateStopCard.index}
               stopName={alternateStopCard.stopName}
               totalDistance={alternateStopCard.totalDistance}
@@ -761,6 +777,7 @@ const EnhancedStopCardsContainer = ({
               onClick={() => {}}
               className="alternate-card unified-fuel-card"
             />
+            </div>
           )}
         </div>
         

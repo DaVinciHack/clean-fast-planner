@@ -894,7 +894,11 @@ const RightPanel = React.forwardRef(({
       
       // Call the parent's flight loading handler if available
       if (onFlightLoad) {
+        console.log('🟠 RIGHTPANEL LOAD: About to call onFlightLoad (FastPlannerApp.handleFlightLoad)');
+        console.log('🟠 RIGHTPANEL LOAD: Flight data being passed:', flightData);
         onFlightLoad(flightData);
+      } else {
+        console.error('🟠 RIGHTPANEL LOAD: onFlightLoad not available!');
       }
       
       // 🎯 CENTRALIZED: Use AppStateManager for coordinated camera control

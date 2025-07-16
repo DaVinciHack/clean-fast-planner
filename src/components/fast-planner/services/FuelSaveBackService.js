@@ -1314,9 +1314,10 @@ export class FuelSaveBackService {
             
             // Use refuel_stop_indices to restore refuel checkbox states
             const refuelIndices = fuelObject.refuelStopIndices || [];
-            // Convert indices back to location names using stop_locations array (adjust for 0-based array)
-            const stopLocationsArray = fuelObject.stopLocations || [];
-            const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
+            // 🎯 CRITICAL FIX: Return indices directly instead of converting to names
+            // The UI expects index numbers [1, 2, 3], not waypoint names
+            const refuelStops = refuelIndices; // Keep as index numbers
+            console.log('🎯 REFUEL INDICES: Returning indices directly:', refuelStops);
             
             // CRITICAL DEBUG: Log what fuel data is being loaded
             console.log('🚨 FUEL DATA DEBUG:', {
@@ -1402,8 +1403,9 @@ export class FuelSaveBackService {
         // Extract fuel settings safely
         const extraFuel = Number(fuelObject.plannedExtraFuel) || 0;
         const refuelIndices = fuelObject.refuelStopIndices || [];
-        const stopLocationsArray = fuelObject.stopLocations || [];
-        const refuelStops = refuelIndices.map(index => stopLocationsArray[index - 1]).filter(Boolean);
+        // 🎯 CRITICAL FIX: Return indices directly instead of converting to names (fallback)
+        const refuelStops = refuelIndices; // Keep as index numbers
+        console.log('🎯 REFUEL INDICES (fallback): Returning indices directly:', refuelStops);
         
         console.log('📥 SAFE FALLBACK: Extracted fuel settings:', {
           extraFuel,

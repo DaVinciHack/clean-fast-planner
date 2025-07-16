@@ -533,6 +533,11 @@ const FlightWizard = ({
                       <div 
                         key={flight.__primaryKey || flight.flightId || flight.id || index}
                         className="flight-item"
+                        style={{
+                          opacity: 0,
+                          transform: 'translateY(20px)',
+                          animation: `cascadeIn 0.4s ease-out forwards ${index * 0.1}s`
+                        }}
                         onClick={() => handleFlightSelect(flight)}
                       >
                         <div className="flight-name">
@@ -897,13 +902,38 @@ const FlightWizard = ({
                 <div className="summary-route">
                   <strong>Route:</strong> 
                   <div className="route-flow">
-                    <span className="route-location departure">{flightData.departure?.name}</span>
+                    <span 
+                      className="route-location departure"
+                      style={{
+                        opacity: 0,
+                        transform: 'translateY(20px)',
+                        animation: `cascadeIn 0.4s ease-out forwards 0s`
+                      }}
+                    >
+                      {flightData.departure?.name}
+                    </span>
                     {flightData.landings.map((landing, index) => {
                       const isLast = index === flightData.landings.length - 1;
+                      const animationDelay = (index + 1) * 0.1;
                       return (
                         <React.Fragment key={index}>
-                          <span className="route-arrow">→</span>
-                          <span className={`route-location ${isLast ? 'destination' : 'stop'}`}>
+                          <span 
+                            className="route-arrow"
+                            style={{
+                              opacity: 0,
+                              animation: `cascadeIn 0.4s ease-out forwards ${animationDelay}s`
+                            }}
+                          >
+                            →
+                          </span>
+                          <span 
+                            className={`route-location ${isLast ? 'destination' : 'stop'}`}
+                            style={{
+                              opacity: 0,
+                              transform: 'translateY(20px)',
+                              animation: `cascadeIn 0.4s ease-out forwards ${animationDelay + 0.05}s`
+                            }}
+                          >
                             {landing.name}
                           </span>
                         </React.Fragment>

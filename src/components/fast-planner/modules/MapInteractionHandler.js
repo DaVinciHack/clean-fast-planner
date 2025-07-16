@@ -79,10 +79,14 @@ class MapInteractionHandler {
 
       // 1. AGGRESSIVE CLEANUP: Remove ALL click handlers to prevent duplicates
       if (typeof map.off === 'function') {
-        // Remove our specific handler if it exists
+        // Remove our specific handlers if they exist
         if (this._boundClickHandler) {
           map.off('click', this._boundClickHandler);
           console.log('MapInteractionHandler: Removed old _boundClickHandler.');
+        }
+        if (this._boundRightClickHandler) {
+          map.off('contextmenu', this._boundRightClickHandler);
+          console.log('MapInteractionHandler: Removed old _boundRightClickHandler.');
         }
         
         // Remove ALL click handlers to clean up any orphaned handlers from emergency fixes
@@ -140,9 +144,14 @@ class MapInteractionHandler {
       map.on('click', this._boundClickHandler);
       console.log('✅ General map click handler attached');
       
+      // 2. Right-click handler for waypoint removal
+      this._boundRightClickHandler = this.handleRightClick.bind(this);
+      map.on('contextmenu', this._boundRightClickHandler);
+      console.log('✅ Right-click handler attached');
+      
       // Platform handlers will be added separately when platforms load
       
-      // 2. Route-specific touch/mouse handlers for dragging
+      // 3. Route-specific touch/mouse handlers for dragging
       const routeLayers = ['route', 'route-drag-detection-layer'];
       console.log('🔍 Checking for route layers...');
       
@@ -173,10 +182,10 @@ class MapInteractionHandler {
       // Start periodic check for route layers appearing
       this.startRouteLayerMonitor(map);
       
-      // 3. DOM touch events fallback for iPad - COMMENTED OUT FOR TESTING
-      // if (this.isTouchDevice) {
-      //   this.setupDOMTouchEvents(map);
-      // }
+      // 3. DOM touch events fallback for iPad
+      if (this.isTouchDevice) {
+        this.setupDOMTouchEvents(map);
+      }
     } catch (e) {
       console.error('MapInteractionHandler: Error setting up separate handlers:', e.message);
       this.triggerCallback('onError', 'Error setting up interaction handlers');
@@ -648,6 +657,8 @@ class MapInteractionHandler {
     // Prevent default browser context menu
     if (e.originalEvent && e.originalEvent.preventDefault) {
       e.originalEvent.preventDefault();
+    } else if (e.preventDefault) {
+      e.preventDefault();
     }
     
     // LOCK CHECK: Respect editing lock for right-click too
