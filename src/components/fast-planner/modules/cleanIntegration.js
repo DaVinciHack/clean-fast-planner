@@ -137,7 +137,7 @@ export function useCleanInteractions() {
 export { interactionController };
 
 // Start the integration process automatically
-integrateCleanModules();
+// integrateCleanModules(); // DISABLED - Let MapInteractionHandler handle everything
 
 // Export default function for explicit import and initialization
 export default integrateCleanModules;

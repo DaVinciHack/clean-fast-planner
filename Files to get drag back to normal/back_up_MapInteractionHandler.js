@@ -113,16 +113,6 @@ class MapInteractionHandler {
 
     // The initial call to initialize() still returns true to indicate it's queued.
     console.log('MapInteractionHandler: Initialization queued with onMapLoaded.');
-    
-    // 🔧 EMERGENCY FIX: Also try direct initialization if map is available
-    const map = this.mapManager.getMap();
-    if (map) {
-      console.log('🔧 EMERGENCY: Map available, starting route layer monitoring directly');
-      setTimeout(() => {
-        this.startRouteLayerMonitor(map);
-      }, 1000);
-    }
-    
     return true;
   }
 
@@ -139,8 +129,6 @@ class MapInteractionHandler {
       this._boundClickHandler = this.handleMapClick.bind(this);
       map.on('click', this._boundClickHandler);
       console.log('✅ General map click handler attached');
-      
-      // Platform handlers will be added separately when platforms load
       
       // 2. Route-specific touch/mouse handlers for dragging
       const routeLayers = ['route', 'route-drag-detection-layer'];
@@ -173,10 +161,10 @@ class MapInteractionHandler {
       // Start periodic check for route layers appearing
       this.startRouteLayerMonitor(map);
       
-      // 3. DOM touch events fallback for iPad - COMMENTED OUT FOR TESTING
-      // if (this.isTouchDevice) {
-      //   this.setupDOMTouchEvents(map);
-      // }
+      // 3. DOM touch events fallback for iPad
+      if (this.isTouchDevice) {
+        this.setupDOMTouchEvents(map);
+      }
     } catch (e) {
       console.error('MapInteractionHandler: Error setting up separate handlers:', e.message);
       this.triggerCallback('onError', 'Error setting up interaction handlers');
@@ -214,40 +202,32 @@ class MapInteractionHandler {
         routeLayers.forEach(layer => {
           if (map.getLayer(layer)) {
             foundLayers.push(layer);
+            console.log(`📱 ATTACHING TOUCH EVENTS to layer: ${layer}`);
             // Mouse events for desktop
             map.on('mousedown', layer, this.handleLineMouseStart.bind(this));
             // Touch events for iPad
             map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
-            // Cursor hover
-            map.on('mouseenter', layer, () => {
-              map.getCanvas().style.cursor = 'pointer';
-            });
-            map.on('mouseleave', layer, () => {
-              map.getCanvas().style.cursor = '';
-            });
+          } else {
+            console.log(`❌ LAYER NOT FOUND: ${layer}`);
           }
         });
         
         console.log(`✅ DRAG HANDLERS ATTACHED! (check ${checkCount}) - Found layers: ${foundLayers.join(', ')}`);
         
-        // Additional route layers get touch only
+        // 🎯 ADDITIONAL TEST: Try to attach to ALL route-related layers for maximum coverage
         routeRelatedLayers.forEach(layer => {
           if (!foundLayers.includes(layer) && layer.includes('route')) {
+            console.log(`📱 ADDITIONAL TOUCH ATTACHMENT to: ${layer}`);
             map.on('touchstart', layer, this.handleLineTouchStart.bind(this));
           }
         });
         
-        // ✅ CRITICAL FIX: Only stop monitoring if we actually attached handlers to draggable layers
-        if (foundLayers.length > 0) {
-          console.log(`✅ SUCCESS: Attached handlers to ${foundLayers.length} draggable layers - stopping monitor`);
-          clearInterval(this.routeLayerMonitor);
-          this.routeLayerMonitor = null;
-        } else {
-          console.log(`❌ CONTINUE: Found route-related layers but no draggable layers - continuing monitor`);
-        }
-      } else if (checkCount >= 50) {
-        // Stop after 50 checks to prevent infinite loop
-        console.log(`❌ STOPPING MONITOR: After ${checkCount} checks - preventing infinite loop`);
+        // Stop monitoring
+        clearInterval(this.routeLayerMonitor);
+        this.routeLayerMonitor = null;
+      } else if (checkCount >= 20) {
+        // Stop after 20 checks (10 seconds)
+        console.log(`❌ NO ROUTE LAYERS AFTER ${checkCount} CHECKS - The route is not being drawn on the map!`);
         clearInterval(this.routeLayerMonitor);
         this.routeLayerMonitor = null;
       }
@@ -355,15 +335,6 @@ class MapInteractionHandler {
     console.log('🚀 DRAG TEST: handleLineMouseStart called! Route drag should work now!');
     console.log('🚀 DRAG STARTED! Mouse down on route line detected.');
     
-    // LOCK CHECK: Prevent route dragging when editing is locked
-    if (this.isMapClicksDisabled || window.isEditLocked === true) {
-      console.log('🔒 MapInteractionHandler: Ignoring route drag start - editing is locked');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
-      }
-      return;
-    }
-    
     // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
     const isAlternateMode = window.isAlternateModeActive === true;
     if (isAlternateMode) {
@@ -392,15 +363,6 @@ class MapInteractionHandler {
    */
   handleLineTouchStart(e) {
     console.log('📱 MapInteractionHandler: Line touch start - route drag');
-    
-    // LOCK CHECK: Prevent route dragging when editing is locked
-    if (this.isMapClicksDisabled || window.isEditLocked === true) {
-      console.log('🔒 MapInteractionHandler: Ignoring route drag start - editing is locked');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
-      }
-      return;
-    }
     
     // ALTERNATE MODE CHECK: Prevent route dragging in alternate mode
     const isAlternateMode = window.isAlternateModeActive === true;
@@ -506,7 +468,10 @@ class MapInteractionHandler {
       console.log('MapInteractionHandler: Ignoring duplicate click - already processing');
       return;
     }
-    // Removed overly aggressive drag blocking - drag now has its own protection
+    if (window._routeDragJustFinished || window._isRouteDragging) {
+      console.log('MapInteractionHandler: Click event ignored due to recent/active route drag.');
+      return; 
+    }
     window._processingMapClick = true;
     
     try {
@@ -1003,10 +968,6 @@ class MapInteractionHandler {
     this.isDragging = true;
     this.activeApproach = approach;
     this.dragStartCoord = [lngLat.lng, lngLat.lat];
-    this.dragStartTime = Date.now(); // Track when drag started
-    
-    // Set flag to prevent click conflicts
-    window._isRouteDragging = true;
     
     // Get current waypoints as original coordinates
     const waypoints = this.waypointManager.getWaypoints();
@@ -1229,18 +1190,11 @@ class MapInteractionHandler {
       }
     }
     
-    // Set drag just finished flag to prevent immediate clicks
-    window._routeDragJustFinished = true;
-    setTimeout(() => {
-      window._routeDragJustFinished = false;
-    }, 100);
-    
     // Reset drag state
     this.isDragging = false;
     this.activeApproach = 'none';
     this.dragMode = 'none';
     this.dragStartCoord = null;
-    window._isRouteDragging = false;
     
     if (map && map.getCanvas) {
       map.getCanvas().style.cursor = '';
@@ -1255,25 +1209,7 @@ class MapInteractionHandler {
     if (lngLat && this.waypointManager) {
       console.log(`🎯 Adding waypoint at drag end: ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}`);
       
-      // 🛡️ DRAG PROTECTION 1: Check if drag was held long enough (minimum 200ms)
-      const dragDuration = Date.now() - this.dragStartTime;
-      if (dragDuration < 200) {
-        console.log('🚫 DRAG TOO SHORT: Ignoring quick tap/click - not a real drag');
-        return;
-      }
-      
       const coords = [lngLat.lng, lngLat.lat];
-      
-      // 🛡️ DRAG PROTECTION 2: Check if too close to existing waypoints
-      const waypoints = this.waypointManager.getWaypoints();
-      for (const wp of waypoints) {
-        const wpCoords = wp.coordinates || [wp.lng, wp.lat];
-        const distance = this.calculateDistance(coords[1], coords[0], wpCoords[1], wpCoords[0]);
-        if (distance < 0.1) { // Less than 0.1 miles
-          console.log('🚫 TOO CLOSE: New point too close to existing waypoint:', wp.name);
-          return;
-        }
-      }
       
       // 🛢️ SNAP TO RIG: Check for nearby rigs within 2 miles
       const snapResult = this.findNearbyRig(coords, 2.0);
@@ -1285,22 +1221,12 @@ class MapInteractionHandler {
         console.log(`🛢️ SNAP: Found nearby rig "${snapResult.name}" within 2 miles - snapping to it`);
         finalCoords = snapResult.coordinates;
         waypointName = snapResult.name;
-        
-        // 🛡️ DRAG PROTECTION 3: Check for duplicate names in sequence
-        const insertIndex = this.dragInsertIndex || Math.floor(waypoints.length / 2);
-        if (insertIndex > 0 && waypoints[insertIndex - 1]?.name === waypointName) {
-          console.log('🚫 DUPLICATE NAME: Same name as previous waypoint:', waypointName);
-          return;
-        }
-        if (insertIndex < waypoints.length && waypoints[insertIndex]?.name === waypointName) {
-          console.log('🚫 DUPLICATE NAME: Same name as next waypoint:', waypointName);
-          return;
-        }
       } else {
         console.log('🎯 No nearby rigs found - adding waypoint at drop location');
       }
       
       // Calculate insertion index based on drag start position
+      const waypoints = this.waypointManager.getWaypoints();
       const routeCoords = waypoints.map(wp => {
         // Handle different coordinate formats
         if (wp.lng !== undefined && wp.lat !== undefined) {

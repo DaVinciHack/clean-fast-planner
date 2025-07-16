@@ -240,7 +240,7 @@ const FastPlannerCore = ({
   
   // Glass menu states for flight-loaded controls
   const [isFlightLoaded, setIsFlightLoaded] = useState(false);
-  const [isEditLocked, setIsEditLocked] = useState(false); // Start unlocked to build flights immediately
+  const [isEditLocked, setIsEditLocked] = useState(true); // Start locked - user must enter edit mode
   
   // CRITICAL: Set initial global lock state for managers
   React.useEffect(() => {
@@ -316,7 +316,7 @@ const FastPlannerCore = ({
   
   const {
     mapManagerRef, waypointManagerRef, platformManagerRef, routeCalculatorRef,
-    aircraftManagerRef, mapInteractionHandlerRef, appSettingsManagerRef, handleMapReady
+    aircraftManagerRef, mapInteractionHandlerRef, mapInteractionsRef, appSettingsManagerRef, handleMapReady
   } = appManagers; // Managers are created in parent and passed down
 
   // Setup for addWaypointDirect (if its implementation is passed)
@@ -350,13 +350,47 @@ const FastPlannerCore = ({
 
     // Aircraft policy selection with enhanced logging
     if (fuelPolicy.hasPolicies && fuelPolicy.selectDefaultPolicyForAircraft) {
+      console.log('🔄 FUEL POLICY: Auto-selecting policy for aircraft:', selectedAircraft.registration);
       const defaultPolicy = fuelPolicy.selectDefaultPolicyForAircraft(selectedAircraft);
       if (defaultPolicy) {
+        console.log('✅ FUEL POLICY: Selected default policy:', defaultPolicy.name);
       } else {
+        console.log('⚠️ FUEL POLICY: No default policy found for aircraft:', selectedAircraft.registration);
       }
     } else {
+      console.log('⚠️ FUEL POLICY: Auto-selection not available - hasPolicies:', fuelPolicy.hasPolicies, 'selectFunction:', !!fuelPolicy.selectDefaultPolicyForAircraft);
     }
-  }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length]);
+  }, [selectedAircraft?.registration, fuelPolicy.hasPolicies, fuelPolicy.availablePolicies?.length, fuelPolicy.selectDefaultPolicyForAircraft, activeRegionFromContext?.osdkRegion]);
+
+  // Effect to update flightSettings.reserveFuel with calculated value when fuel policy or aircraft changes
+  useEffect(() => {
+    if (!fuelPolicy.currentPolicy || !selectedAircraft) {
+      return;
+    }
+
+    // Calculate the reserve fuel using the same logic as useReserveFuel hook
+    const reserveType = fuelPolicy.currentPolicy.fuelTypes?.reserveFuel?.type || 'fixed';
+    const policyValue = fuelPolicy.currentPolicy.fuelTypes?.reserveFuel?.default || 0;
+    
+    let calculatedReserveFuel = 0;
+    if (reserveType === 'time' && selectedAircraft.fuelBurn) {
+      // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+      const timeMinutes = policyValue;
+      const fuelFlowPerHour = selectedAircraft.fuelBurn;
+      calculatedReserveFuel = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+      console.log('🔄 RESERVE FUEL: Calculated from time:', timeMinutes, 'min ×', fuelFlowPerHour, 'lbs/hr =', calculatedReserveFuel, 'lbs');
+    } else {
+      // Fixed amount - the policy value is already in lbs
+      calculatedReserveFuel = policyValue;
+      console.log('🔄 RESERVE FUEL: Using fixed value:', calculatedReserveFuel, 'lbs');
+    }
+
+    // Update flight settings with calculated reserve fuel
+    setFlightSettings(currentSettings => ({
+      ...currentSettings,
+      reserveFuel: calculatedReserveFuel
+    }));
+  }, [fuelPolicy.currentPolicy?.uuid, selectedAircraft?.registration, selectedAircraft?.fuelBurn]);
 
   // 🚁 SAR CALCULATION: Calculate SAR data when relevant parameters change (with race condition prevention)
   useEffect(() => {
@@ -732,8 +766,19 @@ const FastPlannerCore = ({
       // Create a key to prevent duplicate recalculations
       const recalcKey = `${JSON.stringify(alternateRouteData.coordinates)}-${selectedAircraft.id}`;
       if (lastAlternateRecalcKey.current === recalcKey) {
+        console.log('🔄 ALTERNATE ROUTE: Skipping recalculation (already calculated):', {
+          recalcKey: recalcKey.substring(0, 50) + '...',
+          lastKey: lastAlternateRecalcKey.current.substring(0, 50) + '...'
+        });
         return; // Skip if already calculated for this combination
       }
+      
+      console.log('🔄 ALTERNATE ROUTE: Performing recalculation:', {
+        recalcKey: recalcKey.substring(0, 50) + '...',
+        lastKey: lastAlternateRecalcKey.current,
+        coordinates: alternateRouteData.coordinates.length,
+        aircraft: selectedAircraft.registration
+      });
       
       debugLog(DEBUG_ROUTE, '🔍 RECALCULATING ALTERNATE ROUTE STATS for loaded flight');
       
@@ -1179,7 +1224,7 @@ const FastPlannerCore = ({
       // Apply OSDK policy values (these are the authoritative source) - Use ?? to allow 0 values
       contingencyFuelPercent: policySettings.contingencyFlightLegs ?? currentSettings.contingencyFuelPercent ?? 5,
       taxiFuel: policySettings.taxiFuel ?? currentSettings.taxiFuel ?? 50,
-      reserveFuel: policySettings.reserveFuel ?? currentSettings.reserveFuel ?? 600,
+      // ✅ DO NOT SET reserveFuel from policy - it should be calculated by useReserveFuel hook
       deckTimePerStop: policySettings.deckTime ?? currentSettings.deckTimePerStop ?? 5,
       extraFuel: policySettings.extraFuel ?? currentSettings.extraFuel ?? 0, // ✅ ADD: Apply extraFuel from policy
       // deckFuelFlow could come from policy or aircraft, keep existing for now
@@ -1635,6 +1680,11 @@ const FastPlannerCore = ({
     setAlternateRouteInput('');
     setAlternateSplitPoint(null);
     
+    // 🔧 CRITICAL FIX: Reset alternate route recalculation key to allow re-selection
+    console.log('🗑️ CLEAR ALTERNATE: Resetting lastAlternateRecalcKey from:', lastAlternateRecalcKey.current);
+    lastAlternateRecalcKey.current = '';
+    console.log('🗑️ CLEAR ALTERNATE: lastAlternateRecalcKey reset to:', lastAlternateRecalcKey.current);
+    
     // Clear window variables
     window.currentSplitPoint = null;
     window.alternateModeClickHandler = null;
@@ -2010,6 +2060,63 @@ const FastPlannerCore = ({
       if (flightData.flightId) {
         setCurrentFlightId(flightData.flightId);
         
+        // 🛩️ FUEL POLICY LOADING: Load correct fuel policy FIRST, before fuel settings processing
+        console.log('🛩️ FUEL POLICY LOADING: Starting fuel policy selection for flight');
+        console.log('🛩️ FUEL POLICY LOADING: Flight policyUuid:', flightData.policyUuid);
+        console.log('🛩️ FUEL POLICY LOADING: Available policies:', fuelPolicy.availablePolicies?.length);
+        
+        try {
+          let selectedPolicy = null;
+          
+          // Priority 1: Flight-specific policy UUID
+          if (flightData.policyUuid && fuelPolicy.availablePolicies?.length > 0) {
+            selectedPolicy = fuelPolicy.availablePolicies.find(p => p.uuid === flightData.policyUuid);
+            if (selectedPolicy) {
+              console.log('🛩️ FUEL POLICY LOADING: Found flight-specific policy:', selectedPolicy.name);
+              fuelPolicy.selectPolicy(selectedPolicy);
+            } else {
+              console.warn('🛩️ FUEL POLICY LOADING: Flight policyUuid not found in available policies');
+            }
+          }
+          
+          // Priority 2: Aircraft default policy (if no flight policy)
+          if (!selectedPolicy && selectedAircraft && fuelPolicy.availablePolicies?.length > 0) {
+            console.log('🛩️ FUEL POLICY LOADING: Using aircraft default policy for:', selectedAircraft.registration);
+            console.log('🛩️ FUEL POLICY LOADING: Aircraft defaultFuelPolicyId:', selectedAircraft.defaultFuelPolicyId);
+            console.log('🛩️ FUEL POLICY LOADING: Aircraft defaultFuelPolicyName:', selectedAircraft.defaultFuelPolicyName);
+            
+            // Try to find policy by name first (since fuel policy ID is actually the name)
+            const policyName = selectedAircraft.defaultFuelPolicyName || selectedAircraft.defaultFuelPolicyId;
+            if (policyName) {
+              selectedPolicy = fuelPolicy.availablePolicies.find(p => p.name === policyName);
+              if (selectedPolicy) {
+                console.log('🛩️ FUEL POLICY LOADING: Found aircraft policy by name:', selectedPolicy.name);
+                fuelPolicy.selectPolicy(selectedPolicy);
+              } else {
+                console.warn('🛩️ FUEL POLICY LOADING: Aircraft policy not found by name:', policyName);
+                console.warn('🛩️ FUEL POLICY LOADING: Available policy names:', fuelPolicy.availablePolicies.map(p => p.name));
+              }
+            } else {
+              console.warn('🛩️ FUEL POLICY LOADING: Aircraft has no default policy name/id');
+            }
+          }
+          
+          if (selectedPolicy) {
+            if (window.LoadingIndicator) {
+              window.LoadingIndicator.updateStatusIndicator(
+                `Fuel policy loaded: ${selectedPolicy.name}`,
+                'success',
+                2000
+              );
+            }
+          } else {
+            console.error('🛩️ FUEL POLICY LOADING: No fuel policy could be loaded - this will cause incorrect fuel calculations!');
+          }
+          
+        } catch (error) {
+          console.error('🛩️ FUEL POLICY LOADING: Error loading fuel policy:', error);
+        }
+        
         // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2 with new OSDK v0.9.0 support
         try {
           console.log('💾 FUEL LOAD-BACK: Loading saved fuel and refuel stops for flight:', flightData.flightId);
@@ -2049,6 +2156,33 @@ const FastPlannerCore = ({
             if (fuelSettings.fuelObject) {
               console.log('💾 FUEL LOAD-BACK: Storing fuel object for reuse:', fuelSettings.fuelObject.$primaryKey);
               setLoadedFuelObject(fuelSettings.fuelObject);
+              
+              // 🛩️ FUEL POLICY LOADING: Check if fuel object has a different policy than flight data
+              if (fuelSettings.fuelObject.policyUuid || fuelSettings.fuelObject.policyName) {
+                const fuelObjectPolicyId = fuelSettings.fuelObject.policyUuid || fuelSettings.fuelObject.policyName;
+                console.log('🛩️ FUEL POLICY LOADING: Fuel object has policy, using fuel object policy:', fuelObjectPolicyId);
+                
+                // Try to find by UUID first, then by name
+                let fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.uuid === fuelObjectPolicyId);
+                if (!fuelObjectPolicy) {
+                  fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.name === fuelObjectPolicyId);
+                }
+                
+                if (fuelObjectPolicy) {
+                  console.log('🛩️ FUEL POLICY LOADING: Found fuel object policy:', fuelObjectPolicy.name);
+                  fuelPolicy.selectPolicy(fuelObjectPolicy);
+                  
+                  if (window.LoadingIndicator) {
+                    window.LoadingIndicator.updateStatusIndicator(
+                      `Fuel policy updated: ${fuelObjectPolicy.name}`,
+                      'success',
+                      2000
+                    );
+                  }
+                } else {
+                  console.warn('🛩️ FUEL POLICY LOADING: Fuel object policy not found:', fuelObjectPolicyId);
+                }
+              }
             }
             
             // 1. Restore location fuel overrides (includes extra fuel and any other overrides)
@@ -2946,10 +3080,10 @@ const FastPlannerCore = ({
     if (newLockState) {
       // LOCKED - Disable map interactions
       
-      // Disable map click handlers
-      if (appManagers.mapInteractionHandlerRef?.current) {
-        appManagers.mapInteractionHandlerRef.current.disableMapClicks();
-      }
+      // DISABLED: Old MapInteractionHandler system disabled in favor of working MapInteractions
+      // if (appManagers.mapInteractionHandlerRef?.current) {
+      //   appManagers.mapInteractionHandlerRef.current.disableMapClicks();
+      // }
       
       // Disable waypoint dragging
       if (appManagers.waypointManagerRef?.current) {
@@ -3007,10 +3141,10 @@ const FastPlannerCore = ({
     } else {
       // UNLOCKED - Re-enable map interactions
       
-      // Re-enable map click handlers
-      if (appManagers.mapInteractionHandlerRef?.current) {
-        appManagers.mapInteractionHandlerRef.current.enableMapClicks();
-      }
+      // DISABLED: Old MapInteractionHandler system disabled in favor of working MapInteractions
+      // if (appManagers.mapInteractionHandlerRef?.current) {
+      //   appManagers.mapInteractionHandlerRef.current.enableMapClicks();
+      // }
       
       // Re-enable waypoint dragging
       if (appManagers.waypointManagerRef?.current) {
@@ -3129,14 +3263,10 @@ const FastPlannerCore = ({
     };
   }, []); // No dependencies to avoid conflicts
 
-  // 🎯 SMART TOGGLE: Show button when flight is loaded, hide when cleared
+  // 🎯 ALWAYS AVAILABLE: Show edit button for map mode switching (satellite ↔ edit mode)
   useEffect(() => {
-    if (!loadedFlightData) {
-      setShowEditButton(false);
-    } else {
-      setShowEditButton(true);
-    }
-  }, [loadedFlightData]);
+    setShowEditButton(true); // Always show for route building and map switching
+  }, []); // Always available, no dependency on loadedFlightData
   
   // 🎯 SMART TOGGLE: Toggle between satellite and edit modes (like 3D toggle button)
   const handleToggleMode = async () => {
@@ -3213,20 +3343,50 @@ const FastPlannerCore = ({
         }
         
         // 🎯 CRITICAL FIX: Initialize ALL interaction handlers for edit mode
-        // This was missing - explains why click/drag/hover didn't work in edit mode
-        setTimeout(() => {
-          if (mapInteractionHandlerRef.current) {
-            console.log('🎯 EDIT MODE: Re-initializing ALL interaction handlers');
-            mapInteractionHandlerRef.current.initialize();
-          }
+        // DISABLED: Old MapInteractionHandler system disabled in favor of working MapInteractions
+        // setTimeout(() => {
+        //   if (mapInteractionHandlerRef.current) {
+        //     console.log('🎯 EDIT MODE: Re-initializing ALL interaction handlers');
+        //     mapInteractionHandlerRef.current.initialize();
+        //   }
+        
+        // 🏗️ AUTO-ENABLE PLATFORMS: Show all platform types when entering edit mode without active route
+        console.log('🔍 EDIT MODE DEBUG:', { 
+          loadedFlightData: !!loadedFlightData, 
+          waypointsLength: waypoints.length,
+          shouldShowAllPlatforms: !loadedFlightData || waypoints.length === 0
+        });
+        
+        if (!loadedFlightData || waypoints.length === 0) {
+          console.log('🎯 EDIT MODE: Auto-enabling all platforms for route building');
+          console.log('🔍 Current visibility states:', {
+            platformsVisible,
+            airfieldsVisible,
+            movablePlatformsVisible,
+            blocksVisible,
+            basesVisible,
+            fuelAvailableVisible
+          });
           
+          // 🔧 USE PLATFORM MANAGER METHODS: Same approach as "with flight" logic that works
+          if (platformManagerRef.current) {
+            platformManagerRef.current.toggleVisibility(true); // General platforms toggle
+            platformManagerRef.current.toggleFixedPlatformsVisibility(true); // Fixed platforms specifically
+            platformManagerRef.current.toggleAirfieldsVisibility(true);
+            platformManagerRef.current.toggleMovablePlatformsVisibility(true);
+            platformManagerRef.current.toggleBlocksVisibility(true);
+            platformManagerRef.current.toggleBasesVisibility(true);
+            platformManagerRef.current.toggleFuelAvailableVisibility(true);
+          }
+        } else {
           // ⛽ AUTO-LOAD REFUEL RIGS: 99% of edit mode usage is for adding refuel stops
           if (platformManagerRef.current) {
             console.log('🎯 EDIT MODE: Auto-loading rigs with fuel for editing');
             // Show rigs with fuel capability specifically
             platformManagerRef.current.toggleFuelAvailableVisibility(true);
           }
-        }, 100); // Small delay to ensure map style is loaded
+        }
+        // }, 100); // Small delay to ensure map style is loaded
       } else {
         setIsEditLocked(true);
         window.isEditLocked = true;
@@ -3320,8 +3480,9 @@ const FastPlannerCore = ({
   };
   const handleLayersCard = () => handleCardChange('maplayers');
   
-  // LIVE weather toggle handler for glass menu - direct implementation
+  // LIVE weather toggle handler for glass menu - robust standalone implementation
   const handleLiveWeatherToggle = useCallback(async () => {
+    console.log('🌩️ LIVE weather toggle requested from glass menu');
     
     try {
       const mapInstance = appManagers.mapManagerRef?.current?.getMap();
@@ -3330,87 +3491,124 @@ const FastPlannerCore = ({
         return;
       }
       
-      // Determine current state by checking for lightning, NOAA stations, and radar
+      // Check current state by looking at actual layers
       const hasLightningLayer = !!mapInstance.getLayer('simple-lightning-layer');
       const hasNOAAStations = !!observedWeatherStationsRef?.current?.isVisible;
       const hasConusRadar = !!mapInstance.getLayer('noaa-conus-layer');
       const isCurrentlyActive = hasLightningLayer || hasNOAAStations || hasConusRadar;
       
+      console.log('🔍 Current weather layer state:', {
+        hasLightningLayer,
+        hasNOAAStations,
+        hasConusRadar,
+        isCurrentlyActive
+      });
+      
       if (!isCurrentlyActive) {
-        // Turn ON lightning + NOAA stations + radar
+        // Turn ON all weather layers
+        console.log('🌩️ Enabling all weather layers...');
         
         // Import weather loading functions
         const { addSimpleLightningOverlay, addNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
         
         // Enable lightning
         if (!hasLightningLayer) {
+          console.log('⚡ Adding lightning layer...');
           const lightningSuccess = await addSimpleLightningOverlay(mapInstance);
           if (lightningSuccess) {
+            console.log('✅ Lightning layer added successfully');
+          } else {
+            console.error('❌ Failed to add lightning layer');
           }
         }
         
         // Enable NOAA weather stations
-        if (observedWeatherStationsRef?.current && !hasNOAAStations) {
-          observedWeatherStationsRef.current.setVisible(true);
-        } else if (!observedWeatherStationsRef?.current) {
-          // Try to initialize NOAA stations if they don't exist
-          try {
-            const ObservedWeatherStationsLayer = (await import('./modules/layers/ObservedWeatherStationsLayer')).default;
-            const stationsLayer = new ObservedWeatherStationsLayer(mapInstance);
-            await stationsLayer.initialize();
-            observedWeatherStationsRef.current = stationsLayer;
-            stationsLayer.setVisible(true);
-          } catch (initError) {
-            console.error('❌ Failed to initialize NOAA weather stations:', initError);
+        if (!hasNOAAStations) {
+          if (observedWeatherStationsRef?.current) {
+            console.log('🌡️ Enabling NOAA weather stations...');
+            observedWeatherStationsRef.current.setVisible(true);
+            console.log('✅ NOAA weather stations enabled');
+          } else {
+            // Try to initialize NOAA stations if they don't exist
+            console.log('🌡️ Initializing NOAA weather stations...');
+            try {
+              const ObservedWeatherStationsLayer = (await import('./modules/layers/ObservedWeatherStationsLayer')).default;
+              const stationsLayer = new ObservedWeatherStationsLayer(mapInstance);
+              await stationsLayer.initialize();
+              observedWeatherStationsRef.current = stationsLayer;
+              stationsLayer.setVisible(true);
+              console.log('✅ NOAA weather stations initialized and enabled');
+            } catch (initError) {
+              console.error('❌ Failed to initialize NOAA weather stations:', initError);
+            }
           }
         }
         
-        // TEMPORARILY DISABLED: CONUS radar (fixing radar URL issues)
-        // The radar overlay is causing image decoding errors in production
-        // Lightning and weather stations work fine, just radar needs fixing
-        console.warn('🚧 CONUS radar temporarily disabled - working on fixing radar URLs');
-        /*
-        if (!hasConusRadar) {
+        // Enable CONUS radar (if in Gulf region)
+        if (!hasConusRadar && activeRegionFromContext?.id === 'gulf-of-mexico') {
+          console.log('🛰️ Adding CONUS radar...');
           const radarSuccess = await addNOAAWeatherOverlay(mapInstance, 'CONUS');
           if (radarSuccess) {
+            console.log('✅ CONUS radar added successfully');
           } else {
+            console.error('❌ Failed to add CONUS radar');
           }
         }
-        */
         
         setLiveWeatherActive(true);
+        console.log('🌩️ Live weather enabled');
         
       } else {
-        // Turn OFF lightning + NOAA stations + radar
+        // Turn OFF all weather layers
+        console.log('🌩️ Disabling all weather layers...');
         
         // Remove lightning layer
         if (hasLightningLayer) {
-          if (mapInstance.getSource('simple-lightning')) {
-            mapInstance.removeLayer('simple-lightning-layer');
-            mapInstance.removeSource('simple-lightning');
+          console.log('⚡ Removing lightning layer...');
+          try {
+            if (mapInstance.getSource('simple-lightning')) {
+              mapInstance.removeLayer('simple-lightning-layer');
+              mapInstance.removeSource('simple-lightning');
+              console.log('✅ Lightning layer removed');
+            }
+          } catch (removeError) {
+            console.error('❌ Error removing lightning layer:', removeError);
           }
         }
         
         // Disable NOAA weather stations
-        if (observedWeatherStationsRef?.current && hasNOAAStations) {
+        if (hasNOAAStations && observedWeatherStationsRef?.current) {
+          console.log('🌡️ Disabling NOAA weather stations...');
           observedWeatherStationsRef.current.setVisible(false);
+          console.log('✅ NOAA weather stations disabled');
         }
         
-        // TEMPORARILY DISABLED: Remove CONUS radar (disabled above)
-        /*
+        // Remove CONUS radar
         if (hasConusRadar) {
-          const { removeNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
-          await removeNOAAWeatherOverlay(mapInstance, 'CONUS');
+          console.log('🛰️ Removing CONUS radar...');
+          try {
+            const { removeNOAAWeatherOverlay } = await import('./modules/WeatherLoader.js');
+            await removeNOAAWeatherOverlay(mapInstance, 'CONUS');
+            console.log('✅ CONUS radar removed');
+          } catch (removeError) {
+            console.error('❌ Error removing CONUS radar:', removeError);
+          }
         }
-        */
         
         setLiveWeatherActive(false);
+        console.log('🌩️ Live weather disabled');
       }
       
     } catch (error) {
       console.error('❌ Error in LIVE weather toggle:', error);
     }
-  }, [liveWeatherActive, appManagers.mapManagerRef, observedWeatherStationsRef]);
+  }, [appManagers.mapManagerRef, observedWeatherStationsRef, activeRegionFromContext]);
+
+  // Callback to receive live weather state changes from MapLayersCard
+  const handleLiveWeatherStateChange = useCallback((isActive) => {
+    console.log('🔄 Live weather state changed from MapLayersCard:', isActive);
+    setLiveWeatherActive(isActive);
+  }, []);
 
   // 🚁 SAR HANDLERS: Search and Rescue mode functionality
   const handleSARUpdate = useCallback((sarUpdate) => {
@@ -4094,6 +4292,9 @@ const FastPlannerCore = ({
           weatherSegmentsHook={weatherSegmentsHook} // Pass full weather segments hook for layer controls
           currentRefuelStops={currentRefuelStops} // 🚫 REFUEL SYNC: Pass synced refuel stops to components
           onSegmentExtraFuelChange={handleSegmentExtraFuelChange} // ✅ SEGMENT-AWARE: Pass segment extra fuel handler
+          
+          // LIVE Weather state synchronization
+          onLiveWeatherStateChange={handleLiveWeatherStateChange} // Pass callback for live weather state sync
           getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter
           onSARUpdate={handleSARUpdate} // Add SAR update handler
           sarData={sarData} // Pass SAR calculation data
@@ -4297,10 +4498,10 @@ const FastPlannerApp = () => {
           });
       }
 
-      // Initialize map interactions if available
-      if (appManagers.mapInteractionHandlerRef && appManagers.mapInteractionHandlerRef.current) {
-        appManagers.mapInteractionHandlerRef.current.initialize();
-      }
+      // DISABLED: Old MapInteractionHandler system disabled in favor of working MapInteractions
+      // if (appManagers.mapInteractionHandlerRef && appManagers.mapInteractionHandlerRef.current) {
+      //   appManagers.mapInteractionHandlerRef.current.initialize();
+      // }
     } catch (error) {
       console.error("Error in handleMapReady:", error);
     }

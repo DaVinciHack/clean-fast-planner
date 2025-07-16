@@ -19,7 +19,8 @@ const SaveFlightCard = ({
   alternateRouteData = null,    // ADD THIS
   alternateRouteInput = '',      // ADD THIS
   initialETD = null, // 🧙‍♂️ WIZARD FIX: Accept initial ETD from wizard
-  loadedFlightData = null // 🧙‍♂️ SAVE CARD FIX: Accept loaded flight data for existing flight names
+  loadedFlightData = null, // 🧙‍♂️ SAVE CARD FIX: Accept loaded flight data for existing flight names
+  fuelPolicy = null // 🛩️ FUEL POLICY: Accept fuel policy for selection
 }) => {
   // Form state
   const [flightName, setFlightName] = useState(initialFlightName);
@@ -31,6 +32,7 @@ const SaveFlightCard = ({
   const [rswId, setRswId] = useState('');
   const [enableAutomation, setEnableAutomation] = useState(runAutomation);
   const [useOnlyProvidedWaypoints, setUseOnlyProvidedWaypoints] = useState(false); // Add waypoint handling state
+  const [selectedFuelPolicyUuid, setSelectedFuelPolicyUuid] = useState(''); // 🛩️ FUEL POLICY: Selected fuel policy UUID
   
   // Set up initial values when card is shown
   useEffect(() => {
@@ -143,7 +145,8 @@ const SaveFlightCard = ({
       rswId: rswId || null,
       alternateLocation: alternateLocation, // ADD ALTERNATE LOCATION
       runAutomation: enableAutomation, // Add the automation flag
-      useOnlyProvidedWaypoints: useOnlyProvidedWaypoints // Add the waypoint handling flag
+      useOnlyProvidedWaypoints: useOnlyProvidedWaypoints, // Add the waypoint handling flag
+      policyUuid: selectedFuelPolicyUuid || null // 🛩️ FUEL POLICY: Include selected fuel policy UUID
     };
     
     onSave(flightData);
@@ -208,6 +211,13 @@ const SaveFlightCard = ({
       marginLeft: '5px',
       opacity: 0.7,
       display: 'block'
+    },
+    helpText: {
+      fontSize: '11px',
+      color: '#999',
+      marginTop: '3px',
+      fontStyle: 'italic',
+      lineHeight: '1.2'
     },
     buttonRow: {
       display: 'flex',
@@ -365,6 +375,28 @@ const SaveFlightCard = ({
             style={styles.input}
           />
         </div>
+        
+        {/* 🛩️ FUEL POLICY: Add fuel policy selection dropdown */}
+        {fuelPolicy && fuelPolicy.availablePolicies && fuelPolicy.availablePolicies.length > 0 && (
+          <div style={styles.inputContainer}>
+            <label style={styles.label}>Fuel Policy Override (Optional):</label>
+            <select 
+              value={selectedFuelPolicyUuid} 
+              onChange={e => setSelectedFuelPolicyUuid(e.target.value)}
+              style={styles.input}
+            >
+              <option value="">Use Aircraft Default ({fuelPolicy.currentPolicy?.name || 'None'})</option>
+              {fuelPolicy.availablePolicies.map(policy => (
+                <option key={policy.uuid} value={policy.uuid}>
+                  {policy.name}
+                </option>
+              ))}
+            </select>
+            <div style={styles.helpText}>
+              Select a different fuel policy for special conditions (e.g., triggered lightning, special ops)
+            </div>
+          </div>
+        )}
         
         {/* Add automation toggle checkbox */}
         <div style={styles.checkboxContainer}>

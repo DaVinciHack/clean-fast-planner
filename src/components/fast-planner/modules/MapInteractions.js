@@ -26,7 +26,6 @@ class MapInteractions {
     
     // Bound methods to maintain proper 'this' context
     this.handleMapClick = this.handleMapClick.bind(this);
-    this.handleRightClick = this.handleRightClick.bind(this);
     this.handlePlatformClick = this.handlePlatformClick.bind(this);
     this.handleRouteClick = this.handleRouteClick.bind(this);
     this.setupEventHandlers = this.setupEventHandlers.bind(this);
@@ -110,11 +109,6 @@ class MapInteractions {
         map.off('click', this.handleMapClick);
         map.on('click', this.handleMapClick);
         console.log('Added map click handler');
-        
-        // 🖱️ RIGHT-CLICK: Add separate contextmenu handler for right-click detection
-        map.off('contextmenu', this.handleRightClick);
-        map.on('contextmenu', this.handleRightClick);
-        console.log('Added map right-click (contextmenu) handler');
       }
       
       // Set up platform layer handlers if they exist or when they're created
@@ -177,19 +171,10 @@ class MapInteractions {
       
       // Set up route layer handlers
       const setupRouteHandlers = () => {
-        // Check if any route layer exists - updated with actual layer names
-        const routeLayers = ['route', 'route-pills', 'route-drag-detection-layer'];
-        const hasRouteLayer = routeLayers.some(layerId => map.getLayer(layerId));
-        
-        if (hasRouteLayer) {
-          // Register route click handlers on all route layers
-          routeLayers.forEach(layerId => {
-            if (map.getLayer(layerId)) {
-              console.log(`🎯 MapInteractions: Registering click handler on layer: ${layerId}`);
-              map.off('click', layerId, this.handleRouteClick);
-              map.on('click', layerId, this.handleRouteClick);
-            }
-          });
+        if (map.getLayer('route')) {
+          // Route click handler
+          map.off('click', 'route', this.handleRouteClick);
+          map.on('click', 'route', this.handleRouteClick);
           
           // Setup route drag functionality if enabled
           if (this.config.enableDrag) {
@@ -357,15 +342,6 @@ class MapInteractions {
    * Handle map click events
    */
   handleMapClick(e) {
-    // LOCK CHECK: Prevent map clicks when editing is locked
-    if (window.isEditLocked === true) {
-      console.log('🔒 MapInteractions: Ignoring click - editing is locked');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
-      }
-      return;
-    }
-    
     // Prevent rapid clicks
     const now = Date.now();
     if (now - this.lastClickTime < this.config.debounceTime) {
@@ -410,73 +386,6 @@ class MapInteractions {
   }
   
   /**
-   * Handle right-click to delete the last waypoint
-   */
-  handleRightClick(e) {
-    // Prevent default browser context menu
-    e.preventDefault();
-    console.log('🖱️ MapInteractions: Right-click contextmenu event received');
-    
-    // LOCK CHECK: Respect editing lock for right-click too
-    if (window.isEditLocked === true) {
-      console.log('🔒 MapInteractions: Ignoring right-click - editing is locked');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
-      }
-      return;
-    }
-    
-    // Check if we have waypoints to remove - try multiple sources
-    let waypointManager = this.waypointManager;
-    
-    // If not available directly, try to get from window global
-    if (!waypointManager && window.waypointManager) {
-      waypointManager = window.waypointManager;
-      console.log('🔍 MapInteractions: Using global window.waypointManager');
-    }
-    
-    if (!waypointManager) {
-      console.error('MapInteractions: WaypointManager not available for right-click handling');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('❌ WaypointManager not available', 'error', 2000);
-      }
-      return;
-    }
-    
-    const waypoints = waypointManager.getWaypoints();
-    if (!waypoints || waypoints.length === 0) {
-      console.log('🖱️ MapInteractions: No waypoints to remove');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('No waypoints to remove', 'info', 1500);
-      }
-      return;
-    }
-    
-    // Get the last waypoint
-    const lastWaypoint = waypoints[waypoints.length - 1];
-    const lastIndex = waypoints.length - 1;
-    
-    console.log(`🗑️ MapInteractions: Removing last waypoint "${lastWaypoint.name}" at index ${lastIndex}`);
-    
-    // Remove the last waypoint
-    try {
-      waypointManager.removeWaypoint(lastWaypoint.id, lastIndex);
-      
-      // Show success message
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator(`✅ Removed waypoint: ${lastWaypoint.name}`, 'success', 2000);
-      }
-      
-      console.log(`✅ MapInteractions: Successfully removed waypoint "${lastWaypoint.name}"`);
-    } catch (error) {
-      console.error('MapInteractions: Error removing last waypoint:', error);
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('❌ Error removing waypoint', 'error', 2000);
-      }
-    }
-  }
-  
-  /**
    * Check if a click is on a panel element
    */
   isClickOnPanel(event) {
@@ -502,15 +411,6 @@ class MapInteractions {
    * Handle platform click events
    */
   handlePlatformClick(e) {
-    // LOCK CHECK: Prevent platform clicks when editing is locked
-    if (window.isEditLocked === true) {
-      console.log('🔒 MapInteractions: Ignoring platform click - editing is locked');
-      if (window.LoadingIndicator) {
-        window.LoadingIndicator.updateStatusIndicator('🔒 Flight is locked - Click unlock button to edit', 'warning', 2000);
-      }
-      return;
-    }
-    
     // Prevent rapid clicks
     const now = Date.now();
     if (now - this.lastClickTime < this.config.debounceTime) {
@@ -545,69 +445,6 @@ class MapInteractions {
   handleRouteClick(e) {
     // Skip if we're dragging the route (will be handled by drag handler)
     if (this.isRouteDragging) return;
-    
-    // ALTERNATE MODE: Handle route clicks for split point selection
-    if (window.isAlternateModeActive === true) {
-      console.log('🎯 Route clicked in alternate mode');
-      e.preventDefault();
-      e.originalEvent.stopPropagation();
-      
-      // Find the nearest waypoint to this click
-      if (this.waypointManager && typeof this.waypointManager.getWaypoints === 'function') {
-        const waypoints = this.waypointManager.getWaypoints();
-        let nearestWaypoint = null;
-        let minDistance = Infinity;
-        
-        // Find the closest waypoint to the click
-        waypoints.forEach((waypoint, index) => {
-          // Handle different coordinate formats (including Palantir OSDK geoPoint)
-          let lat, lng;
-          if (waypoint.lat !== undefined && waypoint.lng !== undefined) {
-            lat = waypoint.lat;
-            lng = waypoint.lng;
-          } else if (waypoint.latitude !== undefined && waypoint.longitude !== undefined) {
-            lat = waypoint.latitude;
-            lng = waypoint.longitude;
-          } else if (waypoint.geoPoint) {
-            // Palantir OSDK geoPoint format
-            lat = waypoint.geoPoint.latitude;
-            lng = waypoint.geoPoint.longitude;
-          } else if (waypoint.coordinates && Array.isArray(waypoint.coordinates) && waypoint.coordinates.length >= 2) {
-            lng = waypoint.coordinates[0];
-            lat = waypoint.coordinates[1];
-          } else if (waypoint.coords && Array.isArray(waypoint.coords) && waypoint.coords.length >= 2) {
-            lng = waypoint.coords[0];
-            lat = waypoint.coords[1];
-          }
-          
-          if (lat !== undefined && lng !== undefined) {
-            const distance = Math.sqrt(
-              Math.pow(lat - e.lngLat.lat, 2) + 
-              Math.pow(lng - e.lngLat.lng, 2)
-            );
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestWaypoint = waypoint;
-            }
-          }
-        });
-        
-        if (nearestWaypoint) {
-          console.log('🎯 Setting split point:', nearestWaypoint.name);
-          
-          // Call alternate mode handler
-          if (window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
-            const waypointAsFeature = {
-              name: nearestWaypoint.name,
-              hasFuel: true,
-              isInRoute: true
-            };
-            window.alternateModeClickHandler(e.lngLat, waypointAsFeature);
-          }
-        }
-      }
-      return; // Exit early for alternate mode
-    }
     
     // Prevent rapid clicks
     const now = Date.now();

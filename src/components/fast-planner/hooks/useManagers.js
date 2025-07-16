@@ -13,10 +13,12 @@ import {
   AppSettingsManager,
   WeatherVisualizationManager
 } from '../modules';
+import MapInteractions from '../modules/MapInteractions';
 import FlightCalculations from '../modules/calculations/FlightCalculations';
 import { createWaypointInsertionManager, setupWaypointCallbacks, patchWaypointManager } from '../modules/waypoints';
 import * as WindCalc from '../modules/calculations/WindCalculations';
 import WaypointHandler from '../modules/WaypointHandler';
+import RouteGeometry from '../utilities/RouteGeometry';
 
 /**
  * Custom hook to initialize and manage all manager instances
@@ -49,6 +51,7 @@ const useManagers = ({
   const flightCalculationsRef = useRef(null);
   const waypointInsertionManagerRef = useRef(null);
   const mapInteractionHandlerRef = useRef(null);
+  const mapInteractionsRef = useRef(null);
   const appSettingsManagerRef = useRef(null);
   const waypointHandlerRef = useRef(null);
   const weatherVisualizationManagerRef = useRef(null);
@@ -312,66 +315,69 @@ const useManagers = ({
         });
     }
     
+    // UNIFIED SYSTEM: WaypointInsertionManager disabled - MapInteractionHandler handles everything
     // Initialize the WaypointInsertionManager
-    if (!waypointInsertionManagerRef.current && 
-        mapManagerRef.current && 
-        waypointManagerRef.current &&
-        platformManagerRef.current) {
-      console.log("FastPlannerApp: Creating WaypointInsertionManager instance");
-      
-      try {
-        // Create the manager with added safety checks
-        waypointInsertionManagerRef.current = createWaypointInsertionManager(
-          mapManagerRef.current, 
-          waypointManagerRef.current,
-          platformManagerRef.current
-        );
-        
-        // Even if the manager is returned as null, we will try again later
-        if (!waypointInsertionManagerRef.current) {
-          console.log("WaypointInsertionManager creation failed - will retry later");
-          
-          // Retry after a delay
-          setTimeout(() => {
-            if (!waypointInsertionManagerRef.current && 
-                mapManagerRef.current && 
-                mapManagerRef.current.getMap() &&
-                waypointManagerRef.current && 
-                platformManagerRef.current) {
-              console.log("Retrying WaypointInsertionManager creation...");
-              waypointInsertionManagerRef.current = createWaypointInsertionManager(
-                mapManagerRef.current, 
-                waypointManagerRef.current,
-                platformManagerRef.current
-              );
-              
-              // Set up callbacks on the retry
-              if (waypointInsertionManagerRef.current) {
-                console.log("Successfully created WaypointInsertionManager on retry");
-                setupWaypointCallbacks(
-                  waypointInsertionManagerRef.current,
-                  (data) => console.log("Waypoint inserted:", data),
-                  (data) => console.log("Waypoint removed:", data),
-                  (error) => console.error("Waypoint error:", error)
-                );
-              }
-            }
-          }, 3000);
-          
-        } else {
-          // Set up callbacks if the manager was successfully created
-          setupWaypointCallbacks(
-            waypointInsertionManagerRef.current,
-            (data) => console.log("Waypoint inserted:", data),
-            (data) => console.log("Waypoint removed:", data),
-            (error) => console.error("Waypoint error:", error)
-          );
-        }
-        
-      } catch (error) {
-        console.error("Error creating WaypointInsertionManager:", error);
-      }
-    }
+    // if (!waypointInsertionManagerRef.current && 
+    //     mapManagerRef.current && 
+    //     waypointManagerRef.current &&
+    //     platformManagerRef.current) {
+    //   console.log("FastPlannerApp: Creating WaypointInsertionManager instance");
+    //   
+    //   try {
+    //     // Create the manager with added safety checks
+    //     waypointInsertionManagerRef.current = createWaypointInsertionManager(
+    //       mapManagerRef.current, 
+    //       waypointManagerRef.current,
+    //       platformManagerRef.current
+    //     );
+    //     
+    //     // Even if the manager is returned as null, we will try again later
+    //     if (!waypointInsertionManagerRef.current) {
+    //       console.log("WaypointInsertionManager creation failed - will retry later");
+    //       
+    //       // Retry after a delay
+    //       setTimeout(() => {
+    //         if (!waypointInsertionManagerRef.current && 
+    //             mapManagerRef.current && 
+    //             mapManagerRef.current.getMap() &&
+    //             waypointManagerRef.current && 
+    //             platformManagerRef.current) {
+    //           console.log("Retrying WaypointInsertionManager creation...");
+    //           waypointInsertionManagerRef.current = createWaypointInsertionManager(
+    //             mapManagerRef.current, 
+    //             waypointManagerRef.current,
+    //             platformManagerRef.current
+    //           );
+    //           
+    //           // Set up callbacks on the retry
+    //           if (waypointInsertionManagerRef.current) {
+    //             console.log("Successfully created WaypointInsertionManager on retry");
+    //             setupWaypointCallbacks(
+    //               waypointInsertionManagerRef.current,
+    //               (data) => console.log("Waypoint inserted:", data),
+    //               (data) => console.log("Waypoint removed:", data),
+    //               (error) => console.error("Waypoint error:", error)
+    //             );
+    //           }
+    //         }
+    //       }, 3000);
+    //       
+    //     } else {
+    //       // Set up callbacks if the manager was successfully created
+    //       setupWaypointCallbacks(
+    //         waypointInsertionManagerRef.current,
+    //         (data) => console.log("Waypoint inserted:", data),
+    //         (data) => console.log("Waypoint removed:", data),
+    //         (error) => console.error("Waypoint error:", error)
+    //       );
+    //     }
+    //     
+    //   } catch (error) {
+    //     console.error("Error creating WaypointInsertionManager:", error);
+    //   }
+    // }
+    
+    console.log("UNIFIED SYSTEM: WaypointInsertionManager disabled - MapInteractionHandler handles all waypoint insertion");
 
     // Initialize the AppSettingsManager
     if (!appSettingsManagerRef.current) {
@@ -516,6 +522,27 @@ const useManagers = ({
       mapInteractionHandlerRef.current.setCallback('onRouteClick', async (data) => {
         console.log('🛣️ Route click callback received in useManagers', data);
         try {
+          // Check for drag flags to prevent double entry
+          if (window._routeDragJustFinished || window._isRouteDragging) {
+            console.log('🚫 Ignoring route click - drag just finished or in progress');
+            return;
+          }
+          
+          // Check if clicking on existing waypoint to prevent duplicates
+          const clickCoords = [data.lngLat.lng, data.lngLat.lat];
+          const existingWaypoints = waypointManagerRef.current?.getWaypoints() || [];
+          for (const wp of existingWaypoints) {
+            const wpCoords = wp.coordinates || [wp.lng, wp.lat];
+            const distance = Math.sqrt(
+              Math.pow(clickCoords[0] - wpCoords[0], 2) + 
+              Math.pow(clickCoords[1] - wpCoords[1], 2)
+            );
+            if (distance < 0.001) { // Very close to existing waypoint
+              console.log('🚫 Ignoring route click - too close to existing waypoint:', wp.name);
+              return;
+            }
+          }
+          
           // Check if alternate mode is active first
           if (window.isAlternateModeActive && window.alternateModeClickHandler && typeof window.alternateModeClickHandler === 'function') {
             console.log('🎯 Routing route click to alternate mode handler');
@@ -681,14 +708,79 @@ const useManagers = ({
     const handleSettingsChanged = () => {
     };
 
+    // Handler for map style changes - reattach cursor handlers when layers become interactive
+    const handleMapStyleChange = () => {
+      setTimeout(() => {
+        if (mapManagerRef.current?.map) {
+          const map = mapManagerRef.current.map;
+          
+          // Re-attach platform cursor handlers
+          const platformLayers = ['platforms-fixed-layer', 'platforms-movable-layer', 'airfields-layer'];
+          platformLayers.forEach(layer => {
+            if (map.getLayer(layer)) {
+              // Check layer visibility
+              const visibility = map.getLayoutProperty(layer, 'visibility');
+              console.log(`🔍 Platform layer ${layer} visibility:`, visibility);
+              
+              // Ensure layer is visible
+              if (visibility !== 'visible') {
+                map.setLayoutProperty(layer, 'visibility', 'visible');
+                console.log(`🔧 Set ${layer} visibility to visible`);
+              }
+              
+              map.off('mouseenter', layer);
+              map.off('mouseleave', layer);
+              map.on('mouseenter', layer, () => {
+                map.getCanvas().style.cursor = 'pointer';
+              });
+              map.on('mouseleave', layer, () => {
+                map.getCanvas().style.cursor = '';
+              });
+              console.log(`Re-attached platform cursor handlers for: ${layer}`);
+            }
+          });
+          
+          // Re-attach route cursor handlers
+          const routeLayers = ['route', 'route-drag-detection-layer'];
+          routeLayers.forEach(layer => {
+            if (map.getLayer(layer)) {
+              // Check layer visibility
+              const visibility = map.getLayoutProperty(layer, 'visibility');
+              console.log(`🔍 Route layer ${layer} visibility:`, visibility);
+              
+              // Ensure layer is visible
+              if (visibility !== 'visible') {
+                map.setLayoutProperty(layer, 'visibility', 'visible');
+                console.log(`🔧 Set ${layer} visibility to visible`);
+              }
+              
+              map.off('mouseenter', layer);
+              map.off('mouseleave', layer);
+              map.on('mouseenter', layer, () => {
+                map.getCanvas().style.cursor = 'pointer';
+              });
+              map.on('mouseleave', layer, () => {
+                map.getCanvas().style.cursor = '';
+              });
+              console.log(`Re-attached route cursor handlers for: ${layer}`);
+            }
+          });
+        }
+      }, 1000); // Wait for style to fully load
+    };
+
     // Add event listeners
     window.addEventListener('save-aircraft-settings', handleSaveAircraftSettings);
     window.addEventListener('settings-changed', handleSettingsChanged);
+    window.addEventListener('map-style-switched', handleMapStyleChange);
+    window.addEventListener('map-style-changed', handleMapStyleChange);
 
     // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('save-aircraft-settings', handleSaveAircraftSettings);
       window.removeEventListener('settings-changed', handleSettingsChanged);
+      window.removeEventListener('map-style-switched', handleMapStyleChange);
+      window.removeEventListener('map-style-changed', handleMapStyleChange);
     };
   }, [
     client, 
@@ -720,6 +812,29 @@ const useManagers = ({
 
     waypointManagerRef.current.setCallback('onRouteUpdated', (routeData) => {
       console.log(`🗺️ Route updated with ${routeData.waypoints.length} waypoints`);
+      
+      // Add route cursor handlers when route is drawn (like working version)
+      if (mapManagerRef.current?.map) {
+        const map = mapManagerRef.current.map;
+        const routeLayers = ['route', 'route-drag-detection-layer'];
+        
+        routeLayers.forEach(layer => {
+          if (map.getLayer(layer)) {
+            // Remove existing handlers to prevent duplicates
+            map.off('mouseenter', layer);
+            map.off('mouseleave', layer);
+            
+            // Add fresh cursor handlers
+            map.on('mouseenter', layer, () => {
+              map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', layer, () => {
+              map.getCanvas().style.cursor = '';
+            });
+            console.log(`Added route cursor handlers for layer: ${layer}`);
+          }
+        });
+      }
     });
 
     console.log("✅ CALLBACK RE-BINDING: Waypoint callbacks updated successfully");
@@ -740,6 +855,8 @@ const useManagers = ({
     if (typeof platformManagerRef.current.setCallback === 'function') {
       platformManagerRef.current.setCallback('onPlatformsLoaded', (platforms) => {
         console.log(`🏗️ PLATFORMS LOADED: ${platforms.length} platforms via callback`);
+        
+        // Platform cursor handlers will be added when platforms are confirmed visible
         
         // 🛩️ PLATFORM DISPLAY VERIFICATION: Check if platforms actually appear on map
         setTimeout(() => {
@@ -864,19 +981,39 @@ const useManagers = ({
         // First, make sure global flags are properly set
         window.isWaypointModeActive = window.isWaypointModeActive || false;
         
-        // Initialize map interactions immediately - no delay
-        if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
-          console.log("🧹 Initializing map interaction handler immediately");
-          const initSuccess = mapInteractionHandlerRef.current.initialize();
-          
-          if (initSuccess) {
-            console.log("🧹 Map interaction handler initialized successfully");
-          } else {
-            console.error("🧹 Failed to initialize map interaction handler");
-          }
-        } else {
-          console.log("🧹 Map interaction handler already initialized, skipping");
+        // Clean up any existing handlers before initializing new ones
+        const map = mapManagerRef.current.getMap();
+        if (map && map._listeners && map._listeners.click) {
+          console.log(`🧹 Removing ${map._listeners.click.length} existing click handlers before initializing`);
+          map.off('click');
         }
+        
+        // Add a small delay to ensure the map is fully loaded
+        setTimeout(() => {
+          // Initialize map interactions carefully
+          if (mapInteractionHandlerRef.current) {
+            // Only initialize if we haven't already
+            if (!mapInteractionHandlerRef.current.isInitialized) {
+              const initSuccess = mapInteractionHandlerRef.current.initialize();
+              
+              if (initSuccess) {
+                console.log("🧹 Map interaction handler initialized successfully");
+              } else {
+                console.error("🧹 Failed to initialize map interaction handler, will retry once");
+                
+                // Try again after a longer delay
+                setTimeout(() => {
+                  if (mapInteractionHandlerRef.current && !mapInteractionHandlerRef.current.isInitialized) {
+                    console.log("🧹 Second attempt at initializing map handler");
+                    mapInteractionHandlerRef.current.initialize();
+                  }
+                }, 1000);
+              }
+            } else {
+              console.log("🧹 Map interaction handler already initialized, skipping");
+            }
+          }
+        }, 500);
       }
     } catch (error) {
       console.error("Error in handleMapReady:", error);
@@ -939,6 +1076,7 @@ const useManagers = ({
     flightCalculationsRef,
     waypointInsertionManagerRef,
     mapInteractionHandlerRef,
+    mapInteractionsRef,
     appSettingsManagerRef,
     waypointHandlerRef,
     weatherVisualizationManagerRef,

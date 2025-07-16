@@ -124,7 +124,7 @@ const StopCard = React.forwardRef(({
             )}
             
             {/* Fuel capacity warning display beside name */}
-            {isDeparture && fuelCapacityWarning?.exceedsCapacity && (
+            {fuelCapacityWarning?.exceedsCapacity && (
               <span style={{ 
                 fontSize: '0.6em', 
                 color: '#dc2626', 

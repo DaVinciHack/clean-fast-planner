@@ -137,7 +137,9 @@ const RightPanel = React.forwardRef(({
   // 🔥 DIRECT CALLBACK: Function to register fuel overrides callback
   onFuelOverridesChanged = null,
   // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
-  onRefuelStopsChanged = null
+  onRefuelStopsChanged = null,
+  // 🌩️ LIVE Weather state synchronization
+  onLiveWeatherStateChange = null
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -306,7 +308,36 @@ const RightPanel = React.forwardRef(({
         copilotId: flightData.copilotId || null,
         medicId: flightData.medicId || null,
         soId: flightData.soId || null,
-        rswId: flightData.rswId || null
+        rswId: flightData.rswId || null,
+        
+        // 🛩️ FUEL POLICY: Add fuel policy UUID for FastPlanner-created flights
+        policyUuid: (() => {
+          // Priority 1: User-selected fuel policy (if user overrode it)
+          if (flightData.policyUuid) {
+            console.log('🛩️ SAVE FLIGHT: Using user-selected fuel policy:', flightData.policyUuid);
+            return flightData.policyUuid;
+          }
+          
+          // Priority 2: Current fuel policy from state (if user selected one)
+          if (fuelPolicy?.currentPolicy?.uuid) {
+            console.log('🛩️ SAVE FLIGHT: Using current fuel policy:', fuelPolicy.currentPolicy.uuid, fuelPolicy.currentPolicy.name);
+            return fuelPolicy.currentPolicy.uuid;
+          }
+          
+          // Priority 3: Aircraft default fuel policy
+          if (selectedAircraft?.defaultFuelPolicyId) {
+            console.log('🛩️ SAVE FLIGHT: Using aircraft default fuel policy (by name):', selectedAircraft.defaultFuelPolicyId);
+            // Need to find the UUID for the aircraft's default policy name
+            const aircraftPolicy = fuelPolicy?.availablePolicies?.find(p => p.name === selectedAircraft.defaultFuelPolicyId);
+            if (aircraftPolicy) {
+              console.log('🛩️ SAVE FLIGHT: Found aircraft policy UUID:', aircraftPolicy.uuid);
+              return aircraftPolicy.uuid;
+            }
+          }
+          
+          console.warn('🛩️ SAVE FLIGHT: No fuel policy UUID found - this will cause issues!');
+          return null;
+        })()
       };
       
       console.log('Sending flight data to Palantir:', apiParams);
@@ -982,6 +1013,47 @@ const RightPanel = React.forwardRef(({
     handleCardChange('main');
   };
 
+  // 🛩️ SIMPLE SAVE: Direct save without popup - replaces SaveFlightCard workflow
+  const handleDirectSave = async () => {
+    console.log('🛩️ DIRECT SAVE: Starting simple save without popup');
+    
+    if (!selectedAircraft || !waypoints || waypoints.length < 2) {
+      if (window.LoadingIndicator) {
+        window.LoadingIndicator.updateStatusIndicator('Cannot save: Missing aircraft or waypoints', 'error', 3000);
+      }
+      return;
+    }
+
+    // Generate default flight name if not already loaded
+    const defaultFlightName = loadedFlightData?.name || 
+                             loadedFlightData?.flightName || 
+                             `Fast Planner Flight ${new Date().toLocaleDateString()}`;
+
+    // Generate default ETD (1 hour from now)
+    const defaultETD = new Date();
+    defaultETD.setHours(defaultETD.getHours() + 1);
+
+    // Create flight data with simple defaults
+    const flightData = {
+      flightName: defaultFlightName,
+      etd: defaultETD.toISOString(),
+      captainId: null,
+      copilotId: null,
+      medicId: null,
+      soId: null,
+      rswId: null,
+      alternateLocation: alternateRouteData?.name || null,
+      runAutomation: false, // 🚫 NO AUTOMATION - that's what AutoPlan is for
+      useOnlyProvidedWaypoints: false, // ✅ LET PALANTIR ADD WAYPOINTS if needed
+      policyUuid: fuelPolicy?.currentPolicy?.uuid || null // 🛩️ INCLUDE CURRENT FUEL POLICY
+    };
+
+    console.log('🛩️ DIRECT SAVE: Flight data:', flightData);
+
+    // Use existing save logic but without automation
+    await handleSaveFlightSubmit(flightData);
+  };
+
   // Handle Auto Plan action
   const handleAutoPlan = async (autoPlanData) => {
     console.log('🎯 AUTO PLAN: Starting auto plan with data:', autoPlanData);
@@ -1280,6 +1352,7 @@ const RightPanel = React.forwardRef(({
         getCurrentSegmentInfo={getCurrentSegmentInfo} // ✅ SEGMENT-AWARE: Pass segment info getter to MainCard
         onFuelOverridesChanged={onFuelOverridesChanged} // 🔥 DIRECT CALLBACK: Pass fuel overrides callback to MainCard
         onRefuelStopsChanged={onRefuelStopsChanged} // 🔄 REFUEL SYNC: Pass refuel stops callback to MainCard
+        onDirectSave={handleDirectSave} // 🛩️ SIMPLE SAVE: Pass direct save function to MainCard
       />
       
       {/* Settings Card */}
@@ -1376,6 +1449,7 @@ const RightPanel = React.forwardRef(({
         weatherSegmentsHook={weatherSegmentsHook} // Pass weather segments hook for layer controls
         waypoints={waypoints} // Pass current flight waypoints for rig weather graphics
         routeStats={routeStats} // Pass route statistics for rig weather graphics
+        onLiveWeatherToggled={onLiveWeatherStateChange} // Pass live weather state callback
       />
       
       {/* Save Flight Card */}
@@ -1390,6 +1464,7 @@ const RightPanel = React.forwardRef(({
         alternateRouteInput={alternateRouteInput}
         initialETD={etd} // 🧙‍♂️ WIZARD FIX: Pass wizard ETD to save card
         loadedFlightData={loadedFlightData} // 🧙‍♂️ SAVE CARD FIX: Pass loaded flight data for existing flight names
+        fuelPolicy={fuelPolicy} // 🛩️ FUEL POLICY: Pass fuel policy for selection
       />
       
       {/* Load Flights Card */}

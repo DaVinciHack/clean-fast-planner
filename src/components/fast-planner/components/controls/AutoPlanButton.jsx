@@ -118,7 +118,7 @@ const AutoPlanButton = ({
   // Button style to match Submit Flight Plan style - dark grey with blue border
   const buttonStyle = {
     padding: '5px 10px',
-    fontSize: '14px',
+    fontSize: '12px', // Reduced from 14px to 12px to prevent text wrapping
     margin: '0 5px',
     display: 'flex',
     alignItems: 'center',
@@ -163,8 +163,8 @@ const AutoPlanButton = ({
           }}
         />
       )}
-      {!isProcessing && <span style={{ marginRight: '4px' }}>⚡</span>}
-      <span>{buttonState.text}</span>
+      {!isProcessing && <span style={{ marginRight: '3px', fontSize: '12px' }}>✨</span>}
+      <span style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>{buttonState.text}</span>
     </button>
   );
 };

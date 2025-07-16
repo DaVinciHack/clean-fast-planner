@@ -449,14 +449,18 @@ class ObservedWeatherStationsLayer {
      */
     async fetchStationWeather(stationId, stationType) {
         try {
+            // Standardize URL handling for localhost vs production
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('ngrok');
+            const baseUrl = isLocal ? '' : 'https://bristow.info/weather';
+            
             let apiUrl;
             
             if (stationType === 'BUOY') {
-                // NOAA Buoy data via PHP proxy - original Vite-style URL
-                apiUrl = `https://bristow.info/weather/api/buoy/data/realtime2/${stationId}.txt`;
+                // NOAA Buoy data via PHP proxy - standardized URL
+                apiUrl = `${baseUrl}/api/buoy/data/realtime2/${stationId}.txt`;
             } else {
-                // Aviation weather from NOAA Aviation Weather Center via PHP proxy - original Vite-style URL
-                apiUrl = `https://bristow.info/weather/api/awc/api/data/metar?ids=${stationId}&format=json&taf=false`;
+                // Aviation weather from NOAA Aviation Weather Center via PHP proxy - standardized URL
+                apiUrl = `${baseUrl}/api/awc/api/data/metar?ids=${stationId}&format=json&taf=false`;
             }
             
             console.log(`Fetching weather via proxy: ${apiUrl}`);

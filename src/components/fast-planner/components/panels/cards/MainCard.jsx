@@ -85,9 +85,11 @@ const MainCard = ({
   onFuelOverridesChanged = null,
   // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
   onRefuelStopsChanged = null,
+  // 🛩️ SIMPLE SAVE: Direct save function without popup
+  onDirectSave = null,
 }) => {
-  // Use shared reserve fuel calculation hook
-  const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, reserveFuel);
+  // Use shared reserve fuel calculation hook - NO FALLBACK, fuel policy is source of truth
+  const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, 0);
   
 
   // Calculate weather age from weather segments
@@ -291,17 +293,32 @@ const MainCard = ({
             onError={handleSaveError}
             onAutoPlan={onAutoPlan} // Pass the onAutoPlan function from props
           />
-          <SaveFlightButton
-            selectedAircraft={selectedAircraft}
-            waypoints={waypoints}
-            routeStats={routeStats}
-            onSuccess={handleSaveSuccess}
-            onError={handleSaveError}
-            onFlightLoad={onFlightLoad}
-            toggleWaypointMode={toggleWaypointMode}
-            waypointModeActive={waypointModeActive}
-            style={{ flex: 1, margin: 0 }}
-          />
+          {/* 🛩️ SIMPLE SAVE: Direct save button without popup */}
+          <button
+            className="control-button"
+            onClick={() => onDirectSave && onDirectSave()}
+            disabled={!selectedAircraft || !waypoints || waypoints.length < 2}
+            style={{
+              flex: 1,
+              margin: 0,
+              backgroundColor: '#038dde',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '5px 10px',
+              cursor: selectedAircraft && waypoints && waypoints.length >= 2 ? 'pointer' : 'not-allowed',
+              fontSize: '12px',
+              fontWeight: 'normal',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: selectedAircraft && waypoints && waypoints.length >= 2 ? 1 : 0.6
+            }}
+            title="Save current flight plan"
+          >
+            Save
+          </button>
           <LoadFlightsButton 
             style={{ flex: 1, margin: 0 }}
             onSuccess={(message) => {
@@ -830,7 +847,7 @@ const MainCard = ({
             selectedAircraft={selectedAircraft}
             passengerWeight={passengerWeight}
             cargoWeight={cargoWeight} // 🟠 ADDED: Missing cargoWeight prop
-            reserveFuel={reserveFuel}
+            reserveFuel={calculatedReserveFuel.fuel}
             contingencyFuelPercent={contingencyFuelPercent}
             deckTimePerStop={deckTimePerStop}
             deckFuelFlow={deckFuelFlow}

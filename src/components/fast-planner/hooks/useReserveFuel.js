@@ -13,7 +13,18 @@ export const useReserveFuel = (fuelPolicy, selectedAircraft, fallbackReserveFuel
   return useMemo(() => {
     const currentPolicy = fuelPolicy?.currentPolicy;
     
+    // 🔍 DEBUG: Log fuel policy details for debugging
+    console.log('🔍 useReserveFuel: Starting calculation with:', {
+      hasFuelPolicy: !!fuelPolicy,
+      hasCurrentPolicy: !!currentPolicy,
+      policyName: currentPolicy?.name,
+      policyUuid: currentPolicy?.uuid,
+      hasSelectedAircraft: !!selectedAircraft,
+      aircraftFuelBurn: selectedAircraft?.fuelBurn
+    });
+    
     if (!currentPolicy || !selectedAircraft) {
+      console.log('🔍 useReserveFuel: Using fallback due to missing policy or aircraft');
       return {
         fuel: fallbackReserveFuel || 0,
         time: 0,

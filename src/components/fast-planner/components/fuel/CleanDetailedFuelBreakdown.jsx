@@ -181,7 +181,7 @@ const CleanDetailedFuelBreakdown = ({
   // 🎯 WIZARD DATA EXTRACTION: Extract passenger data from wizard
   const getWizardPassengerData = useCallback(() => {
     const wizardData = flightSettings?.wizardPassengerData || {};
-    console.log('🎯 WIZARD DATA:', wizardData);
+    // Debug logging removed to prevent console spam
     
     
     return wizardData;
@@ -670,15 +670,7 @@ const CleanDetailedFuelBreakdown = ({
       return 0;
     }
     
-    console.log('🚨 getWeatherValue DEBUG:', {
-      stopName,
-      fuelType,
-      segment: {
-        isRig: segment.isRig,
-        ranking2: segment.ranking2
-      },
-      fuelPolicy: !!fuelPolicy
-    });
+    // Debug logging removed to prevent console spam
     
     // Simple logic: if ranking indicates fuel needed, suggest amount
     if (fuelType === 'araFuel' && segment.isRig && (segment.ranking2 === 8 || segment.ranking2 === 5)) {
@@ -892,7 +884,32 @@ const CleanDetailedFuelBreakdown = ({
                 segment.uniqueId === stopName
               );
               
-              const isRig = weatherSegment?.isRig || false;
+              // 🔧 NEW FLIGHT LOGIC: If no weather segment (new flight), use waypoint data
+              const waypoint = waypoints.find(wp => 
+                wp.loc_name === stopName || 
+                wp.name === stopName ||
+                wp.airport_icao === stopName
+              );
+              
+              // Debug logging to see what we're getting
+              console.log('🔍 WAYPOINT LOOKUP DEBUG:', {
+                stopName,
+                hasWeatherSegment: !!weatherSegment,
+                waypoint: waypoint ? {
+                  name: waypoint.name,
+                  type: waypoint.type,
+                  pointType: waypoint.pointType,
+                  isWaypoint: waypoint.isWaypoint,
+                  allFields: Object.keys(waypoint),
+                  fullWaypoint: waypoint
+                } : null,
+                totalWaypoints: waypoints.length,
+                waypointNames: waypoints.map(wp => wp.name)
+              });
+              
+              const isRig = weatherSegment ? weatherSegment.isRig : 
+                           (waypoint ? (waypoint.is_airport?.toString().toUpperCase() !== 'YES' && 
+                                       waypoint.is_airport?.toString().toUpperCase() !== 'Y') : false);
               const isDeparture = index === 0;
               const isDestination = index === displayStopCards.length - 1;
               
@@ -1445,7 +1462,7 @@ const CleanDetailedFuelBreakdown = ({
                           const extra = card.fuelComponentsObject?.extraFuel || 0;
                           const res = getFuelValue(stopName, 'reserveFuel', card.index) || card.fuelComponentsObject?.reserveFuel || 0;
                           
-                          // 🎯 ACCURATE TOTAL: Sum actual breakdown components instead of using potentially stale card.totalFuel
+                          // 🎯 ACCURATE TOTAL: Sum actual breakdown components including taxi fuel
                           const accurateTotal = taxi + trip + cont + deck + ara + app + extra + res;
                           
                           const isFinalDestination = card.isDestination || card.maxPassengersDisplay === 'Final Stop';

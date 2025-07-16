@@ -130,6 +130,72 @@ export const removeNOAAWeatherOverlay = (mapInstance, layerType = null) => {
 };
 
 /**
+ * Add simple NOAA lightning detection overlay without TIME parameter (fallback)
+ */
+export const addSimpleLightningOverlayNoTime = async (mapInstance) => {
+    try {
+        if (!mapInstance) {
+            console.warn('⚠️ No map instance provided');
+            return false;
+        }
+        
+        console.log('⚡ Adding lightning detection layer WITHOUT TIME parameter...');
+        
+        // Remove existing lightning layer if present
+        if (mapInstance.getSource('simple-lightning')) {
+            try {
+                mapInstance.removeLayer('simple-lightning-layer');
+                mapInstance.removeSource('simple-lightning');
+                console.log('🧹 Removed existing lightning layer');
+            } catch (cleanupError) {
+                console.warn('⚠️ Error cleaning up existing lightning layer:', cleanupError);
+            }
+        }
+        
+        // Build the tile URL without TIME parameter
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('ngrok');
+        const baseUrl = isLocal ? '' : 'https://bristow.info/weather';
+        const tileUrl = `${baseUrl}/api/noaa/geoserver/observations/lightning_detection/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ldn_lightning_strike_density&CRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=true&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`;
+        
+        console.log(`⚡ Lightning tile URL template (no TIME): ${tileUrl}`);
+        
+        // Add lightning source without TIME parameter
+        try {
+            mapInstance.addSource('simple-lightning', {
+                type: 'raster',
+                tiles: [tileUrl],
+                tileSize: 256,
+                minzoom: 0,
+                maxzoom: 18,
+                attribution: '© NOAA Global Lightning Detection Network'
+            });
+            
+            mapInstance.addLayer({
+                id: 'simple-lightning-layer',
+                type: 'raster',
+                source: 'simple-lightning',
+                minzoom: 0,
+                maxzoom: 18,
+                paint: {
+                    'raster-opacity': 0.8,
+                    'raster-fade-duration': 300
+                }
+            });
+            
+            console.log('⚡ Lightning detection layer added successfully WITHOUT TIME parameter');
+            return true;
+        } catch (addLayerError) {
+            console.error('❌ Failed to add lightning layer (no TIME):', addLayerError);
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error adding lightning layer (no TIME):', error);
+        return false;
+    }
+};
+
+/**
  * Add simple NOAA lightning detection overlay (no opacity control for compatibility)
  */
 export const addSimpleLightningOverlay = async (mapInstance) => {
@@ -143,8 +209,13 @@ export const addSimpleLightningOverlay = async (mapInstance) => {
         
         // Remove existing lightning layer if present
         if (mapInstance.getSource('simple-lightning')) {
-            mapInstance.removeLayer('simple-lightning-layer');
-            mapInstance.removeSource('simple-lightning');
+            try {
+                mapInstance.removeLayer('simple-lightning-layer');
+                mapInstance.removeSource('simple-lightning');
+                console.log('🧹 Removed existing lightning layer');
+            } catch (cleanupError) {
+                console.warn('⚠️ Error cleaning up existing lightning layer:', cleanupError);
+            }
         }
         
         // Get current time in ISO format for TIME parameter (NOAA requires this)
@@ -154,36 +225,79 @@ export const addSimpleLightningOverlay = async (mapInstance) => {
         
         console.log(`⚡ Using TIME parameter: ${timeParam}`);
         
+        // Alternative: try without TIME parameter if issues persist
+        // Some WMS servers have better zoom behavior without time constraints
+        
         // Build the tile URL - use relative URLs for development (localhost or ngrok)
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('ngrok');
         const baseUrl = isLocal ? '' : 'https://bristow.info/weather';
-        const tileUrl = `${baseUrl}/api/noaa/geoserver/observations/lightning_detection/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ldn_lightning_strike_density&CRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=true&WIDTH=512&HEIGHT=512&TIME=${encodeURIComponent(timeParam)}&BBOX={bbox-epsg-3857}`;
+        
+        // Use 256x256 tiles for better zoom compatibility (WMS standard)
+        const tileUrl = `${baseUrl}/api/noaa/geoserver/observations/lightning_detection/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=ldn_lightning_strike_density&CRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=true&WIDTH=256&HEIGHT=256&TIME=${encodeURIComponent(timeParam)}&BBOX={bbox-epsg-3857}`;
         
         console.log(`⚡ Lightning tile URL template: ${tileUrl}`);
         
         // Add lightning source with PHP proxy URL and TIME parameter
-        mapInstance.addSource('simple-lightning', {
-            type: 'raster',
-            tiles: [tileUrl],
-            tileSize: 512,
-            attribution: '© NOAA Global Lightning Detection Network'
-        });
-        
-        // Add lightning layer with minimal configuration
-        mapInstance.addLayer({
-            id: 'simple-lightning-layer',
-            type: 'raster',
-            source: 'simple-lightning',
-            paint: {
-                'raster-opacity': 0.8
+        try {
+            mapInstance.addSource('simple-lightning', {
+                type: 'raster',
+                tiles: [tileUrl],
+                tileSize: 256, // Reduced from 512 to 256 for better zoom compatibility
+                minzoom: 0,
+                maxzoom: 18,
+                attribution: '© NOAA Global Lightning Detection Network'
+            });
+            
+            // Add lightning layer with zoom range configuration
+            mapInstance.addLayer({
+                id: 'simple-lightning-layer',
+                type: 'raster',
+                source: 'simple-lightning',
+                minzoom: 0,
+                maxzoom: 18,
+                paint: {
+                    'raster-opacity': 0.8,
+                    'raster-fade-duration': 300 // Smooth fade transitions
+                }
+            });
+            
+            console.log('⚡ Lightning detection layer added successfully with TIME parameter');
+            console.log('🌍 Global coverage: Updates every 15 minutes');
+            console.log('📡 Data from US NLDN + Global GLD360 networks');
+            
+            // Add zoom change listener to debug zoom-related issues
+            const debugZoomChange = () => {
+                const zoom = mapInstance.getZoom();
+                const hasLayer = !!mapInstance.getLayer('simple-lightning-layer');
+                const hasSource = !!mapInstance.getSource('simple-lightning');
+                console.log(`⚡ Lightning Debug - Zoom: ${zoom.toFixed(2)}, Layer: ${hasLayer}, Source: ${hasSource}`);
+            };
+            
+            mapInstance.on('zoomend', debugZoomChange);
+            
+            // Store cleanup function for later removal
+            if (!window.lightningDebugCleanup) {
+                window.lightningDebugCleanup = () => {
+                    mapInstance.off('zoomend', debugZoomChange);
+                    delete window.lightningDebugCleanup;
+                };
             }
-        });
-        
-        console.log('⚡ Lightning detection layer added successfully with TIME parameter');
-        console.log('🌍 Global coverage: Updates every 15 minutes');
-        console.log('📡 Data from US NLDN + Global GLD360 networks');
-        
-        return true;
+            
+            return true;
+        } catch (addLayerError) {
+            console.error('❌ Failed to add lightning layer to map:', addLayerError);
+            
+            // Clean up source if layer addition failed
+            try {
+                if (mapInstance.getSource('simple-lightning')) {
+                    mapInstance.removeSource('simple-lightning');
+                }
+            } catch (cleanupError) {
+                console.warn('⚠️ Error cleaning up failed lightning source:', cleanupError);
+            }
+            
+            return false;
+        }
         
     } catch (error) {
         console.error('❌ Error adding simple lightning layer:', error);
@@ -388,6 +502,7 @@ if (typeof window !== 'undefined') {
         addNOAAOverlay: addNOAAWeatherOverlay,
         removeNOAAOverlay: removeNOAAWeatherOverlay,
         addLightningSimple: addSimpleLightningOverlay,
+        addLightningNoTime: addSimpleLightningOverlayNoTime,
         testNOAA: () => window.testNOAAWeather ? window.testNOAAWeather() : console.warn('NOAA test not available'),
         testGulf: (lat = 29.0, lon = -94.0) => window.testGulfLocation ? window.testGulfLocation(lat, lon) : console.warn('Gulf test not available'),
         

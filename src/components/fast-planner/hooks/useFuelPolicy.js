@@ -83,9 +83,17 @@ export function useFuelPolicy() {
       return;
     }
 
-    console.log(`Selecting fuel policy: ${policy.name}`);
+    console.log(`🔍 useFuelPolicy: Selecting fuel policy: ${policy.name} (UUID: ${policy.uuid})`);
+    console.log('🔍 useFuelPolicy: Policy reserve fuel config:', {
+      type: policy.fuelTypes?.reserveFuel?.type,
+      value: policy.fuelTypes?.reserveFuel?.default,
+      structure: policy.fuelTypes?.reserveFuel
+    });
+    
     setCurrentPolicy(policy);
     fuelPolicyService.setCurrentPolicy(policy);
+    
+    console.log('🔍 useFuelPolicy: Policy selection complete, currentPolicy should be updated');
   }, []);
 
   /**

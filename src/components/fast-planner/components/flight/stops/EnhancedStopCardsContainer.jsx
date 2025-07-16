@@ -146,20 +146,51 @@ const EnhancedStopCardsContainer = ({
   const debounceTimeoutRef = useRef(null);
   
   // 🚨 CRITICAL FIX: Memoize stopCardOptions to reduce dependency count
-  const stopCardOptions = useMemo(() => ({
-    passengerWeight: Number(passengerWeight) || 0,
-    cargoWeight: Number(cargoWeight) || 0,
-    contingencyFuelPercent: Number(contingencyFuelPercent) || 0,
-    reserveFuel: Number(reserveFuel) || 0,
-    deckTimePerStop: Number(deckTimePerStop) || 0,
-    deckFuelFlow: Number(deckFuelFlow) || 0,
-    taxiFuel: Number(taxiFuel) || 0,
-    extraFuel: Number(extraFuel) || 0,
-    araFuel: Number(araFuel) || 0,
-    approachFuel: Number(approachFuel) || 0,
-    fuelPolicy: fuelPolicy?.currentPolicy,
-    locationFuelOverrides: locationFuelOverrides
-  }), [passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, locationFuelOverrides]);
+  const stopCardOptions = useMemo(() => {
+    // 🚨 AVIATION SAFETY: Debug fuel policy loading
+    console.log('🔍 FUEL POLICY DEBUG: EnhancedStopCardsContainer stopCardOptions');
+    console.log('  - fuelPolicy exists:', !!fuelPolicy);
+    console.log('  - currentPolicy exists:', !!fuelPolicy?.currentPolicy);
+    console.log('  - reserveFuel prop:', reserveFuel);
+    console.log('  - fuelPolicy.currentPolicy:', fuelPolicy?.currentPolicy);
+    
+    // 🚨 AVIATION SAFETY: NO FALLBACKS - Fuel policy must be loaded
+    if (!fuelPolicy?.currentPolicy) {
+      throw new Error('CRITICAL AVIATION SAFETY: No fuel policy loaded. Cannot calculate fuel requirements without verified OSDK policy data.');
+    }
+    
+    // 🚨 AVIATION SAFETY: NO FALLBACKS - All fuel parameters must be explicit
+    if (contingencyFuelPercent === undefined || contingencyFuelPercent === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: Missing contingency fuel percentage from fuel policy.');
+    }
+    
+    if (taxiFuel === undefined || taxiFuel === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: Missing taxi fuel from fuel policy.');
+    }
+    
+    if (deckTimePerStop === undefined || deckTimePerStop === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: Missing deck time from fuel policy.');
+    }
+    
+    if (deckFuelFlow === undefined || deckFuelFlow === null) {
+      throw new Error('CRITICAL AVIATION SAFETY: Missing deck fuel flow from aircraft or fuel policy.');
+    }
+    
+    return {
+      passengerWeight: Number(passengerWeight) || 0, // Weight can legitimately be 0
+      cargoWeight: Number(cargoWeight) || 0, // Weight can legitimately be 0
+      contingencyFuelPercent: Number(contingencyFuelPercent),
+      reserveFuel: Number(reserveFuel), // Will be calculated by StopCardCalculator from fuel policy
+      deckTimePerStop: Number(deckTimePerStop),
+      deckFuelFlow: Number(deckFuelFlow),
+      taxiFuel: Number(taxiFuel),
+      extraFuel: Number(extraFuel) || 0, // Extra fuel can legitimately be 0
+      araFuel: Number(araFuel) || 0, // ARA fuel can legitimately be 0
+      approachFuel: Number(approachFuel) || 0, // Approach fuel can legitimately be 0
+      fuelPolicy: fuelPolicy.currentPolicy,
+      locationFuelOverrides: locationFuelOverrides
+    };
+  }, [passengerWeight, cargoWeight, contingencyFuelPercent, reserveFuel, deckTimePerStop, deckFuelFlow, taxiFuel, extraFuel, araFuel, approachFuel, fuelPolicy, locationFuelOverrides]);
   
   // 🎯 ONE SOURCE OF TRUTH: Calculate stop cards directly with StopCardCalculator
   useEffect(() => {
@@ -629,8 +660,8 @@ const EnhancedStopCardsContainer = ({
         display: 'flex',
         alignItems: 'center',
         marginBottom: '8px',
-        fontSize: '11px',
-        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: '12px',
+        color: '#87CEEB',
         cursor: 'pointer',
         padding: '4px 0'
       }}>
@@ -645,7 +676,7 @@ const EnhancedStopCardsContainer = ({
             cursor: 'pointer'
           }}
         />
-        ☑️ Waive Alternates (VFR Day Flying)
+        VFR Flight (Waive Alternates)
       </label>
       
       {/* COMMENTED OUT DEBUG INFO TO FIX "isReady/isLoading is not defined" ERROR - WILL REVIEW LATER */}

@@ -644,10 +644,10 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       const updatedSegment1ApproachFuel = calculateSegmentLocationFuel('approachFuel', 1);
       const segment1ApproachFuel = updatedSegment1ApproachFuel;
       
-      // 🛩️ VFR MODE: When alternates are waived, use minimal fuel for maximum passengers
-      const segmentReserveFuel = waiveAlternates ? 0 : reserveFuelValue; // VFR: no reserve fuel required
+      // 🛩️ VFR MODE: VFR still requires reserve fuel, only waives alternate requirements
+      const segmentReserveFuel = reserveFuelValue; // VFR: reserve fuel always required, only alternates waived
       
-      // For departure to first refuel: Taxi + Trip(to refuel) + Contingency(for refuel segment) + Reserve(VFR=0) + ARA(if needed) + Approach(if destination in segment) + Deck(for intermediate stops)
+      // For departure to first refuel: Taxi + Trip(to refuel) + Contingency(for refuel segment) + Reserve + ARA(if needed) + Approach(if destination in segment) + Deck(for intermediate stops)
       departureFuelNeeded = taxiFuelValue + tripFuelToFirstRefuel + contingencyToFirstRefuel + deckFuelToFirstRefuel + segmentReserveFuel + segment1ExtraFuel;
       
       // ✅ SEGMENT-AWARE: Recalculate ARA fuel including user overrides for segment 1
@@ -723,6 +723,20 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       if (alternateFuel > departureFuelNeeded) {
         departureFuelNeeded = alternateFuel;
         departureMaxPassengers = alternatePassengers;
+        
+        // 🔧 FUEL BREAKDOWN FIX: Update departure components to match alternate fuel breakdown
+        if (alternateStopCard.fuelComponentsObject) {
+          departureComponentsCalculation = {
+            taxi: alternateStopCard.fuelComponentsObject.taxiFuel || 0,
+            trip: alternateStopCard.fuelComponentsObject.tripFuel || 0,
+            contingency: alternateStopCard.fuelComponentsObject.contingencyFuel || 0,
+            deck: alternateStopCard.fuelComponentsObject.deckFuel || 0,
+            reserve: alternateStopCard.fuelComponentsObject.reserveFuel || 0,
+            ara: alternateStopCard.fuelComponentsObject.araFuel || 0,
+            approach: alternateStopCard.fuelComponentsObject.approachFuel || 0,
+            extra: alternateStopCard.fuelComponentsObject.extraFuel || 0
+          };
+        }
       } else {
         // Keep the refuel-optimized values that include ARA fuel
         debugLog(DEBUG_ALTERNATE, `🛩️ KEEPING REFUEL-OPTIMIZED FUEL: ${departureFuelNeeded} lbs (includes ARA) vs alternate ${alternateFuel} lbs`);
@@ -1339,6 +1353,18 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
       intermediateAlternateRequirements.passengers = maxPassengers;
     }
 
+    // 🛡️ FUEL CAPACITY CHECK: Check if required fuel exceeds aircraft maximum capacity
+    const aircraftMaxFuel = selectedAircraft.maxFuel || null;
+    const exceedsCapacity = aircraftMaxFuel && fuelNeeded > aircraftMaxFuel;
+    const excessAmount = exceedsCapacity ? fuelNeeded - aircraftMaxFuel : 0;
+    
+    const fuelCapacityWarning = exceedsCapacity ? {
+      exceedsCapacity: true,
+      excessAmount: Math.round(excessAmount),
+      requiredFuel: Math.round(fuelNeeded),
+      maxCapacity: Math.round(aircraftMaxFuel)
+    } : null;
+
     // 🛩️ REFUEL LOGIC: Display logic for different stop types
     let displayMaxPassengers;
     if (shouldTreatAsFinal) {
@@ -1436,6 +1462,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
           windDirection: weather?.windDirection || 0,
           source: weather?.source || 'manual'
         },
+        // Add fuel capacity warning for UI display
+        fuelCapacityWarning: fuelCapacityWarning,
         isDeparture: isDeparture,
         isDestination: isDestination,
         refuelMode: false // Final destinations are never refuel stops
@@ -1474,6 +1502,8 @@ const calculateStopCards = (waypoints, routeStats, selectedAircraft, weather, op
         // Add alternate fuel requirements for intermediate stops  
         alternateRequirements: intermediateAlternateRequirements,
         shouldShowStrikethrough: false, // No strikethrough for intermediate stops
+        // Add fuel capacity warning for UI display
+        fuelCapacityWarning: fuelCapacityWarning,
         isDeparture: isDeparture,
         isDestination: isDestination,
         refuelMode: isRefuelStop // Only true if this stop is actually marked for refuel

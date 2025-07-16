@@ -36,7 +36,8 @@ const MapLayersCard = ({
   waypoints, // Current flight waypoints
   routeStats, // Route statistics
   // LIVE weather toggle from glass menu
-  onLiveWeatherToggled // Callback to notify parent when LIVE weather state changes
+  onLiveWeatherToggled, // Callback to notify parent when LIVE weather state changes
+  onLiveWeatherToggleRequested // Callback to handle live weather toggle request from parent
 }) => {
   const { currentRegion } = useRegion();
   
@@ -84,6 +85,33 @@ const MapLayersCard = ({
     satelliteShortwave: 0.4 // Reduced from 0.8 to 0.4 for auto-enable
   });
   
+  // Sync layer states with actual map layers on component mount/render
+  useEffect(() => {
+    if (mapManagerRef?.current) {
+      const mapInstance = mapManagerRef.current.getMap();
+      if (mapInstance) {
+        // Check actual layer state and sync with component state
+        const hasLightningLayer = !!mapInstance.getLayer('simple-lightning-layer');
+        const hasNOAAStations = !!observedWeatherStationsRef?.current?.isVisible;
+        const hasConusRadar = !!mapInstance.getLayer('noaa-conus-layer');
+        
+        console.log('🔄 SYNC: Checking actual layer states:', {
+          hasLightningLayer,
+          hasNOAAStations,
+          hasConusRadar
+        });
+        
+        // Update component state to match actual layer state
+        setLayers(prev => ({
+          ...prev,
+          lightning: hasLightningLayer,
+          observedWeatherStations: hasNOAAStations,
+          satelliteConus: hasConusRadar
+        }));
+      }
+    }
+  }, [mapManagerRef, observedWeatherStationsRef]);
+
   // Update layer states when references or visibility props change
   useEffect(() => {
     console.log('🔄 SYNC: Updating layer states from props:', {
@@ -1044,6 +1072,8 @@ const MapLayersCard = ({
   }, []);
 
   // LIVE Weather Toggle Function - toggles weather radar and CONUS satellite at once
+  const [liveWeatherToggleInProgress, setLiveWeatherToggleInProgress] = useState(false);
+  
   const toggleLiveWeather = async () => {
     console.log('⚡ LIVE WEATHER FUNCTION CALLED: Starting toggle...');
     console.log('⚡ LIVE WEATHER: Current region:', currentRegion?.id);
@@ -1053,51 +1083,85 @@ const MapLayersCard = ({
       allLayers: layers
     });
     
+    // Prevent rapid successive toggles
+    if (liveWeatherToggleInProgress) {
+      console.log('⚡ LIVE WEATHER: Toggle already in progress, skipping...');
+      return;
+    }
+    
+    setLiveWeatherToggleInProgress(true);
+    
     try {
-      // Check current state - LIVE is active if ANY of the 2 features are on
-      const isCurrentlyLive = layers.lightning || layers.observedWeatherStations;
+      // Check current state - LIVE is active if ANY of the 3 features are on
+      const isCurrentlyLive = layers.lightning || layers.observedWeatherStations || layers.satelliteConus;
       const newLiveState = !isCurrentlyLive;
       
       console.log(`⚡ LIVE WEATHER: Current live state: ${isCurrentlyLive}, switching to: ${newLiveState}`);
       
       if (newLiveState) {
-        // Turn ON lightning and NOAA weather stations
-        console.log('⚡ LIVE WEATHER: Enabling lightning and NOAA weather stations...');
+        // Turn ON lightning, NOAA weather stations, and CONUS radar
+        console.log('⚡ LIVE WEATHER: Enabling lightning, NOAA weather stations, and CONUS radar...');
         
-        // Enable lightning
+        // Enable lightning with timing control
         if (!layers.lightning) {
           console.log('⚡ LIVE WEATHER: Enabling lightning...');
           await toggleLayer('lightning');
           console.log('⚡ LIVE WEATHER: Lightning toggle completed');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // Enable NOAA weather stations
+        // Enable NOAA weather stations with timing control
         if (!layers.observedWeatherStations) {
           console.log('⚡ LIVE WEATHER: Enabling NOAA weather stations...');
           await toggleLayer('observedWeatherStations');
           console.log('⚡ LIVE WEATHER: NOAA weather stations toggle completed');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        console.log('✅ LIVE WEATHER: Lightning and NOAA weather stations enabled');
-      } else {
-        // Turn OFF lightning and NOAA weather stations
-        console.log('⚡ LIVE WEATHER: Disabling lightning and NOAA weather stations...');
+        // Enable CONUS radar (if in Gulf region) with timing control
+        if (currentRegion?.id === 'gulf-of-mexico' && !layers.satelliteConus) {
+          console.log('⚡ LIVE WEATHER: Enabling CONUS radar...');
+          await toggleLayer('satelliteConus');
+          console.log('⚡ LIVE WEATHER: CONUS radar toggle completed');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
         
-        // Disable lightning
+        console.log('✅ LIVE WEATHER: Lightning, NOAA weather stations, and CONUS radar enabled');
+      } else {
+        // Turn OFF lightning, NOAA weather stations, and CONUS radar
+        console.log('⚡ LIVE WEATHER: Disabling lightning, NOAA weather stations, and CONUS radar...');
+        
+        // Disable lightning with timing control
         if (layers.lightning) {
           console.log('⚡ LIVE WEATHER: Disabling lightning...');
           await toggleLayer('lightning');
           console.log('⚡ LIVE WEATHER: Lightning disabled');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        // Disable NOAA weather stations
+        // Disable NOAA weather stations with timing control
         if (layers.observedWeatherStations) {
           console.log('⚡ LIVE WEATHER: Disabling NOAA weather stations...');
           await toggleLayer('observedWeatherStations');
           console.log('⚡ LIVE WEATHER: NOAA weather stations disabled');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        console.log('✅ LIVE WEATHER: Lightning and NOAA weather stations disabled');
+        // Disable CONUS radar with timing control
+        if (layers.satelliteConus) {
+          console.log('⚡ LIVE WEATHER: Disabling CONUS radar...');
+          await toggleLayer('satelliteConus');
+          console.log('⚡ LIVE WEATHER: CONUS radar disabled');
+          // Small delay to prevent race conditions
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        console.log('✅ LIVE WEATHER: Lightning, NOAA weather stations, and CONUS radar disabled');
       }
       
       // Notify parent component of the state change
@@ -1107,6 +1171,8 @@ const MapLayersCard = ({
       
     } catch (error) {
       console.error('❌ Error toggling LIVE weather:', error);
+    } finally {
+      setLiveWeatherToggleInProgress(false);
     }
   };
   
@@ -1119,14 +1185,22 @@ const MapLayersCard = ({
       console.log('🔧 CLEANING UP window.toggleLiveWeather function');
       delete window.toggleLiveWeather;
     };
-  }, [layers.lightning, layers.observedWeatherStations, toggleLiveWeather]);
+  }, [layers.lightning, layers.observedWeatherStations, layers.satelliteConus, toggleLiveWeather]);
+
+  // Handle live weather toggle requests from parent component
+  React.useEffect(() => {
+    if (onLiveWeatherToggleRequested) {
+      onLiveWeatherToggleRequested.current = toggleLiveWeather;
+    }
+  }, [onLiveWeatherToggleRequested, toggleLiveWeather]);
   
   // Calculate current LIVE weather state for parent
-  const isLiveWeatherActive = layers.lightning || layers.observedWeatherStations;
+  const isLiveWeatherActive = layers.lightning || layers.observedWeatherStations || layers.satelliteConus;
   
   // Notify parent when LIVE state changes
   React.useEffect(() => {
     if (onLiveWeatherToggled) {
+      console.log('🔄 Notifying parent of live weather state change:', isLiveWeatherActive);
       onLiveWeatherToggled(isLiveWeatherActive);
     }
   }, [isLiveWeatherActive, onLiveWeatherToggled]);
@@ -1441,7 +1515,7 @@ const MapLayersCard = ({
           
           {/* Coordinate Grid - moved here as requested */}
           <div className="subsection-header">Coordinate Grid</div>
-          {renderLayerToggle('grid', 'Coordinate Grid')}
+          {renderLayerToggle('grid', 'Lat/Long Grid')}
           
           {/* Gulf Coast Region */}
           {currentRegion?.id === 'gulf-of-mexico' && (
@@ -1476,26 +1550,40 @@ const MapLayersCard = ({
                 </div>
               )}
               
-              {/* Gulf Region Specific Weather Layers */}
+              {/* Gulf Region Specific Weather Layers - 2x3 Grid */}
               <div className="subsection-header">Gulf Weather Layers</div>
               <div className="button-row">
-                {renderLayerToggle('satelliteConus', '🌧️ Radar (CONUS)', true)}
+                {renderLayerToggle('lightning', '⚡ Lightning', true)}
+                {renderLayerToggle('observedWeatherStations', '🌡️ NOAA', true)}
+              </div>
+              <div className="button-row">
+                {renderLayerToggle('satelliteConus', '🌧️ Radar', true)}
                 {renderLayerToggle('satelliteLongwave', '🛰️ Longwave IR', true)}
               </div>
               <div className="button-row">
                 {renderLayerToggle('satelliteShortwave', '🛰️ Shortwave IR', true)}
+                {renderLayerToggle('weatherCircles', '🌤️ Plan Weather', !!weatherSegmentsHook)}
               </div>
               
-              {/* Weather layer descriptions */}
+              {/* Weather layer descriptions - updated for new layout */}
               <div className="weather-layer-descriptions">
                 <div className="layer-description">
-                  <strong>🌧️ Radar (CONUS):</strong> Real-time precipitation and storm intensity
+                  <strong>⚡ Lightning:</strong> Real-time lightning detection
                 </div>
                 <div className="layer-description">
-                  <strong>🛰️ Longwave IR:</strong> Cloud temperature and high-altitude weather
+                  <strong>🌡️ NOAA:</strong> Weather station observations
                 </div>
                 <div className="layer-description">
-                  <strong>🛰️ Shortwave IR:</strong> Low clouds, fog, and surface conditions
+                  <strong>🌧️ Radar:</strong> Precipitation and storm intensity
+                </div>
+                <div className="layer-description">
+                  <strong>🛰️ Longwave IR:</strong> Cloud temperature and high altitude
+                </div>
+                <div className="layer-description">
+                  <strong>🛰️ Shortwave IR:</strong> Low clouds, fog, and surface
+                </div>
+                <div className="layer-description">
+                  <strong>🌤️ Plan Weather:</strong> Rig-specific weather reports
                 </div>
               </div>
               
@@ -1634,17 +1722,21 @@ const MapLayersCard = ({
             </>
           )}
           
-          {/* US/Gulf-specific Aviation Layers */}
-          {(currentRegion?.id === 'gulf-of-mexico' || currentRegion?.id === 'north-sea' || !currentRegion?.id) && (
+          {/* US/Gulf-specific Aviation Layers - Only show outside Gulf region */}
+          {(currentRegion?.id === 'north-sea' || (!currentRegion?.id && currentRegion?.id !== 'gulf-of-mexico')) && (
             <>
               <div className="subsection-header">Aviation Layers</div>
-              {renderLayerToggle('observedWeatherStations', 'NOAA Weather Stations', true)}
+              {renderLayerToggle('observedWeatherStations', '🌡️ NOAA', true)}
             </>
           )}
           
-          {/* Global Weather Satellite Layers */}
-          <div className="subsection-header">Global Weather Layers</div>
-          {renderLayerToggle('lightning', '⚡ Lightning (Global)', true)}
+          {/* Global Weather Satellite Layers - Only show outside Gulf region */}
+          {currentRegion?.id !== 'gulf-of-mexico' && (
+            <>
+              <div className="subsection-header">Global Weather Layers</div>
+              {renderLayerToggle('lightning', '⚡ Lightning', true)}
+            </>
+          )}
           
           {/* Lightning opacity slider - always visible when lightning is on */}
           {layers.lightning && (

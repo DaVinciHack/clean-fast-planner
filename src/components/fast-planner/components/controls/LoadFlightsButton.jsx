@@ -41,7 +41,7 @@ const LoadFlightsButton = ({
     borderRadius: '4px',
     padding: '5px 10px',
     cursor: isLoading ? 'not-allowed' : 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     margin: '0 5px',
     display: 'flex',
     alignItems: 'center',

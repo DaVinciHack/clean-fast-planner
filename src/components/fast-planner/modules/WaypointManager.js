@@ -274,8 +274,12 @@ class WaypointManager {
         console.error('Failed to create waypoint marker'); 
       }
       
-      // Update the route display
-      this.updateRoute(null);
+      // Update the route display with debounce to prevent double entries
+      setTimeout(() => {
+        if (this.updateRoute) {
+          this.updateRoute(null);
+        }
+      }, 50);
       
       // Notify listeners
       this.triggerCallback('onWaypointAdded', waypoint);
@@ -740,7 +744,7 @@ class WaypointManager {
       const marker = new window.mapboxgl.Marker({ 
         color: isWaypoint ? "#DAA520" : "#FF4136", // Golden for waypoints, red for stops
         draggable: true,
-        scale: isWaypoint ? 0.4 : 0.5, // Sharp size - 0.4 for waypoints, 0.5 for stops
+        scale: isWaypoint ? 0.3 : 0.5, // Medium size - 0.3 for waypoints, 0.5 for stops
         anchor: 'center' // Use center anchor for perfect line alignment
       })
       .setLngLat(coords)
@@ -2252,9 +2256,451 @@ class WaypointManager {
     }
   }
 
-  // CONSOLIDATION: Removed setupRouteDragging method
-  // Route dragging is now handled exclusively by MapInteractionHandler.setupSeparateHandlers()
-  // This eliminates the competing drag system that was causing race conditions
+  // RESTORED: Complete working setupRouteDragging method
+  setupRouteDragging(onRoutePointAdded) {
+    const map = this.mapManager.getMap();
+    if (!map) return;
+    
+    // Clean up any existing handlers to prevent duplicates
+    if (this._routeDragHandlers) {
+      // Remove MapBox mouse event handlers
+      map.off('mousedown', this._routeDragHandlers.mousedown);
+      map.off('mousemove', this._routeDragHandlers.mousemove);
+      map.off('mouseup', this._routeDragHandlers.mouseup);
+      map.off('mouseout', this._routeDragHandlers.mouseout);
+      
+      // 📱 IPAD SUPPORT: Remove touch event handlers from canvas
+      if (this._routeDragHandlers.canvas) {
+        const canvas = this._routeDragHandlers.canvas;
+        canvas.removeEventListener('touchstart', this._routeDragHandlers.touchstart);
+        canvas.removeEventListener('touchmove', this._routeDragHandlers.touchmove);
+        canvas.removeEventListener('touchend', this._routeDragHandlers.touchend);
+        canvas.removeEventListener('touchcancel', this._routeDragHandlers.touchcancel);
+      }
+      
+      this._routeDragHandlers = null;
+      console.log('Removed existing route drag handlers (mouse + touch)');
+    }
+    
+    // Store original handler in global for debugging
+    window._originalRouteDragHandler = onRoutePointAdded;
+    
+    // Create a wrapped handler that ensures insertion happens directly
+    const wrappedHandler = (insertIndex, coords, dragData = {}) => {
+      
+      // The `onRoutePointAdded` is `MapInteractionHandler.handleRouteDragComplete`.
+      // Let `MapInteractionHandler` be responsible for all logic related to determining
+      // snapping, naming, and calling `waypointManager.addWaypointAtIndex`.
+      // This `wrappedHandler`'s job is just to pass the raw drag results.
+      if (typeof onRoutePointAdded === 'function') {
+        console.log(`WaypointManager.setupRouteDragging -> wrappedHandler: Calling onRoutePointAdded (MapInteractionHandler.handleRouteDragComplete)`);
+        onRoutePointAdded(insertIndex, coords, dragData);
+      } else {
+        console.error('WaypointManager.setupRouteDragging -> wrappedHandler: onRoutePointAdded callback is not a function!');
+      }
+    };
+    
+    // Save the wrapped handler for debugging
+    window._wrappedRouteDragHandler = wrappedHandler;
+    
+    // Drag state variables
+    let isDragging = false;
+    let draggedLineCoordinates = [];
+    let originalLineCoordinates = [];
+    let dragStartPoint = null;
+    let closestPointIndex = -1;
+    let dragLineSource = null;
+    let dragStartTime = 0;
+    let touchStarted = false;
+    
+    // 📱 TOUCH DEBUG DISABLED FOR PRODUCTION
+    let touchDebugElement = null; // Disabled for production
+    
+    const updateTouchDebug = (message) => {
+      if (touchDebugElement) {
+        const timestamp = new Date().toLocaleTimeString();
+        touchDebugElement.innerHTML = `[${timestamp}] ${message}<br>` + touchDebugElement.innerHTML;
+        // Keep only last 15 messages and make them stay longer
+        const lines = touchDebugElement.innerHTML.split('<br>');
+        if (lines.length > 15) {
+          touchDebugElement.innerHTML = lines.slice(0, 15).join('<br>');
+        }
+      }
+    };
+    
+    // 📱 TOUCH INDICATORS DISABLED FOR PRODUCTION
+    const createTouchIndicator = (x, y, type) => {
+      // Disabled for production - no visual indicators
+    };
+    
+    // Initialize debug system
+    updateTouchDebug('Route drag setup starting...');
+    
+    // Helper to add the drag line visualization
+    const addDragLine = (coordinates) => {
+      try {
+        updateTouchDebug(`🎨 Adding drag line with ${coordinates.length} points`);
+        
+        // Remove existing line if present
+        if (map.getSource('drag-line')) { 
+          updateTouchDebug('🗑️ Removing existing drag line');
+          map.removeLayer('drag-line'); 
+          map.removeSource('drag-line'); 
+        }
+        
+        // Add the new line source
+        map.addSource('drag-line', { 
+          type: 'geojson', 
+          data: { 
+            type: 'Feature', 
+            properties: {}, 
+            geometry: { 
+              type: 'LineString', 
+              coordinates: coordinates 
+            }
+          }
+        });
+        
+        updateTouchDebug('✅ Drag line source added');
+        
+        // Use different styling based on current mode
+        const isWaypointMode = window.isWaypointModeActive === true;
+        
+        // Add the line layer
+        map.addLayer({ 
+          id: 'drag-line', 
+          type: 'line', 
+          source: 'drag-line', 
+          layout: { 
+            'line-join': 'round', 
+            'line-cap': 'round' 
+          }, 
+          paint: { 
+            'line-color': isWaypointMode ? '#BA55D3' : '#FF4136', // Medium purple for waypoints, red for stops
+            'line-width': 6, // Make it thicker for iPad visibility
+            'line-dasharray': [4, 2], // Bigger dashes for iPad
+            'line-opacity': 0.8
+          }
+        });
+        
+        updateTouchDebug('✅ Drag line layer added and visible');
+        
+        // Store a reference to the line source for updating
+        dragLineSource = map.getSource('drag-line');
+        updateTouchDebug(`✅ dragLineSource stored: ${dragLineSource ? 'SUCCESS' : 'FAILED'}`);
+      } catch (error) { 
+        updateTouchDebug(`❌ Error adding drag line: ${error.message}`);
+        console.error('Error adding drag line:', error); 
+      }
+    };
+    
+    // Helper to find the closest point on the route line
+    const findClosestPointOnLine = (mouseLngLat, mousePoint) => {
+      try {
+        updateTouchDebug('🔍 Finding closest point...');
+        updateTouchDebug(`Input coordinates: lngLat=${mouseLngLat ? mouseLngLat.lng + ',' + mouseLngLat.lat : 'null'}, point=${mousePoint ? mousePoint.x + ',' + mousePoint.y : 'null'}`);
+        
+        // Check if we have a route to work with
+        if (!map.getSource('route')) {
+          updateTouchDebug('❌ No route source');
+          return null;
+        }
+        
+        // CRITICAL FIX: Use the drag detection source for insertion calculations
+        // This source contains the original straight-line waypoint coordinates,
+        // not the curved 3D path coordinates which have many more points
+        const dragDetectionSource = map.getSource('route-drag-detection');
+        if (!dragDetectionSource || !dragDetectionSource._data) {
+          console.warn('Drag detection source not available, falling back to route source');
+          const routeSource = map.getSource('route');
+          if (!routeSource || !routeSource._data) return null;
+        }
+        
+        // Get coordinates from the drag detection source (original waypoint segments)
+        const sourceToUse = dragDetectionSource || map.getSource('route');
+        const coordinates = sourceToUse._data.geometry.coordinates;
+        if (!coordinates || coordinates.length < 2) return null;
+        
+        // Find the closest segment
+        let minDistance = Infinity;
+        let closestPoint = null;
+        let segmentIndex = -1;
+        
+        for (let i = 0; i < coordinates.length - 1; i++) {
+          const line = window.turf.lineString([coordinates[i], coordinates[i + 1]]);
+          const point = window.turf.point([mouseLngLat.lng, mouseLngLat.lat]);
+          const snapped = window.turf.nearestPointOnLine(line, point);
+          
+          if (snapped.properties.dist < minDistance) {
+            minDistance = snapped.properties.dist;
+            closestPoint = snapped.geometry.coordinates;
+            segmentIndex = i;
+          }
+        }
+        
+        // Calculate distance in nautical miles
+        const distanceNM = window.turf.distance(
+          window.turf.point([mouseLngLat.lng, mouseLngLat.lat]),
+          window.turf.point(closestPoint),
+          { units: 'nauticalmiles' }
+        );
+        
+        // Return result if close enough
+        if (distanceNM < 0.5) {
+          updateTouchDebug('✅ Close enough to route!');
+          return { 
+            point: closestPoint, 
+            index: segmentIndex, 
+            distance: distanceNM, 
+            isDirectlyOver: true 
+          };
+        }
+        
+        updateTouchDebug('❌ Too far from route');
+        return null;
+      } catch (error) { 
+        console.error('Error finding closest point on line:', error); 
+        return null; 
+      }
+    };
+    
+    // Mouse down handler - start the drag operation
+    const handleMouseDown = (e) => {
+      updateTouchDebug('handleMouseDown called!');
+      
+      // Skip if no route
+      if (!map.getSource('route')) {
+        return;
+      }
+      
+      // Find the closest point on the route
+      const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+      
+      if (closestInfo) {
+        console.log('Starting route drag operation at segment:', closestInfo.index);
+        
+        // Start the drag operation
+        isDragging = true;
+        dragStartPoint = closestInfo.point;
+        closestPointIndex = closestInfo.index;
+        
+        // Add drag line visualization
+        const originalWaypointCoords = this.waypoints.map(wp => wp.coords);
+        originalLineCoordinates = [...originalWaypointCoords];
+        
+        // Create initial drag coordinates
+        let initialDragCoords = [];
+        for (let i = 0; i <= closestInfo.index; i++) {
+          initialDragCoords.push(originalWaypointCoords[i]);
+        }
+        initialDragCoords.push(closestInfo.point);
+        for (let i = closestInfo.index + 1; i < originalWaypointCoords.length; i++) {
+          initialDragCoords.push(originalWaypointCoords[i]);
+        }
+        
+        draggedLineCoordinates = initialDragCoords;
+        addDragLine(draggedLineCoordinates);
+        
+        // Hide original route during drag
+        map.setLayoutProperty('route', 'visibility', 'none');
+        map.getCanvas().style.cursor = 'grabbing';
+        
+        e.preventDefault();
+      }
+    };
+    
+    // Mouse move handler - update drag line
+    const handleMouseMove = (e) => {
+      if (isDragging) {
+        const currentMousePos = [e.lngLat.lng, e.lngLat.lat];
+        const originalWaypointCoords = this.waypoints.map(wp => wp.coords);
+        
+        // Create straight-line visualization
+        let straightLineDragCoords = [];
+        
+        // Add segments up to insertion point
+        for (let i = 0; i <= closestPointIndex; i++) {
+          if (originalWaypointCoords[i]) {
+            straightLineDragCoords.push(originalWaypointCoords[i]);
+          }
+        }
+        
+        // Add current mouse position
+        straightLineDragCoords.push(currentMousePos);
+        
+        // Add remaining segments
+        for (let i = closestPointIndex + 1; i < originalWaypointCoords.length; i++) {
+          if (originalWaypointCoords[i]) {
+            straightLineDragCoords.push(originalWaypointCoords[i]);
+          }
+        }
+        
+        // Update visualization
+        if (dragLineSource && straightLineDragCoords.length >= 2) {
+          dragLineSource.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'LineString',
+              coordinates: straightLineDragCoords
+            }
+          });
+        }
+      } else {
+        // Handle hover cursor
+        const closestInfo = findClosestPointOnLine(e.lngLat, e.point);
+        if (closestInfo) {
+          map.getCanvas().style.cursor = 'pointer';
+        } else {
+          map.getCanvas().style.cursor = '';
+        }
+      }
+    };
+    
+    // Mouse up handler - complete drag
+    const handleMouseUp = (e) => {
+      if (!isDragging) return;
+      
+      isDragging = false;
+      
+      // Clean up visualization
+      if (map.getSource('drag-line')) {
+        map.removeLayer('drag-line');
+        map.removeSource('drag-line');
+      }
+      
+      // Show original route
+      map.setLayoutProperty('route', 'visibility', 'visible');
+      map.getCanvas().style.cursor = '';
+      
+      // Add waypoint at drag position
+      const insertIndex = closestPointIndex + 1;
+      console.log(`Route drag completed, adding waypoint at index ${insertIndex}`);
+      
+      // Use wrapped handler to add waypoint
+      wrappedHandler(insertIndex, [e.lngLat.lng, e.lngLat.lat], { 
+        lngLat: e.lngLat,
+        point: e.point,
+        originalIndex: insertIndex
+      });
+      
+      // Reset variables
+      draggedLineCoordinates = [];
+      originalLineCoordinates = [];
+      dragStartPoint = null;
+      closestPointIndex = -1;
+      dragLineSource = null;
+    };
+    
+    // Mouse out handler - cancel drag
+    const handleMouseOut = () => {
+      if (!isDragging) return;
+      
+      isDragging = false;
+      
+      // Clean up visualization
+      if (map.getSource('drag-line')) {
+        map.removeLayer('drag-line');
+        map.removeSource('drag-line');
+      }
+      
+      // Show original route
+      map.setLayoutProperty('route', 'visibility', 'visible');
+      map.getCanvas().style.cursor = '';
+      
+      // Reset variables
+      draggedLineCoordinates = [];
+      originalLineCoordinates = [];
+      dragStartPoint = null;
+      closestPointIndex = -1;
+      dragLineSource = null;
+    };
+    
+    // 📱 SIMPLE TOUCH HANDLERS for iPad
+    const handleTouchStart = (e) => {
+      if (e.touches && e.touches.length === 1) {
+        const touch = e.touches[0];
+        const rect = map.getCanvasContainer().getBoundingClientRect();
+        
+        const syntheticEvent = {
+          lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
+          point: {x: touch.clientX - rect.left, y: touch.clientY - rect.top},
+          originalEvent: e,
+          preventDefault: () => e.preventDefault()
+        };
+        
+        // Check if over route before starting drag
+        const closestInfo = findClosestPointOnLine(syntheticEvent.lngLat, syntheticEvent.point);
+        if (closestInfo) {
+          e.preventDefault();
+          touchStarted = true;
+          handleMouseDown(syntheticEvent);
+        }
+      }
+    };
+    
+    const handleTouchMove = (e) => {
+      if (touchStarted && e.touches && e.touches.length === 1) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = map.getCanvasContainer().getBoundingClientRect();
+        
+        const syntheticEvent = {
+          lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
+          point: {x: touch.clientX - rect.left, y: touch.clientY - rect.top},
+          originalEvent: e
+        };
+        
+        handleMouseMove(syntheticEvent);
+      }
+    };
+    
+    const handleTouchEnd = (e) => {
+      if (touchStarted) {
+        touchStarted = false;
+        e.preventDefault();
+        
+        if (e.changedTouches && e.changedTouches[0]) {
+          const touch = e.changedTouches[0];
+          const rect = map.getCanvasContainer().getBoundingClientRect();
+          
+          const syntheticEvent = {
+            lngLat: map.unproject([touch.clientX - rect.left, touch.clientY - rect.top]),
+            originalEvent: e,
+            preventDefault: () => e.preventDefault()
+          };
+          
+          handleMouseUp(syntheticEvent);
+        }
+      }
+    };
+    
+    // Set up mouse event handlers
+    map.on('mousedown', handleMouseDown);
+    map.on('mousemove', handleMouseMove);
+    map.on('mouseup', handleMouseUp);
+    map.on('mouseout', handleMouseOut);
+    
+    // Set up touch event handlers
+    const canvas = map.getCanvasContainer();
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    
+    // Store handlers for cleanup
+    this._routeDragHandlers = {
+      mousedown: handleMouseDown,
+      mousemove: handleMouseMove,
+      mouseup: handleMouseUp,
+      mouseout: handleMouseOut,
+      touchstart: handleTouchStart,
+      touchmove: handleTouchMove,
+      touchend: handleTouchEnd,
+      canvas: canvas
+    };
+    
+    console.log('✅ Route dragging functionality set up successfully (mouse + touch support)');
+  }
 
   /**
    * Restore waypoint layers after a map style change
