@@ -290,31 +290,6 @@ const GlassMenuDock = ({
           </button>
         </div>
 
-        {/* Always visible: Route button */}
-        <div className="glass-button-container">
-          <button 
-            className={`glass-button icon-above-text route-button ${leftPanelVisible ? 'active' : ''}`}
-            onClick={() => {
-              onOpenRoute();
-              // When opening route panel, close right panel if open
-              if (rightPanelVisible && onHideRightPanel) {
-                onHideRightPanel();
-              }
-              // Reset force show when opening panels
-              setForceShowMenu(false);
-            }}
-            title={leftPanelVisible ? 'Close route editor' : 'Open route editor'}
-          >
-            <div className="glass-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
-            </div>
-            <span className="button-label">Route</span>
-          </button>
-        </div>
-
         {/* Always visible: Main button */}
         <div className="glass-button-container">
           <button 
@@ -331,33 +306,6 @@ const GlassMenuDock = ({
             <span className="button-label">Main</span>
           </button>
         </div>
-
-        {/* Phone Layout: Settings Panel Button - shows on phones to toggle right panel */}
-        {isPhoneLayout && (
-          <div className="glass-button-container">
-            <button 
-              className={`glass-button icon-above-text menu-button ${rightPanelVisible ? 'active' : ''}`}
-              onClick={() => {
-                onToggleRightPanel();
-                // When opening right panel, close left panel if open
-                if (leftPanelVisible && onHideLeftPanel) {
-                  onHideLeftPanel();
-                }
-                // Reset force show when opening panels
-                setForceShowMenu(false);
-              }}
-              title={rightPanelVisible ? 'Hide settings panel' : 'Show settings panel'}
-            >
-              <div className="glass-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <circle cx="12" cy="12" r="3"/>
-                  <path d="m12 1 3 9 9 3-9 3-3 9-3-9-9-3 9-3 3-9z"/>
-                </svg>
-              </div>
-              <span className="button-label">Panel</span>
-            </button>
-          </div>
-        )}
 
         {/* Smart Toggle Button - shows when flight is loaded (desktop) */}
         {showEditButton && !isPhoneLayout && (
@@ -395,27 +343,30 @@ const GlassMenuDock = ({
           </div>
         )}
 
-        {/* Expanded menu items - only show when expanded */}
-        {isExpanded && expandedMenuItems.map((item, index) => (
-          <div 
-            key={item.id} 
-            className="glass-button-container expanded-item"
-            style={{
-              animationDelay: `${index * 0.05}s` // Stagger animation
+        {/* Always visible: Route button */}
+        <div className="glass-button-container">
+          <button 
+            className={`glass-button icon-above-text route-button ${leftPanelVisible ? 'active' : ''}`}
+            onClick={() => {
+              onOpenRoute();
+              // When opening route panel, close right panel if open
+              if (rightPanelVisible && onHideRightPanel) {
+                onHideRightPanel();
+              }
+              // Reset force show when opening panels
+              setForceShowMenu(false);
             }}
+            title={leftPanelVisible ? 'Close route editor' : 'Open route editor'}
           >
-            <button 
-              className="glass-button icon-above-text"
-              onClick={item.action}
-              title={item.label}
-            >
-              <div className="glass-icon">
-                {item.icon}
-              </div>
-              <span className="button-label">{item.label}</span>
-            </button>
-          </div>
-        ))}
+            <div className="glass-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+            </div>
+            <span className="button-label">Route</span>
+          </button>
+        </div>
 
         {/* LIVE Weather Toggle - Only visible in compact mode */}
         {!isExpanded && onLiveWeatherToggle && (
@@ -442,6 +393,76 @@ const GlassMenuDock = ({
           </div>
         )}
 
+        {/* Always visible: Weather button */}
+        <div className="glass-button-container">
+          <button 
+            className="glass-button icon-above-text weather-button"
+            onClick={() => {
+              if (onWeatherCard) onWeatherCard();
+              // Close left panel when opening right panel cards
+              if (leftPanelVisible && onHideLeftPanel) onHideLeftPanel();
+            }}
+            title="Weather"
+          >
+            <div className="glass-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                <circle cx="5" cy="8" r="2"/>
+                <circle cx="19" cy="8" r="2"/>
+              </svg>
+            </div>
+            <span className="button-label">Weather</span>
+          </button>
+        </div>
+
+        {/* Phone Layout: Settings Panel Button - shows on phones to toggle right panel */}
+        {isPhoneLayout && (
+          <div className="glass-button-container">
+            <button 
+              className={`glass-button icon-above-text menu-button ${rightPanelVisible ? 'active' : ''}`}
+              onClick={() => {
+                onToggleRightPanel();
+                // When opening right panel, close left panel if open
+                if (leftPanelVisible && onHideLeftPanel) {
+                  onHideLeftPanel();
+                }
+                // Reset force show when opening panels
+                setForceShowMenu(false);
+              }}
+              title={rightPanelVisible ? 'Hide settings panel' : 'Show settings panel'}
+            >
+              <div className="glass-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="m12 1 3 9 9 3-9 3-3 9-3-9-9-3 9-3 3-9z"/>
+                </svg>
+              </div>
+              <span className="button-label">Panel</span>
+            </button>
+          </div>
+        )}
+
+        {/* Expanded menu items - only show when expanded */}
+        {isExpanded && expandedMenuItems.map((item, index) => (
+          <div 
+            key={item.id} 
+            className="glass-button-container expanded-item"
+            style={{
+              animationDelay: `${index * 0.05}s` // Stagger animation
+            }}
+          >
+            <button 
+              className="glass-button icon-above-text"
+              onClick={item.action}
+              title={item.label}
+            >
+              <div className="glass-icon">
+                {item.icon}
+              </div>
+              <span className="button-label">{item.label}</span>
+            </button>
+          </div>
+        ))}
 
         {/* Always visible: Menu/Close button - Round with no text */}
         <div className="glass-button-container">
