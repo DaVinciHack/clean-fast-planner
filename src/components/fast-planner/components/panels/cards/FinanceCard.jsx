@@ -506,7 +506,7 @@ const FinanceCard = ({
                   onChange={(e) => updateCustomLandings(Number(e.target.value))}
                   className="finance-input"
                 />
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-gray-400 mt-1" style={{ fontSize: '9px' }}>
                   Only count landings at airports, not rigs
                 </div>
               </div>
@@ -588,26 +588,45 @@ const FinanceCard = ({
           )}
         </div>
         
-        {/* Time Type Toggle Switch - Simplified UI */}
+        {/* Time Type Toggle Switch - Modern UI */}
         {billingMethod === 'hourly' && (
           <div className="finance-input-group">
             <label className="block mb-2">Time Type:</label>
-            <div className="flex items-center">
-              <input 
-                type="checkbox" 
-                id="time-toggle" 
-                checked={!useFlightTime}
-                onChange={() => updateUseFlightTime(!useFlightTime)}
-                className="mr-2"
-              />
-              <div className="flex-1">
-                <span className={`${useFlightTime ? 'font-bold text-blue-500' : ''}`}>
-                  Flight Time
-                </span>
-                <span className="mx-2">|</span>
-                <span className={`${!useFlightTime ? 'font-bold text-green-500' : ''}`}>
-                  Total Time
-                </span>
+            <div 
+              className="time-toggle-container"
+              role="radiogroup"
+              aria-label="Select time calculation method"
+            >
+              <div className={`time-toggle-slider ${!useFlightTime ? 'total-time' : ''}`}></div>
+              <div 
+                className={`time-toggle-option ${useFlightTime ? 'active' : ''}`}
+                onClick={() => updateUseFlightTime(true)}
+                role="radio"
+                aria-checked={useFlightTime}
+                tabIndex={useFlightTime ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    updateUseFlightTime(true);
+                  }
+                }}
+              >
+                Flight Time
+              </div>
+              <div 
+                className={`time-toggle-option ${!useFlightTime ? 'active' : ''}`}
+                onClick={() => updateUseFlightTime(false)}
+                role="radio"
+                aria-checked={!useFlightTime}
+                tabIndex={!useFlightTime ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    updateUseFlightTime(false);
+                  }
+                }}
+              >
+                Total Time
               </div>
             </div>
           </div>

@@ -130,6 +130,11 @@ export class PlatformEvaluator {
       return true;
     }
 
+    // 🚀 NEW: Check destination rig fuel capability for waypoints
+    if (this.isDestinationRigWithFuel(platform)) {
+      return true;
+    }
+
     // Check platform type - oil rigs typically have fuel
     const platformType = (platform.type || platform.platformType || '').toLowerCase();
     const fuelCapableTypes = ['oil_rig', 'drilling_platform', 'production_platform', 'fpso'];
@@ -294,6 +299,69 @@ export class PlatformEvaluator {
 
       return true;
     });
+  }
+
+  /**
+   * Checks if a waypoint/destination rig has fuel capability
+   * @param {Object} platform - Platform/waypoint data
+   * @returns {Boolean} True if destination rig has fuel
+   */
+  isDestinationRigWithFuel(platform) {
+    // Check if this is a waypoint that might be a destination rig
+    if (!platform.name && !platform.id) {
+      return false;
+    }
+
+    // Check waypoint-specific fuel fields
+    if (platform.fuelAvailable === 'Y' || 
+        platform.fuelAvailable === 'Yes' || 
+        platform.fuelAvailable === 'YES') {
+      console.log(`🛢️ DESTINATION FUEL: ${platform.name} has fuelAvailable=${platform.fuelAvailable}`);
+      return true;
+    }
+
+    // Check if this waypoint is a known rig type
+    const waypointName = (platform.name || '').toLowerCase();
+    const rigIndicators = ['rig', 'platform', 'fpso', 'tlp', 'spar'];
+    
+    if (rigIndicators.some(indicator => waypointName.includes(indicator))) {
+      // For known rigs, check if fuel data exists
+      if (platform.fuelCapacity > 0 || platform.fuel_capacity > 0) {
+        console.log(`🛢️ DESTINATION FUEL: ${platform.name} is a rig with fuel capacity`);
+        return true;
+      }
+      
+      // For oil rigs, assume fuel capability unless explicitly stated otherwise
+      if (platform.fuelAvailable !== 'N' && platform.fuelAvailable !== 'No') {
+        console.log(`🛢️ DESTINATION FUEL: ${platform.name} is a rig (assumed fuel capability)`);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Enhanced scoring for destinations with fuel capability
+   * @param {Object} platform - Platform data
+   * @param {Object} route - Route information
+   * @returns {Number} Enhanced suitability score
+   */
+  calculateEnhancedSuitabilityScore(platform, route) {
+    let score = this.calculateSuitabilityScore(platform, route);
+    
+    // Bonus for destination rigs with fuel
+    if (platform.isDestination && platform.hasFuel) {
+      score += 10; // Significant bonus for destination with fuel
+      console.log(`🎆 DESTINATION BONUS: +10 points for ${platform.name} (destination with fuel)`);
+    }
+    
+    // Bonus for proximity to alternate split point
+    if (route.distanceFromSplit <= 5) {
+      score += 5; // Close to split point
+    }
+    
+    return score;
   }
 }
 

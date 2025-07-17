@@ -18,9 +18,10 @@ export class OptimizationScorer {
    * @param {Array} candidatePlatforms - Potential fuel stops
    * @param {Object} flightData - Current flight configuration
    * @param {Object} overloadAnalysis - Passenger overload details
+   * @param {Object} alternateSplitPoint - Split point coordinates for proximity scoring
    * @returns {Array} Ranked fuel stop options
    */
-  scoreAndRankPlatforms(candidatePlatforms, flightData, overloadAnalysis) {
+  scoreAndRankPlatforms(candidatePlatforms, flightData, overloadAnalysis, alternateSplitPoint) {
     console.log(`Scoring ${candidatePlatforms.length} fuel stop candidates...`);
     
     // 🚨 DEBUG: Check if all platforms have identical coordinates (would cause identical distances)
@@ -31,7 +32,7 @@ export class OptimizationScorer {
     })));
     
     const scoredOptions = candidatePlatforms.map(platform => {
-      const analysis = this.analyzeFuelStopBenefit(platform, flightData, overloadAnalysis);
+      const analysis = this.analyzeFuelStopBenefit(platform, flightData, overloadAnalysis, alternateSplitPoint);
       const score = this.calculateOverallScore(analysis);
       
       return {
@@ -60,14 +61,18 @@ export class OptimizationScorer {
    * @param {Object} platform - Fuel stop platform
    * @param {Object} flightData - Flight configuration
    * @param {Object} overloadAnalysis - Passenger overload details
+   * @param {Object} alternateSplitPoint - Split point coordinates for proximity scoring
    * @returns {Object} Benefit analysis
    */
-  analyzeFuelStopBenefit(platform, flightData, overloadAnalysis) {
+  analyzeFuelStopBenefit(platform, flightData, overloadAnalysis, alternateSplitPoint) {
     const { selectedAircraft, waypoints, stopCards } = flightData;
     const problematicLeg = overloadAnalysis.overloadedLegs[0]; // First leg usually has most fuel
     
     // Calculate route deviation
     const routeDeviation = this.calculateRouteDeviation(platform, waypoints);
+    
+    // 🚀 NEW: Calculate distance from alternate split point (prioritize proximity)
+    const distanceFromSplitPoint = this.calculateDistanceFromSplitPoint(platform, alternateSplitPoint, waypoints);
     
     // Calculate fuel savings from refueling
     const fuelSavings = this.calculateFuelSavings(platform, stopCards, problematicLeg);
@@ -85,6 +90,7 @@ export class OptimizationScorer {
     return {
       platform,
       routeDeviation,
+      distanceFromSplitPoint,
       fuelSavings,
       passengerGain,
       fuelEfficiency,
@@ -234,6 +240,7 @@ export class OptimizationScorer {
     const {
       passengerGain,
       routeDeviation,
+      distanceFromSplitPoint,
       fuelSavings,
       fuelEfficiency,
       targetShortage
@@ -247,19 +254,24 @@ export class OptimizationScorer {
     // Passenger gain is most important (0-40 points)
     score += passengerGain * 8;
 
-    // Distance efficiency (closer is better, 0-30 points)
-    const distancePenalty = Math.min(30, routeDeviation * 3);
-    score -= distancePenalty;
+    // 🚀 NEW: Distance from split point penalty (closer to split is better, 0-25 points)
+    const splitPointPenalty = Math.min(25, (distanceFromSplitPoint || 0) * 2);
+    score -= splitPointPenalty;
 
-    // Fuel savings bonus (0-20 points)
-    score += Math.min(20, fuelSavings / 100);
+    // Route deviation penalty (0-20 points) - reduced importance
+    const routeDeviationPenalty = Math.min(20, routeDeviation * 2);
+    score -= routeDeviationPenalty;
+
+    // Fuel savings bonus (0-15 points)
+    score += Math.min(15, fuelSavings / 100);
 
     console.log('🔍 SCORING BREAKDOWN:', {
       platform: analysis.platform?.name,
       baseScore: 50,
       passengerPoints: passengerGain * 8,
-      distancePenalty: -distancePenalty,
-      fuelBonus: Math.min(20, fuelSavings / 100),
+      splitPointPenalty: -splitPointPenalty,
+      routeDeviationPenalty: -routeDeviationPenalty,
+      fuelBonus: Math.min(15, fuelSavings / 100),
       totalScore: score
     });
 
@@ -328,6 +340,33 @@ export class OptimizationScorer {
     }
 
     return true;
+  }
+
+  /**
+   * Calculates distance from platform to alternate split point
+   * @param {Object} platform - Fuel stop platform
+   * @param {Object} alternateSplitPoint - Split point coordinates
+   * @param {Array} waypoints - Route waypoints
+   * @returns {Number} Distance from split point in nautical miles
+   */
+  calculateDistanceFromSplitPoint(platform, alternateSplitPoint, waypoints) {
+    // If no split point, use last waypoint
+    const splitPoint = alternateSplitPoint || waypoints[waypoints.length - 1];
+    
+    if (!splitPoint || !splitPoint.lat || !splitPoint.lng) {
+      console.log('🔍 NO SPLIT POINT: Using route end for distance calculation');
+      return 0;
+    }
+    
+    const distance = this.corridorSearcher.calculateDistance(platform, splitPoint);
+    
+    console.log('🔍 SPLIT POINT DISTANCE:', {
+      platform: platform.name,
+      splitPoint: `[${splitPoint.lat}, ${splitPoint.lng}]`,
+      distance: distance.toFixed(1) + 'nm'
+    });
+    
+    return distance;
   }
 }
 
