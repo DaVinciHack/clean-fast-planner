@@ -287,6 +287,45 @@ const LeftPanel = ({
                       onWaypointNameChange(waypointId, e.target.value);
                     }
                   }}
+                  onFocus={(e) => {
+                    // Only select all if the input wasn't already focused (first focus)
+                    const input = e.target;
+                    if (!input.hasAttribute('data-focused')) {
+                      input.setAttribute('data-focused', 'true');
+                      if (input.setSelectionRange) {
+                        setTimeout(() => {
+                          input.setSelectionRange(0, input.value.length);
+                        }, 0);
+                      } else {
+                        input.select();
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Reset focus state when leaving input
+                    e.target.removeAttribute('data-focused');
+                  }}
+                  onTouchStart={(e) => {
+                    // Enhanced iPad touch selection
+                    const input = e.target;
+                    setTimeout(() => {
+                      if (input.setSelectionRange) {
+                        input.focus();
+                        input.setSelectionRange(0, input.value.length);
+                      } else {
+                        input.select();
+                      }
+                    }, 100);
+                  }}
+                  onMouseDown={(e) => {
+                    // Prevent drag events from interfering with input selection
+                    e.stopPropagation();
+                  }}
+                  onDragStart={(e) => {
+                    // Prevent input from being dragged
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                 />
                 <div className="coordinates">
                   Lat: {lat.toFixed(5)}, Lon: {lon.toFixed(5)}

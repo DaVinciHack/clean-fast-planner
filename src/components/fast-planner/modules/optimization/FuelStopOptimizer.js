@@ -28,63 +28,41 @@ export class FuelStopOptimizer {
       console.log('FuelStopOptimizer: Starting passenger capacity optimization');
       
       // Step 1: Detect passenger overload
-      console.log('🔍 STEP 1: Analyzing passenger overload...');
       const overloadAnalysis = this.analyzePassengerOverload(flightData);
-      console.log('🔍 OVERLOAD ANALYSIS:', overloadAnalysis);
       
       if (!overloadAnalysis.hasOverload) {
-        console.log('❌ NO OVERLOAD: Exiting optimization');
         return { success: false, reason: 'No passenger overload detected' };
       }
 
       console.log('✅ OVERLOAD CONFIRMED: Proceeding with optimization');
 
       // Step 2: Find the problematic leg (usually first leg)
-      console.log('🔍 STEP 2: Identifying problematic leg...');
       const problematicLeg = this.identifyProblematicLeg(flightData.stopCards, overloadAnalysis);
-      console.log('🔍 PROBLEMATIC LEG:', problematicLeg);
       
       // Step 3: Create search corridor toward split point
-      console.log('🔍 STEP 3: Creating search corridor...');
-      console.log('🔍 WAYPOINTS FOR CORRIDOR:', flightData.waypoints?.map(wp => ({ 
-        name: wp.name, 
-        lat: wp.lat, 
-        lng: wp.lng,
-        hasCoords: !!(wp.lat && wp.lng)
-      })));
+      console.log('🔍 CREATING CORRIDOR WITH SPLIT POINT:', flightData.alternateSplitPoint);
+      
       // 🎯 OPTIMIZED CORRIDOR: Reasonable search area 
       const searchCorridor = this.corridorSearcher.createSearchCorridor(
         flightData.waypoints,
         flightData.alternateSplitPoint,
         { maxOffTrack: 50, minFromStart: 5 } // 50nm corridor, 5nm min from start
       );
-      console.log('🔍 SEARCH CORRIDOR:', searchCorridor);
 
       // Step 4: Find fuel-capable platforms in corridor (including destination rigs)
-      console.log('🔍 STEP 4: Searching for fuel-capable platforms...');
-      console.log('🔍 AVAILABLE PLATFORMS COUNT:', flightData.availablePlatforms?.length || 0);
-      console.log('🔍 FIRST FEW PLATFORMS:', flightData.availablePlatforms?.slice(0, 5).map(p => ({ 
-        name: p.name, 
-        fuelAvailable: p.fuelAvailable,
-        coords: p.coordinates,
-        hasFuelCapability: this.platformEvaluator.hasFuelCapability(p)
-      })));
+      console.log('🔍 SEARCHING FOR FUEL-CAPABLE PLATFORMS...');
       
       // 🎯 NEW: Include destination rigs/waypoints in fuel stop search
       const destinationRigs = this.findDestinationRigsWithFuel(flightData.waypoints);
-      console.log('🔍 DESTINATION RIGS WITH FUEL:', destinationRigs.map(r => r.name));
+      if (destinationRigs.length > 0) {
+        console.log('🔍 DESTINATION RIGS WITH FUEL:', destinationRigs.map(r => r.name));
+      }
       
       // Test fuel capability detection on all platforms
       const fuelCapablePlatformsTotal = flightData.availablePlatforms?.filter(p => 
         this.platformEvaluator.hasFuelCapability(p)
       ) || [];
       console.log('🔍 TOTAL FUEL-CAPABLE PLATFORMS:', fuelCapablePlatformsTotal.length);
-      if (fuelCapablePlatformsTotal.length > 0) {
-        console.log('🔍 FUEL-CAPABLE EXAMPLES:', fuelCapablePlatformsTotal.slice(0, 3).map(p => ({ 
-          name: p.name, 
-          fuelAvailable: p.fuelAvailable 
-        })));
-      }
       
       // 🔧 NORMALIZE PLATFORMS: Convert coordinates array format to lat/lng properties
       const normalizedPlatforms = (flightData.availablePlatforms || []).map(platform => 
@@ -102,6 +80,13 @@ export class FuelStopOptimizer {
       
       // 🚀 IMPROVED: Prioritize by distance from alternate split point (not start)
       const splitPoint = flightData.alternateSplitPoint || flightData.waypoints[flightData.waypoints.length - 1];
+      
+      console.log('🚀 SPLIT POINT BEING USED:', {
+        provided: !!flightData.alternateSplitPoint,
+        coords: splitPoint,
+        fallback: !flightData.alternateSplitPoint ? 'Using last waypoint' : null
+      });
+      
       const platformsWithDistance = fuelCapablePlatforms.map(platform => ({
         ...platform,
         distanceFromStart: this.corridorSearcher.calculateDistance(routeStart, platform),
@@ -109,22 +94,14 @@ export class FuelStopOptimizer {
       })).sort((a, b) => a.distanceFromSplit - b.distanceFromSplit) // Sort by split point distance
         .slice(0, 100); // Limit to 100 closest fuel-capable platforms
       
-      console.log('🔧 NORMALIZED PLATFORMS:', normalizedPlatforms.slice(0, 3).map(p => ({ 
-        name: p.name, 
-        lat: p.lat, 
-        lng: p.lng, 
-        hasCoords: !!(p.lat && p.lng),
-        hasFuel: p.hasFuel
-      })));
       console.log(`🎯 PLATFORM FILTERING: ${fuelCapablePlatforms.length} fuel-capable → ${platformsWithDistance.length} closest to split point`);
 
-      // 🚨 DETAILED DEBUGGING: Test a few platforms manually before corridor search
-      console.log('🧪 MANUAL DISTANCE TEST for first 5 platforms (sorted by split point proximity):');
-      platformsWithDistance.slice(0, 5).forEach(platform => {
-        const distFromStart = this.corridorSearcher.calculateDistance(searchCorridor.startPoint, platform);
-        const distFromEnd = this.corridorSearcher.calculateDistance(searchCorridor.endPoint, platform);
+      // 🚨 SPLIT POINT PROXIMITY TEST: Show top 3 platforms after all filtering
+      console.log('🧪 TOP 3 PLATFORMS (by split point proximity after filtering):');
+      platformsWithMinDistance.slice(0, 3).forEach(platform => {
+        const distFromStart = this.corridorSearcher.calculateDistance(routeStart, platform);
         const distFromSplit = platform.distanceFromSplit || this.corridorSearcher.calculateDistance(splitPoint, platform);
-        console.log(`📏 ${platform.name}: start=${distFromStart.toFixed(1)}nm, end=${distFromEnd.toFixed(1)}nm, split=${distFromSplit.toFixed(1)}nm, coords=[${platform.lat}, ${platform.lng}]`);
+        console.log(`📏 ${platform.name}: ${distFromStart.toFixed(1)}nm from start, ${distFromSplit.toFixed(1)}nm from split point`);
       });
 
       // 🚀 NEW: Filter platforms to only include those BEFORE the alternate split point
@@ -136,16 +113,32 @@ export class FuelStopOptimizer {
       
       console.log(`🎯 SPLIT POINT FILTERING: ${platformsWithDistance.length} platforms → ${platformsBeforeSplit.length} before split point`);
       
+      // 🚀 FORCE MINIMUM DISTANCE: Remove platforms too close to departure
+      const platformsWithMinDistance = platformsBeforeSplit.filter(platform => {
+        const distFromStart = this.corridorSearcher.calculateDistance(routeStart, platform);
+        const minDistance = 20; // Minimum 20nm from departure
+        const isValidDistance = distFromStart >= minDistance;
+        
+        if (!isValidDistance) {
+          console.log(`❌ TOO CLOSE TO START: ${platform.name} at ${distFromStart.toFixed(1)}nm (min: ${minDistance}nm)`);
+        }
+        
+        return isValidDistance;
+      });
+      
+      console.log(`🎯 MINIMUM DISTANCE FILTERING: ${platformsBeforeSplit.length} platforms → ${platformsWithMinDistance.length} after min distance filter`);
+      
       const candidatePlatforms = await this.findFuelStopsInCorridor(
         searchCorridor,
-        platformsBeforeSplit
+        platformsWithMinDistance
       );
       
       console.log('🔍 CANDIDATE PLATFORMS FOUND:', candidatePlatforms.length);
-      console.log('🔍 CANDIDATES:', candidatePlatforms.map(p => ({ name: p.name, fuelAvailable: p.fuelAvailable })));
+      if (candidatePlatforms.length > 0) {
+        console.log('🔍 CANDIDATES:', candidatePlatforms.slice(0, 3).map(p => p.name));
+      }
 
       if (candidatePlatforms.length === 0) {
-        console.log('❌ NO CANDIDATES: No fuel-capable platforms found in corridor');
         return { 
           success: false, 
           reason: 'No fuel-capable platforms found within 50nm corridor' 
@@ -190,13 +183,11 @@ export class FuelStopOptimizer {
         routeDeviation: option.analysis.routeDeviation
       }));
       
-      console.log('🎯 UNIQUE SUGGESTIONS WITH ANALYSIS:', suggestions.map(s => ({
+      console.log('🎯 FINAL SUGGESTIONS:', suggestions.map(s => ({
         name: s.name,
-        deviation: s.analysis.routeDeviation?.toFixed(2) + 'nm',
-        passengerGain: `+${s.analysis.passengerGain} passengers`,
-        fuelSavings: `${s.analysis.fuelSavings}lbs`,
-        score: s.score?.toFixed(1) + '/100',
-        hasAnalysis: !!s.analysis
+        deviation: s.analysis.routeDeviation?.toFixed(1) + 'nm',
+        passengerGain: `+${s.analysis.passengerGain}`,
+        score: s.score?.toFixed(1)
       })));
 
       return {
@@ -220,12 +211,7 @@ export class FuelStopOptimizer {
   analyzePassengerOverload(flightData) {
     const { stopCards, overloadedStops, stopRequests } = flightData;
     
-    console.log('🔍 OVERLOAD ANALYSIS INPUT:', {
-      stopCards: stopCards?.length,
-      overloadedStops: overloadedStops?.length,
-      stopRequests: stopRequests?.length,
-      overloadedStopsNames: overloadedStops
-    });
+    // Reduced logging for overload analysis
     
     if (!stopCards || stopCards.length === 0) {
       return { hasOverload: false, reason: 'No stop cards available' };
@@ -309,53 +295,49 @@ export class FuelStopOptimizer {
       console.warn('❌ CORRIDOR SEARCH: No platforms provided');
       return [];
     }
+    
+    console.log('🔍 CORRIDOR DETAILS:', {
+      maxOffTrack: corridor.maxOffTrack + 'nm',
+      minFromStart: corridor.minFromStart + 'nm',
+      segments: corridor.segments.length,
+      totalDistance: corridor.totalDistance.toFixed(1) + 'nm'
+    });
 
-    // 🚨 DETAILED DEBUG: Show first few platforms before filtering
-    console.log('🔍 RAW PLATFORM SAMPLE:', platforms.slice(0, 3).map(p => ({
-      name: p.name,
-      originalCoords: p.coordinates,
-      normalizedLat: p.lat,
-      normalizedLng: p.lng,
-      hasCoords: !!(p.lat && p.lng),
-      fuelAvailable: p.fuelAvailable,
-      hasFuel: p.hasFuel
-    })));
+    // Debug: Show first few platforms before filtering
+    if (platforms.length > 0) {
+      console.log('🔍 RAW PLATFORM SAMPLE:', platforms.slice(0, 2).map(p => ({
+        name: p.name,
+        hasCoords: !!(p.lat && p.lng),
+        hasFuel: p.hasFuel
+      })));
+    }
 
     // First, filter for fuel capability
-    console.log('🔍 CORRIDOR SEARCH: Filtering for fuel capability...');
     const fuelCapablePlatforms = platforms.filter(platform => {
       return this.platformEvaluator.hasFuelCapability(platform);
     });
     
     console.log('🔍 CORRIDOR SEARCH: Found', fuelCapablePlatforms.length, 'fuel-capable platforms');
     if (fuelCapablePlatforms.length > 0) {
-      console.log('🔍 FUEL-CAPABLE EXAMPLES:', fuelCapablePlatforms.slice(0, 5).map(p => ({
+      console.log('🔍 FUEL-CAPABLE EXAMPLES:', fuelCapablePlatforms.slice(0, 3).map(p => ({
         name: p.name,
-        lat: p.lat,
-        lng: p.lng,
+        hasFuel: p.hasFuel,
         fuelAvailable: p.fuelAvailable
       })));
     }
     
     // Then filter for corridor proximity
     console.log('🔍 CORRIDOR SEARCH: Checking corridor proximity...');
-    console.log('🔍 CORRIDOR DETAILS:', {
-      startPoint: corridor.startPoint,
-      endPoint: corridor.endPoint,
-      maxOffTrack: corridor.maxOffTrack,
-      minFromStart: corridor.minFromStart,
-      segmentsCount: corridor.segments?.length
-    });
     
     let rejectionCount = 0;
     const finalCandidates = fuelCapablePlatforms.filter(platform => {
       const inCorridor = this.corridorSearcher.isPlatformInCorridor(platform, corridor);
       // Only log the first few rejections to avoid spam
-      if (!inCorridor && rejectionCount < 3) {
-        console.log(`❌ OUT OF CORRIDOR: ${platform.name} at lat=${platform.lat}, lng=${platform.lng}`);
+      if (!inCorridor && rejectionCount < 5) {
+        console.log(`❌ OUT OF CORRIDOR: ${platform.name}`);
         rejectionCount++;
-      } else if (inCorridor) {
-        console.log(`✅ IN CORRIDOR: ${platform.name} at lat=${platform.lat}, lng=${platform.lng}`);
+      } else if (inCorridor && rejectionCount < 3) {
+        console.log(`✅ IN CORRIDOR: ${platform.name}`);
       }
       return inCorridor;
     });
@@ -363,6 +345,14 @@ export class FuelStopOptimizer {
     console.log('🔍 CORRIDOR SEARCH: Final candidates:', finalCandidates.length);
     if (finalCandidates.length > 0) {
       console.log('🔍 CORRIDOR SEARCH: Examples:', finalCandidates.slice(0, 3).map(p => p.name));
+    } else {
+      console.log('❌ NO CANDIDATES FOUND - corridor may be too restrictive');
+      console.log('🔍 CORRIDOR SETTINGS:', {
+        maxOffTrack: corridor.maxOffTrack + 'nm',
+        minFromStart: corridor.minFromStart + 'nm',
+        platformsInput: platforms.length,
+        fuelCapablePlatforms: fuelCapablePlatforms.length
+      });
     }
     
     return finalCandidates;
@@ -444,7 +434,7 @@ export class FuelStopOptimizer {
    */
   filterPlatformsBeforeSplitPoint(platforms, waypoints, alternateSplitPoint) {
     if (!alternateSplitPoint || !alternateSplitPoint.lat || !alternateSplitPoint.lng) {
-      console.log('🔍 NO SPLIT POINT: Returning all platforms');
+      console.log('⚠️ NO SPLIT POINT: Returning all platforms (no filtering)');
       return platforms;
     }
 
@@ -454,6 +444,7 @@ export class FuelStopOptimizer {
     // Calculate total distance from start to split point
     const totalDistanceToSplit = this.corridorSearcher.calculateDistance(routeStart, splitPoint);
     console.log(`🔍 ROUTE TO SPLIT: ${totalDistanceToSplit.toFixed(1)}nm from start to split point`);
+    console.log(`🔍 SPLIT POINT COORDS: [${splitPoint.lat}, ${splitPoint.lng}]`);
 
     const filteredPlatforms = platforms.filter(platform => {
       const distanceFromStart = this.corridorSearcher.calculateDistance(routeStart, platform);
@@ -475,6 +466,7 @@ export class FuelStopOptimizer {
       return shouldInclude;
     });
 
+    console.log(`🔍 SPLIT POINT FILTER RESULT: ${filteredPlatforms.length} platforms pass filter`);
     return filteredPlatforms;
   }
 }

@@ -335,15 +335,10 @@ const CleanDetailedFuelBreakdown = ({
       // SECONDARY CHECK: Seating overload (fuel optimization CANNOT help)
       const isSeatingOverloaded = requestedCount > aircraftMaxSeats;
       
-      console.log(`🎯 WEIGHT CHECK: ${card.name || card.stopName}:`, {
-        requestedWeight,
-        availableWeight,
-        requestedCount,
-        aircraftMaxSeats,
-        isWeightOverloaded,
-        isSeatingOverloaded,
-        canOptimize: isWeightOverloaded && !isSeatingOverloaded
-      });
+      // Only log overloaded stops
+      if (isWeightOverloaded) {
+        console.log(`⚠️ OVERWEIGHT: ${card.name || card.stopName} - ${requestedWeight}lbs > ${availableWeight}lbs available`);
+      }
       
       // Only trigger fuel optimization for weight overload (not seating overload)
       return isWeightOverloaded && !isSeatingOverloaded;
@@ -555,15 +550,15 @@ const CleanDetailedFuelBreakdown = ({
         
         optimizationManager.checkAndOptimize(flightConfiguration)
           .then(result => {
-            console.log('🎯 OPTIMIZATION RESULT:', result);
             if (result.success && result.suggestions) {
               console.log('🎯 FUEL STOP SUGGESTIONS:', result.suggestions.map(s => ({
                 name: s.platform.name,
                 passengerGain: s.passengerGain,
-                fuelSavings: s.fuelSavings,
-                deviation: s.routeDeviation,
-                score: s.score
+                deviation: s.routeDeviation + 'nm',
+                score: s.score?.toFixed(1)
               })));
+            } else {
+              console.log('🎯 NO SUGGESTIONS:', result.reason);
             }
           })
           .catch(error => {

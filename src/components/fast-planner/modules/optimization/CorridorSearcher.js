@@ -121,7 +121,7 @@ export class CorridorSearcher {
       });
     }
     
-    console.log(`🗺️ GENERATED ${segments.length} corridor segments`);
+    console.log(`🗺️ GENERATED ${segments.length} corridor segments for ${totalDistance.toFixed(1)}nm route`);
     return segments;
   }
 
@@ -140,9 +140,10 @@ export class CorridorSearcher {
     // Check distance from start point
     const distanceFromStart = this.calculateDistance(corridor.startPoint, platform);
     if (distanceFromStart < corridor.minFromStart) {
-      console.log(`❌ CORRIDOR: ${platform.name} too close to start (${distanceFromStart.toFixed(1)}nm < ${corridor.minFromStart}nm)`);
-      console.log(`  🔍 START POINT: [${corridor.startPoint.lat}, ${corridor.startPoint.lng}]`);
-      console.log(`  🔍 PLATFORM: [${platform.lat}, ${platform.lng}]`);
+      // Only log first few rejections to avoid spam
+      if (Math.random() < 0.1) {
+        console.log(`❌ CORRIDOR: ${platform.name} too close to start (${distanceFromStart.toFixed(1)}nm < ${corridor.minFromStart}nm)`);
+      }
       return false; // Too close to departure
     }
 
@@ -156,13 +157,15 @@ export class CorridorSearcher {
       
       if (distanceFromSegment <= segment.radius) {
         inAnySegment = true;
-        // Only log successful corridor matches to reduce noise
-        console.log(`✅ CORRIDOR: ${platform.name} in segment ${index} (${distanceFromSegment.toFixed(1)}nm from center)`);
+        // Only log successful corridor matches for first few
+        if (Math.random() < 0.2) {
+          console.log(`✅ CORRIDOR: ${platform.name} in segment ${index} (${distanceFromSegment.toFixed(1)}nm from center)`);
+        }
       }
     });
     
     // Only log segment rejection for first few platforms
-    if (!inAnySegment && Math.random() < 0.1) {
+    if (!inAnySegment && Math.random() < 0.05) {
       console.log(`❌ CORRIDOR: ${platform.name} outside all segments (closest: ${closestSegmentDistance.toFixed(1)}nm, radius: ${corridor.maxOffTrack}nm)`);
     }
 
