@@ -326,13 +326,11 @@ const GlassMenuDock = ({
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
                 ) : (
-                  // Satellite icon when in edit mode (vertical tilt)
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
-                    <path d="M8 12h8"/>
-                    <path d="M12 8v8"/>
-                    <path d="M16.24 7.76l-8.48 8.48"/>
-                    <path d="M7.76 7.76l8.48 8.48"/>
+                  // Globe/Map icon when in edit mode
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M2 12h20"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                   </svg>
                 )}
               </div>
