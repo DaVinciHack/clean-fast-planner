@@ -193,8 +193,7 @@ const CleanDetailedFuelBreakdown = ({
     
     // First check if we have a local override
     if (passengerRequests[key] !== undefined) {
-      const value = passengerRequests[key];
-      return (value && value > 0) ? value : ''; // Only show real numbers, hide zeros
+      return passengerRequests[key];
     }
     
     // Then check wizard data for initial values
@@ -206,15 +205,13 @@ const CleanDetailedFuelBreakdown = ({
     
     if (wizardData[legKey]) {
       if (requestType === 'passengerCount') {
-        const value = wizardData[legKey].passengerCount;
-        return (value && value > 0) ? value : ''; // Only show real numbers, hide zeros
+        return wizardData[legKey].passengerCount || 0;
       } else if (requestType === 'totalWeight') {
-        const value = wizardData[legKey].totalWeight;
-        return (value && value > 0) ? value : ''; // Only show real numbers, hide zeros
+        return wizardData[legKey].totalWeight || 0;
       }
     }
     
-    return ''; // Return empty string for zero values - better iPad UX
+    return 0;
   }, [passengerRequests, getWizardPassengerData, stopCards]);
   
   const setPassengerRequest = useCallback((stopName, requestType, value) => {
@@ -468,8 +465,6 @@ const CleanDetailedFuelBreakdown = ({
           weatherSegments,
           routeStats,
           alternateRouteData,
-          // 🚀 CRITICAL: Pass alternate split point for improved optimization
-          alternateSplitPoint: alternateRouteData?.splitPoint || null,
           maxPassengersRequested,
           overloadedStops: overloadedStops.map(card => card.name || card.stopName),
           // Add passenger request data for weight analysis
@@ -484,13 +479,6 @@ const CleanDetailedFuelBreakdown = ({
           availablePlatforms: platformManager?.getPlatforms ? platformManager.getPlatforms() : [],
           platformManager: platformManager
         };
-        
-        // 🚀 DEBUG: Check alternate split point data
-        console.log('🚀 ALTERNATE SPLIT POINT DEBUG:', {
-          alternateRouteData,
-          alternateSplitPoint: alternateRouteData?.splitPoint,
-          hasValidSplitPoint: !!(alternateRouteData?.splitPoint?.lat && alternateRouteData?.splitPoint?.lng)
-        });
         
         // 🚨 SIMPLE DEBUG: Check platform data
         const platformData = platformManager?.getPlatforms ? platformManager.getPlatforms() : [];
@@ -546,13 +534,6 @@ const CleanDetailedFuelBreakdown = ({
         
         // Run optimization with detailed logging
         console.log('🎯 FLIGHT CONFIGURATION:', flightConfiguration);
-        console.log('🎯 OPTIMIZATION WILL PRIORITIZE:', {
-          splitPointProvided: !!flightConfiguration.alternateSplitPoint,
-          splitPointCoords: flightConfiguration.alternateSplitPoint,
-          waypointsCount: flightConfiguration.waypoints.length,
-          platformsCount: flightConfiguration.availablePlatforms.length
-        });
-        
         optimizationManager.checkAndOptimize(flightConfiguration)
           .then(result => {
             console.log('🎯 OPTIMIZATION RESULT:', result);
