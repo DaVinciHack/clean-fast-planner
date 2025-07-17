@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './FlightAutomationLoader.css';
 
 /**
@@ -20,23 +20,97 @@ const FlightAutomationLoader = ({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [automationSteps, setAutomationSteps] = useState([]);
+  
+  // Simulated progress state
+  const [lastRealProgress, setLastRealProgress] = useState(0);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const simulationIntervalRef = useRef(null);
 
   // Initialize default state
   const initializeDefaultState = () => {
     setCurrentMessage('Preparing automation...');
     setCurrentDetail('Initializing Palantir flight automation system');
     setProgress(0);
+    setLastRealProgress(0);
     setIsCompleted(false);
     setHasError(false);
     setErrorMessage('');
     setAutomationSteps([]);
+    setIsSimulating(false);
+    
+    // Clear any existing simulation
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
   };
+
+  // Start simulated progress - slow crawl during waiting periods
+  const startSimulation = useCallback((startFrom = 0) => {
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+    }
+    
+    setIsSimulating(true);
+    setLastRealProgress(startFrom);
+    
+    // Slow, realistic progress simulation
+    simulationIntervalRef.current = setInterval(() => {
+      setProgress(current => {
+        // Different speeds for different ranges
+        let increment;
+        if (current < 20) {
+          increment = 0.3; // Very slow start (connection/auth)
+        } else if (current < 50) {
+          increment = 0.2; // Slow middle (processing)
+        } else if (current < 80) {
+          increment = 0.1; // Very slow towards end
+        } else {
+          increment = 0.05; // Crawl at the end
+        }
+        
+        const newProgress = Math.min(current + increment, 95); // Never quite reach 100%
+        
+        // Stop simulation at 95% to wait for real completion
+        if (newProgress >= 95) {
+          clearInterval(simulationIntervalRef.current);
+          simulationIntervalRef.current = null;
+          setIsSimulating(false);
+        }
+        
+        return newProgress;
+      });
+    }, 100); // Update every 100ms for smooth animation
+  }, []);
+
+  // Stop simulation and jump to real progress
+  const stopSimulation = useCallback(() => {
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
+    setIsSimulating(false);
+  }, []);
 
   // Handle progress updates from external automation
   const handleProgressUpdate = useCallback((progressData) => {
     console.log('🚀 FlightAutomationLoader: Received progress update:', progressData);
     
     const { type, message, detail, progress: newProgress, result, error } = progressData;
+    
+    // Stop simulation when we get real progress updates
+    if (typeof newProgress === 'number' && newProgress >= 0) {
+      stopSimulation();
+      setLastRealProgress(newProgress);
+      
+      // Jump to real progress (or higher if simulation was ahead)
+      setProgress(current => Math.max(current, newProgress));
+      
+      // If this isn't a completion, restart simulation from this point
+      if (type !== 'completed' && type !== 'error' && newProgress < 95) {
+        setTimeout(() => startSimulation(newProgress), 500); // Brief pause before resuming simulation
+      }
+    }
     
     // Add this step to our history
     setAutomationSteps(prevSteps => {
@@ -65,11 +139,12 @@ const FlightAutomationLoader = ({
     // Update current display
     setCurrentMessage(message);
     setCurrentDetail(detail);
-    setProgress(newProgress);
     
     // Handle different types of updates
     switch (type) {
       case 'completed':
+        stopSimulation(); // Stop any simulation
+        setProgress(100); // Jump to 100%
         setIsCompleted(true);
         // Mark the final step as completed
         setAutomationSteps(prevSteps => {
@@ -90,6 +165,7 @@ const FlightAutomationLoader = ({
         break;
         
       case 'error':
+        stopSimulation(); // Stop any simulation
         setHasError(true);
         setErrorMessage(detail);
         // Auto-close after showing error
@@ -125,9 +201,22 @@ const FlightAutomationLoader = ({
     // FRESH START: Always reset state when starting new display
     initializeDefaultState();
     
-    // No more fixed timers - we now respond to real progress updates
+    // Start simulated progress immediately - this keeps the bar moving
+    // even during long connection/auth waits
+    setTimeout(() => {
+      startSimulation(0);
+    }, 300); // Brief delay to let initial state settle
     
   }, [isVisible]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (simulationIntervalRef.current) {
+        clearInterval(simulationIntervalRef.current);
+      }
+    };
+  }, []);
 
   if (!isVisible) {
     return null;
@@ -164,10 +253,14 @@ const FlightAutomationLoader = ({
             )}
             <div className="step-progress">
               <div 
-                className="step-progress-bar"
+                className={`step-progress-bar ${
+                  hasError ? 'error-state' : 
+                  isCompleted ? 'completed-state' : 
+                  isSimulating ? 'active-state simulating' : 
+                  'active-state'
+                }`}
                 style={{ 
-                  width: `${progress}%`,
-                  background: hasError ? '#ff6b6b' : isCompleted ? '#22c55e' : 'linear-gradient(90deg, #1e8ffe, #3ba0ff)'
+                  width: `${progress}%`
                 }}
               />
             </div>
