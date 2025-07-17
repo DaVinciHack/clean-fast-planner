@@ -14,6 +14,7 @@ const FlightWizard = ({
   onComplete,
   onSkip,
   onLoadFlight, // NEW: Handler to load selected flight
+  initialStep = 0, // NEW: Initial step to start the wizard on
   // Data and handlers from parent
   regions = [],
   searchLocation,
@@ -27,7 +28,7 @@ const FlightWizard = ({
   // Get user details from auth context
   const { userDetails, userName } = useAuth();
   // Wizard state
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   
   // Name animation state
@@ -56,6 +57,13 @@ const FlightWizard = ({
   const [flightSearchDate, setFlightSearchDate] = useState('');
   const [isLoadingFlights, setIsLoadingFlights] = useState(false);
   
+  // Reset step when wizard opens with a specific initialStep
+  useEffect(() => {
+    if (isVisible) {
+      setCurrentStep(initialStep);
+    }
+  }, [isVisible, initialStep]);
+
   // Animate names when wizard becomes visible and user data is actually loaded
   useEffect(() => {
     if (isVisible && currentStep === 0 && userDetails) {

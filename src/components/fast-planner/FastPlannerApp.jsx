@@ -165,6 +165,7 @@ const FastPlannerCore = ({
   
   // 🧙‍♂️ WIZARD STATE: Flight planning wizard for non-aviation users
   const [isWizardVisible, setIsWizardVisible] = useState(false);
+  const [wizardInitialStep, setWizardInitialStep] = useState(0);
 
   // 🔧 NEW: State to store alternate card data
   const [alternateStopCard, setAlternateStopCard] = useState(null);
@@ -218,6 +219,7 @@ const FastPlannerCore = ({
     if (!wizardDisabled) {
       // Show wizard first, then fade out base overlay after wizard is visible
       const wizardTimer = setTimeout(() => {
+        setWizardInitialStep(0); // Start from welcome screen
         setIsWizardVisible(true);
         // Give wizard time to appear, then fade out base overlay
         setTimeout(() => {
@@ -662,6 +664,7 @@ const FastPlannerCore = ({
         allAircraftProps: Object.keys(selectedAircraft)
       });
     }
+    
       
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasRequiredAircraftData) {
       
@@ -687,10 +690,22 @@ const FastPlannerCore = ({
           return !isWaypoint;
         });
         
-        const coordinates = landingStopsOnly.map(wp => wp.coords).filter(Boolean);
+        // 🔧 WAYPOINT MODE FIX: If no landing stops but we have waypoints, use all waypoints for route calculation
+        // This ensures waypoint mode triggers route recalculation and stop card updates
         
-        if (coordinates.length >= 2) {
-          const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinates, {
+        // 🔧 WAYPOINT MODE FIX: If no landing stops but we have waypoints, use all waypoints for route calculation
+        // This ensures waypoint mode triggers route recalculation and stop card updates
+        let coordinatesForRouteCalc;
+        if (landingStopsOnly.length >= 2) {
+          coordinatesForRouteCalc = landingStopsOnly.map(wp => wp.coords).filter(Boolean);
+        } else if (waypoints.length >= 2) {
+          // Use all waypoints if we don't have enough landing stops
+          coordinatesForRouteCalc = waypoints.map(wp => wp.coords).filter(Boolean);
+          debugLog(DEBUG_ROUTE, '🗺️ WAYPOINT MODE: Using all waypoints for route calculation (no landing stops)');
+        }
+        
+        if (coordinatesForRouteCalc && coordinatesForRouteCalc.length >= 2) {
+          const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinatesForRouteCalc, {
             selectedAircraft,
             weather,
             payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
@@ -1930,6 +1945,35 @@ const FastPlannerCore = ({
 
   // Handle loading a flight from the LoadFlightsCard
   const handleFlightLoad = async (flightData) => {
+    // 🧹 AUTOMATION FIX: Handle null flightData for state clearing
+    if (flightData === null) {
+      console.log('🧹 handleFlightLoad: NULL FLIGHT DATA - Clearing all state for automation');
+      
+      // Clear all state (same as comprehensive reset but no waypoint loading)
+      setCurrentRefuelStops([]);
+      setPendingRefuelStops(null);
+      setLocationFuelOverrides({});
+      updateFlightSetting('extraFuel', 0);
+      setWeatherFuel({ araFuel: 0, approachFuel: 0 });
+      setLoadedFlightData(null);
+      setLoadedFuelObject(null);
+      setCurrentFlightId(null);
+      setAlternateStopCard(null);
+      setAlternateModeActive(false);
+      setAlternateSplitPoint(null);
+      setAlternateRouteData(null);
+      setAlternateRouteInput('');
+      setSarData(null);
+      setWaiveAlternates(false);
+      setWaypoints([]);
+      setStopCards([]);
+      setRouteStats(null);
+      setForceUpdate(prev => prev + 1);
+      
+      console.log('🧹 handleFlightLoad: State cleared successfully for automation');
+      return;
+    }
+    
     // 🔍 DEBUG: Log the exact flight data received by handleFlightLoad
     console.log('🔍 handleFlightLoad: ===== FLIGHT LOAD STARTED =====');
     console.log('🔍 handleFlightLoad: Received flight data:', flightData);
@@ -3863,6 +3907,12 @@ const FastPlannerCore = ({
     setIsWizardVisible(false);
   }, []);
   
+  // 🆕 NEW FLIGHT HANDLER: Opens wizard for creating a new flight
+  const handleNewFlight = useCallback(() => {
+    setWizardInitialStep(2); // Step 2 = departure (skip welcome and flight list)
+    setIsWizardVisible(true);
+  }, []);
+  
   // 🎯 FIX: Handle flight loading from wizard through proper RightPanel workflow
   const handleWizardFlightLoad = useCallback((flight) => {
     
@@ -4123,6 +4173,7 @@ const FastPlannerCore = ({
         onComplete={handleWizardComplete}
         onSkip={handleWizardSkip}
         onLoadFlight={handleWizardFlightLoad}
+        initialStep={wizardInitialStep}
         searchLocation={handleWizardSearch}
         onAddWaypoint={hookAddWaypoint}
         onClearRoute={clearRoute}
@@ -4345,6 +4396,8 @@ const FastPlannerCore = ({
         // LIVE weather toggle props
         onLiveWeatherToggle={handleLiveWeatherToggle}
         liveWeatherActive={liveWeatherActive}
+        // New flight wizard prop
+        onNewFlight={handleNewFlight}
       />
     </>
   );
@@ -4477,8 +4530,20 @@ const FastPlannerApp = () => {
     
     if (appManagers.waypointManagerRef && appManagers.waypointManagerRef.current) {
         appManagers.waypointManagerRef.current.addWaypoint(coords, name, { isWaypoint, type: isWaypoint ? 'WAYPOINT' : 'STOP' });
-        const updatedWaypoints = appManagers.waypointManagerRef.current.getWaypoints();
-        await new Promise(resolve => { setWaypoints([...updatedWaypoints]); setTimeout(resolve, 0); });
+        
+        // ✅ FIX: Use setTimeout to batch state updates and avoid synchronization issues (matches useWaypoints pattern)
+        await new Promise(resolve => {
+          setTimeout(() => {
+            // Get the updated waypoints
+            const updatedWaypoints = appManagers.waypointManagerRef.current.getWaypoints();
+            
+            // Update the state with the new waypoints
+            setWaypoints([...updatedWaypoints]);
+            
+            console.log(`🌐 addWaypointDirectImpl: Updated waypoints array with ${updatedWaypoints.length} items`);
+            resolve();
+          }, 0);
+        });
     } else {
         console.error('addWaypointDirectImpl: waypointManagerRef is not available on appManagers');
     }
