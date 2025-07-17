@@ -167,35 +167,44 @@ const RightPanel = React.forwardRef(({
   const handleSaveFlightSubmit = async (flightData) => {
     console.log('Save flight data from card:', flightData);
     
-    // 🎯 IMMEDIATE POPUP: Show automation loader immediately if automation is enabled
-    if (flightData.runAutomation) {
-      console.log('🚀 RIGHTPANEL: Showing automation loader IMMEDIATELY on save');
-      
-      // Extract flight details for the loader
-      const departureIcao = waypoints?.[0]?.name || 'DEP';
-      const destinationIcao = waypoints?.[waypoints.length - 1]?.name || 'DEST';
-      const flightNumber = flightData?.flightName || 'Flight Plan';
-      
-      // Store flight data for loader
-      setAutomationFlightData({
-        flightNumber,
-        departureIcao,
-        destinationIcao
-      });
-      
-      // Show automation loader immediately
-      setShowAutomationLoader(true);
-      
-      // Send initial "saving flight" message
-      if (automationProgressCallback) {
-        automationProgressCallback({
-          type: 'step',
-          message: 'Saving flight to Palantir...',
-          detail: `Creating flight "${flightNumber}" with ${waypoints?.length || 0} waypoints`,
-          progress: 5
-        });
-      }
-    }
+    // 🎯 ALWAYS SHOW LOADER: Show loader for ALL saves (automation or regular)
+    console.log('🚀 RIGHTPANEL: Showing loader for save operation');
+    
+    // Extract flight details for the loader
+    const departureIcao = waypoints?.[0]?.name || 'DEP';
+    const destinationIcao = waypoints?.[waypoints.length - 1]?.name || 'DEST';
+    const flightNumber = flightData?.flightName || 'Flight Plan';
+    
+    // Store flight data for loader
+    setAutomationFlightData({
+      flightNumber,
+      departureIcao,
+      destinationIcao
+    });
+    
+    // Show automation loader immediately for all saves
+    setShowAutomationLoader(true);
+    
+    // Send initial "saving flight" message (setup callback if needed)
+    const initialMessage = flightData.runAutomation ? 
+      'Saving flight to Palantir...' : 
+      'Saving flight to Palantir...';
+    
+    const progressCallback = (progressUpdate) => {
+      console.log('Progress update:', progressUpdate);
+      setAutomationProgressCallback(() => progressCallback);
+    };
+    
+    // Set up the progress callback
+    setAutomationProgressCallback(() => progressCallback);
+    
+    // Send initial progress update
+    progressCallback({
+      type: 'step',
+      message: initialMessage,
+      detail: `Creating flight "${flightNumber}" with ${waypoints?.length || 0} waypoints`,
+      progress: 5
+    });
     
     // Import the PalantirFlightService
     try {
@@ -261,6 +270,14 @@ const RightPanel = React.forwardRef(({
       
       // Prepare waypoints with leg structure
       const waypointsWithLegs = waypoints.map((wp, index) => {
+        // 🔍 DEBUG: Log waypoint classification for debugging
+        console.log(`🔍 WAYPOINT ${index} (${wp.name}):`, {
+          pointType: wp.pointType,
+          isWaypoint: wp.isWaypoint,
+          type: wp.type,
+          hasClassification: !!(wp.pointType || wp.isWaypoint !== undefined || wp.type)
+        });
+        
         return {
           legIndex: wp.legIndex || 0,
           name: wp.name || `Waypoint ${index + 1}`,
@@ -364,13 +381,15 @@ const RightPanel = React.forwardRef(({
         
         console.log(`Flight ${currentFlightId ? 'updated' : 'created'} successfully with ID: ${flightId}`);
         
-        // 🎯 IMMEDIATE PROGRESS UPDATE: Show save success in automation loader
-        if (flightData.runAutomation && automationProgressCallback) {
+        // 🎯 PROGRESS UPDATE: Show save success in loader (for both automation and regular saves)
+        if (automationProgressCallback) {
           automationProgressCallback({
             type: 'step',
             message: `Flight "${flightData.flightName}" saved successfully`,
-            detail: `Flight ID: ${flightId} - preparing to run automation`,
-            progress: 15
+            detail: flightData.runAutomation 
+              ? `Flight ID: ${flightId} - preparing to run automation`
+              : `Flight ID: ${flightId} - save complete`,
+            progress: flightData.runAutomation ? 15 : 50
           });
         }
         
@@ -476,6 +495,18 @@ const RightPanel = React.forwardRef(({
             
             // Add a slight delay to ensure flight creation is fully processed
             setTimeout(async () => {
+              // 🧹 CRITICAL FIX: Clear flight state before automation to ensure clean reload
+              console.log('🧹 AUTOMATION PREP: Clearing flight state before automation to prevent contamination');
+              if (onFlightLoad) {
+                // Pass null to trigger complete state reset (same as closing flight)
+                console.log('🧹 AUTOMATION PREP: Calling onFlightLoad(null) to clear state');
+                onFlightLoad(null);
+                
+                // Brief delay to ensure state clearing completes
+                await new Promise(resolve => setTimeout(resolve, 200));
+                console.log('🧹 AUTOMATION PREP: State clearing complete, proceeding with automation');
+              }
+              
               try {
                 const automationResult = await AutomationService.runAutomation(flightId, automationProgressCallback);
                 console.log('Automation successful!', automationResult);
@@ -699,6 +730,19 @@ const RightPanel = React.forwardRef(({
           if (window.LoadingIndicator) {
             window.LoadingIndicator.updateStatusIndicator('Flight saved but automation skipped - no valid flight ID', 'warning');
           }
+        } else if (!flightData.runAutomation) {
+          // 🎯 NON-AUTOMATION SAVE: Complete the loader for regular saves
+          console.log('Flight saved successfully without automation');
+          
+          if (automationProgressCallback) {
+            // Show final completed step (this will auto-hide the loader)
+            automationProgressCallback({
+              type: 'completed',
+              message: `Flight "${flightData.flightName}" saved to Palantir`,
+              detail: `Flight successfully created with ID: ${flightId}`,
+              progress: 100
+            });
+          }
         }
         
         // Return to main card after successful save (and automation if enabled)
@@ -764,8 +808,8 @@ const RightPanel = React.forwardRef(({
         window.LoadingIndicator.updateStatusIndicator(fullErrorMessage, 'error');
       }
       
-      // 🚨 SAVE ERROR: Send error to automation loader if it's running
-      if (flightData.runAutomation && automationProgressCallback) {
+      // 🚨 SAVE ERROR: Send error to loader (for both automation and regular saves)
+      if (automationProgressCallback) {
         automationProgressCallback({
           type: 'error',
           message: `Flight ${operationType} failed`,

@@ -123,9 +123,9 @@ export class FuelStopOptimizationManager {
         console.log(`FuelStopOptimizationManager: Found ${optimizationResult.suggestions.length} fuel stop options`);
         return optimizationResult;
       } else {
-        this.notifyDebug('No Options', '❌ No viable fuel stops found within 100nm of route');
+        this.notifyDebug('No Options', '❌ No viable fuel stops found within 50nm of route');
         console.log('FuelStopOptimizationManager: No viable fuel stop options found');
-        this.notifyError('No suitable fuel stops found within 100nm of route');
+        this.notifyError('No suitable fuel stops found within 50nm of route');
         return optimizationResult;
       }
 

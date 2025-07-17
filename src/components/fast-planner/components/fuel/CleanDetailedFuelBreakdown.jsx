@@ -397,10 +397,69 @@ const CleanDetailedFuelBreakdown = ({
         console.log('🎯 RUNNING FUEL STOP OPTIMIZATION...');
         setHasTriggeredOptimization(true);
         
+        // 🚨 DEBUG: Check waypoint data sources
+        console.log('🔍 WAYPOINT SOURCES DEBUG:', {
+          waypointsLength: waypoints.length,
+          waypointsSample: waypoints.slice(0, 2),
+          stopCardsSample: displayStopCards.slice(0, 2).map(card => ({
+            name: card.name,
+            hasLat: !!card.lat,
+            hasLng: !!card.lng,
+            coordinates: card.coordinates,
+            allFields: Object.keys(card)
+          })),
+          routeStatsKeys: Object.keys(routeStats || {}),
+          alternateRouteDataKeys: Object.keys(alternateRouteData || {})
+        });
+        
+        // 🚨 CRITICAL FIX: Get waypoint coordinates from platformManager
+        const allPlatforms = platformManager?.getPlatforms ? platformManager.getPlatforms() : [];
+        const waypointsWithCoords = waypoints.map(waypoint => {
+          // Look up coordinates in platform data
+          const platform = allPlatforms.find(p => 
+            p.name === waypoint.name || 
+            p.platformName === waypoint.name ||
+            p.id === waypoint.name
+          );
+          
+          if (platform) {
+            // Use platform coordinates (handle both formats)
+            const lat = platform.coordinates ? platform.coordinates[1] : (platform.lat || platform.latitude);
+            const lng = platform.coordinates ? platform.coordinates[0] : (platform.lng || platform.longitude);
+            
+            if (lat && lng) {
+              return {
+                name: waypoint.name,
+                lat: lat,
+                lng: lng,
+                type: 'LANDING_STOP'
+              };
+            }
+          }
+          
+          // If no platform found, return waypoint with missing coords flag
+          return {
+            name: waypoint.name,
+            lat: undefined,
+            lng: undefined,
+            type: 'LANDING_STOP',
+            missingCoords: true
+          };
+        });
+        
+        const validWaypoints = waypointsWithCoords.filter(wp => wp.lat && wp.lng);
+        
+        console.log('🔍 PLATFORM LOOKUP RESULTS:', {
+          totalPlatforms: allPlatforms.length,
+          waypointsWithCoords: waypointsWithCoords,
+          validWaypoints: validWaypoints.length,
+          missingCoords: waypointsWithCoords.filter(wp => wp.missingCoords).map(wp => wp.name)
+        });
+
         // Build flight configuration for optimization
         const flightConfiguration = {
           selectedAircraft,
-          waypoints,
+          waypoints: validWaypoints, // Use only waypoints with valid coordinates
           stopCards: displayStopCards,
           flightSettings,
           weatherSegments,
@@ -689,17 +748,7 @@ const CleanDetailedFuelBreakdown = ({
         approachAmount = fuelPolicy.currentPolicy.fuelTypes.approachFuel.default;
       }
       
-      console.log('🚨 DETAILS APPROACH FUEL DEBUG:', {
-        fuelPolicy: !!fuelPolicy,
-        fuelPolicyKeys: Object.keys(fuelPolicy || {}),
-        fuelTypesPath: fuelPolicy?.fuelTypes?.approachFuel?.default,
-        approachFuelDefault: fuelPolicy?.approachFuelDefault,
-        fullFuelPolicy: fuelPolicy,
-        finalAmount: approachAmount,
-        stopName,
-        ranking: segment.ranking2,
-        isRig: segment.isRig
-      });
+      // Approach fuel debug disabled to reduce logs
       return approachAmount;
     }
     
@@ -892,20 +941,7 @@ const CleanDetailedFuelBreakdown = ({
               );
               
               // Debug logging to see what we're getting
-              console.log('🔍 WAYPOINT LOOKUP DEBUG:', {
-                stopName,
-                hasWeatherSegment: !!weatherSegment,
-                waypoint: waypoint ? {
-                  name: waypoint.name,
-                  type: waypoint.type,
-                  pointType: waypoint.pointType,
-                  isWaypoint: waypoint.isWaypoint,
-                  allFields: Object.keys(waypoint),
-                  fullWaypoint: waypoint
-                } : null,
-                totalWaypoints: waypoints.length,
-                waypointNames: waypoints.map(wp => wp.name)
-              });
+              // Waypoint lookup debug disabled
               
               const isRig = weatherSegment ? weatherSegment.isRig : 
                            (waypoint ? (waypoint.is_airport?.toString().toUpperCase() !== 'YES' && 

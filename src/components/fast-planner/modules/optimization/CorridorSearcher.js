@@ -22,13 +22,33 @@ export class CorridorSearcher {
     }
 
     const startPoint = waypoints[0];
-    const endPoint = alternateSplitPoint || waypoints[waypoints.length - 1];
+    
+    // 🚨 CRITICAL FIX: Check if alternateSplitPoint has valid coordinates
+    let endPoint;
+    if (alternateSplitPoint && alternateSplitPoint.lat && alternateSplitPoint.lng) {
+      endPoint = alternateSplitPoint;
+    } else {
+      endPoint = waypoints[waypoints.length - 1]; // Use last waypoint
+      console.log('🔍 CORRIDOR: Using last waypoint as end point (alternateSplitPoint invalid)');
+    }
+    
+    // 🚨 CRITICAL FIX: Validate waypoint coordinates
+    if (!startPoint.lat || !startPoint.lng) {
+      console.error('❌ CORRIDOR: Start point missing coordinates:', startPoint);
+      throw new Error(`Start point ${startPoint.name} missing lat/lng coordinates`);
+    }
+    
+    if (!endPoint.lat || !endPoint.lng) {
+      console.error('❌ CORRIDOR: End point missing coordinates:', endPoint);
+      throw new Error(`End point ${endPoint.name || 'undefined'} missing lat/lng coordinates`);
+    }
     
     console.log('Creating search corridor:', {
       start: `${startPoint.name} (${startPoint.lat}, ${startPoint.lng})`,
-      end: alternateSplitPoint ? 'Split Point' : waypoints[waypoints.length - 1].name,
+      end: alternateSplitPoint ? `Split Point (${endPoint.lat}, ${endPoint.lng})` : `${waypoints[waypoints.length - 1].name} (${endPoint.lat}, ${endPoint.lng})`,
       maxOffTrack: `${maxOffTrack}nm`,
-      minFromStart: `${minFromStart}nm`
+      minFromStart: `${minFromStart}nm`,
+      totalDistance: `${this.calculateDistance(startPoint, endPoint).toFixed(1)}nm`
     });
 
     // Create corridor segments for better coverage
@@ -38,6 +58,9 @@ export class CorridorSearcher {
       maxOffTrack,
       minFromStart
     );
+
+    // Reduced logging for corridor segments
+    console.log(`🗺️ CORRIDOR SEGMENTS: Created ${corridorSegments.length} segments, radius=${maxOffTrack}nm each`);
 
     return {
       startPoint,
@@ -59,6 +82,25 @@ export class CorridorSearcher {
    */
   generateCorridorSegments(start, end, corridorWidth, minFromStart) {
     const segments = [];
+    const totalDistance = this.calculateDistance(start, end);
+    
+    console.log(`🗺️ SEGMENT GENERATION: ${totalDistance.toFixed(1)}nm route, minFromStart=${minFromStart}nm`);
+    
+    // 🚨 SPECIAL CASE: Round trip or very short route
+    if (totalDistance < minFromStart * 2) {
+      console.log('🗺️ SHORT/ROUND TRIP: Creating radial search pattern around start point');
+      
+      // Create radial segments around the start point for short routes
+      const radialSegments = [
+        { center: { lat: start.lat + 0.05, lng: start.lng }, radius: corridorWidth, distanceFromStart: minFromStart + 5 },
+        { center: { lat: start.lat - 0.05, lng: start.lng }, radius: corridorWidth, distanceFromStart: minFromStart + 5 },
+        { center: { lat: start.lat, lng: start.lng + 0.05 }, radius: corridorWidth, distanceFromStart: minFromStart + 5 },
+        { center: { lat: start.lat, lng: start.lng - 0.05 }, radius: corridorWidth, distanceFromStart: minFromStart + 5 }
+      ];
+      
+      return radialSegments;
+    }
+    
     const numSegments = 10; // Divide corridor into 10 segments
     
     for (let i = 0; i <= numSegments; i++) {
@@ -79,6 +121,7 @@ export class CorridorSearcher {
       });
     }
     
+    console.log(`🗺️ GENERATED ${segments.length} corridor segments`);
     return segments;
   }
 
@@ -90,21 +133,40 @@ export class CorridorSearcher {
    */
   isPlatformInCorridor(platform, corridor) {
     if (!platform.lat || !platform.lng) {
-      console.warn('Platform missing coordinates:', platform);
+      console.warn('❌ CORRIDOR: Platform missing coordinates:', platform.name);
       return false;
     }
 
     // Check distance from start point
     const distanceFromStart = this.calculateDistance(corridor.startPoint, platform);
     if (distanceFromStart < corridor.minFromStart) {
+      console.log(`❌ CORRIDOR: ${platform.name} too close to start (${distanceFromStart.toFixed(1)}nm < ${corridor.minFromStart}nm)`);
+      console.log(`  🔍 START POINT: [${corridor.startPoint.lat}, ${corridor.startPoint.lng}]`);
+      console.log(`  🔍 PLATFORM: [${platform.lat}, ${platform.lng}]`);
       return false; // Too close to departure
     }
 
     // Check if platform is within any corridor segment
-    return corridor.segments.some(segment => {
+    let closestSegmentDistance = Infinity;
+    let inAnySegment = false;
+    
+    corridor.segments.forEach((segment, index) => {
       const distanceFromSegment = this.calculateDistance(segment.center, platform);
-      return distanceFromSegment <= segment.radius;
+      closestSegmentDistance = Math.min(closestSegmentDistance, distanceFromSegment);
+      
+      if (distanceFromSegment <= segment.radius) {
+        inAnySegment = true;
+        // Only log successful corridor matches to reduce noise
+        console.log(`✅ CORRIDOR: ${platform.name} in segment ${index} (${distanceFromSegment.toFixed(1)}nm from center)`);
+      }
     });
+    
+    // Only log segment rejection for first few platforms
+    if (!inAnySegment && Math.random() < 0.1) {
+      console.log(`❌ CORRIDOR: ${platform.name} outside all segments (closest: ${closestSegmentDistance.toFixed(1)}nm, radius: ${corridor.maxOffTrack}nm)`);
+    }
+
+    return inAnySegment;
   }
 
   /**
@@ -155,6 +217,10 @@ export class CorridorSearcher {
    */
   calculateDistance(point1, point2) {
     if (!point1 || !point2 || !point1.lat || !point1.lng || !point2.lat || !point2.lng) {
+      console.warn('❌ DISTANCE: Missing coordinates', { 
+        point1: { lat: point1?.lat, lng: point1?.lng }, 
+        point2: { lat: point2?.lat, lng: point2?.lng } 
+      });
       return 0;
     }
 
@@ -168,7 +234,14 @@ export class CorridorSearcher {
               Math.sin(dLng / 2) * Math.sin(dLng / 2);
     
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    const distance = R * c;
+    
+    // Only log distance calculation issues during optimization debugging
+    if (distance < 1 && (point1.name || point2.name)) {
+      console.log(`📏 SUSPICIOUS DISTANCE: ${distance.toFixed(4)}nm between [${point1.lat}, ${point1.lng}] and [${point2.lat}, ${point2.lng}]`);
+    }
+    
+    return distance;
   }
 
   /**

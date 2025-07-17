@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6); /* Darker background as requested */
+  background: rgba(0, 0, 0, 0.8); /* Much darker background for better focus */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,10 +85,12 @@
 
 .step-progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #1e8ffe, #3ba0ff);
+  background: linear-gradient(90deg, #1e8ffe, #3ba0ff, #1e8ffe);
+  background-size: 200% 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
   box-shadow: 0 0 8px rgba(30, 143, 254, 0.6);
+  animation: progressShimmer 2s ease-in-out infinite, progressPulse 1.5s ease-in-out infinite;
 }
 
 /* Flight Information Section */
@@ -208,6 +210,29 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Progress bar shimmer effect */
+@keyframes progressShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Progress bar pulse effect */
+@keyframes progressPulse {
+  0% { 
+    box-shadow: 0 0 8px rgba(30, 143, 254, 0.6);
+    transform: scaleY(1);
+  }
+  50% { 
+    box-shadow: 0 0 12px rgba(30, 143, 254, 0.8);
+    transform: scaleY(1.1);
+  }
+  100% { 
+    box-shadow: 0 0 8px rgba(30, 143, 254, 0.6);
+    transform: scaleY(1);
+  }
 }
 
 /* Empty circle for pending steps - Smaller */

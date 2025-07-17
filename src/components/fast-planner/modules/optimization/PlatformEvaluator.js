@@ -171,9 +171,16 @@ export class PlatformEvaluator {
    */
   hasValidCoordinates(platform) {
     // Check various coordinate field names
-    const lat = platform.lat || platform.latitude || platform.coord?.lat;
-    const lng = platform.lng || platform.longitude || platform.coord?.lng || 
+    let lat = platform.lat || platform.latitude || platform.coord?.lat;
+    let lng = platform.lng || platform.longitude || platform.coord?.lng || 
                 platform.lon || platform.coord?.lon;
+
+    // 🚨 CRITICAL FIX: Handle coordinates array format [longitude, latitude]
+    if (!lat && !lng && platform.coordinates && Array.isArray(platform.coordinates) && platform.coordinates.length >= 2) {
+      lng = platform.coordinates[0]; // longitude is first
+      lat = platform.coordinates[1]; // latitude is second
+      // Coordinate conversion successful
+    }
 
     if (!lat || !lng) {
       return false;
@@ -194,9 +201,16 @@ export class PlatformEvaluator {
    */
   normalizePlatform(platform) {
     // Normalize coordinates
-    const lat = platform.lat || platform.latitude || platform.coord?.lat;
-    const lng = platform.lng || platform.longitude || platform.coord?.lng || 
+    let lat = platform.lat || platform.latitude || platform.coord?.lat;
+    let lng = platform.lng || platform.longitude || platform.coord?.lng || 
                 platform.lon || platform.coord?.lon;
+
+    // 🚨 CRITICAL FIX: Handle coordinates array format [longitude, latitude]
+    if (!lat && !lng && platform.coordinates && Array.isArray(platform.coordinates) && platform.coordinates.length >= 2) {
+      lng = platform.coordinates[0]; // longitude is first
+      lat = platform.coordinates[1]; // latitude is second
+      // Platform normalized with coordinates array
+    }
 
     // Normalize identification
     const name = platform.name || platform.platformName || platform.id || platform.code;

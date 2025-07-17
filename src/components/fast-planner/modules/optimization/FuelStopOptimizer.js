@@ -46,11 +46,17 @@ export class FuelStopOptimizer {
       
       // Step 3: Create search corridor toward split point
       console.log('🔍 STEP 3: Creating search corridor...');
-      console.log('🔍 WAYPOINTS FOR CORRIDOR:', flightData.waypoints?.map(wp => ({ name: wp.name, lat: wp.lat, lng: wp.lng })));
+      console.log('🔍 WAYPOINTS FOR CORRIDOR:', flightData.waypoints?.map(wp => ({ 
+        name: wp.name, 
+        lat: wp.lat, 
+        lng: wp.lng,
+        hasCoords: !!(wp.lat && wp.lng)
+      })));
+      // 🎯 OPTIMIZED CORRIDOR: Reasonable search area 
       const searchCorridor = this.corridorSearcher.createSearchCorridor(
         flightData.waypoints,
         flightData.alternateSplitPoint,
-        { maxOffTrack: 100, minFromStart: 20 }
+        { maxOffTrack: 50, minFromStart: 5 } // 50nm corridor, 5nm min from start
       );
       console.log('🔍 SEARCH CORRIDOR:', searchCorridor);
 
@@ -76,9 +82,44 @@ export class FuelStopOptimizer {
         })));
       }
       
+      // 🔧 NORMALIZE PLATFORMS: Convert coordinates array format to lat/lng properties
+      const normalizedPlatforms = (flightData.availablePlatforms || []).map(platform => 
+        this.platformEvaluator.normalizePlatform(platform)
+      );
+      
+      // 🎯 LIMIT PLATFORMS: Only consider fuel-capable platforms near route
+      const routeStart = flightData.waypoints[0];
+      const fuelCapablePlatforms = normalizedPlatforms.filter(platform => 
+        platform.hasFuel && platform.lat && platform.lng
+      );
+      
+      // Calculate distance from route start and limit to top 100 closest platforms
+      const platformsWithDistance = fuelCapablePlatforms.map(platform => ({
+        ...platform,
+        distanceFromStart: this.corridorSearcher.calculateDistance(routeStart, platform)
+      })).sort((a, b) => a.distanceFromStart - b.distanceFromStart)
+        .slice(0, 100); // Limit to 100 closest fuel-capable platforms
+      
+      console.log('🔧 NORMALIZED PLATFORMS:', normalizedPlatforms.slice(0, 3).map(p => ({ 
+        name: p.name, 
+        lat: p.lat, 
+        lng: p.lng, 
+        hasCoords: !!(p.lat && p.lng),
+        hasFuel: p.hasFuel
+      })));
+      console.log(`🎯 PLATFORM FILTERING: ${fuelCapablePlatforms.length} fuel-capable → ${platformsWithDistance.length} closest`);
+
+      // 🚨 DETAILED DEBUGGING: Test a few platforms manually before corridor search
+      console.log('🧪 MANUAL DISTANCE TEST for first 5 platforms:');
+      platformsWithDistance.slice(0, 5).forEach(platform => {
+        const distFromStart = this.corridorSearcher.calculateDistance(searchCorridor.startPoint, platform);
+        const distFromEnd = this.corridorSearcher.calculateDistance(searchCorridor.endPoint, platform);
+        console.log(`📏 ${platform.name}: start=${distFromStart.toFixed(1)}nm, end=${distFromEnd.toFixed(1)}nm, coords=[${platform.lat}, ${platform.lng}]`);
+      });
+
       const candidatePlatforms = await this.findFuelStopsInCorridor(
         searchCorridor,
-        flightData.availablePlatforms
+        platformsWithDistance
       );
       
       console.log('🔍 CANDIDATE PLATFORMS FOUND:', candidatePlatforms.length);
@@ -88,7 +129,7 @@ export class FuelStopOptimizer {
         console.log('❌ NO CANDIDATES: No fuel-capable platforms found in corridor');
         return { 
           success: false, 
-          reason: 'No fuel-capable platforms found within 100nm corridor' 
+          reason: 'No fuel-capable platforms found within 50nm corridor' 
         };
       }
 
@@ -99,15 +140,44 @@ export class FuelStopOptimizer {
         overloadAnalysis
       );
 
-      // Step 6: Return top 2 suggestions
-      const suggestions = rankedOptions.slice(0, 2).map(option => ({
+      // Step 6: Remove duplicates and return top suggestions
+      const uniqueOptions = [];
+      const seenPlatforms = new Set();
+      
+      for (const option of rankedOptions) {
+        const platformId = option.platform.name || option.platform.id;
+        if (!seenPlatforms.has(platformId)) {
+          seenPlatforms.add(platformId);
+          uniqueOptions.push(option);
+        }
+        if (uniqueOptions.length >= 3) break; // Top 3 unique suggestions
+      }
+      
+      const suggestions = uniqueOptions.map(option => ({
         platform: option.platform,
+        analysis: {
+          passengerGain: option.analysis.passengerGain,
+          fuelSavings: option.analysis.fuelSavings,
+          routeDeviation: option.analysis.routeDeviation,
+          fuelEfficiency: option.analysis.fuelEfficiency
+        },
+        score: option.score,
+        insertionPoint: option.insertionPoint,
+        name: option.platform.name || option.platform.id,
+        // Also include flattened versions for compatibility
         passengerGain: option.analysis.passengerGain,
         fuelSavings: option.analysis.fuelSavings,
-        routeDeviation: option.analysis.routeDeviation,
-        score: option.score,
-        insertionPoint: option.insertionPoint
+        routeDeviation: option.analysis.routeDeviation
       }));
+      
+      console.log('🎯 UNIQUE SUGGESTIONS WITH ANALYSIS:', suggestions.map(s => ({
+        name: s.name,
+        deviation: s.analysis.routeDeviation?.toFixed(2) + 'nm',
+        passengerGain: `+${s.analysis.passengerGain} passengers`,
+        fuelSavings: `${s.analysis.fuelSavings}lbs`,
+        score: s.score?.toFixed(1) + '/100',
+        hasAnalysis: !!s.analysis
+      })));
 
       return {
         success: true,
@@ -128,23 +198,55 @@ export class FuelStopOptimizer {
    * @returns {Object} Overload analysis
    */
   analyzePassengerOverload(flightData) {
-    const { stopCards, requiredPassengers } = flightData;
+    const { stopCards, overloadedStops, stopRequests } = flightData;
+    
+    console.log('🔍 OVERLOAD ANALYSIS INPUT:', {
+      stopCards: stopCards?.length,
+      overloadedStops: overloadedStops?.length,
+      stopRequests: stopRequests?.length,
+      overloadedStopsNames: overloadedStops
+    });
     
     if (!stopCards || stopCards.length === 0) {
       return { hasOverload: false, reason: 'No stop cards available' };
     }
 
-    // Find legs where required > available passengers
+    // 🚨 USE THE OVERLOAD DATA PASSED FROM UI
+    // The UI already detected overload and passed overloadedStops
+    if (overloadedStops && overloadedStops.length > 0) {
+      console.log('✅ OVERLOAD CONFIRMED: Using UI-detected overload data');
+      
+      // Get detailed overload info from stopRequests
+      const overloadDetails = stopRequests?.filter(req => 
+        overloadedStops.includes(req.stopName) && req.requestedWeight > req.availableWeight
+      ) || [];
+      
+      const maxShortage = Math.max(...overloadDetails.map(req => 
+        req.requestedWeight - req.availableWeight
+      ), 0);
+      
+      return {
+        hasOverload: true,
+        overloadedLegs: overloadDetails,
+        maxShortage,
+        affectedLegs: overloadDetails.length,
+        reason: `${overloadedStops.length} stops have weight overload`
+      };
+    }
+
+    // Fallback: analyze stop cards directly
     const overloadedLegs = stopCards
       .map((card, index) => ({
         legIndex: index,
-        required: requiredPassengers,
-        available: card.maxPassengers || 0,
-        shortage: requiredPassengers - (card.maxPassengers || 0)
+        stopName: card.name || card.stopName,
+        required: card.requestedWeight || 0,
+        available: card.availableWeight || 0,
+        shortage: (card.requestedWeight || 0) - (card.availableWeight || 0)
       }))
       .filter(leg => leg.shortage > 0);
 
     if (overloadedLegs.length === 0) {
+      console.log('❌ NO OVERLOAD: No weight overload detected in analysis');
       return { hasOverload: false, reason: 'Sufficient passenger capacity' };
     }
 
@@ -188,24 +290,52 @@ export class FuelStopOptimizer {
       return [];
     }
 
+    // 🚨 DETAILED DEBUG: Show first few platforms before filtering
+    console.log('🔍 RAW PLATFORM SAMPLE:', platforms.slice(0, 3).map(p => ({
+      name: p.name,
+      originalCoords: p.coordinates,
+      normalizedLat: p.lat,
+      normalizedLng: p.lng,
+      hasCoords: !!(p.lat && p.lng),
+      fuelAvailable: p.fuelAvailable,
+      hasFuel: p.hasFuel
+    })));
+
     // First, filter for fuel capability
     console.log('🔍 CORRIDOR SEARCH: Filtering for fuel capability...');
     const fuelCapablePlatforms = platforms.filter(platform => {
-      const hasFuel = this.platformEvaluator.hasFuelCapability(platform);
-      if (!hasFuel && Math.random() < 0.1) { // Log 10% of non-fuel platforms
-        console.log(`❌ NO FUEL: ${platform.name} - fuelAvailable: "${platform.fuelAvailable}"`);
-      }
-      return hasFuel;
+      return this.platformEvaluator.hasFuelCapability(platform);
     });
     
     console.log('🔍 CORRIDOR SEARCH: Found', fuelCapablePlatforms.length, 'fuel-capable platforms');
+    if (fuelCapablePlatforms.length > 0) {
+      console.log('🔍 FUEL-CAPABLE EXAMPLES:', fuelCapablePlatforms.slice(0, 5).map(p => ({
+        name: p.name,
+        lat: p.lat,
+        lng: p.lng,
+        fuelAvailable: p.fuelAvailable
+      })));
+    }
     
     // Then filter for corridor proximity
     console.log('🔍 CORRIDOR SEARCH: Checking corridor proximity...');
+    console.log('🔍 CORRIDOR DETAILS:', {
+      startPoint: corridor.startPoint,
+      endPoint: corridor.endPoint,
+      maxOffTrack: corridor.maxOffTrack,
+      minFromStart: corridor.minFromStart,
+      segmentsCount: corridor.segments?.length
+    });
+    
+    let rejectionCount = 0;
     const finalCandidates = fuelCapablePlatforms.filter(platform => {
       const inCorridor = this.corridorSearcher.isPlatformInCorridor(platform, corridor);
-      if (!inCorridor && Math.random() < 0.05) { // Log 5% of out-of-corridor platforms
-        console.log(`❌ OUT OF CORRIDOR: ${platform.name} at [${platform.coordinates?.[1]}, ${platform.coordinates?.[0]}]`);
+      // Only log the first few rejections to avoid spam
+      if (!inCorridor && rejectionCount < 3) {
+        console.log(`❌ OUT OF CORRIDOR: ${platform.name} at lat=${platform.lat}, lng=${platform.lng}`);
+        rejectionCount++;
+      } else if (inCorridor) {
+        console.log(`✅ IN CORRIDOR: ${platform.name} at lat=${platform.lat}, lng=${platform.lng}`);
       }
       return inCorridor;
     });

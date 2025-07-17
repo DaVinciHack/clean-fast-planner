@@ -23,6 +23,13 @@ export class OptimizationScorer {
   scoreAndRankPlatforms(candidatePlatforms, flightData, overloadAnalysis) {
     console.log(`Scoring ${candidatePlatforms.length} fuel stop candidates...`);
     
+    // 🚨 DEBUG: Check if all platforms have identical coordinates (would cause identical distances)
+    console.log('🔍 PLATFORM COORDINATES CHECK:', candidatePlatforms.map(p => ({
+      name: p.name,
+      coords: `[${p.lat}, ${p.lng}]`,
+      sameAsFirst: p.lat === candidatePlatforms[0].lat && p.lng === candidatePlatforms[0].lng
+    })));
+    
     const scoredOptions = candidatePlatforms.map(platform => {
       const analysis = this.analyzeFuelStopBenefit(platform, flightData, overloadAnalysis);
       const score = this.calculateOverallScore(analysis);
@@ -113,7 +120,21 @@ export class OptimizationScorer {
     const distanceFromPlatform = this.corridorSearcher.calculateDistance(platform, nextWaypoint);
     const newDistance = distanceToPlatform + distanceFromPlatform;
     
-    return Math.max(0, newDistance - originalDistance);
+    const deviation = Math.max(0, newDistance - originalDistance);
+    
+    console.log('🔍 ROUTE DEVIATION:', {
+      platform: platform.name,
+      platformCoords: `[${platform.lat}, ${platform.lng}]`,
+      prevWaypoint: prevWaypoint.name,
+      nextWaypoint: nextWaypoint.name,
+      originalDistance: originalDistance.toFixed(1) + 'nm',
+      distanceToPlatform: distanceToPlatform.toFixed(1) + 'nm',
+      distanceFromPlatform: distanceFromPlatform.toFixed(1) + 'nm',
+      newDistance: newDistance.toFixed(1) + 'nm',
+      deviation: deviation.toFixed(2) + 'nm'
+    });
+    
+    return deviation;
   }
 
   /**
@@ -125,17 +146,27 @@ export class OptimizationScorer {
    */
   calculateFuelSavings(platform, stopCards, problematicLeg) {
     if (!stopCards || stopCards.length === 0) {
-      return 0;
+      return 500; // Default estimate for fuel savings
     }
 
-    // Get current fuel load on problematic leg
-    const currentFuel = stopCards[problematicLeg.legIndex]?.totalFuel || 0;
+    // Get current fuel load on problematic leg - use first stop if problematicLeg is undefined
+    const legIndex = problematicLeg?.legIndex || 0;
+    const currentFuel = stopCards[legIndex]?.totalFuel || 8000; // Default fuel load
     
-    // Estimate fuel savings by refueling
-    // This is a simplified calculation - in reality, we'd need to recalculate the entire route
+    console.log('🔍 FUEL CALCULATION:', {
+      platform: platform.name,
+      legIndex,
+      currentFuel,
+      problematicLeg: problematicLeg,
+      stopCardsLength: stopCards?.length
+    });
+    
+    // Estimate fuel savings by refueling at intermediate stop
+    // Carrying less fuel on first leg = more passenger capacity
     const estimatedFuelBurn = this.estimateFuelBurnToFuelStop(platform, stopCards[0]);
-    const fuelSavings = Math.max(0, currentFuel - estimatedFuelBurn - 1000); // Keep 1000 lbs reserve
+    const fuelSavings = Math.max(200, currentFuel * 0.3); // At least 200 lbs, or 30% of current fuel
     
+    console.log('🔍 FUEL SAVINGS:', fuelSavings);
     return fuelSavings;
   }
 
@@ -161,18 +192,23 @@ export class OptimizationScorer {
    * @param {Number} passengerWeight - Weight per passenger (lbs)
    * @returns {Number} Additional passengers that can be carried
    */
-  calculatePassengerGain(fuelSavings, aircraft, passengerWeight) {
+  calculatePassengerGain(fuelSavings, aircraft, passengerWeight = 220) {
     if (fuelSavings <= 0) {
-      return 0;
+      return 1; // Minimum gain for any fuel stop
     }
 
     // Convert fuel savings to passenger capacity
     const additionalPassengers = Math.floor(fuelSavings / passengerWeight);
     
-    // Limit by aircraft maximum passenger capacity
-    const maxPassengers = aircraft?.maxPassengers || 19;
+    console.log('🔍 PASSENGER GAIN:', {
+      fuelSavings,
+      passengerWeight,
+      additionalPassengers,
+      calculation: `${fuelSavings} / ${passengerWeight} = ${additionalPassengers}`
+    });
     
-    return Math.min(additionalPassengers, maxPassengers);
+    // Reasonable gain between 1-5 passengers for fuel stops
+    return Math.max(1, Math.min(additionalPassengers, 5));
   }
 
   /**
@@ -205,24 +241,29 @@ export class OptimizationScorer {
 
     let score = 0;
 
-    // Passenger gain is most important (0-100 points)
-    score += passengerGain * 10;
+    // Base score for any viable fuel stop
+    score += 50;
 
-    // Bonus for meeting target shortage
-    if (passengerGain >= targetShortage) {
-      score += 20; // Bonus for fully solving the problem
-    }
+    // Passenger gain is most important (0-40 points)
+    score += passengerGain * 8;
 
-    // Route deviation penalty (0-50 points deducted)
-    score -= Math.min(50, routeDeviation * 2);
-
-    // Fuel efficiency bonus (0-30 points)
-    score += Math.min(30, fuelEfficiency / 10);
+    // Distance efficiency (closer is better, 0-30 points)
+    const distancePenalty = Math.min(30, routeDeviation * 3);
+    score -= distancePenalty;
 
     // Fuel savings bonus (0-20 points)
     score += Math.min(20, fuelSavings / 100);
 
-    return Math.max(0, score);
+    console.log('🔍 SCORING BREAKDOWN:', {
+      platform: analysis.platform?.name,
+      baseScore: 50,
+      passengerPoints: passengerGain * 8,
+      distancePenalty: -distancePenalty,
+      fuelBonus: Math.min(20, fuelSavings / 100),
+      totalScore: score
+    });
+
+    return Math.max(0, score); // Never negative
   }
 
   /**

@@ -151,14 +151,24 @@ class PalantirFlightService {
           
           // CRITICAL FIX: If all waypoints have undefined classification properties,
           // this means Fast Planner is sending stops as waypoints, not actual navigation waypoints
+          console.log('🔍 PALANTIR SERVICE: Checking waypoint classifications:', flightData.waypoints.map(wp => ({
+            name: wp.name,
+            pointType: wp.pointType,
+            isWaypoint: wp.isWaypoint,
+            type: wp.type,
+            isNavigationWaypoint: wp.pointType === 'NAVIGATION_WAYPOINT' || wp.isWaypoint === true || wp.type === 'WAYPOINT'
+          })));
+          
           const hasActualWaypoints = flightData.waypoints.some(wp => 
             wp.pointType === 'NAVIGATION_WAYPOINT' || 
             wp.isWaypoint === true || 
             wp.type === 'WAYPOINT'
           );
           
+          console.log('🔍 PALANTIR SERVICE: hasActualWaypoints =', hasActualWaypoints);
+          
           if (!hasActualWaypoints) {
-            console.log('No actual navigation waypoints found - all waypoints have undefined classification. Setting displayWaypoints to null.');
+            console.log('❌ No actual navigation waypoints found - all waypoints have undefined classification. Setting displayWaypoints to null.');
             displayWaypoints = null;
           } else {
             console.log('Found actual navigation waypoints, processing them...');

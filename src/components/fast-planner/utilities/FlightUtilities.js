@@ -7,7 +7,7 @@ import StopCardCalculator from '../modules/calculations/flight/StopCardCalculato
  * Generate stop cards data using StopCardCalculator - single source of truth
  */
 export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, weather, fuelPolicy, options = {}, weatherSegments = null) => {
-  console.log('🎯 generateStopCardsData: Using StopCardCalculator directly - single source of truth');
+  // Using StopCardCalculator directly - single source of truth
   
   // Get fuel policy for reserve fuel conversion
   const currentPolicy = fuelPolicy?.currentPolicy;
@@ -50,7 +50,8 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
     alternateStopCard  // 🔧 SAR FIX: Pass alternate card to main calculation
   );
   
-  console.log('✅ generateStopCardsData: StopCardCalculator returned', stopCards?.length || 0, 'cards');
+  
+  // Return stop cards from StopCardCalculator
   
   // 🚨 AVIATION SAFETY: If StopCardCalculator returns empty array, CLEAR ALL FUEL DATA
   if (!stopCards || stopCards.length === 0) {
@@ -69,35 +70,58 @@ export const generateStopCardsData = (waypoints, routeStats, selectedAircraft, w
   
   // Calculate header totals from stop cards ONLY if we have valid data
   if (stopCards && stopCards.length > 0) {
-    calculateHeaderTotals(stopCards);
+    calculateHeaderTotals(stopCards, routeStats);
   }
   
   return stopCards || [];
 };
 
 /**
- * Calculate header totals from stop cards
+ * Calculate header totals from stop cards and route stats
  */
-const calculateHeaderTotals = (stopCards) => {
+const calculateHeaderTotals = (stopCards, routeStats) => {
   let totalFuel = 0;
   let totalDistance = 0;
   let totalTime = 0;
   let maxPassengers = 0;
   
+  // Use route stats as primary source for distance and time
+  if (routeStats) {
+    totalDistance = Number(routeStats.totalDistance) || 0;
+    totalTime = Number(routeStats.timeHours) || Number(routeStats.estimatedTime) || 0;
+    
+    console.log('📊 Using route stats for header totals:', {
+      totalDistance: routeStats.totalDistance,
+      timeHours: routeStats.timeHours,
+      estimatedTime: routeStats.estimatedTime
+    });
+  } else {
+    // Fallback: Calculate from stop cards if route stats not available
+    console.log('📊 Fallback: Calculating totals from stop cards');
+    stopCards.forEach((card, index) => {
+      if (!card) {
+        console.warn(`⚠️ Null card at index ${index}`);
+        return;
+      }
+      if (card.legDistance) totalDistance += Number(card.legDistance) || 0;
+      if (card.legTime) totalTime += Number(card.legTime) || 0;
+    });
+  }
+  
+  // Always calculate fuel and passengers from stop cards
   stopCards.forEach((card, index) => {
     if (!card) {
       console.warn(`⚠️ Null card at index ${index}`);
       return;
     }
     if (card.totalFuel) totalFuel += Number(card.totalFuel) || 0;
-    if (card.distance) totalDistance += Number(card.distance) || 0;
-    if (card.time) totalTime += Number(card.time) || 0;
     if (card.maxPassengers) maxPassengers = Math.max(maxPassengers, Number(card.maxPassengers) || 0);
   });
   
   console.log('📊 generateStopCardsData: Updated header totals:', {
     totalDistance: Math.round(totalDistance * 10) / 10,
     totalFuel: Math.round(totalFuel),
+    totalTime: Math.round(totalTime * 100) / 100,
     maxPassengers: maxPassengers
   });
   

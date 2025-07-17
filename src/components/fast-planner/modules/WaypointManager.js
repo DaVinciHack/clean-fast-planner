@@ -1901,10 +1901,10 @@ class WaypointManager {
       this.triggerCallback('onRouteUpdated', { waypoints: this.waypoints, coordinates: coordinates });
       this.triggerCallback('onChange', this.waypoints);
       
-      // Also update global state for components that depend on it
-      if (window.routeCalculator && typeof window.routeCalculator.calculateDistanceOnly === 'function') {
-        window.routeCalculator.calculateDistanceOnly(coordinates);
-      }
+      // 🚀 WAYPOINT MODE FIX: Don't call calculateDistanceOnly - let the main useEffect handle full route calculation
+      // The onChange callback above will trigger the main useEffect with waypoints dependency,
+      // which will call calculateRouteStats() for full fuel/time/distance calculations
+      // Removed calculateDistanceOnly() call to avoid bypassing the main calculation pipeline
     } else {
       // No waypoints or only one, remove route display
       // ENHANCED CLEANUP: Remove ALL route-related layers and sources including shadows and drag detection

@@ -30,7 +30,13 @@ import { FavoriteLocationsManager } from '../modules';
  * Core component that uses all contexts to render the UI
  * and handle user interactions.
  */
-const FastPlannerCore = ({ mapManagerRef, appManagers }) => {
+const FastPlannerCore = ({ 
+  mapManagerRef, 
+  appManagers,
+  stopCards = [],
+  setStopCards,
+  weather = {}
+}) => {
   // Get data from Region context
   const { 
     regions, 
@@ -294,6 +300,8 @@ const FastPlannerCore = ({ mapManagerRef, appManagers }) => {
         routeStats={routeStats}
         selectedAircraft={selectedAircraft}
         waypoints={waypoints}
+        weather={weather}
+        stopCards={stopCards}
         deckTimePerStop={flightSettings.deckTimePerStop}
         deckFuelPerStop={flightSettings.deckFuelPerStop}
         passengerWeight={flightSettings.passengerWeight}

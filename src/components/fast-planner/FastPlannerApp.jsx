@@ -704,30 +704,35 @@ const FastPlannerCore = ({
           debugLog(DEBUG_ROUTE, '🗺️ WAYPOINT MODE: Using all waypoints for route calculation (no landing stops)');
         }
         
-        if (coordinatesForRouteCalc && coordinatesForRouteCalc.length >= 2) {
-          const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinatesForRouteCalc, {
-            selectedAircraft,
-            weather,
-            payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
-            reserveFuel: flightSettings.reserveFuel || 0
-          });
-          
-          if (newRouteStats) {
-            // 🔧 CRITICAL FIX: Don't override route stats if refuel stops are active
-            // Let the fuel calculation system manage route optimization when refuel configured
-            if (currentRefuelStops.length === 0) {
-              setRouteStats(newRouteStats);
-              debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Updated route stats (no refuel stops)');
-            } else {
-              // CRITICAL: Set route stats anyway on first load to prevent time clearing
-              if (!routeStats || !routeStats.totalDistance) {
-                debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: First load with refuel stops - setting route stats to prevent time clearing');
-                setRouteStats(newRouteStats);
-              }
-              debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Skipping route stats update (refuel stops active)');
-            }
-          }
-        }
+        // 🚨 LEGACY SYSTEM - DO NOT UNCOMMENT
+        // This RouteCalculator call was interfering with StopCardCalculator 
+        // StopCardCalculator handles all route calculations correctly (including navigation waypoints)
+        // RouteCalculator is still used by: WeatherCirclesLayer, AlternateRoutes
+        // But for main route stats, StopCardCalculator is the single source of truth
+        // if (coordinatesForRouteCalc && coordinatesForRouteCalc.length >= 2) {
+        //   const newRouteStats = appManagers.routeCalculatorRef.current.calculateRouteStats(coordinatesForRouteCalc, {
+        //     selectedAircraft,
+        //     weather,
+        //     payloadWeight: (flightSettings.passengerWeight || 0) + (flightSettings.cargoWeight || 0),
+        //     reserveFuel: flightSettings.reserveFuel || 0
+        //   });
+        //   
+        //   if (newRouteStats) {
+        //     // 🔧 CRITICAL FIX: Don't override route stats if refuel stops are active
+        //     // Let the fuel calculation system manage route optimization when refuel configured
+        //     if (currentRefuelStops.length === 0) {
+        //       setRouteStats(newRouteStats);
+        //       debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Updated route stats (no refuel stops)');
+        //     } else {
+        //       // CRITICAL: Set route stats anyway on first load to prevent time clearing
+        //       if (!routeStats || !routeStats.totalDistance) {
+        //         debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: First load with refuel stops - setting route stats to prevent time clearing');
+        //         setRouteStats(newRouteStats);
+        //       }
+        //       debugLog(DEBUG_ROUTE, '🗺️ AUTO-CALC: Skipping route stats update (refuel stops active)');
+        //     }
+        //   }
+        // }
       } else {
       }
 
