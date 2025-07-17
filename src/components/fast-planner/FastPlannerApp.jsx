@@ -252,6 +252,9 @@ const FastPlannerCore = ({
   // State for weather-based fuel calculations
   const [weatherFuel, setWeatherFuel] = useState({ araFuel: 0, approachFuel: 0 });
   
+  // ✅ NUCLEAR RESET: Component key for forcing complete remounts
+  const [componentKey, setComponentKey] = useState(0);
+  
   // Phone layout detection - PHONE ONLY (≤480px, not iPad)
   const [isPhoneLayout, setIsPhoneLayout] = useState(false);
   
@@ -335,8 +338,15 @@ const FastPlannerCore = ({
     aircraftLoading, changeAircraftType, changeAircraftRegistration,
     setAircraftManagers, setCurrentAircraftRegion
   } = useAircraft({
-    aircraftManagerRef, appSettingsManagerRef, setFlightSettings
+    aircraftManagerRef, appSettingsManagerRef, setFlightSettings, fuelPolicy
   });
+  
+  // 🔍 DEBUG: Only log wrong fuel policy
+  useEffect(() => {
+    if (fuelPolicy?.currentPolicy?.name === "Norway Line Flights V2") {
+      console.log('🚨 FASTPLANNERAPP WRONG POLICY:', fuelPolicy?.currentPolicy?.name);
+    }
+  }, [fuelPolicy?.currentPolicy]);
   
   useEffect(() => {
     if (aircraftManagerRef.current && appSettingsManagerRef.current) {
@@ -1954,6 +1964,10 @@ const FastPlannerCore = ({
     if (flightData === null) {
       console.log('🧹 handleFlightLoad: NULL FLIGHT DATA - Clearing all state for automation');
       
+      // ✅ NUCLEAR RESET: Increment componentKey to force complete component remount
+      setComponentKey(prev => prev + 1);
+      console.log('🚨 NUCLEAR RESET: ComponentKey incremented for automation clearing');
+      
       // Clear all state (same as comprehensive reset but no waypoint loading)
       setCurrentRefuelStops([]);
       setPendingRefuelStops(null);
@@ -1994,6 +2008,10 @@ const FastPlannerCore = ({
     // 🚨 CRITICAL: COMPREHENSIVE STATE RESET - Clear ALL state before loading new flight
     console.log('🧹 COMPREHENSIVE RESET: Clearing all state for new flight load');
     
+    // ✅ NUCLEAR RESET: Increment componentKey to force complete component remount
+    setComponentKey(prev => prev + 1);
+    console.log('🚨 NUCLEAR RESET: ComponentKey incremented - forcing component remount');
+    
     // 1. Refuel state
     setCurrentRefuelStops([]); // Clear current refuel stops
     setPendingRefuelStops(null); // Clear pending refuel stops
@@ -2019,40 +2037,39 @@ const FastPlannerCore = ({
     setSarData(null); // Clear SAR data
     setWaiveAlternates(false); // Reset waive alternates
     
-    // 6. SMOOTH TRANSITION: Clear waypoints and stopCards with minimal delay
-    console.log('🧹 WAYPOINTS RESET: Clearing all waypoints before new flight load');
+    // 6. IMMEDIATE RESET: Clear waypoints and stopCards synchronously (no race conditions)
+    console.log('🧹 WAYPOINTS & STOPCARDS RESET: Immediate synchronous clearing');
+    setWaypoints([]);
+    setStopCards([]);
     
-    // Add a tiny delay to make the transition smoother
-    setTimeout(() => {
-      setWaypoints([]);
-      setStopCards([]); // Clear after tiny delay to reduce flash
-    }, 10);
-    
-    // 7. SMOOTH TRANSITION: StopCards cleared with waypoints above
-    console.log('🧹 STOPCARDS RESET: Preparing for smooth stopCard transition');
-    
-    // 8. Clear route stats (will be recalculated)
-    setRouteStats(null);
-    
-    // 9. Clear temp fuel object cache
+    // 8. Clear temp fuel object cache
     const { FuelSaveBackService } = await import('./services/FuelSaveBackService');
     if (FuelSaveBackService._tempExistingFuelObject) {
       console.log('🧹 CACHE CLEAR: Clearing temp fuel object cache');
       delete FuelSaveBackService._tempExistingFuelObject;
     }
     
-    // 10. Force recalculation with clean state
-    setForceUpdate(prev => prev + 1); // Force recalculation with clean fuel state
+    // 9. CRITICAL: Reset managers to clear their internal state
+    console.log('🧹 MANAGER RESET: Clearing manager states');
+    if (appManagers.waypointManagerRef?.current) {
+      appManagers.waypointManagerRef.current.clearRoute();
+      appManagers.waypointManagerRef.current.clearAlternateRouteData();
+    }
+    if (appManagers.mapManagerRef?.current) {
+      // Clear any map-specific cache if needed
+    }
     
-    // 11. CRITICAL: Allow all state clearing to complete before continuing
-    console.log('🧹 STATE RESET: Waiting for all state clearing to complete...');
-    await new Promise(resolve => setTimeout(resolve, 20)); // Minimal delay to prevent glitching
+    // 10. NUCLEAR RESET: Clear absolutely everything and force complete re-render
+    console.log('🚨 NUCLEAR RESET: Forcing complete component re-render');
     
-    // RESET LOADING STATE: Always reset to false first, then set to true
+    // Reset loading state
     setIsActuallyLoading(false);
     
-    // Small delay to ensure state update
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Force multiple renders to clear any cached state
+    setForceUpdate(prev => prev + 1);
+    
+    // 🚨 COMPONENT REMOUNT: Force EnhancedStopCardsContainer to completely remount
+    setComponentKey(prev => prev + 1); // This will force complete remount if we add a key prop
     
     // Now set to true for this load
     setIsActuallyLoading(true);
@@ -2099,10 +2116,10 @@ const FastPlannerCore = ({
           if (matchingAircraft) {
             console.log('🛩️ FLIGHT LOAD: Found matching aircraft:', matchingAircraft.registration, 'type:', matchingAircraft.modelType);
             
-            // ROBUST AIRCRAFT SELECTION: Set all aircraft state directly
+            // ROBUST AIRCRAFT SELECTION: Use proper functions to trigger reserve fuel calculation
             setAircraftType(matchingAircraft.modelType);
-            setAircraftRegistration(matchingAircraft.registration);
-            setSelectedAircraft(matchingAircraft);
+            changeAircraftRegistration(matchingAircraft.registration); // This calculates reserve fuel
+            // setSelectedAircraft is called by changeAircraftRegistration
             
             console.log('🛩️ FLIGHT LOAD: Aircraft state set directly:', {
               type: matchingAircraft.modelType,
@@ -4369,6 +4386,7 @@ const FastPlannerCore = ({
           onSARUpdate={handleSARUpdate} // Add SAR update handler
           sarData={sarData} // Pass SAR calculation data
           ref={rightPanelRef} // Add ref to access card change functionality
+          componentKey={componentKey} // ✅ NUCLEAR RESET: Force component remount on state contamination
         />
       </div>
 
@@ -4447,6 +4465,7 @@ const FastPlannerApp = () => {
   }, [waypoints]);
   const [routeStats, setRouteStats] = useState(null);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [componentKey, setComponentKey] = useState(0); // For forcing complete remounts
   const [routeInput, setRouteInput] = useState('');
   const [reserveMethod, setReserveMethod] = useState('fixed');
   const [alternateRouteData, setAlternateRouteData] = useState(null);

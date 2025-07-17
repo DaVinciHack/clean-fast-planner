@@ -9,7 +9,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 const useAircraft = ({
   aircraftManagerRef,
   appSettingsManagerRef,
-  setFlightSettings
+  setFlightSettings,
+  fuelPolicy = null
 }) => {
   // Internal refs to store the actual manager instances
   const aircraftManagerInstanceRef = useRef(null);
@@ -362,9 +363,32 @@ const useAircraft = ({
           
           // 📝 TODO: Add other OSDK aircraft fuel values here when available:
           // - Aircraft-specific taxi fuel from OSDK (if available)
-          // - Aircraft-specific reserve fuel from OSDK (if available) 
           // - Aircraft-specific contingency percent from OSDK (if available)
           // - Aircraft-specific deck time from OSDK (if available)
+          
+          // ✅ IMMEDIATE RESERVE FUEL CALCULATION: Update reserve fuel when aircraft changes
+          if (fuelPolicy && fuelPolicy.currentPolicy && aircraft.fuelBurn) {
+            const reserveType = fuelPolicy.currentPolicy.fuelTypes?.reserveFuel?.type || 'fixed';
+            const policyValue = fuelPolicy.currentPolicy.fuelTypes?.reserveFuel?.default || 0;
+            
+            let calculatedReserveFuel = 0;
+            if (reserveType === 'time' && aircraft.fuelBurn) {
+              // Time-based: time (minutes) × fuel flow (lbs/hour) ÷ 60
+              const timeMinutes = policyValue;
+              const fuelFlowPerHour = aircraft.fuelBurn;
+              calculatedReserveFuel = Math.round((timeMinutes * fuelFlowPerHour) / 60);
+              console.log(`🔄 AIRCRAFT CHANGE: Calculated reserve fuel from time: ${timeMinutes} min × ${fuelFlowPerHour} lbs/hr = ${calculatedReserveFuel} lbs`);
+            } else {
+              // Fixed amount - the policy value is already in lbs
+              calculatedReserveFuel = policyValue;
+              console.log(`🔄 AIRCRAFT CHANGE: Using fixed reserve fuel: ${calculatedReserveFuel} lbs`);
+            }
+            
+            updates.reserveFuel = calculatedReserveFuel;
+            console.log(`✅ AIRCRAFT CHANGE: Updated reserveFuel to ${calculatedReserveFuel} lbs`);
+          } else {
+            console.log('⚠️ AIRCRAFT CHANGE: Cannot calculate reserve fuel - missing fuelPolicy or aircraft.fuelBurn');
+          }
           
           console.log('🛠️ FINAL FLIGHT SETTINGS UPDATE:', updates);
           return updates;
@@ -387,7 +411,7 @@ const useAircraft = ({
         handleLoadAircraftSettings(aircraft);
       }
     }
-  }, [aircraftType, aircraftsByType]);
+  }, [aircraftType, aircraftsByType, fuelPolicy?.currentPolicy?.uuid]);
 
   // ARCHITECTURAL FIX: Clean return object
   const returnObject = {

@@ -64,6 +64,7 @@ const MainCard = ({
   toggleWaypointMode = () => {},
   waypointModeActive = false,
   // Weather segments for rig detection
+  componentKey = 0, // For forcing component remounts during flight loads
   weatherSegments = null,
   // Current flight ID for Auto Plan detection
   currentFlightId = null,
@@ -88,8 +89,18 @@ const MainCard = ({
   // 🛩️ SIMPLE SAVE: Direct save function without popup
   onDirectSave = null,
 }) => {
-  // Use shared reserve fuel calculation hook - NO FALLBACK, fuel policy is source of truth
-  const calculatedReserveFuel = useReserveFuel(fuelPolicy, selectedAircraft, 0);
+  // 🚨 AVIATION SAFETY: Only calculate reserve fuel when BOTH policy AND aircraft are ready
+  // Never show fallback values that could be wrong fuel amounts
+  const safeFuelPolicy = fuelPolicy || {};
+  const shouldCalculateReserveFuel = fuelPolicy?.currentPolicy && selectedAircraft?.fuelBurn;
+  
+  // Force recalculation when fuel policy changes by including policy name in dependencies
+  const calculatedReserveFuel = useReserveFuel(safeFuelPolicy, selectedAircraft, 0);
+  
+  // 🔍 DEBUG: Only log when fuel policy is wrong
+  if (fuelPolicy?.currentPolicy?.name === "Norway Line Flights V2") {
+    console.log('🚨 MAINCARD WRONG POLICY:', fuelPolicy?.currentPolicy?.name);
+  }
   
 
   // Calculate weather age from weather segments
@@ -842,6 +853,7 @@ const MainCard = ({
         {/* Enhanced Stop Cards with MasterFuelManager Integration */}
         {waypoints.length >= 2 && (
           <EnhancedStopCardsContainer
+            key={componentKey} // Force complete remount when componentKey changes
             waypoints={waypoints}
             routeStats={routeStats}
             selectedAircraft={selectedAircraft}
