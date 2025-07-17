@@ -25,6 +25,36 @@ const FlightAutomationLoader = ({
   const [lastRealProgress, setLastRealProgress] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
   const simulationIntervalRef = useRef(null);
+  
+  // Timeout handling
+  const timeoutRef = useRef(null);
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
+  
+  // Step counter for unique keys
+  const stepCounterRef = useRef(0);
+
+  // Handle timeout after 145 seconds  
+  const handleTimeout = useCallback(() => {
+    setTimeoutOccurred(true);
+    setHasError(true);
+    setCurrentMessage('Save + automation timed out');
+    setCurrentDetail('The save and automation process took longer than expected and has been cancelled');
+    setErrorMessage(
+      'The save + automation process exceeded the 145-second limit. This may be due to:\n\n' +
+      '• Network connectivity issues\n' +
+      '• Palantir service delays\n' +
+      '• Missing or invalid flight data\n' +
+      '• Fuel calculation validation errors\n\n' +
+      'Please check your connection and try again. If the problem persists, ' +
+      'verify that all required flight information is complete and valid.'
+    );
+    
+    // Stop simulation
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
+  }, []);
 
   // Initialize default state
   const initializeDefaultState = () => {
@@ -37,11 +67,21 @@ const FlightAutomationLoader = ({
     setErrorMessage('');
     setAutomationSteps([]);
     setIsSimulating(false);
+    setTimeoutOccurred(false);
+    
+    // Reset step counter
+    stepCounterRef.current = 0;
     
     // Clear any existing simulation
     if (simulationIntervalRef.current) {
       clearInterval(simulationIntervalRef.current);
       simulationIntervalRef.current = null;
+    }
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
   };
 
@@ -94,7 +134,6 @@ const FlightAutomationLoader = ({
 
   // Handle progress updates from external automation
   const handleProgressUpdate = useCallback((progressData) => {
-    console.log('🚀 FlightAutomationLoader: Received progress update:', progressData);
     
     const { type, message, detail, progress: newProgress, result, error } = progressData;
     
@@ -114,8 +153,10 @@ const FlightAutomationLoader = ({
     
     // Add this step to our history
     setAutomationSteps(prevSteps => {
+      // Generate unique ID using counter
+      stepCounterRef.current += 1;
       const newStep = {
-        id: Date.now(),
+        id: `step-${stepCounterRef.current}`,
         message,
         detail,
         progress: newProgress,
@@ -146,6 +187,11 @@ const FlightAutomationLoader = ({
         stopSimulation(); // Stop any simulation
         setProgress(100); // Jump to 100%
         setIsCompleted(true);
+        // Clear timeout on successful completion
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         // Mark the final step as completed
         setAutomationSteps(prevSteps => {
           if (prevSteps.length > 0) {
@@ -168,6 +214,11 @@ const FlightAutomationLoader = ({
         stopSimulation(); // Stop any simulation
         setHasError(true);
         setErrorMessage(detail);
+        // Clear timeout on error
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         // Auto-close after showing error
         setTimeout(() => {
           onComplete?.();
@@ -188,15 +239,11 @@ const FlightAutomationLoader = ({
   }, []); // Empty dependency array - only run once
 
   useEffect(() => {
-    console.log('🚀 FlightAutomationLoader useEffect triggered:', { isVisible, flightNumber, departureIcao, destinationIcao });
     if (!isVisible) {
-      console.log('🚀 FlightAutomationLoader: Not visible, returning early');
       // RESET STATE: Always reset when becoming invisible
       initializeDefaultState();
       return;
     }
-    
-    console.log('🚀 FlightAutomationLoader: Starting automation display');
     
     // FRESH START: Always reset state when starting new display
     initializeDefaultState();
@@ -207,7 +254,12 @@ const FlightAutomationLoader = ({
       startSimulation(0);
     }, 300); // Brief delay to let initial state settle
     
-  }, [isVisible]);
+    // Start 145-second timeout for save+automation operations  
+    timeoutRef.current = setTimeout(() => {
+      handleTimeout();
+    }, 145000); // 145 seconds for save+automation
+    
+  }, [isVisible, handleTimeout]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -215,27 +267,28 @@ const FlightAutomationLoader = ({
       if (simulationIntervalRef.current) {
         clearInterval(simulationIntervalRef.current);
       }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
   }, []);
 
   if (!isVisible) {
     return null;
   }
-  
-  console.log('🚀 FlightAutomationLoader: Rendering loader with props:', { 
-    isVisible, 
-    flightNumber, 
-    departureIcao, 
-    destinationIcao,
-    currentMessage,
-    progress,
-    isCompleted,
-    hasError 
-  });
 
   return (
     <div className="flight-automation-overlay">
       <div className="flight-automation-popup">
+        {/* Close Button */}
+        <button 
+          className="loader-close-button"
+          onClick={() => onComplete?.()}
+          aria-label="Close loader"
+        >
+          ×
+        </button>
+        
         {/* Current Step Display */}
         <div className={`current-step ${hasError ? 'error' : isCompleted ? 'completed' : 'active'}`}>
           <div className="step-info">

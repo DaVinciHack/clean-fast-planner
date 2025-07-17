@@ -25,6 +25,9 @@ import { detectLocationSegment, createSegmentFuelKey, getSegmentBoundaries } fro
 // Import fuel save service for loading saved fuel settings
 import { FuelSaveBackService } from './services/FuelSaveBackService.js';
 
+// Import centralized flight loading service
+import FlightLoader from './services/FlightLoader.js';
+
 // Import UI components
 import {
   LeftPanel,
@@ -1964,9 +1967,9 @@ const FastPlannerCore = ({
     if (flightData === null) {
       console.log('🧹 handleFlightLoad: NULL FLIGHT DATA - Clearing all state for automation');
       
-      // ✅ NUCLEAR RESET: Increment componentKey to force complete component remount
-      setComponentKey(prev => prev + 1);
-      console.log('🚨 NUCLEAR RESET: ComponentKey incremented for automation clearing');
+      // 🚨 TEMPORARILY DISABLED: Nuclear reset causing waypoint order corruption  
+      // setComponentKey(prev => prev + 1);
+      // console.log('🚨 NUCLEAR RESET: ComponentKey incremented for automation clearing');
       
       // Clear all state (same as comprehensive reset but no waypoint loading)
       setCurrentRefuelStops([]);
@@ -2008,9 +2011,9 @@ const FastPlannerCore = ({
     // 🚨 CRITICAL: COMPREHENSIVE STATE RESET - Clear ALL state before loading new flight
     console.log('🧹 COMPREHENSIVE RESET: Clearing all state for new flight load');
     
-    // ✅ NUCLEAR RESET: Increment componentKey to force complete component remount
-    setComponentKey(prev => prev + 1);
-    console.log('🚨 NUCLEAR RESET: ComponentKey incremented - forcing component remount');
+    // 🚨 TEMPORARILY DISABLED: Nuclear reset causing waypoint order corruption
+    // setComponentKey(prev => prev + 1);
+    // console.log('🚨 NUCLEAR RESET: ComponentKey incremented - forcing component remount');
     
     // 1. Refuel state
     setCurrentRefuelStops([]); // Clear current refuel stops
@@ -2024,7 +2027,19 @@ const FastPlannerCore = ({
     // 3. Flight data state
     setLoadedFlightData(null); // Clear previous flight data
     setLoadedFuelObject(null); // Clear previous fuel object
-    setCurrentFlightId(null); // Clear previous flight ID
+    
+    // 🎯 CRITICAL FIX: Only clear flight ID if loading a DIFFERENT flight
+    // This prevents creating new flights when re-saving the same flight
+    const incomingFlightId = flightData?.flightId;
+    const isDifferentFlight = incomingFlightId && currentFlightId && incomingFlightId !== currentFlightId;
+    const isNewFlight = !currentFlightId; // No current flight loaded
+    
+    if (isDifferentFlight || isNewFlight) {
+      setCurrentFlightId(null); // Only clear if different flight or no current flight
+      console.log('🎯 FLIGHT ID: Cleared because', isDifferentFlight ? 'different flight' : 'new flight');
+    } else {
+      console.log('🎯 FLIGHT ID: Preserved existing flight ID to enable updates:', currentFlightId);
+    }
     
     // 4. Alternate route state
     setAlternateStopCard(null); // Clear alternate card
@@ -2098,35 +2113,173 @@ const FastPlannerCore = ({
       
       // 🚁 CRITICAL: Set aircraft FIRST before anything else - RACE CONDITION FIX
       // This ensures stop cards have aircraft data for speed calculations
-      if (flightData.aircraftId && appManagers.aircraftManagerRef?.current) {
+      const setAircraftFromFlightData = () => {
+        if (!flightData.aircraftId) return;
+        
+        console.log('🛩️ FLIGHT LOAD: Aircraft loading requested for:', flightData.aircraftId);
+        console.log('🛩️ FLIGHT LOAD: Aircraft manager available:', !!appManagers.aircraftManagerRef?.current);
+        console.log('🛩️ FLIGHT LOAD: Aircraft list available:', !!aircraftList && aircraftList.length);
+        console.log('🛩️ FLIGHT LOAD: Aircraft loading state:', aircraftLoading);
+        
+        if (appManagers.aircraftManagerRef?.current) {
         try {
           console.log('🛩️ FLIGHT LOAD: Setting aircraft FIRST:', flightData.aircraftId);
+          console.log('🛩️ FLIGHT LOAD: Aircraft manager available:', !!appManagers.aircraftManagerRef.current);
+          console.log('🛩️ FLIGHT LOAD: Flight region:', flightData.region);
+          console.log('🛩️ FLIGHT LOAD: Current region:', activeRegionFromContext?.id);
+          console.log('🛩️ FLIGHT LOAD: useAircraft hook functions available:', {
+            setAircraftType: typeof setAircraftType,
+            changeAircraftRegistration: typeof changeAircraftRegistration,
+            setSelectedAircraft: typeof setSelectedAircraft,
+            currentAircraftType: aircraftType,
+            currentAircraftRegistration: aircraftRegistration,
+            currentSelectedAircraft: selectedAircraft?.registration || 'none'
+          });
           
-          // Get available aircraft using the correct method
-          const availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
+          // Try multiple methods to get aircraft - don't rely on region filtering alone
+          let availableAircraft = [];
+          
+          // Method 1: Try region-filtered aircraft
+          try {
+            availableAircraft = appManagers.aircraftManagerRef.current.filterAircraft(flightData.region);
+            console.log('🛩️ FLIGHT LOAD: Region-filtered aircraft count:', availableAircraft.length);
+          } catch (error) {
+            console.warn('🛩️ FLIGHT LOAD: Region filtering failed:', error);
+          }
+          
+          // Method 2: If region filtering fails or returns no aircraft, try all aircraft
+          if (availableAircraft.length === 0) {
+            try {
+              availableAircraft = appManagers.aircraftManagerRef.current.getAllAircraft();
+              console.log('🛩️ FLIGHT LOAD: Using all aircraft, count:', availableAircraft.length);
+            } catch (error) {
+              console.warn('🛩️ FLIGHT LOAD: Getting all aircraft failed:', error);
+            }
+          }
+          
+          // Method 3: Try current aircraftList from state as fallback
+          if (availableAircraft.length === 0 && aircraftList && aircraftList.length > 0) {
+            availableAircraft = aircraftList;
+            console.log('🛩️ FLIGHT LOAD: Using aircraftList from state, count:', availableAircraft.length);
+          }
+          
+          console.log('🛩️ FLIGHT LOAD: Available aircraft IDs:', 
+            availableAircraft.map(a => ({
+              aircraftId: a.aircraftId, 
+              id: a.id, 
+              registration: a.registration,
+              rawRegistration: a.rawRegistration,
+              name: a.name
+            })).slice(0, 5)
+          );
+          
+          console.log('🛩️ FLIGHT LOAD: Looking for aircraft with ID:', flightData.aircraftId);
           
           const matchingAircraft = availableAircraft.find(aircraft => {
-            return aircraft.aircraftId === flightData.aircraftId || 
-                   aircraft.id === flightData.aircraftId ||
-                   aircraft.rawRegistration === flightData.aircraftId ||  // Use rawRegistration!
-                   aircraft.registration === flightData.aircraftId ||
-                   aircraft.name === flightData.aircraftId;
+            // Convert flightData.aircraftId to string and number for comparison
+            const flightAircraftId = flightData.aircraftId;
+            const flightAircraftIdNum = parseInt(flightAircraftId);
+            const flightAircraftIdStr = String(flightAircraftId);
+            
+            const matches = aircraft.aircraftId === flightAircraftId || 
+                           aircraft.id === flightAircraftId ||
+                           aircraft.aircraftId === flightAircraftIdNum ||  // Number comparison
+                           aircraft.id === flightAircraftIdNum ||         // Number comparison
+                           aircraft.aircraftId === flightAircraftIdStr ||  // String comparison
+                           aircraft.id === flightAircraftIdStr ||         // String comparison
+                           aircraft.rawRegistration === flightAircraftId ||
+                           aircraft.registration === flightAircraftId ||
+                           aircraft.name === flightAircraftId;
+            
+            if (matches) {
+              console.log('🛩️ FLIGHT LOAD: Found match using field:', {
+                aircraftId: aircraft.aircraftId === flightAircraftId ? 'aircraftId' : null,
+                id: aircraft.id === flightAircraftId ? 'id' : null,
+                aircraftIdNum: aircraft.aircraftId === flightAircraftIdNum ? 'aircraftId (number)' : null,
+                idNum: aircraft.id === flightAircraftIdNum ? 'id (number)' : null,
+                aircraftIdStr: aircraft.aircraftId === flightAircraftIdStr ? 'aircraftId (string)' : null,
+                idStr: aircraft.id === flightAircraftIdStr ? 'id (string)' : null,
+                rawRegistration: aircraft.rawRegistration === flightAircraftId ? 'rawRegistration' : null,
+                registration: aircraft.registration === flightAircraftId ? 'registration' : null,
+                name: aircraft.name === flightAircraftId ? 'name' : null
+              });
+              
+              console.log('🛩️ FLIGHT LOAD: Matched aircraft details:', {
+                aircraftId: aircraft.aircraftId,
+                id: aircraft.id,
+                registration: aircraft.registration,
+                name: aircraft.name,
+                flightDataAircraftId: flightAircraftId,
+                flightDataAircraftIdType: typeof flightAircraftId
+              });
+            }
+            
+            return matches;
           });
           
           if (matchingAircraft) {
             console.log('🛩️ FLIGHT LOAD: Found matching aircraft:', matchingAircraft.registration, 'type:', matchingAircraft.modelType);
+            console.log('🛩️ FLIGHT LOAD: Aircraft data:', {
+              aircraftId: matchingAircraft.aircraftId,
+              registration: matchingAircraft.registration,
+              modelType: matchingAircraft.modelType,
+              cruiseSpeed: matchingAircraft.cruiseSpeed,
+              fuelBurn: matchingAircraft.fuelBurn,
+              defaultFuelPolicyName: matchingAircraft.defaultFuelPolicyName
+            });
             
             // ROBUST AIRCRAFT SELECTION: Use proper functions to trigger reserve fuel calculation
+            console.log('🛩️ FLIGHT LOAD: Setting aircraft type:', matchingAircraft.modelType);
             setAircraftType(matchingAircraft.modelType);
-            changeAircraftRegistration(matchingAircraft.registration); // This calculates reserve fuel
-            // setSelectedAircraft is called by changeAircraftRegistration
             
-            console.log('🛩️ FLIGHT LOAD: Aircraft state set directly:', {
-              type: matchingAircraft.modelType,
-              registration: matchingAircraft.registration,
-              cruiseSpeed: matchingAircraft.cruiseSpeed,
-              fuelBurn: matchingAircraft.fuelBurn
-            });
+            console.log('🛩️ FLIGHT LOAD: About to change aircraft registration:', matchingAircraft.registration);
+            console.log('🛩️ FLIGHT LOAD: Current selectedAircraft before change:', selectedAircraft?.registration);
+            console.log('🛩️ FLIGHT LOAD: changeAircraftRegistration function available:', typeof changeAircraftRegistration);
+            
+            // Try to set aircraft directly as well as through the normal flow
+            try {
+              changeAircraftRegistration(matchingAircraft.registration); // This calculates reserve fuel and sets selectedAircraft
+              console.log('🛩️ FLIGHT LOAD: changeAircraftRegistration completed successfully');
+            } catch (error) {
+              console.error('🛩️ FLIGHT LOAD: Error in changeAircraftRegistration:', error);
+            }
+            
+            // Also set selectedAircraft directly as a backup
+            try {
+              console.log('🛩️ FLIGHT LOAD: Setting selectedAircraft directly as backup');
+              setSelectedAircraft(matchingAircraft);
+              console.log('🛩️ FLIGHT LOAD: Direct setSelectedAircraft completed');
+            } catch (error) {
+              console.error('🛩️ FLIGHT LOAD: Error in setSelectedAircraft:', error);
+            }
+            
+            console.log('🛩️ FLIGHT LOAD: Aircraft selection complete');
+            
+            // Verify the aircraft was set correctly (multiple checks)
+            setTimeout(() => {
+              console.log('🛩️ FLIGHT LOAD: Aircraft verification (after 100ms):', {
+                currentAircraftType: aircraftType,
+                currentAircraftRegistration: aircraftRegistration,
+                selectedAircraftRegistration: selectedAircraft?.registration,
+                selectedAircraftId: selectedAircraft?.aircraftId,
+                hasSelectedAircraft: !!selectedAircraft,
+                aircraftLoading: aircraftLoading
+              });
+            }, 100);
+            
+            // Double check after longer delay
+            setTimeout(() => {
+              console.log('🛩️ FLIGHT LOAD: Aircraft verification (after 500ms):', {
+                selectedAircraft: !!selectedAircraft,
+                selectedAircraftReg: selectedAircraft?.registration,
+                aircraftInStopCards: !!selectedAircraft
+              });
+              
+              if (!selectedAircraft) {
+                console.error('🚨 AIRCRAFT STILL NOT SET - This will cause stop card rendering issues');
+                console.error('🚨 Aircraft selection may have failed or state update was lost');
+              }
+            }, 500);
             
             if (window.LoadingIndicator) {
               window.LoadingIndicator.updateStatusIndicator(
@@ -2142,7 +2295,14 @@ const FastPlannerCore = ({
         } catch (error) {
           console.error('🚁 Error setting aircraft FIRST:', error);
         }
-      }
+        } else {
+          console.warn('🛩️ FLIGHT LOAD: Aircraft manager not available, aircraft will not be set');
+          console.warn('🛩️ FLIGHT LOAD: This may cause issues with fuel calculations');
+        }
+      };
+      
+      // Execute aircraft setting
+      setAircraftFromFlightData();
       
       // 🎯 GLASS MENU: Activate glass menu when flight loads
       setIsFlightLoaded(true);
@@ -2171,61 +2331,37 @@ const FastPlannerCore = ({
       if (flightData.flightId) {
         setCurrentFlightId(flightData.flightId);
         
-        // 🛩️ FUEL POLICY LOADING: Load correct fuel policy FIRST, before fuel settings processing
-        console.log('🛩️ FUEL POLICY LOADING: Starting fuel policy selection for flight');
+        // 🛩️ UNIFIED FUEL POLICY: Use centralized FlightLoader service for consistent policy resolution
+        console.log('🛩️ FUEL POLICY LOADING: Starting unified fuel policy resolution');
         console.log('🛩️ FUEL POLICY LOADING: Flight policyUuid:', flightData.policyUuid);
         console.log('🛩️ FUEL POLICY LOADING: Available policies:', fuelPolicy.availablePolicies?.length);
         
         try {
-          let selectedPolicy = null;
+          // 🔄 USE RETRY MECHANISM: Wait for fuel policies to load, then apply correct policy
+          console.log('🛩️ FUEL POLICY: Using retry mechanism to override any defaults with fuel object policy');
           
-          // Priority 1: Flight-specific policy UUID
-          if (flightData.policyUuid && fuelPolicy.availablePolicies?.length > 0) {
-            selectedPolicy = fuelPolicy.availablePolicies.find(p => p.uuid === flightData.policyUuid);
-            if (selectedPolicy) {
-              console.log('🛩️ FUEL POLICY LOADING: Found flight-specific policy:', selectedPolicy.name);
-              fuelPolicy.selectPolicy(selectedPolicy);
-            } else {
-              console.warn('🛩️ FUEL POLICY LOADING: Flight policyUuid not found in available policies');
-            }
-          }
-          
-          // Priority 2: Aircraft default policy (if no flight policy)
-          if (!selectedPolicy && selectedAircraft && fuelPolicy.availablePolicies?.length > 0) {
-            console.log('🛩️ FUEL POLICY LOADING: Using aircraft default policy for:', selectedAircraft.registration);
-            console.log('🛩️ FUEL POLICY LOADING: Aircraft defaultFuelPolicyId:', selectedAircraft.defaultFuelPolicyId);
-            console.log('🛩️ FUEL POLICY LOADING: Aircraft defaultFuelPolicyName:', selectedAircraft.defaultFuelPolicyName);
-            
-            // Try to find policy by name first (since fuel policy ID is actually the name)
-            const policyName = selectedAircraft.defaultFuelPolicyName || selectedAircraft.defaultFuelPolicyId;
-            if (policyName) {
-              selectedPolicy = fuelPolicy.availablePolicies.find(p => p.name === policyName);
-              if (selectedPolicy) {
-                console.log('🛩️ FUEL POLICY LOADING: Found aircraft policy by name:', selectedPolicy.name);
-                fuelPolicy.selectPolicy(selectedPolicy);
+          // Start the retry process asynchronously - this will override any defaults
+          FlightLoader.applyFuelPolicyWithRetry(flightData, fuelPolicy, selectedAircraft)
+            .then((success) => {
+              if (success) {
+                console.log('🛩️ FUEL POLICY: ✅ Successfully applied fuel policy from fuel object');
+                if (window.LoadingIndicator) {
+                  window.LoadingIndicator.updateStatusIndicator(
+                    `Fuel policy loaded from flight data`,
+                    'success',
+                    2000
+                  );
+                }
               } else {
-                console.warn('🛩️ FUEL POLICY LOADING: Aircraft policy not found by name:', policyName);
-                console.warn('🛩️ FUEL POLICY LOADING: Available policy names:', fuelPolicy.availablePolicies.map(p => p.name));
+                console.warn('🛩️ FUEL POLICY: ❌ Failed to apply fuel policy - using defaults');
               }
-            } else {
-              console.warn('🛩️ FUEL POLICY LOADING: Aircraft has no default policy name/id');
-            }
-          }
-          
-          if (selectedPolicy) {
-            if (window.LoadingIndicator) {
-              window.LoadingIndicator.updateStatusIndicator(
-                `Fuel policy loaded: ${selectedPolicy.name}`,
-                'success',
-                2000
-              );
-            }
-          } else {
-            console.error('🛩️ FUEL POLICY LOADING: No fuel policy could be loaded - this will cause incorrect fuel calculations!');
-          }
+            })
+            .catch((error) => {
+              console.error('🛩️ FUEL POLICY: Error applying fuel policy:', error);
+            });
           
         } catch (error) {
-          console.error('🛩️ FUEL POLICY LOADING: Error loading fuel policy:', error);
+          console.error('🛩️ FUEL POLICY: Error during fuel policy resolution:', error);
         }
         
         // 💾 FUEL LOAD-BACK: Load saved fuel data from MainFuelV2 with new OSDK v0.9.0 support
@@ -2272,30 +2408,48 @@ const FastPlannerCore = ({
               console.log('💾 FUEL LOAD-BACK: Storing fuel object for reuse:', fuelSettings.fuelObject.$primaryKey);
               setLoadedFuelObject(fuelSettings.fuelObject);
               
-              // 🛩️ FUEL POLICY LOADING: Check if fuel object has a different policy than flight data
-              if (fuelSettings.fuelObject.policyUuid || fuelSettings.fuelObject.policyName) {
-                const fuelObjectPolicyId = fuelSettings.fuelObject.policyUuid || fuelSettings.fuelObject.policyName;
-                console.log('🛩️ FUEL POLICY LOADING: Fuel object has policy, using fuel object policy:', fuelObjectPolicyId);
+              // 🛩️ FUEL POLICY PRIORITY CHECK: Only use fuel object policy if no flight or aircraft policy exists
+              const currentPolicySource = fuelPolicy.currentPolicy?.uuid;
+              const fuelObjectPolicyId = fuelSettings.fuelObject.policyUuid || fuelSettings.fuelObject.policyName;
+              
+              if (fuelObjectPolicyId) {
+                console.log('🛩️ FUEL POLICY: Fuel object has policy:', fuelObjectPolicyId);
+                console.log('🛩️ FUEL POLICY: Current policy source:', currentPolicySource);
+                console.log('🛩️ FUEL POLICY: Flight policyUuid:', flightData.policyUuid);
+                console.log('🛩️ FUEL POLICY: Aircraft default policy available:', !!selectedAircraft?.defaultFuelPolicyName);
                 
-                // Try to find by UUID first, then by name
-                let fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.uuid === fuelObjectPolicyId);
-                if (!fuelObjectPolicy) {
-                  fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.name === fuelObjectPolicyId);
-                }
+                // ⚠️ PRIORITY SYSTEM: Only use fuel object policy as LAST RESORT
+                // Priority: Flight UUID > Aircraft Default > Fuel Object > Region Default
+                const shouldUseFuelObjectPolicy = !flightData.policyUuid && 
+                                                !selectedAircraft?.defaultFuelPolicyName && 
+                                                !currentPolicySource;
                 
-                if (fuelObjectPolicy) {
-                  console.log('🛩️ FUEL POLICY LOADING: Found fuel object policy:', fuelObjectPolicy.name);
-                  fuelPolicy.selectPolicy(fuelObjectPolicy);
+                if (shouldUseFuelObjectPolicy) {
+                  console.log('🛩️ FUEL POLICY: No flight or aircraft policy available, using fuel object policy as fallback');
                   
-                  if (window.LoadingIndicator) {
-                    window.LoadingIndicator.updateStatusIndicator(
-                      `Fuel policy updated: ${fuelObjectPolicy.name}`,
-                      'success',
-                      2000
-                    );
+                  // Try to find by UUID first, then by name
+                  let fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.uuid === fuelObjectPolicyId);
+                  if (!fuelObjectPolicy) {
+                    fuelObjectPolicy = fuelPolicy.availablePolicies?.find(p => p.name === fuelObjectPolicyId);
+                  }
+                  
+                  if (fuelObjectPolicy) {
+                    console.log('🛩️ FUEL POLICY: Found fuel object policy:', fuelObjectPolicy.name);
+                    fuelPolicy.selectPolicy(fuelObjectPolicy);
+                    
+                    if (window.LoadingIndicator) {
+                      window.LoadingIndicator.updateStatusIndicator(
+                        `Fuel policy (fallback): ${fuelObjectPolicy.name}`,
+                        'warning',
+                        3000
+                      );
+                    }
+                  } else {
+                    console.warn('🛩️ FUEL POLICY: Fuel object policy not found:', fuelObjectPolicyId);
                   }
                 } else {
-                  console.warn('🛩️ FUEL POLICY LOADING: Fuel object policy not found:', fuelObjectPolicyId);
+                  console.log('🛩️ FUEL POLICY: Higher priority policy already set, ignoring fuel object policy');
+                  console.log('🛩️ FUEL POLICY: Using current policy:', fuelPolicy.currentPolicy?.name);
                 }
               }
             }
@@ -3904,18 +4058,43 @@ const FastPlannerCore = ({
       // Wait for React state updates to process before triggering automation
       setTimeout(() => {
         
-        // Simple approach: Find and click the AutoPlan button
+        // 🎯 WIZARD FIX: Enhanced AutoPlan button detection
         const buttons = Array.from(document.querySelectorAll('button'));
-        const autoPlanButton = buttons.find(btn => 
-          btn.textContent.includes('Auto Plan') || 
-          btn.textContent.includes('⚡') || 
-          btn.innerHTML.includes('⚡')
-        );
+        console.log('🧙‍♂️ WIZARD: Searching for AutoPlan button among', buttons.length, 'buttons');
+        
+        // Check button text content for various AutoPlan variations
+        const autoPlanButton = buttons.find(btn => {
+          const text = btn.textContent || '';
+          const html = btn.innerHTML || '';
+          const isAutoPlan = text.includes('Auto Plan') || 
+                           text.includes('Auto plan') || 
+                           text.includes('auto plan') ||
+                           text.includes('⚡') || 
+                           html.includes('⚡') ||
+                           text.includes('AutoPlan') ||
+                           text.includes('autoplan');
+          
+          if (isAutoPlan) {
+            console.log('🧙‍♂️ WIZARD: Found potential AutoPlan button:', text);
+          }
+          return isAutoPlan;
+        });
         
         if (autoPlanButton) {
+          console.log('🧙‍♂️ WIZARD: Clicking AutoPlan button:', autoPlanButton.textContent);
           autoPlanButton.click();
         } else {
-          console.error('🧙‍♂️ No AutoPlan button found');
+          console.error('🧙‍♂️ WIZARD: No AutoPlan button found! Available button texts:', 
+            buttons.map(btn => btn.textContent).filter(text => text && text.trim()));
+          
+          // Fallback: Try to find button by class or other attributes
+          const fallbackButton = document.querySelector('[data-testid*="auto"], [class*="auto"], [id*="auto"]');
+          if (fallbackButton && fallbackButton.tagName === 'BUTTON') {
+            console.log('🧙‍♂️ WIZARD: Found fallback button:', fallbackButton);
+            fallbackButton.click();
+          } else {
+            console.error('🧙‍♂️ WIZARD: No fallback button found either');
+          }
         }
       }, 1000);
     }

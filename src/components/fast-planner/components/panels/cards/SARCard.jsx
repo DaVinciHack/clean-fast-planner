@@ -37,20 +37,6 @@ const SARCard = ({
   onSARUpdate 
 }) => {
   
-  console.log('🚁 SARCard MOUNTED/RENDERED - id:', id);
-  console.log('🚁 SARCard render called with props:', {
-    id,
-    hasSelectedAircraft: !!selectedAircraft,
-    hasRouteStats: !!routeStats,
-    hasAlternateStats: !!alternateStats,
-    alternateStats: alternateStats,
-    hasAlternateRouteData: !!alternateRouteData,
-    alternateRouteData: alternateRouteData,
-    hasFuelPolicy: !!fuelPolicy,
-    waypointsCount: waypoints?.length || 0,
-    stopCardsCount: stopCards?.length || 0,
-    hasOnSARUpdate: !!onSARUpdate
-  });
   
   const {
     // Core State
@@ -72,7 +58,6 @@ const SARCard = ({
     updateTakeoffFuel,
     updateSARWeight,
     updateTimeOnTask,
-    applyAircraftPresets,
     
     // Calculation Results
     sarCalculation,
@@ -107,34 +92,14 @@ const SARCard = ({
   const sarStatus = getSARStatus();
   const validation = getParameterValidation();
   
-  console.log('🚁 SARCard: sarCalculation from useSARMode:', sarCalculation);
   
   // Handle SAR updates to parent component (done here to avoid race conditions in hook)
   useEffect(() => {
-    console.log('🚁 SARCard: ===== USEEFFECT TRIGGERED =====');
-    console.log('🚁 SARCard useEffect triggered:', {
-      sarEnabled,
-      waypointCount: waypoints?.length || 0,
-      waypoints: waypoints?.map(wp => ({ name: wp.name, coords: wp.coords, id: wp.id })),
-      stopCardsCount: stopCards?.length || 0,
-      hasAlternateCard: !!stopCards?.find(card => card.isAlternate),
-      alternateCardFuel: stopCards?.find(card => card.isAlternate)?.fuelComponentsObject?.altFuel,
-      hasSarCalculation: !!sarCalculation,
-      sarCalculationRadius: sarCalculation?.operationalRadiusNM,
-      alternateFuel,
-      hasOnSARUpdate: !!onSARUpdate,
-      hasSelectedAircraft: !!selectedAircraft,
-      hasRouteStats: !!routeStats,
-      hasFuelPolicy: !!fuelPolicy,
-      timestamp: new Date().toISOString()
-    });
-    
     if (onSARUpdate && sarEnabled) {
       // Get the final waypoint from the current waypoints
       const finalWaypoint = waypoints && waypoints.length > 0 ? 
         (() => {
           const lastWaypoint = waypoints[waypoints.length - 1];
-          console.log('🚁 SARCard checking last waypoint:', lastWaypoint);
           
           // Handle both coordinate formats: coords array [lng, lat] or direct lat/lng properties
           let lat, lng;
@@ -149,22 +114,12 @@ const SARCard = ({
             return null;
           }
           
-          console.log('🚁 SARCard: Using final waypoint coordinates:', { lat, lng, name: lastWaypoint.name });
           return {
             lat,
             lng,
             name: lastWaypoint.name || 'Final Waypoint'
           };
         })() : null;
-      
-      console.log('🚁 SARCard: Final waypoint result:', finalWaypoint);
-      console.log('🚁 SARCard: Waypoints array:', waypoints?.map(wp => ({ name: wp.name, coords: wp.coords })));
-      
-      console.log('🚁 SARCard sending update:', {
-        hasCalculation: !!sarCalculation,
-        finalWaypoint,
-        enabled: sarEnabled
-      });
       
       onSARUpdate({
         calculation: sarCalculation,
@@ -178,7 +133,6 @@ const SARCard = ({
       });
     } else if (onSARUpdate) {
       // Send disabled state (SAR disabled OR no waypoints)
-      console.log('🚁 SARCard sending disabled state - sarEnabled:', sarEnabled, 'waypoints:', waypoints?.length);
       onSARUpdate({
         calculation: null,
         finalWaypoint: null,
@@ -258,12 +212,8 @@ const SARCard = ({
             {hasValidAircraft ? (
               <div style={{ fontSize: '11px', color: 'var(--label-color)', marginTop: '4px' }}>
                 Cruise: {selectedAircraft.cruiseSpeed} kts | Fuel Flow: {selectedAircraft.fuelBurn} lbs/hr
-                {selectedAircraft.flatPitchFuelBurnDeckFuel && (
-                  <>
-                    <br />
-                    Hover: {selectedAircraft.flatPitchFuelBurnDeckFuel} lbs/hr
-                  </>
-                )}
+                <br />
+                Reserve: {reserveFuel} lbs
               </div>
             ) : (
               <div style={{ fontSize: '11px', color: 'var(--accent-red)', marginTop: '4px' }}>
@@ -295,7 +245,7 @@ const SARCard = ({
             border: `1px solid ${actualRemainingFuel.warningNoAlternate ? 'var(--accent-red)' : '#4caf50'}`
           }}>
             <div style={{ fontWeight: 'bold', marginBottom: '8px', color: 'var(--text-color)' }}>
-              🎯 Real-World SAR Analysis
+              SAR Analysis
             </div>
             
             <div style={{ fontSize: '12px', color: 'var(--text-color)', marginBottom: '6px' }}>
@@ -334,37 +284,18 @@ const SARCard = ({
         {/* SAR Parameters */}
         {sarEnabled && (
           <>
-            {/* Aircraft Presets Button */}
-            {hasValidAircraft && (
-              <button 
-                onClick={applyAircraftPresets}
-                style={{
-                  width: '100%',
-                  padding: '6px',
-                  marginBottom: '10px',
-                  backgroundColor: 'var(--input-bg)',
-                  border: '1px solid var(--button-bg)',
-                  borderRadius: '4px',
-                  color: 'var(--button-bg)',
-                  fontSize: '12px',
-                  cursor: 'pointer'
-                }}
-                title="Auto-fill fuel and equipment weights based on aircraft type"
-              >
-                Apply Aircraft-Specific Presets
-              </button>
-            )}
-            
-            {/* Takeoff Fuel */}
+            {/* Takeoff Fuel with Slider */}
             <label htmlFor="takeoff-fuel" style={{ display: 'block', marginBottom: '4px' }}>
               Takeoff Fuel (lbs):
             </label>
+            
+            {/* Fuel Input */}
             <input 
               type="number" 
               id="takeoff-fuel"
               value={takeoffFuel}
               onChange={(e) => updateTakeoffFuel(Number(e.target.value))}
-              min="0"
+              min={reserveFuel || 0}
               max={selectedAircraft?.maxFuel || 10000}
               step="50"
               className="route-input"
@@ -373,14 +304,46 @@ const SARCard = ({
                 borderColor: validation.fuel.valid ? 'var(--input-border)' : 'var(--accent-red)'
               }}
             />
+            
+            {/* Fuel Slider */}
+            {selectedAircraft?.maxFuel && (
+              <div style={{ marginBottom: '8px' }}>
+                <input 
+                  type="range"
+                  min={reserveFuel || 0}
+                  max={selectedAircraft.maxFuel}
+                  value={takeoffFuel}
+                  onChange={(e) => updateTakeoffFuel(Number(e.target.value))}
+                  step={Math.max(1, Math.round((selectedAircraft.maxFuel - (reserveFuel || 0)) / 100))} // 100 steps between reserve and max
+                  style={{
+                    width: '100%',
+                    marginBottom: '4px',
+                    background: '#333333',
+                    appearance: 'none',
+                    height: '8px',
+                    borderRadius: '4px',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+                {/* Slider Labels */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  fontSize: '10px', 
+                  color: 'var(--label-color)',
+                  marginBottom: '8px'
+                }}>
+                  <span>Reserve ({reserveFuel || 0} lbs)</span>
+                  <span>{Math.round(takeoffFuel / selectedAircraft.maxFuel * 100)}%</span>
+                  <span>Max ({selectedAircraft.maxFuel} lbs)</span>
+                </div>
+              </div>
+            )}
+            
             {!validation.fuel.valid && (
               <div style={{ fontSize: '11px', color: 'var(--accent-red)', marginBottom: '8px' }}>
                 {validation.fuel.message}
-              </div>
-            )}
-            {selectedAircraft?.maxFuel && (
-              <div style={{ fontSize: '11px', color: 'var(--label-color)', marginBottom: '10px' }}>
-                Max capacity: {selectedAircraft.maxFuel} lbs ({Math.round(takeoffFuel / selectedAircraft.maxFuel * 100)}%)
               </div>
             )}
             

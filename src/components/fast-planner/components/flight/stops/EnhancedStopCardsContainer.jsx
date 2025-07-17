@@ -75,6 +75,9 @@ const EnhancedStopCardsContainer = ({
   // Track last notified cards to prevent infinite loop
   const lastNotifiedCardsRef = useRef(null);
   
+  // 🎯 CONTAMINATION FIX: Track flight ID changes to reset contaminated state
+  const lastFlightIdRef = useRef(null);
+  
   // 🔥 DIRECT CALLBACK HANDLER: Handle fuel overrides from CleanDetailedFuelBreakdown
   const handleFuelOverridesChanged = useCallback((newOverrides) => {
     
@@ -97,6 +100,26 @@ const EnhancedStopCardsContainer = ({
       onFuelOverridesChanged(handleFuelOverridesChanged);
     }
   }, [onFuelOverridesChanged, handleFuelOverridesChanged]);
+  
+  // 🎯 CONTAMINATION FIX: Reset state when flight ID changes to prevent state contamination
+  useEffect(() => {
+    if (currentFlightId !== lastFlightIdRef.current) {
+      console.log('🎯 FLIGHT ID CHANGED: Resetting contaminated state', {
+        oldFlightId: lastFlightIdRef.current,
+        newFlightId: currentFlightId
+      });
+      
+      // Reset potentially contaminated state
+      setLocalFuelOverrides({});
+      setRefuelStops([]);
+      setDisplayStopCards([]);
+      setAlternateStopCard(null);
+      setForceRecalculation(prev => prev + 1);
+      
+      // Update ref
+      lastFlightIdRef.current = currentFlightId;
+    }
+  }, [currentFlightId]);
   
   // 🔄 REFUEL SYNC: Sync refuel stops to parent when they change (but not during parent sync)
   const isUpdatingFromParentRef = useRef(false);
@@ -207,6 +230,20 @@ const EnhancedStopCardsContainer = ({
       selectedAircraft.fuelBurn &&
       selectedAircraft.usefulLoad && selectedAircraft.usefulLoad > 0;
     
+    // 🔍 ENHANCED AIRCRAFT DEBUG: Show exactly what aircraft data we have
+    if (selectedAircraft) {
+      console.log('🔍 AIRCRAFT DATA DETAILS:', {
+        registration: selectedAircraft.registration,
+        aircraftId: selectedAircraft.aircraftId || selectedAircraft.id,
+        fuelBurn: selectedAircraft.fuelBurn,
+        usefulLoad: selectedAircraft.usefulLoad,
+        hasRequiredAircraftData: hasRequiredAircraftData,
+        allKeys: Object.keys(selectedAircraft)
+      });
+    } else {
+      console.log('🔍 AIRCRAFT DATA: selectedAircraft is null/undefined');
+    }
+    
     // 🚨 AVIATION SAFETY: Ensure fuel policy is fully loaded with all required data (like aircraft pattern)
     const hasValidFuelPolicy = fuelPolicy && 
       fuelPolicy.currentPolicy && 
@@ -219,6 +256,17 @@ const EnhancedStopCardsContainer = ({
       fuelPolicy.currentPolicy.contingencyFuel.flightLegs.default !== undefined &&
       !fuelPolicy.isLoading;
       
+    // 🔍 VALIDATION DEBUG: Log all dependencies for stop card rendering
+    console.log('🔍 STOP CARD DEPENDENCIES:', {
+      waypoints: waypoints?.length || 0,
+      hasWaypoints: !!(waypoints && waypoints.length >= 2),
+      selectedAircraft: !!selectedAircraft,
+      aircraftId: selectedAircraft?.id || selectedAircraft?.assetId,
+      hasValidFuelPolicy,
+      hasRequiredAircraftData,
+      canRender: !!(waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData)
+    });
+    
     if (waypoints && waypoints.length >= 2 && selectedAircraft && hasValidFuelPolicy && hasRequiredAircraftData) {
       
       try {
@@ -285,6 +333,14 @@ const EnhancedStopCardsContainer = ({
         setDisplayStopCards([]);
       }
     } else {
+      // 🚨 VALIDATION FAILED: Log why stop cards cannot be rendered
+      const missingDeps = [];
+      if (!waypoints || waypoints.length < 2) missingDeps.push('waypoints (need ≥2)');
+      if (!selectedAircraft) missingDeps.push('selectedAircraft');
+      if (!hasValidFuelPolicy) missingDeps.push('validFuelPolicy');
+      if (!hasRequiredAircraftData) missingDeps.push('requiredAircraftData');
+      
+      console.warn('🚨 STOP CARDS CANNOT RENDER - Missing:', missingDeps.join(', '));
       setDisplayStopCards([]);
     }
     

@@ -60,7 +60,7 @@ export class FuelStopOptimizer {
       );
       console.log('🔍 SEARCH CORRIDOR:', searchCorridor);
 
-      // Step 4: Find fuel-capable platforms in corridor
+      // Step 4: Find fuel-capable platforms in corridor (including destination rigs)
       console.log('🔍 STEP 4: Searching for fuel-capable platforms...');
       console.log('🔍 AVAILABLE PLATFORMS COUNT:', flightData.availablePlatforms?.length || 0);
       console.log('🔍 FIRST FEW PLATFORMS:', flightData.availablePlatforms?.slice(0, 5).map(p => ({ 
@@ -69,6 +69,10 @@ export class FuelStopOptimizer {
         coords: p.coordinates,
         hasFuelCapability: this.platformEvaluator.hasFuelCapability(p)
       })));
+      
+      // 🎯 NEW: Include destination rigs/waypoints in fuel stop search
+      const destinationRigs = this.findDestinationRigsWithFuel(flightData.waypoints);
+      console.log('🔍 DESTINATION RIGS WITH FUEL:', destinationRigs.map(r => r.name));
       
       // Test fuel capability detection on all platforms
       const fuelCapablePlatformsTotal = flightData.availablePlatforms?.filter(p => 
@@ -87,17 +91,22 @@ export class FuelStopOptimizer {
         this.platformEvaluator.normalizePlatform(platform)
       );
       
+      // 🎯 COMBINE: Regular platforms + destination rigs with fuel
+      const allPlatforms = [...normalizedPlatforms, ...destinationRigs];
+      
       // 🎯 LIMIT PLATFORMS: Only consider fuel-capable platforms near route
       const routeStart = flightData.waypoints[0];
-      const fuelCapablePlatforms = normalizedPlatforms.filter(platform => 
+      const fuelCapablePlatforms = allPlatforms.filter(platform => 
         platform.hasFuel && platform.lat && platform.lng
       );
       
-      // Calculate distance from route start and limit to top 100 closest platforms
+      // 🚀 IMPROVED: Prioritize by distance from alternate split point (not start)
+      const splitPoint = flightData.alternateSplitPoint || flightData.waypoints[flightData.waypoints.length - 1];
       const platformsWithDistance = fuelCapablePlatforms.map(platform => ({
         ...platform,
-        distanceFromStart: this.corridorSearcher.calculateDistance(routeStart, platform)
-      })).sort((a, b) => a.distanceFromStart - b.distanceFromStart)
+        distanceFromStart: this.corridorSearcher.calculateDistance(routeStart, platform),
+        distanceFromSplit: this.corridorSearcher.calculateDistance(splitPoint, platform)
+      })).sort((a, b) => a.distanceFromSplit - b.distanceFromSplit) // Sort by split point distance
         .slice(0, 100); // Limit to 100 closest fuel-capable platforms
       
       console.log('🔧 NORMALIZED PLATFORMS:', normalizedPlatforms.slice(0, 3).map(p => ({ 
@@ -107,19 +116,29 @@ export class FuelStopOptimizer {
         hasCoords: !!(p.lat && p.lng),
         hasFuel: p.hasFuel
       })));
-      console.log(`🎯 PLATFORM FILTERING: ${fuelCapablePlatforms.length} fuel-capable → ${platformsWithDistance.length} closest`);
+      console.log(`🎯 PLATFORM FILTERING: ${fuelCapablePlatforms.length} fuel-capable → ${platformsWithDistance.length} closest to split point`);
 
       // 🚨 DETAILED DEBUGGING: Test a few platforms manually before corridor search
-      console.log('🧪 MANUAL DISTANCE TEST for first 5 platforms:');
+      console.log('🧪 MANUAL DISTANCE TEST for first 5 platforms (sorted by split point proximity):');
       platformsWithDistance.slice(0, 5).forEach(platform => {
         const distFromStart = this.corridorSearcher.calculateDistance(searchCorridor.startPoint, platform);
         const distFromEnd = this.corridorSearcher.calculateDistance(searchCorridor.endPoint, platform);
-        console.log(`📏 ${platform.name}: start=${distFromStart.toFixed(1)}nm, end=${distFromEnd.toFixed(1)}nm, coords=[${platform.lat}, ${platform.lng}]`);
+        const distFromSplit = platform.distanceFromSplit || this.corridorSearcher.calculateDistance(splitPoint, platform);
+        console.log(`📏 ${platform.name}: start=${distFromStart.toFixed(1)}nm, end=${distFromEnd.toFixed(1)}nm, split=${distFromSplit.toFixed(1)}nm, coords=[${platform.lat}, ${platform.lng}]`);
       });
 
+      // 🚀 NEW: Filter platforms to only include those BEFORE the alternate split point
+      const platformsBeforeSplit = this.filterPlatformsBeforeSplitPoint(
+        platformsWithDistance,
+        flightData.waypoints,
+        flightData.alternateSplitPoint
+      );
+      
+      console.log(`🎯 SPLIT POINT FILTERING: ${platformsWithDistance.length} platforms → ${platformsBeforeSplit.length} before split point`);
+      
       const candidatePlatforms = await this.findFuelStopsInCorridor(
         searchCorridor,
-        platformsWithDistance
+        platformsBeforeSplit
       );
       
       console.log('🔍 CANDIDATE PLATFORMS FOUND:', candidatePlatforms.length);
@@ -133,11 +152,12 @@ export class FuelStopOptimizer {
         };
       }
 
-      // Step 5: Score and rank platforms
+      // Step 5: Score and rank platforms (prioritize alternate split point proximity)
       const rankedOptions = this.optimizationScorer.scoreAndRankPlatforms(
         candidatePlatforms,
         flightData,
-        overloadAnalysis
+        overloadAnalysis,
+        flightData.alternateSplitPoint // Pass split point for proximity scoring
       );
 
       // Step 6: Remove duplicates and return top suggestions
@@ -380,6 +400,82 @@ export class FuelStopOptimizer {
       } : null,
       actionPrompt: 'Would you like me to add this fuel stop to your route?'
     };
+  }
+
+  /**
+   * Finds destination rigs/waypoints that have fuel capability
+   * @param {Array} waypoints - Route waypoints
+   * @returns {Array} Destination rigs with fuel capability
+   */
+  findDestinationRigsWithFuel(waypoints) {
+    if (!waypoints || waypoints.length === 0) {
+      return [];
+    }
+
+    const destinationRigs = [];
+    
+    // Check all waypoints (excluding first one - departure)
+    for (let i = 1; i < waypoints.length; i++) {
+      const waypoint = waypoints[i];
+      
+      // Normalize waypoint to platform format for fuel evaluation
+      const normalizedWaypoint = this.platformEvaluator.normalizePlatform(waypoint);
+      
+      // Check if this waypoint has fuel capability
+      if (normalizedWaypoint.hasFuel) {
+        destinationRigs.push({
+          ...normalizedWaypoint,
+          isDestination: true,
+          waypointIndex: i
+        });
+        console.log(`🛢️ DESTINATION WITH FUEL: ${waypoint.name} has fuel capability`);
+      }
+    }
+    
+    return destinationRigs;
+  }
+
+  /**
+   * Filters platforms to only include those before the alternate split point
+   * @param {Array} platforms - Platforms with distances
+   * @param {Array} waypoints - Route waypoints
+   * @param {Object} alternateSplitPoint - Split point coordinates
+   * @returns {Array} Filtered platforms
+   */
+  filterPlatformsBeforeSplitPoint(platforms, waypoints, alternateSplitPoint) {
+    if (!alternateSplitPoint || !alternateSplitPoint.lat || !alternateSplitPoint.lng) {
+      console.log('🔍 NO SPLIT POINT: Returning all platforms');
+      return platforms;
+    }
+
+    const routeStart = waypoints[0];
+    const splitPoint = alternateSplitPoint;
+    
+    // Calculate total distance from start to split point
+    const totalDistanceToSplit = this.corridorSearcher.calculateDistance(routeStart, splitPoint);
+    console.log(`🔍 ROUTE TO SPLIT: ${totalDistanceToSplit.toFixed(1)}nm from start to split point`);
+
+    const filteredPlatforms = platforms.filter(platform => {
+      const distanceFromStart = this.corridorSearcher.calculateDistance(routeStart, platform);
+      const distanceFromSplit = this.corridorSearcher.calculateDistance(splitPoint, platform);
+      
+      // Platform is "before" split point if it's closer to start than to split point
+      // AND it's not significantly past the split point
+      const isBeforeSplit = distanceFromStart <= (totalDistanceToSplit + 10); // Allow 10nm tolerance
+      const preferOnWayToSplit = distanceFromStart < distanceFromSplit; // Prefer platforms "on the way"
+      
+      const shouldInclude = isBeforeSplit;
+      
+      if (!shouldInclude) {
+        console.log(`❌ PAST SPLIT: ${platform.name} at ${distanceFromStart.toFixed(1)}nm from start (split at ${totalDistanceToSplit.toFixed(1)}nm)`);
+      } else if (preferOnWayToSplit) {
+        console.log(`✅ ON THE WAY: ${platform.name} at ${distanceFromStart.toFixed(1)}nm from start, ${distanceFromSplit.toFixed(1)}nm from split`);
+      }
+      
+      return shouldInclude;
+    });
+
+    return filteredPlatforms;
   }
 }
 

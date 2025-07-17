@@ -27,6 +27,7 @@
   padding: 25px;
   max-width: 500px; /* Bigger as requested */
   width: 90%;
+  position: relative; /* For close button positioning */
   
   /* Card shadow to match site cards */
   box-shadow: 
@@ -36,6 +37,39 @@
   color: white;
   font-family: 'Segoe UI', system-ui, sans-serif;
   animation: popIn 0.3s ease-out;
+}
+
+/* Close Button - Small X in corner like wizard */
+.loader-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 18px;
+  font-weight: normal;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1;
+}
+
+.loader-close-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
+}
+
+.loader-close-button:active {
+  transform: scale(0.95);
 }
 
 /* Current Step Styling - Prominent display at top */

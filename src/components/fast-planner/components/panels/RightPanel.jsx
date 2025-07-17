@@ -18,6 +18,7 @@ import { PanelProvider } from '../../context/PanelContext';
 import { useRegion } from '../../context/region'; // Import region context
 import FlightAutomationLoader from '../loaders/FlightAutomationLoader';
 import FuelSaveBackService from '../../services/FuelSaveBackService';
+import FlightLoader from '../../services/FlightLoader';
 
 /**
  * Right Panel Component
@@ -139,7 +140,9 @@ const RightPanel = React.forwardRef(({
   // 🔄 REFUEL SYNC: Callback for refuel stops synchronization
   onRefuelStopsChanged = null,
   // 🌩️ LIVE Weather state synchronization
-  onLiveWeatherStateChange = null
+  onLiveWeatherStateChange = null,
+  // 🚨 NUCLEAR RESET: Component key for forcing remounts
+  componentKey = 0
 }, ref) => {
   // Get current region from context
   const { currentRegion } = useRegion();
@@ -264,9 +267,44 @@ const RightPanel = React.forwardRef(({
         allProperties: Object.keys(wp)
       })));
       
-      // CRITICAL FIX: Use the aircraft tail number (rawRegistration) first, then assetId as fallback
-      // The automation expects the aircraft's tail number to look up the aircraft in the system
-      const finalAircraftId = selectedAircraft?.rawRegistration || selectedAircraft?.assetId || "190";
+      // 🎯 AIRCRAFT SAVE DEBUG: Check what aircraft data we have available
+      console.log('🎯 AIRCRAFT SAVE DATA ANALYSIS:', {
+        selectedAircraft: selectedAircraft,
+        registration: selectedAircraft?.registration,
+        rawRegistration: selectedAircraft?.rawRegistration, 
+        assetId: selectedAircraft?.assetId,
+        id: selectedAircraft?.id,
+        aircraftId: selectedAircraft?.aircraftId,
+        allKeys: Object.keys(selectedAircraft || {})
+      });
+      
+      // 🎯 AUTOMATION FIX: Send BOTH aircraftId (tail number) AND assetIdx (numeric index)
+      const aircraftTailNumber = selectedAircraft?.assetIdentifier ||  // ✅ PRIMARY: Clean tail number like "N109DR"
+                                 selectedAircraft?.rawRegistration ||  // ✅ Backup: Raw tail number like "N123AB"
+                                 selectedAircraft?.registration ||     // ✅ Backup: Full registration (may include description)
+                                 "UNKNOWN";                             // ❌ Fallback
+      
+      const aircraftNumericIndex = Number(selectedAircraft?.assetId ||      // ✅ PRIMARY: Use assetId (like "1650")
+                                          selectedAircraft?.id ||           // ✅ Backup: Convert to number from "1", "2", "3"
+                                          selectedAircraft?.aircraftId ||   // ✅ Backup: numeric index  
+                                          "190");                            // ❌ Fallback as number
+      
+      console.log('🎯 AIRCRAFT DATA FOR AUTOMATION:', {
+        aircraftId: aircraftTailNumber,              // STRING: "N123AB" 
+        assetIdx: aircraftNumericIndex,              // NUMBER: 123
+        aircraftIdType: typeof aircraftTailNumber,
+        assetIdxType: typeof aircraftNumericIndex,
+        tailNumberSource: selectedAircraft?.rawRegistration ? 'rawRegistration' :
+                         selectedAircraft?.registration ? 'registration' : 'fallback',
+        indexSource: selectedAircraft?.id ? 'id' :
+                    selectedAircraft?.aircraftId ? 'aircraftId' :
+                    selectedAircraft?.assetId ? 'assetId' : 'fallback',
+        bothFieldsValid: aircraftTailNumber !== "UNKNOWN" && aircraftNumericIndex !== 190
+      });
+      
+      // 🎯 FUEL OBJECT FIX: Get existing fuel object ID early for API params
+      const existingFuelObjectId = loadedFuelObject?.$primaryKey || null;
+      console.log('💾 FUEL OBJECT ID: Retrieved for reuse:', existingFuelObjectId);
       
       // Prepare waypoints with leg structure
       const waypointsWithLegs = waypoints.map((wp, index) => {
@@ -294,6 +332,21 @@ const RightPanel = React.forwardRef(({
       const regionCode = currentRegion?.osdkRegion || currentRegion?.id || "NORWAY"; // Fallback to NORWAY only if no region
       
       // Prepare parameters for the Palantir API
+      // 🎯 FLIGHT SAVE VALIDATION: Log save operation type
+      const isUpdate = currentFlightId && currentFlightId.trim() !== '';
+      console.log('🎯 FLIGHT SAVE OPERATION:', {
+        operation: isUpdate ? 'UPDATE' : 'CREATE',
+        currentFlightId: currentFlightId,
+        hasCurrentFlightId: !!currentFlightId,
+        flightIdLength: currentFlightId?.length || 0
+      });
+      
+      if (!isUpdate) {
+        console.warn('⚠️ CREATING NEW FLIGHT instead of updating - this may cause waypoint duplication');
+      } else {
+        console.log('✅ UPDATING EXISTING FLIGHT - waypoints should be preserved');
+      }
+      
       const apiParams = {
         // CRITICAL FIX: Include flight ID for updates instead of always creating new flights
         ...(currentFlightId && { flightId: currentFlightId }),
@@ -301,7 +354,8 @@ const RightPanel = React.forwardRef(({
         // Basic parameters
         flightName: flightData.flightName,
         aircraftRegion: regionCode, // Use current region
-        aircraftId: finalAircraftId,
+        aircraftId: aircraftTailNumber,      // ✅ Tail number like "N123AB"
+        // NOTE: Testing without assetIdx field for wizard
         region: regionCode, // Use current region
         etd: new Date(flightData.etd).toISOString(), // Ensure proper ISO format
         // 🧙‍♂️ DEBUG: Log ETD conversion for debugging
@@ -326,6 +380,9 @@ const RightPanel = React.forwardRef(({
         medicId: flightData.medicId || null,
         soId: flightData.soId || null,
         rswId: flightData.rswId || null,
+        
+        // 🎯 FUEL OBJECT: Include existing fuel object ID for updates (not new creation)
+        ...(existingFuelObjectId && { fuelPlanId: existingFuelObjectId }),
         
         // 🛩️ FUEL POLICY: Add fuel policy UUID for FastPlanner-created flights
         policyUuid: (() => {
@@ -433,8 +490,7 @@ const RightPanel = React.forwardRef(({
             approachFuel: approachFuel || 0
           };
           
-          // 🎯 SIMPLE FIX: Use the stored fuel object UUID to prevent duplicate searches
-          const existingFuelObjectId = loadedFuelObject?.$primaryKey || null;
+          // 🎯 FUEL SAVE-BACK: Using stored fuel object ID (already retrieved above)
           console.log('💾 FUEL SAVE-BACK: Using stored fuel object ID:', existingFuelObjectId);
           console.log('💾 FUEL SAVE-BACK: Current data being saved:', {
             flightId,
@@ -570,7 +626,10 @@ const RightPanel = React.forwardRef(({
                       
                       if (onFlightLoad) {
                         // ✅ CRITICAL FIX: Use the same handleLoadFlight function that manual loading uses
-                        console.log('🔄 AUTOMATION: Using handleLoadFlight (same as manual loading)');
+                        console.log('🔄 AUTOMATION: Using unified handleLoadFlight (same as manual loading)');
+                        console.log('🔄 AUTOMATION: This should use FlightLoader.extractFlightData and unified fuel policy system');
+                        console.log('🔄 AUTOMATION: Target flight aircraft ID:', targetFlight.aircraftId);
+                        console.log('🔄 AUTOMATION: Target flight has _rawFlight:', !!targetFlight._rawFlight);
                         handleLoadFlight(targetFlight);
                         
                         // Final success message
@@ -840,7 +899,7 @@ const RightPanel = React.forwardRef(({
     handleCardChange('main');
   };
   
-  // Handle loading a flight from LoadFlightsCard
+  // Handle loading a flight from LoadFlightsCard or FlightWizard
   const handleLoadFlight = (flight) => {
     console.log('🟠 RIGHTPANEL LOAD: Load flight data from card:', flight);
     console.log('🟠 RIGHTPANEL LOAD: Raw flight available:', !!flight._rawFlight);
@@ -851,90 +910,28 @@ const RightPanel = React.forwardRef(({
       window.clearRigWeatherGraphics();
     }
     
-    // Note: Rig weather graphics auto-enable moved to after flight data processing
-    
-    // DEBUG: Check for alternate data in the loaded flight
-    if (flight._rawFlight) {
-      const rawFlight = flight._rawFlight;
-      console.log('🟠 RIGHTPANEL LOAD: alternateSplitPoint:', rawFlight.alternateSplitPoint);
-      console.log('🟠 RIGHTPANEL LOAD: alternateName:', rawFlight.alternateName);
-      console.log('🟠 RIGHTPANEL LOAD: alternateFullRouteGeoShape:', !!rawFlight.alternateFullRouteGeoShape);
-      console.log('🟠 RIGHTPANEL LOAD: alternateLegIds:', rawFlight.alternateLegIds);
-      console.log('🟠 RIGHTPANEL LOAD: alternateGeoPoint:', rawFlight.alternateGeoPoint);
-    }
-    
     try {
-      // Extract flight data for the main application
-      const flightData = {
-        flightId: flight.id,
-        flightNumber: flight.flightNumber,
-        
-        // Extract stops (landing locations) from the stops array
-        stops: flight.stops || [],
-        
-        // Extract waypoints by separating them from stops using displayWaypoints
-        waypoints: extractWaypointsFromFlight(flight),
-        
-        // Aircraft and crew information
-        aircraftId: flight.aircraftId,
-        captainId: flight.captainId,
-        copilotId: flight.copilotId,
-        medicId: flight.medicId,
-        soId: flight.soId,
-        rswId: flight.rswId,
-        
-        // 💾 FUEL LOADING FIX: Include fuelPlanId for direct fuel object lookup
-        fuelPlanId: flight.fuelPlanId,
-        
-        // CRITICAL FIX: Extract wind data from flight if available - use avgWindSpeed/avgWindDirection (automation calculated)
-        windData: {
-          windSpeed: flight._rawFlight?.avgWindSpeed || flight._rawFlight?.windSpeed || flight.avgWindSpeed || flight.windSpeed || 0,
-          windDirection: flight._rawFlight?.avgWindDirection || flight._rawFlight?.windDirection || flight.avgWindDirection || flight.windDirection || 0,
-          source: 'palantir_automation'
-        },
-        
-        // Other flight data
-        etd: flight.date,
-        region: flight.region,
-        alternateLocation: flight.alternateLocation,
-        
-        // 🟠 CRITICAL FIX: Extract full alternate route data from raw flight
-        alternateRouteData: (() => {
-          if (flight._rawFlight?.alternateFullRouteGeoShape) {
-            console.log('🟠 RIGHTPANEL LOAD: ✅ Extracting alternate route data for FastPlannerApp');
-            
-            const rawFlight = flight._rawFlight;
-            const alternateGeoShape = rawFlight.alternateFullRouteGeoShape.toGeoJson ? 
-              rawFlight.alternateFullRouteGeoShape.toGeoJson() : rawFlight.alternateFullRouteGeoShape;
-            
-            if (alternateGeoShape?.coordinates) {
-              const alternateData = {
-                coordinates: alternateGeoShape.coordinates,
-                splitPoint: rawFlight.alternateSplitPoint || null,
-                name: rawFlight.alternateName || 'Alternate Route',
-                geoPoint: rawFlight.alternateGeoPoint || null,
-                legIds: rawFlight.alternateLegIds || []
-              };
-              
-              console.log('🟠 RIGHTPANEL LOAD: ✅ Created alternateRouteData:', {
-                coordinateCount: alternateData.coordinates.length,
-                splitPoint: alternateData.splitPoint,
-                name: alternateData.name
-              });
-              
-              return alternateData;
-            }
-          }
-          
-          console.log('🟠 RIGHTPANEL LOAD: ❌ No alternate route data found');
-          return null;
-        })(),
-        
-        // Include raw flight for reference
-        _rawFlight: flight._rawFlight
-      };
+      // 🛩️ UNIFIED EXTRACTION: Use centralized FlightLoader service
+      const flightData = FlightLoader.extractFlightData(flight);
       
-      console.log('Processed flight data for loading:', flightData);
+      console.log('🛩️ FLIGHT LOADER: Extracted flight data successfully:', {
+        flightId: flightData.flightId,
+        policyUuid: flightData.policyUuid,
+        fuelPlanId: flightData.fuelPlanId,
+        waypointCount: flightData.waypoints.length
+      });
+      
+      // 🛩️ FUEL POLICY: Resolve and apply fuel policy using unified system
+      const policyResolution = FlightLoader.resolveFuelPolicy(flightData, fuelPolicy, selectedAircraft);
+      
+      if (policyResolution.success) {
+        console.log(`🛩️ FLIGHT LOADER: Fuel policy resolved from ${policyResolution.source}:`, policyResolution.policy.name);
+        FlightLoader.applyFuelPolicy(policyResolution, fuelPolicy);
+      } else {
+        console.warn('🛩️ FLIGHT LOADER: No suitable fuel policy found - will use region defaults');
+      }
+      
+      console.log('🛩️ FLIGHT LOADER: Processed flight data for loading:', flightData);
       
       // Call the parent's flight loading handler if available
       if (onFlightLoad) {
@@ -997,63 +994,7 @@ const RightPanel = React.forwardRef(({
    * Extract waypoints from flight data, separating them from stops
    * This addresses the core challenge of waypoint vs stop separation
    */
-  const extractWaypointsFromFlight = (flight) => {
-    try {
-      const waypoints = [];
-      const stops = flight.stops || [];
-      
-      // Use displayWaypoints if available (newer format with labels)
-      if (flight.displayWaypoints && flight.displayWaypoints.length > 0) {
-        console.log('Using displayWaypoints to extract waypoints');
-        
-        flight.displayWaypoints.forEach((wp, index) => {
-          // Remove labels like "(Dep)", "(Stop1)", "(Des)" to get clean waypoint name
-          const cleanName = wp.replace(/\s*\([^)]*\)\s*$/, '').trim();
-          
-          // Skip if this is a stop (departure, intermediate stops, or destination)
-          if (stops.includes(cleanName)) {
-            console.log(`Skipping stop: ${cleanName}`);
-            return;
-          }
-          
-          // This is a navigation waypoint
-          waypoints.push({
-            name: cleanName,
-            type: 'waypoint',
-            legIndex: 0, // Will be determined by the routing logic
-            coords: null, // Will be looked up when loading
-            isStop: false
-          });
-        });
-      }
-      // Fallback to combinedWaypoints if displayWaypoints not available
-      else if (flight.combinedWaypoints && flight.combinedWaypoints.length > 0) {
-        console.log('Using combinedWaypoints to extract waypoints');
-        
-        flight.combinedWaypoints.forEach((wp) => {
-          // Skip stops
-          if (stops.includes(wp)) {
-            return;
-          }
-          
-          waypoints.push({
-            name: wp,
-            type: 'waypoint',
-            legIndex: 0,
-            coords: null,
-            isStop: false
-          });
-        });
-      }
-      
-      console.log(`Extracted ${waypoints.length} waypoints from flight`);
-      return waypoints;
-      
-    } catch (error) {
-      console.error('Error extracting waypoints from flight:', error);
-      return [];
-    }
-  };
+  // extractWaypointsFromFlight function moved to FlightLoader service for centralization
   
   // Handle cancel from SaveFlightCard
   const handleSaveFlightCancel = () => {
@@ -1206,10 +1147,57 @@ const RightPanel = React.forwardRef(({
         rswId: null,
         alternateLocation: alternateRouteData?.name || null, // Include alternate if available
         runAutomation: true,
-        useOnlyProvidedWaypoints: skipWaypointGeneration // Use correct field name
+        useOnlyProvidedWaypoints: skipWaypointGeneration, // Use correct field name
+        policyUuid: (() => {
+          // WIZARD: Always use aircraft default policy (wizard has no UI for fuel policy selection)
+          // First try direct UUID (if aircraft.defaultFuelPolicyId is already a UUID)
+          if (selectedAircraft?.defaultFuelPolicyId) {
+            // Check if it's already a UUID (contains hyphens)
+            if (selectedAircraft.defaultFuelPolicyId.includes('-')) {
+              console.log('🧙‍♂️ WIZARD: Using aircraft default policy UUID directly:', selectedAircraft.defaultFuelPolicyId);
+              return selectedAircraft.defaultFuelPolicyId;
+            }
+            
+            // Otherwise, look up by name
+            const aircraftPolicy = fuelPolicy?.availablePolicies?.find(p => p.name === selectedAircraft.defaultFuelPolicyId);
+            if (aircraftPolicy?.uuid) {
+              console.log('🧙‍♂️ WIZARD: Found aircraft policy by name:', aircraftPolicy.name, aircraftPolicy.uuid);
+              return aircraftPolicy.uuid;
+            }
+            console.log('🧙‍♂️ WIZARD: Aircraft default policy not found by name:', selectedAircraft.defaultFuelPolicyId);
+          }
+          console.log('🧙‍♂️ WIZARD: No aircraft default fuel policy available');
+          return null;
+        })() // 🧙‍♂️ WIZARD: Always use aircraft default (no UI for policy selection)
       };
       
       console.log('🎯 AUTO PLAN: Calling handleSaveFlightSubmit with:', flightData);
+      
+      // 🚨 WIZARD 400 DEBUG: Check aircraft data that will be used
+      const wizardTailNumber = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
+      const wizardNumericIndex = Number(selectedAircraft?.assetId || selectedAircraft?.id || selectedAircraft?.aircraftId || "190");
+      
+      console.log('🚨 WIZARD 400 DEBUG: Aircraft and policy data:', {
+        selectedAircraft: !!selectedAircraft,
+        aircraftReg: selectedAircraft?.registration,
+        aircraftAssetIdentifier: selectedAircraft?.assetIdentifier,  // ✅ This should be the clean tail number
+        aircraftId: selectedAircraft?.id,
+        aircraftAssetId: selectedAircraft?.assetId,
+        aircraftDefaultPolicy: selectedAircraft?.defaultFuelPolicyId,
+        tailNumberUsed: wizardTailNumber,  // ✅ Show what tail number will be sent
+        numericIndexUsed: wizardNumericIndex,  // ✅ Show what numeric index will be sent
+        allAircraftKeys: Object.keys(selectedAircraft || {}),
+        fuelPolicyAvailable: !!fuelPolicy,
+        fuelPolicyPolicies: fuelPolicy?.availablePolicies?.length,
+        flightDataPolicyUuid: flightData.policyUuid,
+        locationsArray: flightData.locations,
+        waypointsCount: flightData.waypoints?.length,
+        // 🌍 REGION DEBUG: Check what region data is available
+        currentRegion: currentRegion,
+        currentRegionName: currentRegion?.name,
+        currentRegionOsdk: currentRegion?.osdkRegion,
+        currentRegionId: currentRegion?.id
+      });
       
       // Use existing save flight logic
       await handleSaveFlightSubmit(flightData);
@@ -1288,10 +1276,41 @@ const RightPanel = React.forwardRef(({
         rswId: null,
         alternateLocation: alternateRouteData?.name || null, // Include alternate if available
         runAutomation: true,
-        useOnlyProvidedWaypoints: false // 🔧 FIX: Allow Palantir to update weather and replan for Auto Plan
+        useOnlyProvidedWaypoints: false, // 🔧 FIX: Allow Palantir to update weather and replan for Auto Plan
+        policyUuid: (() => {
+          // WIZARD: Always use aircraft default policy (wizard has no UI for fuel policy selection)
+          // First try direct UUID (if aircraft.defaultFuelPolicyId is already a UUID)
+          if (selectedAircraft?.defaultFuelPolicyId) {
+            // Check if it's already a UUID (contains hyphens)
+            if (selectedAircraft.defaultFuelPolicyId.includes('-')) {
+              console.log('🧙‍♂️ WIZARD: Using aircraft default policy UUID directly:', selectedAircraft.defaultFuelPolicyId);
+              return selectedAircraft.defaultFuelPolicyId;
+            }
+            
+            // Otherwise, look up by name
+            const aircraftPolicy = fuelPolicy?.availablePolicies?.find(p => p.name === selectedAircraft.defaultFuelPolicyId);
+            if (aircraftPolicy?.uuid) {
+              console.log('🧙‍♂️ WIZARD: Found aircraft policy by name:', aircraftPolicy.name, aircraftPolicy.uuid);
+              return aircraftPolicy.uuid;
+            }
+            console.log('🧙‍♂️ WIZARD: Aircraft default policy not found by name:', selectedAircraft.defaultFuelPolicyId);
+          }
+          console.log('🧙‍♂️ WIZARD: No aircraft default fuel policy available');
+          return null;
+        })() // 🧙‍♂️ WIZARD: Always use aircraft default (no UI for policy selection)
       };
       
       console.log('🎯 AUTO PLAN: Saving existing flight changes with:', flightData);
+      
+      // 🚨 WIZARD 400 DEBUG: Check aircraft data for existing flight
+      const wizardTailNumber2 = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
+      const wizardNumericIndex2 = Number(selectedAircraft?.assetId || selectedAircraft?.id || selectedAircraft?.aircraftId || "190");
+      
+      console.log('🚨 WIZARD EXISTING DEBUG: Aircraft data:', {
+        tailNumberUsed: wizardTailNumber2,
+        numericIndexUsed: wizardNumericIndex2,
+        flightDataPolicyUuid: flightData.policyUuid
+      });
       
       // Use existing save flight logic
       await handleSaveFlightSubmit(flightData);
@@ -1401,6 +1420,7 @@ const RightPanel = React.forwardRef(({
         onFuelOverridesChanged={onFuelOverridesChanged} // 🔥 DIRECT CALLBACK: Pass fuel overrides callback to MainCard
         onRefuelStopsChanged={onRefuelStopsChanged} // 🔄 REFUEL SYNC: Pass refuel stops callback to MainCard
         onDirectSave={handleDirectSave} // 🛩️ SIMPLE SAVE: Pass direct save function to MainCard
+        componentKey={componentKey} // 🚨 NUCLEAR RESET: Force component remount on flight loads
       />
       
       {/* Settings Card */}

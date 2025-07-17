@@ -9,7 +9,7 @@
  * @integration: Works with AlternateMode for complete SAR planning workflow
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { calculateOperationalRadius, calculateMaxSARWeight, calculateMinimumFuel } from '../calculations/SARCalculations';
 
 /**
@@ -53,20 +53,52 @@ export const useSARMode = ({
   const [lastCalculationTime, setLastCalculationTime] = useState(null);
   const [calculationInProgress, setCalculationInProgress] = useState(false);
   
+  // Track previous aircraft to detect changes
+  const prevAircraftRef = useRef(null);
+  
+  // ========================================
+  // AUTO-PRESET AIRCRAFT VALUES
+  // ========================================
+  
+  // Automatically set fuel and weight when aircraft changes
+  useEffect(() => {
+    const currentAircraftId = selectedAircraft?.id || selectedAircraft?.registration;
+    const prevAircraftId = prevAircraftRef.current?.id || prevAircraftRef.current?.registration;
+    
+    // Only apply presets if aircraft actually changed (not on first load with null)
+    if (selectedAircraft && currentAircraftId !== prevAircraftId) {
+      // Set fuel to 80% of max capacity (typical SAR loading)
+      if (selectedAircraft.maxFuel) {
+        setTakeoffFuel(Math.round(selectedAircraft.maxFuel * 0.8));
+      }
+      
+      // Set weight based on aircraft type
+      const modelType = selectedAircraft.modelType || selectedAircraft.modelName || '';
+      let presetWeight = 440; // Default SAR weight
+      
+      if (modelType.includes('S92') || modelType.includes('S-92')) {
+        presetWeight = 600; // Heavier SAR equipment for large aircraft
+      } else if (modelType.includes('AW139') || modelType.includes('139')) {
+        presetWeight = 500; // Medium SAR equipment
+      } else if (modelType.includes('AW169') || modelType.includes('169')) {
+        presetWeight = 450; // Medium-light SAR equipment
+      }
+      
+      setSarWeight(presetWeight);
+      setLastCalculationTime(new Date());
+    }
+    
+    // Update the ref to track the current aircraft
+    prevAircraftRef.current = selectedAircraft;
+  }, [selectedAircraft]);
+  
   // ========================================
   // DERIVED VALUES FROM CURRENT FLIGHT (SIMPLIFIED)
   // ========================================
   
   // Extract fuel requirements from stop cards (single source of truth)
   const routeFuel = (() => {
-    console.log('🚁 SAR: Extracting routeFuel from stopCards:', {
-      hasStopCards: !!stopCards,
-      stopCardsLength: stopCards?.length || 0,
-      stopCards: stopCards
-    });
-    
     if (!stopCards || stopCards.length === 0) {
-      console.log('🚁 SAR: No stopCards available, routeFuel = 0');
       return 0;
     }
     
@@ -75,58 +107,32 @@ export const useSARMode = ({
     const departureCard = stopCards.find(card => card.type === 'departure') || stopCards[0];
     const destinationCard = stopCards.find(card => card.isDestination) || stopCards[stopCards.length - 1];
     
-    console.log('🚁 SAR: Debugging fuel extraction:');
-    console.log('  - departureCard:', departureCard);
-    console.log('  - destinationCard:', destinationCard);
-    console.log('  - departureCard.fuelComponentsObject:', departureCard?.fuelComponentsObject);
-    console.log('  - destinationCard.fuelComponentsObject:', destinationCard?.fuelComponentsObject);
-    
     // Try to get trip fuel from fuel components
     let routeFuelValue = 0;
     if (destinationCard?.fuelComponentsObject?.tripFuel) {
       routeFuelValue = destinationCard.fuelComponentsObject.tripFuel;
-      console.log('🚁 SAR: Using destinationCard.fuelComponentsObject.tripFuel:', routeFuelValue);
     } else if (departureCard?.fuelComponentsObject?.tripFuel) {
       routeFuelValue = departureCard.fuelComponentsObject.tripFuel;
-      console.log('🚁 SAR: Using departureCard.fuelComponentsObject.tripFuel:', routeFuelValue);
     } else {
       // No route fuel available
       routeFuelValue = 0;
-      console.log('🚁 SAR: No route fuel available from stop cards');
     }
-    
-    console.log('🚁 SAR: Final routeFuel value (consumed by route):', routeFuelValue);
     
     return routeFuelValue;
   })();
   
   const alternateFuel = useMemo(() => {
-    console.log('🚁 SAR: ===== ALTERNATEFUEL USEMEMO TRIGGERED =====');
-    console.log('🚁 SAR: Extracting alternateFuel from all sources:', {
-      alternateStats: alternateStats,
-      alternateRouteData: alternateRouteData,
-      hasStopCards: !!stopCards,
-      stopCardsLength: stopCards?.length || 0,
-      debugMessage: 'Need to find the ALTERNATE CARD (A) with Alt:95 fuel value',
-      timestamp: new Date().toISOString()
-    });
-    
     // First try alternateStats
     if (alternateStats?.totalFuelRequired || alternateStats?.fuelRequired) {
       const altFuel = alternateStats.totalFuelRequired || alternateStats.fuelRequired;
-      console.log('🚁 SAR: Using alternateStats fuel:', altFuel);
       return altFuel;
     }
     
     // Second try alternateRouteData - check EVERYTHING in it
     if (alternateRouteData) {
-      console.log('🚁 SAR: FULL alternateRouteData structure:', alternateRouteData);
-      console.log('🚁 SAR: alternateRouteData keys:', Object.keys(alternateRouteData));
-      
       // Try stats first
       if (alternateRouteData?.stats?.totalFuelRequired || alternateRouteData?.stats?.fuelRequired) {
         const altFuel = alternateRouteData.stats.totalFuelRequired || alternateRouteData.stats.fuelRequired;
-        console.log('🚁 SAR: ✅ Using alternateRouteData.stats fuel:', altFuel);
         return altFuel;
       }
       
@@ -134,86 +140,35 @@ export const useSARMode = ({
       const possibleFuelProps = ['alternateFuel', 'altFuel', 'fuelRequired', 'totalFuel', 'fuel'];
       for (const prop of possibleFuelProps) {
         if (alternateRouteData[prop]) {
-          console.log(`🚁 SAR: ✅ Found alternate fuel in alternateRouteData.${prop}:`, alternateRouteData[prop]);
           return alternateRouteData[prop];
         }
       }
-      
-      console.log('🚁 SAR: alternateRouteData exists but no fuel found in it');
     }
     
     // PRIORITY 3: Extract from stop cards (including separate alternate card)
     if (stopCards && stopCards.length > 0) {
-      console.log('🚁 SAR: Searching ALL cards (stop cards + alternate card):', {
-        totalCards: stopCards.length,
-        cardTypes: stopCards.map((card, index) => ({ 
-          index: index,
-          type: card.type, 
-          isAlternate: card.isAlternate, 
-          stopName: card.stopName,
-          totalFuel: card.totalFuel,
-          fuelRequired: card.fuelRequired,
-          fuelComponentsObject: card.fuelComponentsObject,
-          isDestination: card.isDestination,
-          isDeparture: card.isDeparture,
-          cardDescription: `${card.isDeparture ? 'D' : ''}${card.isDestination ? 'F' : ''}${card.isAlternate ? 'A' : ''}`,
-          allKeys: Object.keys(card)
-        }))
-      });
-      
       // Look for alternate card (when alternate route is added)
       const alternateCard = stopCards.find(card => card.isAlternate === true);
       if (alternateCard) {
-        console.log('🚁 SAR: Found alternate card - FULL STRUCTURE:', alternateCard);
-        
         // Extract ONLY the alternate leg fuel (Alt: 112), not total fuel
         const altFuel = alternateCard.fuelComponentsObject?.altFuel || 
                        alternateCard.altFuel || 
                        alternateCard.tripFuel || 0;
         
-        console.log('🚁 SAR: ✅ Alternate fuel extraction attempt:', {
-          stopName: alternateCard.stopName,
-          'fuelComponentsObject exists': !!alternateCard.fuelComponentsObject,
-          'fuelComponentsObject': alternateCard.fuelComponentsObject,
-          'altFuel property (CORRECT KEY)': alternateCard.fuelComponentsObject?.altFuel,
-          'direct altFuel': alternateCard.altFuel,
-          'tripFuel': alternateCard.tripFuel,
-          'totalFuel': alternateCard.totalFuel,
-          'FINAL extractedAltFuel': altFuel
-        });
-        
         if (altFuel > 0) {
-          console.log('🚁 SAR: ✅ Successfully extracted alternate fuel:', altFuel);
           return altFuel;
-        } else {
-          console.log('🚁 SAR: ❌ Alternate card found but no fuel extracted - checking all properties');
-          console.log('🚁 SAR: All alternate card keys:', Object.keys(alternateCard));
         }
       }
       
       // Check departure card for alternate fuel component (first card or card with isDeparture)
       const departureCard = stopCards.find(card => card.isDeparture === true) || stopCards[0];
-      console.log('🚁 SAR: Checking departure card for altFuel - COMPLETE BREAKDOWN:', {
-        stopName: departureCard?.stopName,
-        isDeparture: departureCard?.isDeparture,
-        'ALL fuelComponentsObject keys': departureCard?.fuelComponentsObject ? Object.keys(departureCard.fuelComponentsObject) : 'none',
-        'FULL fuelComponentsObject': departureCard?.fuelComponentsObject,
-        'altFuel property (CORRECT KEY)': departureCard?.fuelComponentsObject?.altFuel,
-        'alt property': departureCard?.fuelComponentsObject?.alt,
-        'alternateFuel property (OLD KEY)': departureCard?.fuelComponentsObject?.alternateFuel,
-        hasAltFuel: !!departureCard?.fuelComponentsObject?.altFuel
-      });
       
       if (departureCard?.fuelComponentsObject?.altFuel) {
         const altFuel = departureCard.fuelComponentsObject.altFuel;
-        console.log('🚁 SAR: ✅ Found altFuel in departure card components:', altFuel);
         return altFuel;
       }
-      
-      console.log('🚁 SAR: No alternate fuel found in stop cards');
     }
     
-    console.log('🚁 SAR: No alternate fuel found, using 0');
     return 0;
   }, [alternateStats, alternateRouteData, stopCards,
       // Add granular dependency tracking for alternate route data properties
@@ -223,15 +178,6 @@ export const useSARMode = ({
       stopCards?.length, 
       stopCards?.some(card => card.isAlternate)]);
   const reserveFuelValue = customReserveFuel !== null ? customReserveFuel : (() => {
-    console.log('🚁 SAR: Extracting reserveFuel:', {
-      hasPreCalculatedReserve: reserveFuel !== null,
-      preCalculatedReserve: reserveFuel,
-      hasStopCards: !!stopCards,
-      stopCardsLength: stopCards?.length || 0,
-      hasFuelPolicy: !!fuelPolicy,
-      selectedAircraftFuelBurn: selectedAircraft?.fuelBurn
-    });
-    
     // PRIORITY 1: Use pre-calculated reserve fuel passed as prop (may be in minutes, need to convert)
     if (reserveFuel !== null && reserveFuel > 0) {
       // Check if this looks like a time value (typical reserve times are 20-45 minutes)
@@ -239,16 +185,9 @@ export const useSARMode = ({
         // Convert minutes to fuel amount
         const reserveHours = reserveFuel / 60;
         const calculatedReserveFuel = reserveHours * selectedAircraft.fuelBurn;
-        console.log('🚁 SAR: ✅ Converting reserve time to fuel:', {
-          reserveMinutes: reserveFuel,
-          reserveHours,
-          fuelBurnRate: selectedAircraft.fuelBurn,
-          calculatedReserveFuel
-        });
         return calculatedReserveFuel;
       } else {
         // Already in fuel amount
-        console.log('🚁 SAR: ✅ Using pre-calculated reserve fuel amount:', reserveFuel);
         return reserveFuel;
       }
     }
@@ -258,7 +197,6 @@ export const useSARMode = ({
       const departureCard = stopCards.find(card => card.type === 'departure') || stopCards[0];
       if (departureCard?.fuelComponentsObject?.reserveFuel) {
         const reserveFromCards = departureCard.fuelComponentsObject.reserveFuel;
-        console.log('🚁 SAR: Using reserve from stop cards:', reserveFromCards);
         return reserveFromCards;
       }
     }
@@ -266,14 +204,6 @@ export const useSARMode = ({
     // Fallback: calculate from fuel policy if aircraft is selected
     if (selectedAircraft && fuelPolicy && fuelPolicy.currentPolicy) {
       const currentPolicy = fuelPolicy.currentPolicy;
-      console.log('🚁 SAR: Calculating reserve from fuel policy:', {
-        selectedAircraft: !!selectedAircraft,
-        fuelPolicy: fuelPolicy,
-        currentPolicy: currentPolicy,
-        fuelBurn: selectedAircraft.fuelBurn,
-        reserveType: currentPolicy.reserveType,
-        reserveValue: currentPolicy.reserveValue
-      });
       
       // Use the same logic as StopCardCalculator for reserve fuel
       const fuelBurnRate = selectedAircraft.fuelBurn || 0;
@@ -282,32 +212,13 @@ export const useSARMode = ({
         const reserveMinutes = currentPolicy.reserveValue;
         const reserveHours = reserveMinutes / 60;
         const calculatedReserve = reserveHours * fuelBurnRate;
-        console.log('🚁 SAR: ✅ Calculated reserve from TIME policy:', {
-          reserveMinutes,
-          reserveHours,
-          fuelBurnRate,
-          calculatedReserve
-        });
         return calculatedReserve;
       } else if (currentPolicy.reserveType === 'FUEL' && currentPolicy.reserveValue) {
         const calculatedReserve = currentPolicy.reserveValue;
-        console.log('🚁 SAR: ✅ Using FUEL policy reserve:', calculatedReserve);
         return calculatedReserve;
-      } else {
-        console.log('🚁 SAR: ❌ Fuel policy missing required fields:', {
-          reserveType: currentPolicy.reserveType,
-          reserveValue: currentPolicy.reserveValue,
-          fuelBurnRate
-        });
       }
-    } else {
-      console.log('🚁 SAR: ❌ Missing selectedAircraft or fuelPolicy:', {
-        hasSelectedAircraft: !!selectedAircraft,
-        hasFuelPolicy: !!fuelPolicy
-      });
     }
     
-    console.log('🚁 SAR: No reserve fuel available, using 0');
     return 0;
   })();
   
@@ -345,7 +256,6 @@ export const useSARMode = ({
   // ========================================
   
   const sarCalculation = useMemo(() => {
-    console.log('🚁 SAR: ===== SARCALCULATION USEMEMO TRIGGERED =====');
     if (!sarEnabled || !selectedAircraft) {
       return null;
     }
@@ -354,35 +264,6 @@ export const useSARMode = ({
     // This ensures SAR calculation updates when route changes
     const waypointCount = waypoints?.length || 0;
     const hasValidFinalWaypoint = finalWaypoint && finalWaypoint.lat && finalWaypoint.lng;
-    
-    console.log('🚁 SAR calculation triggered:', {
-      sarEnabled,
-      selectedAircraft: !!selectedAircraft,
-      waypointCount,
-      hasValidFinalWaypoint,
-      finalWaypoint,
-      waypointDependency,
-      routeFuel,
-      alternateFuel,
-      routeStats: !!routeStats,
-      takeoffFuel,
-      // Add alternate route data debug info
-      alternateRouteDataStats: alternateRouteData?.stats,
-      alternateStatsData: alternateStats,
-      alternateRouteHasStats: !!alternateRouteData?.stats,
-      alternateStatsHasData: !!alternateStats,
-      alternateRouteDataStatsFuel: alternateRouteData?.stats?.totalFuelRequired || alternateRouteData?.stats?.fuelRequired,
-      alternateStatsFuel: alternateStats?.totalFuelRequired || alternateStats?.fuelRequired
-    });
-    
-    console.log('🚁 SAR: About to call calculateOperationalRadius with:', {
-      takeoffFuel,
-      routeFuel,
-      alternateFuel,
-      reserveFuelValue,
-      sarWeight,
-      timeOnTask
-    });
 
     try {
       const result = calculateOperationalRadius({
@@ -400,7 +281,6 @@ export const useSARMode = ({
         waypointDependency
       });
       
-      console.log('🚁 SAR calculation result:', result);
       return result;
     } catch (error) {
       console.error('SAR calculation error:', error);
@@ -476,29 +356,6 @@ export const useSARMode = ({
     setTimeOnTask(value);
   }, []);
   
-  const applyAircraftPresets = useCallback(() => {
-    if (!selectedAircraft) return;
-    
-    // Set fuel to 80% of max capacity (typical SAR loading)
-    if (selectedAircraft.maxFuel) {
-      setTakeoffFuel(Math.round(selectedAircraft.maxFuel * 0.8));
-    }
-    
-    // Set weight based on aircraft type
-    const modelType = selectedAircraft.modelType || selectedAircraft.modelName || '';
-    let presetWeight = 440; // Default SAR weight
-    
-    if (modelType.includes('S92') || modelType.includes('S-92')) {
-      presetWeight = 600; // Heavier SAR equipment for large aircraft
-    } else if (modelType.includes('AW139') || modelType.includes('139')) {
-      presetWeight = 500; // Medium SAR equipment
-    } else if (modelType.includes('AW169') || modelType.includes('169')) {
-      presetWeight = 450; // Medium-light SAR equipment
-    }
-    
-    setSarWeight(presetWeight);
-    setLastCalculationTime(new Date());
-  }, [selectedAircraft]);
   
   // ========================================
   // COMPUTED PROPERTIES (SIMPLIFIED)
@@ -540,12 +397,6 @@ export const useSARMode = ({
   // Range circle data for map display
   const rangeCircleData = (() => {
     if (!isOperational || !finalWaypoint || !sarCalculation) {
-      console.log('🚁 Range circle not displayed:', {
-        isOperational,
-        hasFinalWaypoint: !!finalWaypoint,
-        hasSarCalculation: !!sarCalculation,
-        finalWaypoint
-      });
       return null;
     }
     
@@ -556,7 +407,6 @@ export const useSARMode = ({
       helicopterPosition: finalWaypoint
     };
     
-    console.log('🚁 Range circle data generated:', circleData);
     return circleData;
   })();
   
@@ -655,7 +505,6 @@ export const useSARMode = ({
     updateTakeoffFuel,
     updateSARWeight,
     updateTimeOnTask,
-    applyAircraftPresets,
     
     // Calculation Results
     sarCalculation,

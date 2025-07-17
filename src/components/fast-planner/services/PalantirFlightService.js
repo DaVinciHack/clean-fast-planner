@@ -16,6 +16,62 @@ class PalantirFlightService {
   }
   
   /**
+   * Inspect createFlightWithWaypoints API to see its signature
+   * @returns {Promise<Object>} - Information about the function signature
+   */
+  static async inspectCreateFlightWithWaypoints() {
+    try {
+      console.log("🔍 INSPECTING: createFlightWithWaypoints API...");
+      
+      const sdk = await this.getSDK();
+      
+      if (!sdk.createFlightWithWaypoints) {
+        return { error: "createFlightWithWaypoints not available" };
+      }
+      
+      // Try to inspect the function signature
+      const func = sdk.createFlightWithWaypoints;
+      console.log("🔍 Function type:", typeof func);
+      console.log("🔍 Function string:", func.toString());
+      
+      // Try to access any metadata if available
+      if (func.metadata) {
+        console.log("🔍 Function metadata:", func.metadata);
+      }
+      
+      if (func.parameters) {
+        console.log("🔍 Function parameters:", func.parameters);
+      }
+      
+      if (func.signature) {
+        console.log("🔍 Function signature:", func.signature);
+      }
+      
+      // Check if it has any properties that might indicate parameter structure
+      const props = Object.getOwnPropertyNames(func);
+      console.log("🔍 Function properties:", props);
+      
+      for (const prop of props) {
+        if (prop !== 'length' && prop !== 'name' && prop !== 'prototype') {
+          console.log(`🔍 Property ${prop}:`, func[prop]);
+        }
+      }
+      
+      return { 
+        type: typeof func,
+        properties: props,
+        hasMetadata: !!func.metadata,
+        hasParameters: !!func.parameters,
+        hasSignature: !!func.signature
+      };
+      
+    } catch (error) {
+      console.error("🔍 Function inspection failed:", error);
+      return { error: error.message };
+    }
+  }
+
+  /**
    * Run a diagnostic test with minimal parameters to identify API issues
    * @returns {Promise<boolean>} - True if the diagnostic succeeded
    */
@@ -99,11 +155,26 @@ class PalantirFlightService {
     // Check if this is an update (existing flight with ID) or create (new flight)
     const isUpdate = flightData.flightId && flightData.flightId.trim() !== '';
     
+    // 🎯 ENHANCED LOGGING: Detailed save operation tracking
+    console.log('🎯 PALANTIR SAVE OPERATION ANALYSIS:', {
+      operation: isUpdate ? 'UPDATE' : 'CREATE',
+      flightId: flightData.flightId,
+      hasFlightId: !!flightData.flightId,
+      flightIdLength: flightData.flightId?.length || 0,
+      flightIdTrimmed: flightData.flightId?.trim(),
+      waypointCount: flightData.waypoints?.length || 0,
+      flightName: flightData.flightName,
+      aircraftId: flightData.aircraftId,
+      assetIdx: flightData.assetIdx,
+      aircraftIdType: typeof flightData.aircraftId,
+      assetIdxType: typeof flightData.assetIdx
+    });
+    
     if (isUpdate) {
-      console.log(`Updating existing flight with ID: ${flightData.flightId}`);
+      console.log(`✅ UPDATING existing flight with ID: ${flightData.flightId}`);
       return await this.updateFlight(flightData);
     } else {
-      console.log('Creating new flight');
+      console.warn('⚠️ CREATING NEW FLIGHT - this may cause waypoint duplication if flight ID should exist');
       return await this.createNewFlight(flightData);
     }
   }
@@ -131,6 +202,7 @@ class PalantirFlightService {
     
     try {
       // Check if we should use the new createFlightWithWaypoints function
+      // ✅ TRY: Use newer API instead of forcing legacy API
       if (sdk.createFlightWithWaypoints) {
         console.log('Using new createFlightWithWaypoints function');
         
@@ -212,12 +284,39 @@ class PalantirFlightService {
           "locations": cleanLocations,
           "displayWaypoints": displayWaypoints,  // Send structured waypoint information
           "useOnlyProvidedWaypoints": flightData.useOnlyProvidedWaypoints ?? false,  // 🔧 FIX: Respect Auto Plan setting for weather replanning
-          "aircraftId": flightData.aircraftId || "190",
+          "aircraftId": flightData.aircraftId || "190",    // ✅ Tail number
+          ...(flightData.assetIdx && { "assetIdx": Number(flightData.assetIdx) }),      // ✅ Numeric index (optional)
           "region": flightData.region || "NORWAY",
           "etd": flightData.etd || new Date().toISOString() // 🧙‍♂️ WIZARD FIX: Include ETD in newer API
+          // 🚨 DEBUG: Temporarily removing policy UUID to test other parameters
         };
         
         console.log('🧙‍♂️ CREATEFLIGHT DEBUG: params.etd =', params.etd);
+        console.log('🛩️ POLICY DEBUG: flightData.policyUuid =', flightData.policyUuid, '(temporarily removed for testing)');
+        console.log('🚨 CRITICAL DEBUG: Full params being sent to createFlightWithWaypoints:', JSON.stringify(params, null, 2));
+        
+        // 🔍 PARAMETER DISCOVERY: Inspect the API function signature
+        console.log('🔍 To inspect the API function signature, run this in console:');
+        console.log('window.PalantirFlightService.inspectCreateFlightWithWaypoints()');
+        
+        // Make the service available globally for testing
+        if (typeof window !== 'undefined') {
+          window.PalantirFlightService = PalantirFlightService;
+        }
+        
+        // 🚨 WIZARD DEBUG: Check for potential 400 error causes
+        console.log('🚨 WIZARD 400 DEBUG:', {
+          hasFlightName: !!params.flightName,
+          flightNameLength: params.flightName?.length,
+          hasLocations: !!params.locations,
+          locationsCount: params.locations?.length,
+          hasAircraftId: !!params.aircraftId,
+          aircraftIdType: typeof params.aircraftId,
+          policyUuidProvided: !!flightData.policyUuid,
+          hasRegion: !!params.region,
+          hasETD: !!params.etd,
+          etdValid: !isNaN(new Date(params.etd))
+        });
         
         // Add crew members if provided
         if (flightData.captainId) params.captainId = flightData.captainId;
@@ -235,10 +334,28 @@ class PalantirFlightService {
         );
         
         console.log('Flight creation with structured waypoints successful!', result);
+        
+        // 🛩️ POST-CREATION POLICY: Try to add policy UUID after flight creation if provided
+        if (flightData.policyUuid && result) {
+          console.log('🛩️ Attempting to add policy UUID after flight creation...');
+          try {
+            const flightId = this.extractFlightId(result);
+            console.log('🛩️ Extracted flight ID for policy update:', flightId);
+            
+            // Here we could try to update the flight with policy UUID using updateFastPlannerFlight
+            // or save it via the fuel save-back service
+            console.log('🛩️ Policy UUID will be handled by fuel save-back service for flight:', flightId);
+            
+          } catch (policyError) {
+            console.warn('🛩️ Could not add policy UUID after creation:', policyError);
+          }
+        }
+        
         return result;
       } else {
-        // Fall back to the old createNewFlightFp2 if the new function is not available
-        console.log('New createFlightWithWaypoints function not available, falling back to createNewFlightFp2');
+        // Fall back to the old createNewFlightFp2 if the new function is not available OR if we need policy UUID support
+        const reason = !sdk.createFlightWithWaypoints ? 'function not available' : 'policy UUID support needed';
+        console.log(`Using legacy createNewFlightFp2 API (${reason})`);
         
         // Use a greatly simplified approach that matches the working ApiTester
         // 🧙‍♂️ DEBUG: Log ETD before and after fallback
@@ -257,16 +374,18 @@ class PalantirFlightService {
         
         const cleanData = {
           flightName: flightData.flightName || "Test Flight",
-          aircraftRegion: "NORWAY",
-          new_parameter: "Norway",
-          aircraftId: flightData.aircraftId || "190",
-          region: "NORWAY",
+          aircraftRegion: "GULF_OF_MEXICO",  // ✅ TEMP: Hardcode Gulf of Mexico for wizard
+          new_parameter: "Gulf of Mexico",
+          aircraftId: flightData.aircraftId || "N109DR",    // ✅ Back to aircraftId
+          // NOTE: Removing asset_idx to test without it
+          region: "GULF_OF_MEXICO",  // ✅ TEMP: Hardcode Gulf of Mexico for wizard
           etd: finalETD,
           locations: cleanLocations,
           alternateLocation: flightData.alternateLocation || "",
           // Only include crew if provided
           ...(flightData.captainId ? { captainId: flightData.captainId } : {}),
-          ...(flightData.copilotId ? { copilotId: flightData.copilotId } : {})
+          ...(flightData.copilotId ? { copilotId: flightData.copilotId } : {}),
+          // NOTE: Legacy API doesn't support policy UUID - will be saved in fuel object instead
         };
         
         // Log the clean data 
@@ -285,6 +404,7 @@ class PalantirFlightService {
         console.log('Calling createNewFlightFp2 with params:', params);
         // 🧙‍♂️ DEBUG: Log final ETD in params object
         console.log('🧙‍♂️ PALANTIR DEBUG: Final params.etd =', params.etd);
+        console.log('🛩️ LEGACY API DEBUG: Final params with policy fields:', JSON.stringify(params, null, 2));
         
         // Make the API call with the exact format from the documentation
         const result = await client(sdk.createNewFlightFp2).applyAction(
@@ -298,8 +418,22 @@ class PalantirFlightService {
     } catch (error) {
       console.error('Error creating flight:', error);
       
-      // Log the full error for debugging
-      console.error('Error details:', error);
+      // 🚨 ENHANCED ERROR LOGGING: Get detailed error information
+      console.error('🚨 DETAILED ERROR ANALYSIS:', {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorCode: error.errorCode,
+        statusCode: error.statusCode,
+        errorInstanceId: error.errorInstanceId,
+        parameters: error.parameters,
+        submissionCriteria: error.submissionCriteria,
+        fullError: error
+      });
+      
+      // Try to extract validation details if available
+      if (error.parameters) {
+        console.error('🚨 PARAMETER VALIDATION:', error.parameters);
+      }
       
       throw error;
     }
@@ -372,7 +506,11 @@ class PalantirFlightService {
         };
         
         // Add optional parameters if provided
-        if (flightData.aircraftId) params.aircraftId = flightData.aircraftId;
+        if (flightData.aircraftId) params.aircraftId = flightData.aircraftId;    // ✅ Tail number
+        if (flightData.assetIdx !== undefined && flightData.assetIdx !== null) {
+          params.assetIdx = Number(flightData.assetIdx);   // ✅ Numeric index
+          console.log('🎯 PALANTIR: Adding assetIdx:', params.assetIdx, 'type:', typeof params.assetIdx);
+        }
         if (flightData.alternateLocation) params.alternateLocation = flightData.alternateLocation;
         if (flightData.captainId) params.captainId = flightData.captainId;
         if (flightData.copilotId) params.copilotId = flightData.copilotId;
@@ -520,14 +658,19 @@ class PalantirFlightService {
     // Based on actual implementation, use simple string for aircraftId
     const formattedParams = {
       "flightName": params.flightName || "Test Flight",
-      "aircraftRegion": "NORWAY",
-      "new_parameter": "Norway",
+      "aircraftRegion": "GULF_OF_MEXICO",  // ✅ HARDCODE: Gulf of Mexico for wizard
+      "new_parameter": "Gulf of Mexico",
       "aircraftId": params.aircraftId || "190", // Use the numeric ID as fallback
-      "region": "NORWAY",
+      "region": "GULF_OF_MEXICO",  // ✅ HARDCODE: Gulf of Mexico for wizard
       "etd": params.etd || new Date().toISOString(),
       "locations": Array.isArray(params.locations) ? params.locations : ["ENZV", "ENLE"],
       "alternateLocation": params.alternateLocation || ""
     };
+    
+    // NOTE: Testing without asset_idx field
+    
+    // NOTE: Legacy API doesn't support policy UUID parameters
+    // Policy UUID will be saved in the fuel object via fuel save-back service
     
     // Add crew members only if provided
     if (params.captainId) {

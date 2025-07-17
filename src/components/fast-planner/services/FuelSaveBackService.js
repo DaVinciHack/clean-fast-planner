@@ -103,13 +103,7 @@ export class FuelSaveBackService {
             const currentTotalFuel = Math.round(stopCards?.[0]?.totalFuel || 0);
             const existingTotalFuel = Math.round(existingFuelData.minTotalFuel || 0);
             
-            console.log('🔍 DUPLICATE PREVENTION: Comparison data:', {
-              currentTotalFuel,
-              existingTotalFuel,
-              stopCardsLength: stopCards?.length,
-              existingStopsLength: existingFuelData?.stopLocations?.length,
-              hasExistingData: !!existingFuelData
-            });
+            console.log('🔍 Fuel comparison: current', currentTotalFuel, 'vs existing', existingTotalFuel);
             
             // Use the same robust logic as autoSaveFuelData
             if (!this.shouldSaveFuelData(stopCards, existingFuelData, currentTotalFuel, existingTotalFuel)) {
@@ -218,8 +212,23 @@ export class FuelSaveBackService {
       
       // 🚨 AVIATION SAFETY: NO FALLBACKS - Use only verified data or explicit null
       
-      // Only use actual verified data - NO fallbacks that could mislead pilots
-      const outboundFuel = routeStats?.tripFuel ? Math.round(routeStats.tripFuel) : null;
+      // Get trip fuel from StopCardCalculator (single source of truth) instead of routeStats
+      // Calculate total trip fuel from all segments in stopCards
+      let calculatedTripFuel = 0;
+      if (stopCards && stopCards.length > 0) {
+        stopCards.forEach(card => {
+          if (card.fuelComponentsObject?.tripFuel) {
+            calculatedTripFuel += card.fuelComponentsObject.tripFuel;
+          }
+        });
+      }
+      
+      // Trip fuel calculation (reduced logging)
+      console.log('🔍 Trip fuel calculation:', calculatedTripFuel, 'lbs from', stopCards?.length || 0, 'stops');
+      
+      // Use calculated trip fuel from StopCardCalculator (primary) or fallback to routeStats (legacy)
+      const outboundFuel = calculatedTripFuel > 0 ? Math.round(calculatedTripFuel) : 
+                          (routeStats?.tripFuel ? Math.round(routeStats.tripFuel) : null);
       const alternateFuel = routeStats?.alternateFuel ? Math.round(routeStats.alternateFuel) : null;
       
       // Only use actual departure card data - NO fallbacks
@@ -229,20 +238,25 @@ export class FuelSaveBackService {
       const reserveFuel = departureCard.fuelComponentsObject?.reserveFuel ? Math.round(departureCard.fuelComponentsObject.reserveFuel) : null;
       
       // 🚨 AVIATION SAFETY CHECK: Verify we have essential fuel data
+      // Reduced fuel validation logging
+      console.log('🔍 Fuel validation: outbound', outboundFuel, 'taxi', taxiFuel, 'reserve', reserveFuel);
+      
       if (outboundFuel === null || taxiFuel === null || reserveFuel === null) {
-        throw new Error('AVIATION SAFETY: Missing essential fuel data - cannot save without verified values');
+        const missingValues = [];
+        if (outboundFuel === null) missingValues.push('outboundFuel (from routeStats.tripFuel)');
+        if (taxiFuel === null) missingValues.push('taxiFuel (from departureCard.fuelComponentsObject.taxiFuel)');
+        if (reserveFuel === null) missingValues.push('reserveFuel (from departureCard.fuelComponentsObject.reserveFuel)');
+        
+        console.error('❌ FUEL VALIDATION: Missing essential fuel values:', missingValues);
+        throw new Error(`AVIATION SAFETY: Missing essential fuel data - cannot save without verified values. Missing: ${missingValues.join(', ')}`);
       }
       
       // Only calculate if we have actual data
       const totalAlternateFuel = taxiFuel + outboundFuel + (alternateFuel || 0) + (totalContingency || 0) + reserveFuel + (extraFuel || 0);
       
       // Only use actual passenger count - NO fallbacks for critical calculations
-      console.log('🔍 PASSENGER DEBUG: Departure card passenger data:', {
-        maxPassengers: departureCard.maxPassengers,
-        passengers: departureCard.passengers,
-        requestedPassengersArray: requestedPassengers,
-        departureCardKeys: Object.keys(departureCard)
-      });
+      // Reduced passenger logging
+      console.log('🔍 Passenger count:', departureCard.maxPassengers || departureCard.passengers);
       
       const alternatePassengers = departureCard.maxPassengers || departureCard.passengers;
       if (alternatePassengers === undefined || alternatePassengers === null) {
@@ -250,11 +264,8 @@ export class FuelSaveBackService {
       }
       const alternatePassengerWeight = alternatePassengers * regionalPassengerWeight;
       
-      console.log('🔍 PASSENGER DEBUG: Final values:', {
-        alternatePassengers,
-        alternatePassengerWeight,
-        regionalPassengerWeight
-      });
+      // Final passenger calculation
+      console.log('🔍 Final passengers:', alternatePassengers, 'weight:', alternatePassengerWeight);
       const alternateLandingFuel = reserveFuel + (totalContingency || 0) + (extraFuel || 0);
       
       // Generate ALL 4 tables in proper MARKDOWN format matching Palantir
@@ -437,7 +448,7 @@ export class FuelSaveBackService {
         "stop_excess_fuels": stopExcessFuels,
         
         // Summary fuel values - FIXED: Use fuelComponentsObject
-        "planned_trip_fuel": Math.round(departureCard.fuelComponentsObject?.tripFuel || routeStats.tripFuel || taxiFuel), // Use taxiFuel as minimum if no trip fuel
+        "planned_trip_fuel": Math.round(departureCard.fuelComponentsObject?.tripFuel || (routeStats?.tripFuel) || taxiFuel), // Use taxiFuel as minimum if no trip fuel
         "planned_extra_fuel": Math.round(stopCards.reduce((total, card) => {
           const cardExtraFuel = card?.fuelComponentsObject?.extraFuel || card?.extraFuel;
           return total + (cardExtraFuel || 0); // Only for sum calculation
@@ -452,7 +463,7 @@ export class FuelSaveBackService {
         
         // Critical fuel totals  
         "round_trip_fuel": Math.round(departureCard.totalFuel), // Must have total fuel
-        "planned_alternate_fuel": Math.round(alternateFuel || routeStats.minimumFuel || reserveFuel), // Use calculated alternate
+        "planned_alternate_fuel": Math.round(alternateFuel || (routeStats?.minimumFuel) || reserveFuel), // Use calculated alternate with safe access
         "total_fuel_burned": Math.round(outboundFuel), // Use verified outbound fuel
         "total_fuel_uplifted": Math.round(departureCard.totalFuel), // Must have total fuel
         
@@ -796,7 +807,7 @@ export class FuelSaveBackService {
       policyUuid: fuelPolicy?.uuid || fuelPolicy?.currentPolicy?.uuid || null,
       
       // 🎯 CRITICAL: Planned fuel totals from actual calculations (not settings)
-      plannedTripFuel: Math.round(departureCard.tripFuel || routeStats.tripFuel || 0), // This was missing!
+      plannedTripFuel: Math.round(departureCard.tripFuel || (routeStats?.tripFuel) || 0), // This was missing!
       plannedTaxiFuel: Math.round(departureCard.taxiFuel || 0),
       plannedContingencyFuel: Math.round(departureCard.contingencyFuel || 0),
       plannedReserveFuel: Math.round(departureCard.reserveFuel || 0),
@@ -969,7 +980,7 @@ export class FuelSaveBackService {
         totalFuel: departureCard.totalFuel || 0,
         
         // Trip fuel (actual fuel consumption for flight)
-        tripFuel: routeStats.tripFuel || departureCard.tripFuel || 0,
+        tripFuel: (routeStats?.tripFuel) || departureCard.tripFuel || 0,
         
         // Reserve fuel (policy-based)
         reserveFuel: departureCard.reserveFuel || flightSettings.reserveFuel || 0,
@@ -1594,7 +1605,7 @@ export class FuelSaveBackService {
       "stop_excess_fuels": stopExcessFuels,
       
       // Summary fuel values
-      "planned_trip_fuel": Math.round(departureCard.tripFuel || routeStats.tripFuel || 0),
+      "planned_trip_fuel": Math.round(departureCard.tripFuel || (routeStats?.tripFuel) || 0),
       "planned_extra_fuel": Math.round(stopCards.reduce((total, card) => {
         const cardExtraFuel = card?.extraFuel || card?.fuelComponentsObject?.extraFuel || 0;
         return total + cardExtraFuel;
@@ -1609,8 +1620,8 @@ export class FuelSaveBackService {
       
       // Critical fuel totals  
       "round_trip_fuel": Math.round(departureCard.totalFuel || 0),
-      "planned_alternate_fuel": Math.round(routeStats.alternateFuel || routeStats.minimumFuel || departureCard.reserveFuel || 0),
-      "total_fuel_burned": Math.round(routeStats.tripFuel || departureCard.tripFuel || 0),
+      "planned_alternate_fuel": Math.round((routeStats?.alternateFuel) || (routeStats?.minimumFuel) || departureCard.reserveFuel || 0),
+      "total_fuel_burned": Math.round((routeStats?.tripFuel) || departureCard.tripFuel || 0),
       "total_fuel_uplifted": Math.round(departureCard.totalFuel || 0),
       
       // Passenger data
