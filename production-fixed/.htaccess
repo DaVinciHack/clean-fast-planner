@@ -1,0 +1,56 @@
+# .htaccess for FastPlanner production deployment
+# Configuration for React SPA with OSDK authentication
+
+# Enable URL rewriting
+RewriteEngine On
+
+# Security headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+
+# CORS headers for OSDK authentication
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+
+# Handle preflight requests
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# Cache static assets (but not index.html)
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|ttf|woff|woff2|map)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+    
+    # Enable compression for these files
+    <IfModule mod_deflate.c>
+        SetOutputFilter DEFLATE
+    </IfModule>
+</FilesMatch>
+
+# Don't cache HTML files (for updates)
+<FilesMatch "\.(html|htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+</FilesMatch>
+
+# Handle React Router - redirect all non-file requests to index.html
+# But exclude auth directory and API calls
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/auth/
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule . /plan/index.html [L]
+
+# Ensure auth directory is accessible
+RewriteCond %{REQUEST_URI} ^/auth/
+RewriteRule ^auth/(.*)$ auth/$1 [L]
+
+# Force HTTPS (uncomment if using HTTPS)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Error pages
+ErrorDocument 404 /plan/index.html
+ErrorDocument 500 /plan/index.html

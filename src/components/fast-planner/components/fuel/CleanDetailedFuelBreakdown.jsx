@@ -66,6 +66,8 @@ const CleanDetailedFuelBreakdown = ({
   currentRefuelStops = [],
   // Platform manager for real platform data
   platformManager = null,
+  // Map manager for visual rings
+  mapManager = null,
   // Main callback to update parent
   onFuelDataChanged = () => {}
 }) => {
@@ -119,6 +121,71 @@ const CleanDetailedFuelBreakdown = ({
   const [hasTriggeredOptimization, setHasTriggeredOptimization] = useState(false);
   const [optimizationDebugLog, setOptimizationDebugLog] = useState([]);
   
+  // 🗺️ MAP RINGS: Add colored rings around fuel stop suggestions
+  const addFuelStopRings = useCallback((suggestions, mapManager) => {
+    if (!mapManager?.map || !suggestions?.length) return;
+    
+    const colors = ['#FF1493', '#DA70D6', '#DDA0DD']; // Deep Pink → Orchid → Plum
+    
+    suggestions.slice(0, 3).forEach((suggestion, index) => {
+      const platform = suggestion.platform;
+      if (!platform) return;
+      
+      // Handle multiple coordinate formats
+      let lat, lng;
+      if (platform.lat !== undefined && platform.lng !== undefined) {
+        lat = platform.lat;
+        lng = platform.lng;
+      } else if (platform.coordinates && Array.isArray(platform.coordinates) && platform.coordinates.length === 2) {
+        lng = platform.coordinates[0];
+        lat = platform.coordinates[1];
+      } else {
+        console.warn('🗺️ RINGS: Invalid coordinates for platform:', platform.name);
+        return;
+      }
+      
+      const sourceId = `fuel-stop-ring-${index}`;
+      const layerId = `fuel-stop-ring-layer-${index}`;
+      
+      // Remove existing layer and source if they exist
+      if (mapManager.map.getLayer(layerId)) {
+        mapManager.map.removeLayer(layerId);
+      }
+      if (mapManager.map.getSource(sourceId)) {
+        mapManager.map.removeSource(sourceId);
+      }
+      
+      // Add source
+      mapManager.map.addSource(sourceId, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          }
+        }
+      });
+      
+      // Add stroke-only circle layer
+      mapManager.map.addLayer({
+        id: layerId,
+        type: 'circle',
+        source: sourceId,
+        paint: {
+          'circle-color': 'transparent',
+          'circle-opacity': 0,
+          'circle-stroke-width': 3,
+          'circle-stroke-color': colors[index],
+          'circle-stroke-opacity': 0.9,
+          'circle-radius': 15
+        }
+      });
+      
+      console.log(`🗺️ RING: Added ring ${index + 1} for ${platform.name} at [${lng}, ${lat}]`);
+    });
+  }, []);
+  
   // 🎯 OPTIMIZATION MANAGER: Initialize the fuel stop optimization system
   const optimizationManager = useMemo(() => {
     const manager = new FuelStopOptimizationManager();
@@ -131,6 +198,12 @@ const CleanDetailedFuelBreakdown = ({
           data: suggestions.suggestions?.map(s => `${s.platform.name} (+${s.passengerGain} pax)`),
           timestamp: Date.now()
         }]);
+        
+        // 🗺️ ADD MAP RINGS: Show visual rings for top 3 suggestions
+        if (mapManager && suggestions.suggestions?.length > 0) {
+          addFuelStopRings(suggestions.suggestions, mapManager);
+        }
+        
         setFuelStopPopup({
           type: 'suggestions',
           data: suggestions,
@@ -176,7 +249,7 @@ const CleanDetailedFuelBreakdown = ({
       }
     });
     return manager;
-  }, []);
+  }, [addFuelStopRings, mapManager]);
   
   // 🎯 WIZARD DATA EXTRACTION: Extract passenger data from wizard
   const getWizardPassengerData = useCallback(() => {
@@ -367,6 +440,25 @@ const CleanDetailedFuelBreakdown = ({
   useEffect(() => {
     onFuelDataChangedRef.current = onFuelDataChanged;
   });
+
+
+  // 🗺️ CLEANUP: Remove fuel stop rings from map
+  const removeFuelStopRings = useCallback((mapManager) => {
+    if (!mapManager?.map) return;
+    
+    for (let i = 0; i < 3; i++) {
+      const layerId = `fuel-stop-ring-layer-${i}`;
+      const sourceId = `fuel-stop-ring-${i}`;
+      
+      if (mapManager.map.getLayer(layerId)) {
+        mapManager.map.removeLayer(layerId);
+      }
+      if (mapManager.map.getSource(sourceId)) {
+        mapManager.map.removeSource(sourceId);
+      }
+    }
+    console.log('🗺️ RINGS: Cleaned up fuel stop rings');
+  }, []);
   
   // Stable callback that won't change reference
   const stableOnFuelDataChanged = useCallback((effectiveSettings) => {
@@ -573,6 +665,10 @@ const CleanDetailedFuelBreakdown = ({
         // Reset when no overload
         setFuelStopPopup(null);
         setHasTriggeredOptimization(false);
+        // 🗺️ CLEANUP: Remove rings when no overload
+        if (mapManager) {
+          removeFuelStopRings(mapManager);
+        }
       }
       
       if (maxPassengersRequested > 0 && onFuelDataChanged) {
@@ -607,9 +703,22 @@ const CleanDetailedFuelBreakdown = ({
     if (!visible && isInitialized) {
       console.log('🔄 RESET: Component closed, resetting for next open');
       setIsInitialized(false);
+      // 🗺️ CLEANUP: Remove map rings when component closes
+      if (mapManager) {
+        removeFuelStopRings(mapManager);
+      }
       // Don't clear refuelStopsRef here - let it be re-read on next open
     }
-  }, [visible, isInitialized]);
+  }, [visible, isInitialized, mapManager, removeFuelStopRings]);
+
+  // 🗺️ CLEANUP: Remove rings on component unmount
+  useEffect(() => {
+    return () => {
+      if (mapManager) {
+        removeFuelStopRings(mapManager);
+      }
+    };
+  }, [mapManager, removeFuelStopRings]);
   
   // 🚀 DIRECT CALCULATOR: Removed - now handled directly in setState callback to avoid closure issues
   
@@ -1691,6 +1800,10 @@ const CleanDetailedFuelBreakdown = ({
           setFuelStopPopup({ type: 'background', data: fuelStopPopup.data });
         } else {
           setFuelStopPopup(null);
+          // 🗺️ CLEANUP: Remove rings when popup closed
+          if (mapManager) {
+            removeFuelStopRings(mapManager);
+          }
         }
       }}>
         <div className="fuel-optimization-popup" style={{
@@ -1868,7 +1981,13 @@ const CleanDetailedFuelBreakdown = ({
                 {fuelStopPopup.message}
               </div>
               <button 
-                onClick={() => setFuelStopPopup(null)}
+                onClick={() => {
+                  setFuelStopPopup(null);
+                  // 🗺️ CLEANUP: Remove rings when popup closed
+                  if (mapManager) {
+                    removeFuelStopRings(mapManager);
+                  }
+                }}
                 style={{
                   background: '#e74c3c',
                   color: '#fff',
@@ -1889,19 +2008,26 @@ const CleanDetailedFuelBreakdown = ({
               {/* AI Assistant Message */}
               <div className="ai-message">
                 {(() => {
-                  // Extract overloaded location info
-                  const overloadedLocation = fuelStopPopup.data.overloadDetails?.find(loc => loc.isWeightOverload);
-                  const locationName = overloadedLocation?.locationName || 'your destination';
-                  const excessWeight = overloadedLocation ? 
-                    (overloadedLocation.requestedWeight - overloadedLocation.availableWeight) : 0;
+                  // Extract actual overload data from current stops
+                  let overloadInfo = { locationName: 'your destination', excessWeight: 0 };
+                  
+                  // Check overloadedStops for actual data
+                  if (overloadedStops.length > 0) {
+                    const firstOverload = overloadedStops[0];
+                    const locationName = firstOverload.name || firstOverload.stopName;
+                    const requestedWeight = getPassengerRequest(locationName, 'totalWeight');
+                    const availableWeight = firstOverload.availableWeight || 0;
+                    const excessWeight = Math.max(0, requestedWeight - availableWeight);
+                    
+                    overloadInfo = {
+                      locationName: locationName,
+                      excessWeight: excessWeight
+                    };
+                  }
                   
                   return (
                     <>
-                      I've detected that you'll be <span className="highlight">{excessWeight.toFixed(0)} lbs overweight</span> at <span className="highlight">{locationName}</span>. 
-                      This exceeds your aircraft's capacity and could impact safety and performance.
-                      <br/><br/>
-                      Don't worry - I've analyzed your route and found <span className="highlight">{fuelStopPopup.data.suggestions?.length || 0} strategic fuel stops</span> that could resolve this issue. 
-                      By adding fuel at one of these locations, we can reduce your aircraft weight and increase passenger capacity for a smoother, safer flight.
+                      Weight overload detected at <span className="highlight">{overloadInfo.locationName}</span> - you'll be <span className="highlight">{overloadInfo.excessWeight} lbs over capacity</span>. Found <span className="highlight">{fuelStopPopup.data.suggestions?.length || 0} fuel stops</span> that can help.
                     </>
                   );
                 })()}
@@ -1974,7 +2100,13 @@ const CleanDetailedFuelBreakdown = ({
               
               <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                 <button 
-                  onClick={() => setFuelStopPopup(null)}
+                  onClick={() => {
+                    setFuelStopPopup(null);
+                    // 🗺️ CLEANUP: Remove rings when popup closed
+                    if (mapManager) {
+                      removeFuelStopRings(mapManager);
+                    }
+                  }}
                   style={{
                     background: '#666',
                     color: '#fff',
@@ -1989,7 +2121,13 @@ const CleanDetailedFuelBreakdown = ({
                   Maybe Later
                 </button>
                 <button 
-                  onClick={() => setFuelStopPopup(null)}
+                  onClick={() => {
+                    setFuelStopPopup(null);
+                    // 🗺️ CLEANUP: Remove rings when popup closed
+                    if (mapManager) {
+                      removeFuelStopRings(mapManager);
+                    }
+                  }}
                   style={{
                     background: 'linear-gradient(135deg, #81c784, #66bb6a)',
                     color: '#fff',
