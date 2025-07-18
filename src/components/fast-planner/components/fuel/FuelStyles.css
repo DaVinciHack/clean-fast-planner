@@ -4,6 +4,149 @@
  * Styles for the Enhanced Fuel Display components
  */
 
+/* Fuel Stop Optimization Popup Animations */
+@keyframes optimizationPopupFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes optimizationBackdropFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes optimizationPopupSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes optimizationPopupFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+@keyframes optimizationBackdropFadeOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.fuel-optimization-backdrop {
+  animation: optimizationBackdropFadeIn 0.3s ease-out;
+}
+
+.fuel-optimization-backdrop.closing {
+  animation: optimizationBackdropFadeOut 0.25s ease-in;
+}
+
+.fuel-optimization-popup {
+  animation: optimizationPopupSlideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fuel-optimization-popup.closing {
+  animation: optimizationPopupFadeOut 0.25s ease-in;
+}
+
+/* AI Message Styling */
+.ai-message {
+  background: linear-gradient(135deg, #1e3a8a, #3730a3);
+  border: 1px solid #60a5fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  color: #e0e7ff;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  position: relative;
+}
+
+.ai-message::before {
+  content: "🤖";
+  position: absolute;
+  top: -8px;
+  left: 16px;
+  background: linear-gradient(135deg, #1e3a8a, #3730a3);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  border: 1px solid #60a5fa;
+}
+
+.ai-message .highlight {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+/* Suggestion Cards Layout */
+.suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.suggestion-card {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 14px;
+  transition: all 0.2s ease;
+}
+
+.suggestion-card:hover {
+  background: #333;
+  border-color: #4fc3f7;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 195, 247, 0.2);
+}
+
+.suggestion-card-header {
+  color: #4fc3f7;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.suggestion-card-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.suggestion-card-benefit {
+  color: #81c784;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 /* Fuel Display Component */
 .fuel-display {
   width: 100%;

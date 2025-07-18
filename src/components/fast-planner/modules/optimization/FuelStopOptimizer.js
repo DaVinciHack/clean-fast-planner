@@ -98,7 +98,7 @@ export class FuelStopOptimizer {
 
       // 🚨 SPLIT POINT PROXIMITY TEST: Show top 3 platforms after all filtering
       console.log('🧪 TOP 3 PLATFORMS (by split point proximity after filtering):');
-      platformsWithMinDistance.slice(0, 3).forEach(platform => {
+      platformsWithDistance.slice(0, 3).forEach(platform => {
         const distFromStart = this.corridorSearcher.calculateDistance(routeStart, platform);
         const distFromSplit = platform.distanceFromSplit || this.corridorSearcher.calculateDistance(splitPoint, platform);
         console.log(`📏 ${platform.name}: ${distFromStart.toFixed(1)}nm from start, ${distFromSplit.toFixed(1)}nm from split point`);

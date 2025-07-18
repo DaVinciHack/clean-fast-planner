@@ -213,27 +213,60 @@ export class CorridorSearcher {
   }
 
   /**
+   * Normalize coordinate format to {lat, lng} object
+   * @param {Object} point - Point with various coordinate formats
+   * @returns {Object} Point with {lat, lng} properties
+   */
+  normalizeCoordinates(point) {
+    if (!point) return null;
+    
+    // Already normalized format
+    if (point.lat !== undefined && point.lng !== undefined) {
+      return point;
+    }
+    
+    // Waypoint format: coords array [lng, lat]
+    if (point.coords && Array.isArray(point.coords) && point.coords.length === 2) {
+      return { lat: point.coords[1], lng: point.coords[0] };
+    }
+    
+    // Alternative format: coordinates array [lng, lat]
+    if (point.coordinates && Array.isArray(point.coordinates) && point.coordinates.length === 2) {
+      return { lat: point.coordinates[1], lng: point.coordinates[0] };
+    }
+    
+    // Return original point if no conversion possible
+    return point;
+  }
+
+  /**
    * Calculates great circle distance between two points (nautical miles)
-   * @param {Object} point1 - {lat, lng}
-   * @param {Object} point2 - {lat, lng}
+   * @param {Object} point1 - {lat, lng} or point with coords array
+   * @param {Object} point2 - {lat, lng} or point with coords array
    * @returns {Number} Distance in nautical miles
    */
   calculateDistance(point1, point2) {
-    if (!point1 || !point2 || !point1.lat || !point1.lng || !point2.lat || !point2.lng) {
+    // Normalize coordinates to handle different formats
+    const normalizedPoint1 = this.normalizeCoordinates(point1);
+    const normalizedPoint2 = this.normalizeCoordinates(point2);
+    
+    if (!normalizedPoint1 || !normalizedPoint2 || 
+        !normalizedPoint1.lat || !normalizedPoint1.lng || 
+        !normalizedPoint2.lat || !normalizedPoint2.lng) {
       console.warn('❌ DISTANCE: Missing coordinates', { 
-        point1: { lat: point1?.lat, lng: point1?.lng }, 
-        point2: { lat: point2?.lat, lng: point2?.lng } 
+        point1: { lat: normalizedPoint1?.lat, lng: normalizedPoint1?.lng }, 
+        point2: { lat: normalizedPoint2?.lat, lng: normalizedPoint2?.lng } 
       });
       return 0;
     }
 
     const R = 3440.065; // Earth radius in nautical miles
-    const dLat = this.degreesToRadians(point2.lat - point1.lat);
-    const dLng = this.degreesToRadians(point2.lng - point1.lng);
+    const dLat = this.degreesToRadians(normalizedPoint2.lat - normalizedPoint1.lat);
+    const dLng = this.degreesToRadians(normalizedPoint2.lng - normalizedPoint1.lng);
     
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.degreesToRadians(point1.lat)) * 
-              Math.cos(this.degreesToRadians(point2.lat)) *
+              Math.cos(this.degreesToRadians(normalizedPoint1.lat)) * 
+              Math.cos(this.degreesToRadians(normalizedPoint2.lat)) *
               Math.sin(dLng / 2) * Math.sin(dLng / 2);
     
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));

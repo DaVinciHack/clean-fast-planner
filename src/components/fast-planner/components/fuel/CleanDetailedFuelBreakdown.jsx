@@ -1674,7 +1674,7 @@ const CleanDetailedFuelBreakdown = ({
     
     {/* 🎯 FUEL STOP OPTIMIZATION POPUP - Independent overlay */}
     {fuelStopPopup && fuelStopPopup.type !== 'background' && (
-      <div style={{
+      <div className="fuel-optimization-backdrop" style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -1693,12 +1693,12 @@ const CleanDetailedFuelBreakdown = ({
           setFuelStopPopup(null);
         }
       }}>
-        <div style={{
+        <div className="fuel-optimization-popup" style={{
           background: 'linear-gradient(to bottom, #404040, #1a1a1a)',
           border: '2px solid #ff3333',
           borderRadius: '12px',
-          padding: '20px',
-          maxWidth: '400px',
+          padding: '24px',
+          maxWidth: '800px',
           width: '90%',
           color: '#fff',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
@@ -1886,70 +1886,124 @@ const CleanDetailedFuelBreakdown = ({
           
           {fuelStopPopup.type === 'suggestions' && (
             <>
-              <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center' }}>
-                Fuel Stop Recommendations
+              {/* AI Assistant Message */}
+              <div className="ai-message">
+                {(() => {
+                  // Extract overloaded location info
+                  const overloadedLocation = fuelStopPopup.data.overloadDetails?.find(loc => loc.isWeightOverload);
+                  const locationName = overloadedLocation?.locationName || 'your destination';
+                  const excessWeight = overloadedLocation ? 
+                    (overloadedLocation.requestedWeight - overloadedLocation.availableWeight) : 0;
+                  
+                  return (
+                    <>
+                      I've detected that you'll be <span className="highlight">{excessWeight.toFixed(0)} lbs overweight</span> at <span className="highlight">{locationName}</span>. 
+                      This exceeds your aircraft's capacity and could impact safety and performance.
+                      <br/><br/>
+                      Don't worry - I've analyzed your route and found <span className="highlight">{fuelStopPopup.data.suggestions?.length || 0} strategic fuel stops</span> that could resolve this issue. 
+                      By adding fuel at one of these locations, we can reduce your aircraft weight and increase passenger capacity for a smoother, safer flight.
+                    </>
+                  );
+                })()}
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#ccc', marginBottom: '16px', textAlign: 'center' }}>
-                Found {fuelStopPopup.data.suggestions?.length || 0} options to increase passenger capacity
-              </div>
-              
+
+              {/* Suggestions Grid */}
               {fuelStopPopup.data.suggestions?.length > 0 ? (
-                <div style={{ marginBottom: '16px' }}>
-                  {fuelStopPopup.data.suggestions.slice(0, 3).map((suggestion, index) => (
-                    <div key={index} style={{
-                      background: '#333',
-                      padding: '12px',
-                      marginBottom: '8px',
-                      borderRadius: '4px',
-                      border: '1px solid #555'
-                    }}>
-                      <div style={{ fontWeight: 'bold', color: '#4fc3f7', marginBottom: '4px' }}>
+                <div className="suggestions-grid">
+                  {fuelStopPopup.data.suggestions.slice(0, 6).map((suggestion, index) => (
+                    <div key={index} className="suggestion-card">
+                      <div className="suggestion-card-header">
                         {suggestion.platform?.name || `Option ${index + 1}`}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
-                        Distance: +{suggestion.analysis?.routeDeviation?.toFixed(1) || '0.0'}nm
+                      
+                      <div className="suggestion-card-details">
+                        <span>📍 Distance:</span>
+                        <span>+{suggestion.analysis?.routeDeviation?.toFixed(1) || '0.0'}nm</span>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
-                        Passenger Gain: +{suggestion.analysis?.passengerGain || 0} passengers
+                      
+                      <div className="suggestion-card-details">
+                        <span>👥 Passenger Gain:</span>
+                        <span>+{suggestion.analysis?.passengerGain || 0}</span>
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
-                        Score: {suggestion.score?.toFixed(1) || '0.0'}/100
+                      
+                      <div className="suggestion-card-details">
+                        <span>⭐ Efficiency Score:</span>
+                        <span>{suggestion.score?.toFixed(1) || '0.0'}/100</span>
                       </div>
+                      
+                      <div className="suggestion-card-benefit">
+                        ✅ Resolves weight overload + adds capacity
+                      </div>
+                      
                       <button style={{
-                        background: '#4fc3f7',
+                        background: 'linear-gradient(135deg, #4fc3f7, #29b6f6)',
                         color: '#fff',
                         border: 'none',
-                        padding: '4px 8px',
-                        borderRadius: '3px',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
                         cursor: 'pointer',
                         fontSize: '0.8rem',
-                        marginTop: '8px'
-                      }}>
-                        Add Fuel Stop
+                        marginTop: '10px',
+                        width: '100%',
+                        fontWeight: '500',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => e.target.style.transform = 'translateY(-1px)'}
+                      onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+                      >
+                        Add This Fuel Stop
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '16px', textAlign: 'center' }}>
-                  No suitable fuel stops found within 10nm of your route.
+                <div style={{ 
+                  fontSize: '0.95rem', 
+                  color: '#ffab91', 
+                  marginBottom: '20px', 
+                  textAlign: 'center',
+                  padding: '16px',
+                  background: 'rgba(255, 171, 145, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 171, 145, 0.3)'
+                }}>
+                  I couldn't find any suitable fuel stops within a reasonable distance of your route. 
+                  You may need to reduce passenger load or cargo weight manually.
                 </div>
               )}
               
-              <button 
-                onClick={() => setFuelStopPopup(null)}
-                style={{
-                  background: '#666',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  width: '100%'
-                }}
-              >
-                Close
-              </button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <button 
+                  onClick={() => setFuelStopPopup(null)}
+                  style={{
+                    background: '#666',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    flex: 1,
+                    fontWeight: '500'
+                  }}
+                >
+                  Maybe Later
+                </button>
+                <button 
+                  onClick={() => setFuelStopPopup(null)}
+                  style={{
+                    background: 'linear-gradient(135deg, #81c784, #66bb6a)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    flex: 1,
+                    fontWeight: '500'
+                  }}
+                >
+                  I'll Handle It Manually
+                </button>
+              </div>
             </>
           )}
           
