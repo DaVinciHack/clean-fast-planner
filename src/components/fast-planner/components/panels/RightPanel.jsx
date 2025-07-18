@@ -1206,6 +1206,12 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Calling handleSaveFlightSubmit with:', flightData);
       
+      // 🚨 AUTOPLAN DEBUG: Check aircraft data that will be used (moved here to fix initialization error)
+      const wizardTailNumber = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
+      
+      // Get the current region for the flight (moved here to fix regionCode error)
+      const regionCode = currentRegion?.osdkRegion || currentRegion?.id || "NORWAY";
+      
       // 🔍 VALIDATION: Check for common automation failure causes
       console.log('🔍 AUTOMATION VALIDATION CHECK:', {
         hasValidAircraftId: wizardTailNumber !== "UNKNOWN",
@@ -1220,9 +1226,6 @@ const RightPanel = React.forwardRef(({
         hasValidRegion: regionCode && regionCode !== "",
         regionValue: regionCode
       });
-      
-      // 🚨 AUTOPLAN DEBUG: Check aircraft data that will be used
-      const wizardTailNumber = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
       
       console.log('🚨 AUTOPLAN DEBUG: Aircraft and policy data:', {
         selectedAircraft: !!selectedAircraft,
