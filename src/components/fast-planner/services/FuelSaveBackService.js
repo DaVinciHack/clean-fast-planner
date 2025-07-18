@@ -1246,8 +1246,16 @@ export class FuelSaveBackService {
           length: flightData.fuelPlanId?.length
         });
         try {
-          const fuelObject = await client(sdk.MainFuelV2).fetchOne(flightData.fuelPlanId);
-          console.log('📥 🎯 Direct lookup result:', {
+          console.log('📥 🔍 STARTING fetchOne call for fuel object...');
+          
+          // Add timeout to catch hanging calls
+          const fetchPromise = client(sdk.MainFuelV2).fetchOne(flightData.fuelPlanId);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('FetchOne timeout after 10 seconds')), 10000)
+          );
+          
+          const fuelObject = await Promise.race([fetchPromise, timeoutPromise]);
+          console.log('📥 ✅ COMPLETED fetchOne call - result:', {
             found: !!fuelObject,
             fuelObjectKeys: fuelObject ? Object.keys(fuelObject) : 'none'
           });
@@ -1335,7 +1343,7 @@ export class FuelSaveBackService {
               fuelObjectId: fuelObject.$primaryKey,
               flightUuid: fuelObject.flightUuid,
               refuelIndices: refuelIndices,
-              stopLocations: stopLocationsArray,
+              stopLocations: fuelObject.stopLocations,
               calculatedRefuelStops: refuelStops,
               shouldHaveRefuel: refuelIndices.length > 0
             });

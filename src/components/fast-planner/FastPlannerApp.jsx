@@ -2331,7 +2331,18 @@ const FastPlannerCore = ({
       if (flightData.flightId) {
         setCurrentFlightId(flightData.flightId);
         
-        // 🛩️ UNIFIED FUEL POLICY: Use centralized FlightLoader service for consistent policy resolution
+        // 🛩️ IMMEDIATE FUEL POLICY: Set flight policy immediately when loading flight
+        if (flightData.policyUuid && fuelPolicy.availablePolicies?.length > 0) {
+          const flightPolicy = fuelPolicy.availablePolicies.find(p => p.uuid === flightData.policyUuid);
+          if (flightPolicy) {
+            console.log('🛩️ IMMEDIATE: Setting flight policy on load:', flightPolicy.name);
+            fuelPolicy.selectPolicy(flightPolicy);
+          } else {
+            console.warn('🛩️ IMMEDIATE: Flight policy UUID not found:', flightData.policyUuid);
+          }
+        }
+        
+        // 🛩️ UNIFIED FUEL POLICY: Use centralized FlightLoader service for consistent policy resolution  
         console.log('🛩️ FUEL POLICY LOADING: Starting unified fuel policy resolution');
         console.log('🛩️ FUEL POLICY LOADING: Flight policyUuid:', flightData.policyUuid);
         console.log('🛩️ FUEL POLICY LOADING: Available policies:', fuelPolicy.availablePolicies?.length);

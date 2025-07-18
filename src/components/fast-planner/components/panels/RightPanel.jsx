@@ -278,28 +278,19 @@ const RightPanel = React.forwardRef(({
         allKeys: Object.keys(selectedAircraft || {})
       });
       
-      // 🎯 AUTOMATION FIX: Send BOTH aircraftId (tail number) AND assetIdx (numeric index)
+      // 🎯 AIRCRAFT FIX: Use aircraftId (tail number) only - assetIdx removed to fix save failures
       const aircraftTailNumber = selectedAircraft?.assetIdentifier ||  // ✅ PRIMARY: Clean tail number like "N109DR"
                                  selectedAircraft?.rawRegistration ||  // ✅ Backup: Raw tail number like "N123AB"
                                  selectedAircraft?.registration ||     // ✅ Backup: Full registration (may include description)
                                  "UNKNOWN";                             // ❌ Fallback
       
-      const aircraftNumericIndex = Number(selectedAircraft?.assetId ||      // ✅ PRIMARY: Use assetId (like "1650")
-                                          selectedAircraft?.id ||           // ✅ Backup: Convert to number from "1", "2", "3"
-                                          selectedAircraft?.aircraftId ||   // ✅ Backup: numeric index  
-                                          "190");                            // ❌ Fallback as number
-      
-      console.log('🎯 AIRCRAFT DATA FOR AUTOMATION:', {
+      console.log('🎯 AIRCRAFT DATA FOR SAVE:', {
         aircraftId: aircraftTailNumber,              // STRING: "N123AB" 
-        assetIdx: aircraftNumericIndex,              // NUMBER: 123
         aircraftIdType: typeof aircraftTailNumber,
-        assetIdxType: typeof aircraftNumericIndex,
-        tailNumberSource: selectedAircraft?.rawRegistration ? 'rawRegistration' :
+        tailNumberSource: selectedAircraft?.assetIdentifier ? 'assetIdentifier' :
+                         selectedAircraft?.rawRegistration ? 'rawRegistration' :
                          selectedAircraft?.registration ? 'registration' : 'fallback',
-        indexSource: selectedAircraft?.id ? 'id' :
-                    selectedAircraft?.aircraftId ? 'aircraftId' :
-                    selectedAircraft?.assetId ? 'assetId' : 'fallback',
-        bothFieldsValid: aircraftTailNumber !== "UNKNOWN" && aircraftNumericIndex !== 190
+        aircraftIdValid: aircraftTailNumber !== "UNKNOWN"
       });
       
       // 🎯 FUEL OBJECT FIX: Get existing fuel object ID early for API params
@@ -352,7 +343,26 @@ const RightPanel = React.forwardRef(({
         ...(currentFlightId && { flightId: currentFlightId }),
         
         // Basic parameters
-        flightName: flightData.flightName,
+        flightName: (() => {
+          // 🔧 PRESERVE EXISTING FLIGHT NAMES: Check if this is an existing flight update
+          if (currentFlightId && loadedFlightData) {
+            // For existing flights, preserve the original name unless explicitly changed
+            const existingFlightName = loadedFlightData.flightNumber || 
+                                     loadedFlightData.flightName || 
+                                     loadedFlightData.name || 
+                                     loadedFlightData.title || 
+                                     loadedFlightData.displayName;
+            
+            if (existingFlightName && existingFlightName.trim()) {
+              console.log('🔧 SAVE: Preserving existing flight name:', existingFlightName);
+              return existingFlightName.trim();
+            }
+          }
+          
+          // For new flights or when no existing name found, use provided name
+          console.log('🔧 SAVE: Using provided flight name:', flightData.flightName);
+          return flightData.flightName;
+        })(),
         aircraftRegion: regionCode, // Use current region
         aircraftId: aircraftTailNumber,      // ✅ Tail number like "N123AB"
         // NOTE: Testing without assetIdx field for wizard
@@ -790,8 +800,31 @@ const RightPanel = React.forwardRef(({
             window.LoadingIndicator.updateStatusIndicator('Flight saved but automation skipped - no valid flight ID', 'warning');
           }
         } else if (!flightData.runAutomation) {
-          // 🎯 NON-AUTOMATION SAVE: Complete the loader for regular saves
-          console.log('Flight saved successfully without automation');
+          // 🎯 NON-AUTOMATION SAVE: Complete the loader for regular saves AND reload flight data
+          console.log('Flight saved successfully without automation - reloading flight data');
+          
+          // 🔄 RELOAD: Load the saved flight to refresh stop cards (same as automation path)
+          try {
+            const FlightService = (await import('../../services/FlightService')).default;
+            const currentRegionCode = currentRegion?.osdkRegion || "GULF OF MEXICO";
+            const flightsResult = await FlightService.loadFlights(currentRegionCode, 200);
+            
+            if (flightsResult.success && flightsResult.flights) {
+              console.log('🔄 NON-AUTOMATION RELOAD: Loaded flights list, searching for flight ID:', flightId);
+              
+              // Find our specific flight by ID
+              const targetFlight = flightsResult.flights.find(f => f.id === flightId);
+              
+              if (targetFlight) {
+                console.log('🔄 NON-AUTOMATION RELOAD: Found flight, reloading to refresh stop cards');
+                handleLoadFlight(targetFlight);
+              } else {
+                console.warn('🔄 NON-AUTOMATION RELOAD: Could not find saved flight in list');
+              }
+            }
+          } catch (reloadError) {
+            console.error('🔄 NON-AUTOMATION RELOAD: Failed to reload flight data:', reloadError);
+          }
           
           if (automationProgressCallback) {
             // Show final completed step (this will auto-hide the loader)
@@ -1173,30 +1206,39 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Calling handleSaveFlightSubmit with:', flightData);
       
-      // 🚨 WIZARD 400 DEBUG: Check aircraft data that will be used
-      const wizardTailNumber = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
-      const wizardNumericIndex = Number(selectedAircraft?.assetId || selectedAircraft?.id || selectedAircraft?.aircraftId || "190");
+      // 🔍 VALIDATION: Check for common automation failure causes
+      console.log('🔍 AUTOMATION VALIDATION CHECK:', {
+        hasValidAircraftId: wizardTailNumber !== "UNKNOWN",
+        aircraftIdFormat: wizardTailNumber,
+        aircraftIdLength: wizardTailNumber.length,
+        hasValidETD: flightData.etd && !isNaN(new Date(flightData.etd)),
+        etdValue: flightData.etd,
+        hasLocations: flightData.locations && flightData.locations.length > 0,
+        locationCount: flightData.locations?.length,
+        hasWaypoints: flightData.waypoints && flightData.waypoints.length > 0,
+        waypointCount: flightData.waypoints?.length,
+        hasValidRegion: regionCode && regionCode !== "",
+        regionValue: regionCode
+      });
       
-      console.log('🚨 WIZARD 400 DEBUG: Aircraft and policy data:', {
+      // 🚨 AUTOPLAN DEBUG: Check aircraft data that will be used
+      const wizardTailNumber = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
+      
+      console.log('🚨 AUTOPLAN DEBUG: Aircraft and policy data:', {
         selectedAircraft: !!selectedAircraft,
         aircraftReg: selectedAircraft?.registration,
         aircraftAssetIdentifier: selectedAircraft?.assetIdentifier,  // ✅ This should be the clean tail number
-        aircraftId: selectedAircraft?.id,
-        aircraftAssetId: selectedAircraft?.assetId,
-        aircraftDefaultPolicy: selectedAircraft?.defaultFuelPolicyId,
         tailNumberUsed: wizardTailNumber,  // ✅ Show what tail number will be sent
-        numericIndexUsed: wizardNumericIndex,  // ✅ Show what numeric index will be sent
         allAircraftKeys: Object.keys(selectedAircraft || {}),
         fuelPolicyAvailable: !!fuelPolicy,
         fuelPolicyPolicies: fuelPolicy?.availablePolicies?.length,
         flightDataPolicyUuid: flightData.policyUuid,
         locationsArray: flightData.locations,
         waypointsCount: flightData.waypoints?.length,
-        // 🌍 REGION DEBUG: Check what region data is available
-        currentRegion: currentRegion,
-        currentRegionName: currentRegion?.name,
-        currentRegionOsdk: currentRegion?.osdkRegion,
-        currentRegionId: currentRegion?.id
+        // 🔍 CRITICAL: Check if flightData has any assetIdx field
+        flightDataHasAssetIdx: 'assetIdx' in flightData,
+        flightDataAssetIdx: flightData.assetIdx,
+        flightDataKeys: Object.keys(flightData)
       });
       
       // Use existing save flight logic
@@ -1252,16 +1294,31 @@ const RightPanel = React.forwardRef(({
       if (wizardFlightName && wizardFlightName.trim()) {
         console.log('🧙‍♂️ Using wizard custom flight name for existing flight:', wizardFlightName);
         flightName = wizardFlightName.trim();
-      } else if (loadedFlightData?.name && loadedFlightData.name.trim()) {
-        // 🎯 PRESERVE EXISTING: Use the loaded flight's existing name
-        console.log('🔧 PRESERVING: Using existing flight name:', loadedFlightData.name);
-        flightName = loadedFlightData.name.trim();
+      } else if (currentFlightId && loadedFlightData) {
+        // 🎯 PRESERVE EXISTING: Use the loaded flight's existing name (same logic as SaveFlightCard)
+        const foundFlightName = loadedFlightData.flightNumber || // 🔧 CORRECT PROPERTY!
+                               loadedFlightData.flightName || 
+                               loadedFlightData.name || 
+                               loadedFlightData.title || 
+                               loadedFlightData.displayName;
+        
+        if (foundFlightName && foundFlightName.trim()) {
+          console.log('🔧 PRESERVING: Using existing flight name:', foundFlightName);
+          flightName = foundFlightName.trim();
+        } else {
+          console.log('🔧 PRESERVING: Flight ID exists but no name found in loadedFlightData');
+          flightName = "Existing Flight"; // Safe fallback
+        }
+      } else if (currentFlightId) {
+        // 🔧 FALLBACK: If we have a flight ID but no name, preserve it by not generating a new one
+        console.log('🔧 PRESERVING: Flight ID exists but no loaded name - keeping original name');
+        flightName = "Existing Flight"; // Use a safe fallback instead of generating a new name
       } else {
-        // Generate flight name using departure + first location + short date format
+        // Generate flight name using departure + first location + short date format (only for truly new flights)
         const departure = locations[0] || 'Unknown';
         const firstLocation = locations[1] || 'Direct';
         flightName = `${departure} ${firstLocation} ${shortDate}`;
-        console.log('🧙‍♂️ Generated default flight name for existing flight:', flightName);
+        console.log('🧙‍♂️ Generated default flight name for new flight:', flightName);
       }
       
       const flightData = {
@@ -1302,14 +1359,16 @@ const RightPanel = React.forwardRef(({
       
       console.log('🎯 AUTO PLAN: Saving existing flight changes with:', flightData);
       
-      // 🚨 WIZARD 400 DEBUG: Check aircraft data for existing flight
+      // 🚨 AUTOPLAN DEBUG: Check aircraft data for existing flight
       const wizardTailNumber2 = selectedAircraft?.assetIdentifier || selectedAircraft?.rawRegistration || selectedAircraft?.registration || "UNKNOWN";
-      const wizardNumericIndex2 = Number(selectedAircraft?.assetId || selectedAircraft?.id || selectedAircraft?.aircraftId || "190");
       
-      console.log('🚨 WIZARD EXISTING DEBUG: Aircraft data:', {
+      console.log('🚨 AUTOPLAN EXISTING DEBUG: Aircraft data:', {
         tailNumberUsed: wizardTailNumber2,
-        numericIndexUsed: wizardNumericIndex2,
-        flightDataPolicyUuid: flightData.policyUuid
+        flightDataPolicyUuid: flightData.policyUuid,
+        // 🔍 CRITICAL: Check if flightData has any assetIdx field  
+        flightDataHasAssetIdx: 'assetIdx' in flightData,
+        flightDataAssetIdx: flightData.assetIdx,
+        flightDataKeys: Object.keys(flightData)
       });
       
       // Use existing save flight logic

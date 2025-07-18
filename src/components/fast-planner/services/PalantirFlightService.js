@@ -165,9 +165,7 @@ class PalantirFlightService {
       waypointCount: flightData.waypoints?.length || 0,
       flightName: flightData.flightName,
       aircraftId: flightData.aircraftId,
-      assetIdx: flightData.assetIdx,
-      aircraftIdType: typeof flightData.aircraftId,
-      assetIdxType: typeof flightData.assetIdx
+      aircraftIdType: typeof flightData.aircraftId
     });
     
     if (isUpdate) {
@@ -285,7 +283,7 @@ class PalantirFlightService {
           "displayWaypoints": displayWaypoints,  // Send structured waypoint information
           "useOnlyProvidedWaypoints": flightData.useOnlyProvidedWaypoints ?? false,  // 🔧 FIX: Respect Auto Plan setting for weather replanning
           "aircraftId": flightData.aircraftId || "190",    // ✅ Tail number
-          ...(flightData.assetIdx && { "assetIdx": Number(flightData.assetIdx) }),      // ✅ Numeric index (optional)
+          // assetIdx removed - was causing save failures
           "region": flightData.region || "NORWAY",
           "etd": flightData.etd || new Date().toISOString() // 🧙‍♂️ WIZARD FIX: Include ETD in newer API
           // 🚨 DEBUG: Temporarily removing policy UUID to test other parameters
@@ -507,10 +505,11 @@ class PalantirFlightService {
         
         // Add optional parameters if provided
         if (flightData.aircraftId) params.aircraftId = flightData.aircraftId;    // ✅ Tail number
-        if (flightData.assetIdx !== undefined && flightData.assetIdx !== null) {
-          params.assetIdx = Number(flightData.assetIdx);   // ✅ Numeric index
-          console.log('🎯 PALANTIR: Adding assetIdx:', params.assetIdx, 'type:', typeof params.assetIdx);
-        }
+        // assetIdx removed - was causing save failures
+        // if (flightData.assetIdx !== undefined && flightData.assetIdx !== null) {
+        //   params.assetIdx = Number(flightData.assetIdx);
+        //   console.log('🎯 PALANTIR: Adding assetIdx:', params.assetIdx, 'type:', typeof params.assetIdx);
+        // }
         if (flightData.alternateLocation) params.alternateLocation = flightData.alternateLocation;
         if (flightData.captainId) params.captainId = flightData.captainId;
         if (flightData.copilotId) params.copilotId = flightData.copilotId;
